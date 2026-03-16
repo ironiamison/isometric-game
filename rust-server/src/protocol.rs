@@ -390,6 +390,15 @@ pub enum ClientMessage {
     /// Set the player's combat style
     #[serde(rename = "setCombatStyle")]
     SetCombatStyle { style: String },
+
+    // ===== KOTH Messages =====
+    /// Player continues fighting at KOTH checkpoint
+    #[serde(rename = "kothContinue")]
+    KothContinue,
+
+    /// Player leaves KOTH and claims rewards
+    #[serde(rename = "kothLeave")]
+    KothLeave,
 }
 
 impl ClientMessage {
@@ -480,6 +489,8 @@ impl ClientMessage {
             ClientMessage::StallBuy { .. } => "StallBuy",
             ClientMessage::SpectatorUpgrade { .. } => "SpectatorUpgrade",
             ClientMessage::SetCombatStyle { .. } => "SetCombatStyle",
+            ClientMessage::KothContinue => "KothContinue",
+            ClientMessage::KothLeave => "KothLeave",
         }
     }
 }
@@ -854,6 +865,50 @@ pub enum ServerMessage {
         current_streak: i32,
         best_streak: i32,
     },
+    // KOTH (King of the Hill) messages
+    KothStateUpdate {
+        phase: String,
+        wave: u32,
+        points: u32,
+        enemies_alive: u32,
+        enemies_total: u32,
+        countdown_ms: u32,
+    },
+    KothCheckpoint {
+        wave: u32,
+        points: u32,
+        rewards: Vec<KothRewardData>,
+        next_wave_enemy_count: u32,
+    },
+    KothGameOver {
+        waves_completed: u32,
+        total_points: u32,
+        rewards: Vec<KothRewardData>,
+        victory: bool,
+    },
+    // Boss fight messages
+    BossStateUpdate {
+        boss_id: String,
+        hp: i32,
+        max_hp: i32,
+        phase: String,
+        wurm_state: String,
+    },
+    AoeWarning {
+        tiles: Vec<(i32, i32)>,
+        delay_ms: u64,
+        effect: String,
+    },
+    AoeDamage {
+        tiles: Vec<(i32, i32)>,
+        damage: i32,
+    },
+    Explosion {
+        x: i32,
+        y: i32,
+        radius: i32,
+        damage: i32,
+    },
     /// Tell client to transition to a different map (interior or world)
     MapTransition {
         map_type: String, // "interior" or "world"
@@ -876,6 +931,9 @@ pub enum ServerMessage {
         portals: Vec<ChunkPortalData>,
         objects: Vec<ChunkObjectData>,
         walls: Vec<ChunkWallData>,
+        heightmap: Option<Vec<u8>>,
+        block_types_down: Option<Vec<u16>>,
+        block_types_right: Option<Vec<u16>>,
     },
     // Gathering messages
     GatheringMarkers {
@@ -1429,6 +1487,13 @@ pub struct ArenaPlacementData {
     pub gold_reward: i32,
 }
 
+/// Reward item data for KOTH messages
+#[derive(Debug, Clone, Serialize)]
+pub struct KothRewardData {
+    pub item_id: String,
+    pub quantity: u32,
+}
+
 /// Layer data for chunk transmission
 #[derive(Debug, Clone, Serialize)]
 pub struct ChunkLayerData {
@@ -1647,6 +1712,13 @@ impl ServerMessage {
             ServerMessage::ArenaPlayerEliminated { .. } => "arenaPlayerEliminated",
             ServerMessage::ArenaMatchEnd { .. } => "arenaMatchEnd",
             ServerMessage::ArenaStatsUpdate { .. } => "arenaStatsUpdate",
+            ServerMessage::KothStateUpdate { .. } => "kothStateUpdate",
+            ServerMessage::KothCheckpoint { .. } => "kothCheckpoint",
+            ServerMessage::KothGameOver { .. } => "kothGameOver",
+            ServerMessage::BossStateUpdate { .. } => "bossStateUpdate",
+            ServerMessage::AoeWarning { .. } => "aoeWarning",
+            ServerMessage::AoeDamage { .. } => "aoeDamage",
+            ServerMessage::Explosion { .. } => "explosion",
             ServerMessage::Announcement { .. } => "announcement",
             ServerMessage::NpcSpeech { .. } => "npcSpeech",
             ServerMessage::MapTransition { .. } => "mapTransition",
@@ -4271,6 +4343,80 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
+        ServerMessage::KothStateUpdate { phase, wave, points, enemies_alive, enemies_total, countdown_ms } => {
+            let mut map = Vec::new();
+            map.push((Value::String("phase".into()), Value::String(phase.clone().into())));
+            map.push((Value::String("wave".into()), Value::Integer((*wave as i64).into())));
+            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
+            map.push((Value::String("enemiesAlive".into()), Value::Integer((*enemies_alive as i64).into())));
+            map.push((Value::String("enemiesTotal".into()), Value::Integer((*enemies_total as i64).into())));
+            map.push((Value::String("countdownMs".into()), Value::Integer((*countdown_ms as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::KothCheckpoint { wave, points, rewards, next_wave_enemy_count } => {
+            let mut map = Vec::new();
+            map.push((Value::String("wave".into()), Value::Integer((*wave as i64).into())));
+            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
+            let reward_values: Vec<Value> = rewards.iter().map(|r| {
+                let mut rmap = Vec::new();
+                rmap.push((Value::String("itemId".into()), Value::String(r.item_id.clone().into())));
+                rmap.push((Value::String("quantity".into()), Value::Integer((r.quantity as i64).into())));
+                Value::Map(rmap)
+            }).collect();
+            map.push((Value::String("rewards".into()), Value::Array(reward_values)));
+            map.push((Value::String("nextWaveEnemyCount".into()), Value::Integer((*next_wave_enemy_count as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::KothGameOver { waves_completed, total_points, rewards, victory } => {
+            let mut map = Vec::new();
+            map.push((Value::String("wavesCompleted".into()), Value::Integer((*waves_completed as i64).into())));
+            map.push((Value::String("totalPoints".into()), Value::Integer((*total_points as i64).into())));
+            let reward_values: Vec<Value> = rewards.iter().map(|r| {
+                let mut rmap = Vec::new();
+                rmap.push((Value::String("itemId".into()), Value::String(r.item_id.clone().into())));
+                rmap.push((Value::String("quantity".into()), Value::Integer((r.quantity as i64).into())));
+                Value::Map(rmap)
+            }).collect();
+            map.push((Value::String("rewards".into()), Value::Array(reward_values)));
+            map.push((Value::String("victory".into()), Value::Boolean(*victory)));
+            Value::Map(map)
+        }
+        ServerMessage::BossStateUpdate { boss_id, hp, max_hp, phase, wurm_state } => {
+            let mut map = Vec::new();
+            map.push((Value::String("bossId".into()), Value::String(boss_id.clone().into())));
+            map.push((Value::String("hp".into()), Value::Integer((*hp as i64).into())));
+            map.push((Value::String("maxHp".into()), Value::Integer((*max_hp as i64).into())));
+            map.push((Value::String("phase".into()), Value::String(phase.clone().into())));
+            map.push((Value::String("wurmState".into()), Value::String(wurm_state.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::AoeWarning { tiles, delay_ms, effect } => {
+            let mut map = Vec::new();
+            let tile_values: Vec<Value> = tiles.iter().map(|(x, y)| {
+                Value::Array(vec![Value::Integer((*x as i64).into()), Value::Integer((*y as i64).into())])
+            }).collect();
+            map.push((Value::String("tiles".into()), Value::Array(tile_values)));
+            map.push((Value::String("delayMs".into()), Value::Integer((*delay_ms as i64).into())));
+            map.push((Value::String("effect".into()), Value::String(effect.clone().into())));
+            Value::Map(map)
+        }
+        ServerMessage::AoeDamage { tiles, damage } => {
+            let mut map = Vec::new();
+            let tile_values: Vec<Value> = tiles.iter().map(|(x, y)| {
+                Value::Array(vec![Value::Integer((*x as i64).into()), Value::Integer((*y as i64).into())])
+            }).collect();
+            map.push((Value::String("tiles".into()), Value::Array(tile_values)));
+            map.push((Value::String("damage".into()), Value::Integer((*damage as i64).into())));
+            Value::Map(map)
+        }
+        ServerMessage::Explosion { x, y, radius, damage } => {
+            let mut map = Vec::new();
+            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
+            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
+            map.push((Value::String("radius".into()), Value::Integer((*radius as i64).into())));
+            map.push((Value::String("damage".into()), Value::Integer((*damage as i64).into())));
+            Value::Map(map)
+        }
         ServerMessage::InteriorData {
             map_id,
             name,
@@ -4284,6 +4430,9 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             portals,
             objects,
             walls,
+            heightmap,
+            block_types_down,
+            block_types_right,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -4432,6 +4581,20 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 })
                 .collect();
             map.push((Value::String("walls".into()), Value::Array(wall_values)));
+
+            // Encode optional heightmap
+            if let Some(hm) = heightmap {
+                let hm_values: Vec<Value> = hm.iter().map(|&h| Value::Integer((h as i64).into())).collect();
+                map.push((Value::String("heightmap".into()), Value::Array(hm_values)));
+            }
+            if let Some(btd) = block_types_down {
+                let btd_values: Vec<Value> = btd.iter().map(|&b| Value::Integer((b as i64).into())).collect();
+                map.push((Value::String("blockTypesDown".into()), Value::Array(btd_values)));
+            }
+            if let Some(btr) = block_types_right {
+                let btr_values: Vec<Value> = btr.iter().map(|&b| Value::Integer((b as i64).into())).collect();
+                map.push((Value::String("blockTypesRight".into()), Value::Array(btr_values)));
+            }
 
             Value::Map(map)
         }
@@ -6724,6 +6887,8 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let style = extract_string(msg_data, "style").unwrap_or_default();
             Ok(ClientMessage::SetCombatStyle { style })
         }
+        "kothContinue" => Ok(ClientMessage::KothContinue),
+        "kothLeave" => Ok(ClientMessage::KothLeave),
         _ => Err(format!("Unknown message type: {}", msg_type)),
     }
 }

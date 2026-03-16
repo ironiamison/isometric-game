@@ -96,7 +96,7 @@ export interface EntitySpawn {
   name: string;
   x: number; // local x within chunk
   y: number; // local y within chunk
-  level: number;
+  level?: number;
   uniqueId?: string;
   facing?: string;
   respawn?: boolean;
@@ -288,7 +288,7 @@ export interface SimplifiedEntitySpawn {
   entityId: string;
   x: number;
   y: number;
-  level: number;
+  level?: number;
   uniqueId?: string;
   facing?: string;
   respawn?: boolean;

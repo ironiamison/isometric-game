@@ -104,6 +104,15 @@ pub struct InteriorMapDef {
     pub requires_slayer_task: bool,
     #[serde(default)]
     pub chests: Vec<InteriorChestSpawn>,
+    /// Optional heightmap for interiors with elevation (e.g. KOTH arena)
+    #[serde(default)]
+    pub heightmap: Option<Vec<u8>>,
+    /// Optional block types for downward tile edges (visual)
+    #[serde(default, rename = "blockTypesDown")]
+    pub block_types_down: Option<Vec<u16>>,
+    /// Optional block types for rightward tile edges (visual)
+    #[serde(default, rename = "blockTypesRight")]
+    pub block_types_right: Option<Vec<u16>>,
 }
 
 /// Layer data for interior maps

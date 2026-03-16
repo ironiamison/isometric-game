@@ -18,11 +18,11 @@ use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Scree
 
 use crate::game::tutorial::TutorialManager;
 
-// pub const SERVER_URL: &str = "http://localhost:2567";
-// pub const WS_URL: &str = "ws://localhost:2567";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+// pub const SERVER_URL: &str = "https://aeven.xyz";
+// pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -782,6 +782,8 @@ pub fn run_game_frame(
             InputCommand::SetCombatStyle { style } => ClientMessage::SetCombatStyle {
                 style: style.clone(),
             },
+            InputCommand::KothContinue => ClientMessage::KothContinue,
+            InputCommand::KothLeave => ClientMessage::KothLeave,
         };
         network.send(&msg);
     }

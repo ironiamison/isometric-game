@@ -307,6 +307,11 @@ pub enum ClientMessage {
     /// Set combat style (accurate, aggressive, defensive, controlled)
     #[serde(rename = "setCombatStyle")]
     SetCombatStyle { style: String },
+
+    /// KOTH: Continue fighting at checkpoint
+    KothContinue,
+    /// KOTH: Leave and claim rewards
+    KothLeave,
 }
 
 impl ClientMessage {
@@ -779,6 +784,8 @@ impl ClientMessage {
                 data.insert("style".into(), Value::String(style.clone().into()));
                 "setCombatStyle"
             }
+            ClientMessage::KothContinue => "kothContinue",
+            ClientMessage::KothLeave => "kothLeave",
         };
 
         (msg_type, data)

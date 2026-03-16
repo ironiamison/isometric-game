@@ -120,3 +120,12 @@ category = "material"
 max_stack = 99
 base_price = 160
 sellable = true
+
+[cactus_seed]
+display_name = "Cactus Seed"
+sprite = "cactus_seed"
+description = "A prickly seed from the deep desert. Plant it in a farming patch."
+category = "material"
+max_stack = 99
+base_price = 100
+sellable = true

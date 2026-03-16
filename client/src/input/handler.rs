@@ -1689,6 +1689,9 @@ pub enum InputCommand {
     SetCombatStyle {
         style: String,
     },
+    // KOTH commands
+    KothContinue,
+    KothLeave,
 }
 
 /// Movement directions for isometric movement (cardinal + diagonal)
@@ -2948,6 +2951,40 @@ impl InputHandler {
                 return true;
             }
 
+            return true;
+        }
+
+        // KOTH game over dialog
+        if state.koth_game_over.is_some() {
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    if matches!(element, UiElementId::KothGameOverDismiss) {
+                        state.koth_game_over = None;
+                    }
+                }
+            }
+            return true;
+        }
+
+        // KOTH checkpoint dialog
+        if state.koth_checkpoint_open {
+            if mouse_clicked {
+                if let Some(element) = clicked_element {
+                    match element {
+                        UiElementId::KothContinueButton => {
+                            state.koth_checkpoint_open = false;
+                            state.koth_checkpoint_info = None;
+                            commands.push(InputCommand::KothContinue);
+                        }
+                        UiElementId::KothLeaveButton => {
+                            state.koth_checkpoint_open = false;
+                            state.koth_checkpoint_info = None;
+                            commands.push(InputCommand::KothLeave);
+                        }
+                        _ => {}
+                    }
+                }
+            }
             return true;
         }
 

@@ -28,6 +28,8 @@ mod crafting;
 mod farming;
 mod instance_npc_tick;
 mod inventory;
+pub(crate) mod koth_tick;
+pub(crate) mod boss_tick;
 mod movement_tick;
 mod npc_speech;
 mod npc_tick;
@@ -1127,6 +1129,10 @@ pub struct GameRoom {
     instance_manager: Arc<crate::instance::InstanceManager>,
     /// Arena duel manager (active when players are in duel_arena instance)
     arena_manager: RwLock<crate::arena::ArenaManager>,
+    /// Active KOTH (King of the Hill) sessions: instance_id -> KothState
+    koth_states: RwLock<crate::koth::KothStates>,
+    /// Active boss fight sessions: instance_id -> BossState
+    boss_states: RwLock<crate::boss::BossStates>,
     /// Database reference for arena stats persistence
     db: Option<Arc<crate::db::Database>>,
     /// Gathering system (fishing)
@@ -1648,6 +1654,8 @@ impl GameRoom {
             arena_manager: RwLock::new(crate::arena::ArenaManager::new(
                 crate::arena::ArenaConfig::default(),
             )),
+            koth_states: RwLock::new(std::collections::HashMap::new()),
+            boss_states: RwLock::new(std::collections::HashMap::new()),
             db,
             gathering: RwLock::new(gathering),
             woodcutting: RwLock::new(woodcutting),
@@ -2822,6 +2830,16 @@ impl GameRoom {
         }
     }
 
+    pub async fn set_player_position_and_z(&self, player_id: &str, x: i32, y: i32, z: i32) {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.x = x;
+            player.y = y;
+            player.z = z;
+            player.grounded = true;
+        }
+    }
+
     pub async fn set_combat_style(&self, player_id: &str, style: CombatStyle) {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
@@ -3897,6 +3915,11 @@ impl GameRoom {
             if let Some(inst) = instance {
                 let mut npcs = inst.npcs.write().await;
                 if let Some(npc) = npcs.get_mut(&target_id) {
+                    // Invulnerable NPCs (e.g. boss underground) cannot be hit
+                    if npc.invulnerable {
+                        let name = npc.name();
+                        (npc.hp, name, false, 0)
+                    } else {
                     let npc_defence_level = npc.level;
                     let npc_defence_bonus = npc.stats.defence_bonus;
 
@@ -3942,6 +3965,7 @@ impl GameRoom {
                         );
                         (npc.hp, name, died, damage)
                     }
+                    } // end invulnerable else
                 } else {
                     return;
                 }
@@ -4198,30 +4222,67 @@ impl GameRoom {
                 // Process slayer kill event
                 self.process_slayer_kill(player_id, &prototype_id).await;
 
+                // Check KOTH NPC death
+                if let Some(ref inst_id) = attacker_instance {
+                    let ct = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                    self.check_koth_npc_death(&target_id, inst_id, ct).await;
+
+                    // Check boss minion death (player killed a minion via combat)
+                    self.check_boss_minion_death(
+                        &target_id,
+                        inst_id,
+                        target_x as i32,
+                        target_y as i32,
+                        ct,
+                    )
+                    .await;
+
+                    // Check boss NPC death (player killed the boss)
+                    self.check_boss_npc_death(
+                        &target_id,
+                        inst_id,
+                        Some(player_id),
+                        ct,
+                    )
+                    .await;
+                }
+
+                // Skip loot drops in boss arena (rewards come from battle master)
+                let in_boss_arena = attacker_instance.as_ref()
+                    .map(|id| id.contains(crate::game::boss_tick::BOSS_MAP_ID))
+                    .unwrap_or(false);
+
                 // Spawn item drops from prototype loot table
                 let current_time = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
 
-                // Get killer's current instance for loot zone tracking
-                let killer_instance = {
-                    let instances = self.player_instances.read().await;
-                    instances.get(player_id).cloned()
-                };
-
-                let drops = if let Some(prototype) = self.entity_registry.get(&prototype_id) {
-                    crate::entity::generate_loot_from_prototype(
-                        prototype,
-                        target_x,
-                        target_y,
-                        player_id,
-                        current_time,
-                        npc_level,
-                        killer_instance,
-                    )
+                let drops = if in_boss_arena {
+                    vec![]
                 } else {
-                    vec![] // No prototype found, no drops
+                    // Get killer's current instance for loot zone tracking
+                    let killer_instance = {
+                        let instances = self.player_instances.read().await;
+                        instances.get(player_id).cloned()
+                    };
+
+                    if let Some(prototype) = self.entity_registry.get(&prototype_id) {
+                        crate::entity::generate_loot_from_prototype(
+                            prototype,
+                            target_x,
+                            target_y,
+                            player_id,
+                            current_time,
+                            npc_level,
+                            killer_instance,
+                        )
+                    } else {
+                        vec![]
+                    }
                 };
 
                 for item in drops {
@@ -4898,6 +4959,18 @@ impl GameRoom {
             return;
         }
 
+        // KOTH rewards NPC - show pending rewards
+        let is_koth_rewards = self
+            .entity_registry
+            .get(&entity_type)
+            .map(|p| p.behaviors.koth_rewards)
+            .unwrap_or(false);
+
+        if is_koth_rewards {
+            self.show_koth_rewards_dialogue(player_id, &npc_id).await;
+            return;
+        }
+
         if self
             .try_open_merchant_shop(player_id, &npc_id, &entity_type)
             .await
@@ -4969,6 +5042,19 @@ impl GameRoom {
                 self.handle_bank_open(player_id).await;
             } else if choice_id == "upgrade" {
                 self.handle_bank_upgrade(player_id, npc_id).await;
+            } else {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+            }
+            return;
+        }
+
+        // Handle KOTH rewards dialogue choices (format: "koth_rewards:{npc_id}")
+        if quest_id.starts_with("koth_rewards:") {
+            if choice_id == "claim" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+                self.claim_koth_rewards(player_id).await;
             } else {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
@@ -5107,6 +5193,12 @@ impl GameRoom {
         self.send_npc_speech_events(instance_npc_tick.speech_events)
             .await;
 
+        // Process explosive minion contact explosions
+        for (npc_id, instance_id, npc_x, npc_y) in instance_npc_tick.minion_explosions {
+            self.check_boss_minion_death(&npc_id, &instance_id, npc_x, npc_y, current_time)
+                .await;
+        }
+
         // Process NPC attacks on players using hit/miss mechanics
         for (npc_id, target_id, npc_level, max_hit, npc_attack_bonus) in npc_attacks {
             // Players in gathering zones are immune to NPC damage
@@ -5217,6 +5309,9 @@ impl GameRoom {
                 .await;
 
                 self.clear_auto_action(&target_id, "player_died").await;
+
+                // Check KOTH player death
+                self.check_koth_player_death(&target_id, current_time).await;
 
                 // Send prayer state update to dying player (prayers cleared on death)
                 let (points, max_points) = {
@@ -6213,6 +6308,12 @@ impl GameRoom {
                 .await;
             }
         }
+
+        // KOTH tick: wave spawning + phase transitions
+        self.process_koth_tick(current_time).await;
+
+        // Boss fight tick
+        self.process_boss_tick(current_time).await;
 
         // Arena tick: zone detection + state machine
         let arena_start = std::time::Instant::now();

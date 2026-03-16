@@ -1,0 +1,35 @@
+id = "range_shop"
+display_name = "Range Shop"
+
+# Arrows - up to mithril
+[[stock]]
+item_id = "bronze_arrow"
+max_quantity = 500
+restock_rate = 50
+
+[[stock]]
+item_id = "iron_arrow"
+max_quantity = 300
+restock_rate = 30
+
+[[stock]]
+item_id = "steel_arrow"
+max_quantity = 200
+restock_rate = 20
+
+[[stock]]
+item_id = "mithril_arrow"
+max_quantity = 100
+restock_rate = 10
+
+# Starter bow
+[[stock]]
+item_id = "oak_bow"
+max_quantity = 5
+restock_rate = 1
+
+# Gloves
+[[stock]]
+item_id = "leather_gloves"
+max_quantity = 10
+restock_rate = 2

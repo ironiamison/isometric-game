@@ -607,6 +607,9 @@ impl ChunkManager {
         portals: Vec<Portal>,
         objects: Vec<MapObject>,
         walls: Vec<Wall>,
+        heightmap: Option<Vec<u8>>,
+        block_types_down: Option<Vec<u16>>,
+        block_types_right: Option<Vec<u16>>,
     ) {
         // Cache overworld chunks when entering an interior
         if self.interior_size.is_none() {
@@ -642,9 +645,9 @@ impl ChunkManager {
             objects,
             walls,
             portals,
-            heights: None,
-            block_types_down: None,
-            block_types_right: None,
+            heights: heightmap,
+            block_types_down,
+            block_types_right,
         };
 
         self.chunks.insert(coord, chunk);

@@ -499,6 +499,21 @@ attack_bonus = 22
 strength_bonus = 18
 defence_bonus = 0
 
+[wurm_blade]
+display_name = "Wurm Blade"
+sprite = "wurm_blade"
+description = "A razor-sharp blade carved from a desert wurm's fang."
+category = "equipment"
+max_stack = 1
+base_price = 5000
+sellable = true
+[wurm_blade.equipment]
+slot_type = "weapon"
+attack_level_required = 55
+attack_bonus = 28
+strength_bonus = 24
+defence_bonus = 0
+
 [steel_sword]
 display_name = "Steel Sword"
 sprite = "steel_sword"
@@ -1425,6 +1440,151 @@ slot_type = "weapon"
 attack_level_required = 40
 attack_bonus = 16
 strength_bonus = 11
+defence_bonus = 0
+
+# --- Mithril Tier (Level 35) ---
+
+[mithril_sword]
+display_name = "Mithril Sword"
+sprite = "mithril_sword"
+description = "A lightweight mithril blade. Cuts through armor with ease."
+category = "equipment"
+max_stack = 1
+base_price = 4000
+sellable = true
+[mithril_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 35
+attack_bonus = 13
+strength_bonus = 9
+defence_bonus = 0
+
+# --- Adamant Tier (Level 45) ---
+
+[adamant_sword]
+display_name = "Adamant Sword"
+sprite = "adamant_sword"
+description = "A dense adamant blade. Heavy but devastatingly powerful."
+category = "equipment"
+max_stack = 1
+base_price = 8000
+sellable = true
+[adamant_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 45
+attack_bonus = 18
+strength_bonus = 13
+defence_bonus = 0
+
+# --- Rune Tier (Level 55) ---
+
+[rune_sword]
+display_name = "Rune Sword"
+sprite = "rune_sword"
+description = "A runite blade pulsing with magical energy. The pinnacle of smithing."
+category = "equipment"
+max_stack = 1
+base_price = 15000
+sellable = true
+[rune_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 55
+attack_bonus = 22
+strength_bonus = 16
+defence_bonus = 0
+
+# =============================================================================
+# SCIMITARS (Attack requirement) - Slightly better than swords
+# =============================================================================
+
+[bronze_scimitar]
+display_name = "Bronze Scimitar"
+sprite = "bronze_scimitar"
+description = "A curved bronze blade. Quick and aggressive."
+category = "equipment"
+max_stack = 1
+base_price = 300
+sellable = true
+[bronze_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 5
+attack_bonus = 4
+strength_bonus = 2
+defence_bonus = 0
+
+[iron_scimitar]
+display_name = "Iron Scimitar"
+sprite = "iron_scimitar"
+description = "A curved iron blade. Slices faster than a straight sword."
+category = "equipment"
+max_stack = 1
+base_price = 800
+sellable = true
+[iron_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 15
+attack_bonus = 7
+strength_bonus = 5
+defence_bonus = 0
+
+[steel_scimitar]
+display_name = "Steel Scimitar"
+sprite = "steel_scimitar"
+description = "A polished steel scimitar. The curved edge bites deep."
+category = "equipment"
+max_stack = 1
+base_price = 2000
+sellable = true
+[steel_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 25
+attack_bonus = 11
+strength_bonus = 8
+defence_bonus = 0
+
+[mithril_scimitar]
+display_name = "Mithril Scimitar"
+sprite = "mithril_scimitar"
+description = "A feather-light mithril scimitar. Wickedly fast."
+category = "equipment"
+max_stack = 1
+base_price = 4500
+sellable = true
+[mithril_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 35
+attack_bonus = 14
+strength_bonus = 10
+defence_bonus = 0
+
+[adamant_scimitar]
+display_name = "Adamant Scimitar"
+sprite = "adamant_scimitar"
+description = "A heavy adamant scimitar. Its curved edge cleaves through defenses."
+category = "equipment"
+max_stack = 1
+base_price = 9000
+sellable = true
+[adamant_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 45
+attack_bonus = 19
+strength_bonus = 14
+defence_bonus = 0
+
+[rune_scimitar]
+display_name = "Rune Scimitar"
+sprite = "rune_scimitar"
+description = "A runite scimitar humming with power. The finest curved blade."
+category = "equipment"
+max_stack = 1
+base_price = 16000
+sellable = true
+[rune_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 55
+attack_bonus = 23
+strength_bonus = 17
 defence_bonus = 0
 
 # =============================================================================

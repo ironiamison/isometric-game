@@ -41,5 +41,7 @@ pub use state::{
     PendingRequestInfo, Projectile, QuestCatalogEntry, QuestCompletedEvent, QuestObjective,
     SkillXpEvent, SocialState, SocialTab, SpellEffect, StallBrowseInfo, StallPriceDialog,
     StallSlotInfo, TradeOfferItem, TransitionState, UiState, XpDropFeed,
+    KothClientState, KothCheckpointInfo, KothGameOverInfo, KothRewardPreview,
+    BossClientState, AoeWarningZone, ExplosionEffect,
 };
 pub use tilemap::{LayerType, Tilemap, TilemapLayer};

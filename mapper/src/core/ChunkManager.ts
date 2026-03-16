@@ -387,7 +387,7 @@ export class ChunkManager {
       entityId: e.entityId,
       x: e.x,
       y: e.y,
-      level: e.level,
+      ...(e.level != null ? { level: e.level } : {}),
       uniqueId: e.uniqueId,
       facing: e.facing,
       respawn: e.respawn,

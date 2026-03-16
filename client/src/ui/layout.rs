@@ -280,6 +280,11 @@ pub enum UiElementId {
     StallBrowseCloseButton,
     StallBrowseQuantityMinus,
     StallBrowseQuantityPlus,
+
+    // KOTH (King of the Hill)
+    KothContinueButton,
+    KothLeaveButton,
+    KothGameOverDismiss,
 }
 
 /// A single interactive UI element with its bounds

@@ -25,6 +25,8 @@ pub struct Instance {
     pub map_width: u32,
     /// Interior map height in tiles
     pub map_height: u32,
+    /// Optional heightmap for elevation lookups
+    pub heightmap: RwLock<Option<Vec<u8>>>,
 }
 
 impl Instance {
@@ -132,10 +134,29 @@ impl Instance {
         self.npcs.read().await.clone()
     }
 
+    /// Set heightmap data for this instance
+    pub async fn set_heightmap(&self, data: Vec<u8>) {
+        *self.heightmap.write().await = Some(data);
+    }
+
+    /// Get height at a tile position (0 if no heightmap)
+    pub fn get_height_at_sync(&self, heightmap: &Option<Vec<u8>>, x: i32, y: i32) -> i32 {
+        if x < 0 || y < 0 || x >= self.map_width as i32 || y >= self.map_height as i32 {
+            return 0;
+        }
+        if let Some(hm) = heightmap {
+            let idx = (y as u32 * self.map_width + x as u32) as usize;
+            hm.get(idx).copied().unwrap_or(0) as i32
+        } else {
+            0
+        }
+    }
+
     /// Get NPC updates for sending to clients
     pub async fn get_npc_updates(&self) -> Vec<crate::npc::NpcUpdate> {
         let npcs = self.npcs.read().await;
         npcs.values()
+            .filter(|npc| !npc.hidden)
             .map(|npc| crate::npc::NpcUpdate::from(npc))
             .collect()
     }
@@ -180,6 +201,7 @@ impl InstanceManager {
             collision: RwLock::new(Vec::new()),
             map_width: width,
             map_height: height,
+            heightmap: RwLock::new(None),
         });
 
         self.public_instances
@@ -214,6 +236,7 @@ impl InstanceManager {
             collision: RwLock::new(Vec::new()),
             map_width: width,
             map_height: height,
+            heightmap: RwLock::new(None),
         });
 
         self.private_instances.insert(key, instance.clone());

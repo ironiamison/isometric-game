@@ -1,0 +1,84 @@
+# Desert Wurm Boss and explosive minions
+# Boss fight in desert_wurm_arena instance
+
+# =============================================================================
+# Desert Wurm - Main boss, level 60
+# =============================================================================
+
+[desert_wurm]
+display_name = "Desert Wurm"
+sprite = "worm"
+animation_type = "standard"
+description = "A massive wurm that burrows through the desert sands."
+
+[desert_wurm.stats]
+level = 60
+max_hp = 217
+damage = 6
+attack_bonus = 12
+defence_bonus = 5
+attack_range = 1
+aggro_range = 999
+chase_range = 999
+move_cooldown_ms = 600
+attack_cooldown_ms = 1800
+respawn_time_ms = 0
+
+[desert_wurm.rewards]
+exp_base = 500
+gold_min = 200
+gold_max = 500
+
+[[desert_wurm.loot]]
+item_id = "ancient_fragment"
+drop_chance = 0.40
+quantity_min = 1
+quantity_max = 3
+
+[[desert_wurm.loot]]
+item_id = "cactus_seed"
+drop_chance = 0.50
+quantity_min = 2
+quantity_max = 5
+
+[[desert_wurm.loot]]
+item_id = "wurm_blade"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
+
+[desert_wurm.behaviors]
+hostile = true
+wander_enabled = false
+
+# =============================================================================
+# Sand Scarab - Explosive minion (1 HP, chases player, explodes on contact)
+# =============================================================================
+
+[wurm_minion]
+display_name = "Sand Scarab"
+sprite = "spider"
+animation_type = "standard"
+description = "A volatile scarab that detonates on contact."
+
+[wurm_minion.stats]
+level = 30
+max_hp = 1
+damage = 0
+attack_bonus = 0
+defence_bonus = 0
+attack_range = 1
+aggro_range = 999
+chase_range = 999
+move_cooldown_ms = 500
+attack_cooldown_ms = 9999999
+respawn_time_ms = 0
+
+[wurm_minion.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[wurm_minion.behaviors]
+hostile = true
+wander_enabled = false

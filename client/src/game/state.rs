@@ -1177,6 +1177,71 @@ pub struct AltarPanelState {
     pub altar_name: String,
 }
 
+/// Boss fight client state
+#[derive(Debug, Clone)]
+pub struct BossClientState {
+    pub boss_id: String,
+    pub hp: i32,
+    pub max_hp: i32,
+    pub phase: String,
+    pub wurm_state: String,
+}
+
+/// AOE warning zone being displayed
+#[derive(Debug, Clone)]
+pub struct AoeWarningZone {
+    pub tiles: Vec<(i32, i32)>,
+    pub created_at: f64,
+    pub delay_ms: u64,
+    pub effect: String,
+}
+
+/// Active explosion effect
+#[derive(Debug, Clone)]
+pub struct ExplosionEffect {
+    pub x: i32,
+    pub y: i32,
+    pub radius: i32,
+    pub created_at: f64,
+}
+
+/// KOTH minigame client state
+#[derive(Debug, Clone)]
+pub struct KothClientState {
+    pub phase: String,
+    pub wave: u32,
+    pub points: u32,
+    pub enemies_alive: u32,
+    pub enemies_total: u32,
+    pub countdown_ms: u32,
+}
+
+/// KOTH checkpoint reward preview
+#[derive(Debug, Clone)]
+pub struct KothCheckpointInfo {
+    pub wave: u32,
+    pub points: u32,
+    pub rewards: Vec<KothRewardPreview>,
+    pub next_wave_enemy_count: u32,
+}
+
+/// KOTH game over info
+#[derive(Debug, Clone)]
+pub struct KothGameOverInfo {
+    pub waves_completed: u32,
+    pub total_points: u32,
+    pub rewards: Vec<KothRewardPreview>,
+    pub victory: bool,
+    pub shown_at: f64,
+}
+
+/// A reward item preview
+#[derive(Debug, Clone)]
+pub struct KothRewardPreview {
+    pub item_id: String,
+    pub quantity: u32,
+}
+
 /// A single item in a trade offer
 #[derive(Debug, Clone)]
 pub struct TradeOfferItem {
@@ -1870,6 +1935,20 @@ pub struct GameState {
     pub current_interior: Option<String>,
     /// Current instance ID if in an instance
     pub current_instance: Option<String>,
+    /// KOTH minigame state (active when in KOTH arena)
+    pub koth: Option<KothClientState>,
+    /// Boss fight state (active when in boss arena)
+    pub boss: Option<BossClientState>,
+    /// Active AOE warning zones
+    pub aoe_warnings: Vec<AoeWarningZone>,
+    /// Active explosion effects
+    pub explosions: Vec<ExplosionEffect>,
+    /// Whether the KOTH checkpoint dialog is open
+    pub koth_checkpoint_open: bool,
+    /// KOTH checkpoint info for dialog display
+    pub koth_checkpoint_info: Option<KothCheckpointInfo>,
+    /// Whether the KOTH game over screen is showing
+    pub koth_game_over: Option<KothGameOverInfo>,
     /// Pending portal to enter (set when player walks onto a portal)
     pub pending_portal_id: Option<String>,
     /// Last tile position checked for portal (to avoid triggering on spawn)
@@ -2011,6 +2090,13 @@ impl GameState {
             map_transition: MapTransition::default(),
             current_interior: None,
             current_instance: None,
+            koth: None,
+            boss: None,
+            aoe_warnings: Vec::new(),
+            explosions: Vec::new(),
+            koth_checkpoint_open: false,
+            koth_checkpoint_info: None,
+            koth_game_over: None,
             pending_portal_id: None,
             last_portal_check_pos: None,
             portal_ignore_tile: None,
@@ -2313,6 +2399,17 @@ impl GameState {
         self.spell_effects.retain(|effect| {
             let elapsed = current_time - effect.time;
             elapsed < 3.0
+        });
+
+        // Clean up expired AOE warnings
+        self.aoe_warnings.retain(|w| {
+            let elapsed = (current_time - w.created_at) * 1000.0;
+            elapsed < (w.delay_ms as f64 + 500.0)
+        });
+
+        // Clean up expired explosions
+        self.explosions.retain(|e| {
+            current_time - e.created_at < 1.0
         });
 
         // Clean up old quest completion events (older than 4 seconds)

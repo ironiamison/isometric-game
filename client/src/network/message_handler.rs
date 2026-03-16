@@ -743,9 +743,11 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
 
     // Update NPCs (grid positions from server, converted to f32 for interpolation)
     let mut npc_regen_events: Vec<(String, f32, f32, i32)> = Vec::new();
+    let mut synced_npc_ids: Vec<String> = Vec::new();
     if let Some(npcs) = extract_array(value, "npcs") {
         for npc_value in npcs {
             let id = extract_string(npc_value, "id").unwrap_or_default();
+            synced_npc_ids.push(id.clone());
             let _npc_type = extract_u8(npc_value, "npc_type").unwrap_or(0);
             let entity_type =
                 extract_string(npc_value, "entity_type").unwrap_or_else(|| "pig".to_string());
@@ -855,6 +857,11 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 }
             }
         }
+    }
+
+    // Instance full sync: remove NPCs no longer present in the server's list
+    if is_full_sync && !sync_instance.is_empty() {
+        state.npcs.retain(|id, _| synced_npc_ids.contains(id));
     }
 
     // Push NPC regen events as healing numbers (negative damage = green +X)
@@ -2691,6 +2698,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.npcs.clear();
                     state.ground_items.clear();
 
+                    // Clear boss fight state
+                    state.boss = None;
+                    state.aoe_warnings.clear();
+                    state.explosions.clear();
+
                     // Reset portal check and ignore the spawn tile until player steps off
                     state.last_portal_check_pos = None;
                     let spawn_tile = (spawn_x.floor() as i32, spawn_y.floor() as i32);
@@ -2806,6 +2818,26 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
+                // Parse optional heightmap
+                let heightmap: Option<Vec<u8>> = extract_array(value, "heightmap")
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u8))
+                            .collect()
+                    });
+                let block_types_down: Option<Vec<u16>> = extract_array(value, "blockTypesDown")
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u16))
+                            .collect()
+                    });
+                let block_types_right: Option<Vec<u16>> = extract_array(value, "blockTypesRight")
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u16))
+                            .collect()
+                    });
+
                 // Clear world data when entering interior
                 state.npcs.clear();
                 state.ground_items.clear();
@@ -2828,7 +2860,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 // Load the interior
                 state
                     .chunk_manager
-                    .load_interior(width, height, layers, &collision, portals, objects, walls);
+                    .load_interior(width, height, layers, &collision, portals, objects, walls, heightmap, block_types_down, block_types_right);
                 state.current_interior = Some(map_id.clone());
                 state.current_instance = Some(instance_id);
 
@@ -4298,6 +4330,178 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 state.top_level_player_name = extract_string(value, "player_name");
                 state.second_level_player_name = extract_string(value, "second_player_name");
+            }
+        }
+
+        "kothStateUpdate" => {
+            if let Some(value) = data {
+                let phase = extract_string(value, "phase").unwrap_or_default();
+                let wave = extract_u32(value, "wave").unwrap_or(0);
+                let points = extract_u32(value, "points").unwrap_or(0);
+                let enemies_alive = extract_u32(value, "enemiesAlive").unwrap_or(0);
+                let enemies_total = extract_u32(value, "enemiesTotal").unwrap_or(0);
+                let countdown_ms = extract_u32(value, "countdownMs").unwrap_or(0);
+
+                state.koth = Some(crate::game::KothClientState {
+                    phase,
+                    wave,
+                    points,
+                    enemies_alive,
+                    enemies_total,
+                    countdown_ms,
+                });
+            }
+        }
+
+        "kothCheckpoint" => {
+            if let Some(value) = data {
+                let wave = extract_u32(value, "wave").unwrap_or(0);
+                let points = extract_u32(value, "points").unwrap_or(0);
+                let next_wave_enemy_count = extract_u32(value, "nextWaveEnemyCount").unwrap_or(0);
+
+                let mut rewards = Vec::new();
+                if let Some(rewards_arr) = extract_array(value, "rewards") {
+                    for r in rewards_arr {
+                        rewards.push(crate::game::KothRewardPreview {
+                            item_id: extract_string(r, "itemId").unwrap_or_default(),
+                            quantity: extract_u32(r, "quantity").unwrap_or(0),
+                        });
+                    }
+                }
+
+                state.koth_checkpoint_open = true;
+                // Store checkpoint info in koth state
+                if let Some(ref mut koth) = state.koth {
+                    koth.phase = "checkpoint".to_string();
+                    koth.wave = wave;
+                    koth.points = points;
+                }
+                // Store checkpoint rewards for UI display
+                state.koth_checkpoint_info = Some(crate::game::KothCheckpointInfo {
+                    wave,
+                    points,
+                    rewards,
+                    next_wave_enemy_count,
+                });
+            }
+        }
+
+        "kothGameOver" => {
+            if let Some(value) = data {
+                let waves_completed = extract_u32(value, "wavesCompleted").unwrap_or(0);
+                let total_points = extract_u32(value, "totalPoints").unwrap_or(0);
+                let victory = extract_bool(value, "victory").unwrap_or(false);
+
+                let mut rewards = Vec::new();
+                if let Some(rewards_arr) = extract_array(value, "rewards") {
+                    for r in rewards_arr {
+                        rewards.push(crate::game::KothRewardPreview {
+                            item_id: extract_string(r, "itemId").unwrap_or_default(),
+                            quantity: extract_u32(r, "quantity").unwrap_or(0),
+                        });
+                    }
+                }
+
+                state.koth_game_over = Some(crate::game::KothGameOverInfo {
+                    waves_completed,
+                    total_points,
+                    rewards,
+                    victory,
+                    shown_at: macroquad::prelude::get_time(),
+                });
+                state.koth = None; // Clear HUD state
+                state.koth_checkpoint_open = false;
+            }
+        }
+
+        "bossStateUpdate" => {
+            if let Some(value) = data {
+                let boss_id = extract_string(value, "bossId").unwrap_or_default();
+                let hp = extract_i32(value, "hp").unwrap_or(0);
+                let max_hp = extract_i32(value, "maxHp").unwrap_or(0);
+                let phase = extract_string(value, "phase").unwrap_or_default();
+                let wurm_state = extract_string(value, "wurmState").unwrap_or_default();
+
+                if phase == "dead" {
+                    state.boss = None;
+                } else {
+                    state.boss = Some(crate::game::state::BossClientState {
+                        boss_id,
+                        hp,
+                        max_hp,
+                        phase,
+                        wurm_state,
+                    });
+                }
+            }
+        }
+
+        "aoeWarning" => {
+            if let Some(value) = data {
+                let delay_ms = extract_u64(value, "delayMs").unwrap_or(1000);
+                let effect = extract_string(value, "effect").unwrap_or_default();
+
+                let mut tiles = Vec::new();
+                if let Some(tiles_arr) = extract_array(value, "tiles") {
+                    for tile_val in tiles_arr {
+                        if let Some(arr) = tile_val.as_array() {
+                            if arr.len() >= 2 {
+                                let tx = arr[0].as_i64().unwrap_or(0) as i32;
+                                let ty = arr[1].as_i64().unwrap_or(0) as i32;
+                                tiles.push((tx, ty));
+                            }
+                        }
+                    }
+                }
+
+                state.aoe_warnings.push(crate::game::state::AoeWarningZone {
+                    tiles,
+                    created_at: current_time(),
+                    delay_ms,
+                    effect,
+                });
+            }
+        }
+
+        "aoeDamage" => {
+            if let Some(value) = data {
+                let mut tiles = Vec::new();
+                if let Some(tiles_arr) = extract_array(value, "tiles") {
+                    for tile_val in tiles_arr {
+                        if let Some(arr) = tile_val.as_array() {
+                            if arr.len() >= 2 {
+                                let tx = arr[0].as_i64().unwrap_or(0) as i32;
+                                let ty = arr[1].as_i64().unwrap_or(0) as i32;
+                                tiles.push((tx, ty));
+                            }
+                        }
+                    }
+                }
+
+                // Spawn a small impact effect on each damaged tile
+                for (tx, ty) in tiles {
+                    state.explosions.push(crate::game::state::ExplosionEffect {
+                        x: tx,
+                        y: ty,
+                        radius: 0,
+                        created_at: current_time(),
+                    });
+                }
+            }
+        }
+
+        "explosion" => {
+            if let Some(value) = data {
+                let x = extract_i32(value, "x").unwrap_or(0);
+                let y = extract_i32(value, "y").unwrap_or(0);
+                let radius = extract_i32(value, "radius").unwrap_or(3);
+
+                state.explosions.push(crate::game::state::ExplosionEffect {
+                    x,
+                    y,
+                    radius,
+                    created_at: current_time(),
+                });
             }
         }
 

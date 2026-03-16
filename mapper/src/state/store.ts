@@ -950,7 +950,6 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       name: entityId,
       x: local.lx,
       y: local.ly,
-      level: 1,
     };
 
     history.push({
@@ -1762,7 +1761,6 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       name: entityId,
       x,
       y,
-      level: 1,
     };
 
     set({

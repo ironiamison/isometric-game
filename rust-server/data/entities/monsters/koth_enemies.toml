@@ -1,0 +1,131 @@
+# KOTH (King of the Hill) enemy variants
+# High chase/aggro range so they always charge the player
+# No respawn - wave system handles spawning
+
+# =============================================================================
+# KOTH Slime - Waves 1-5 (easiest)
+# =============================================================================
+
+[koth_slime]
+display_name = "Hill Slime"
+sprite = "slime"
+animation_type = "standard"
+description = "A gelatinous creature drawn to the hilltop."
+
+[koth_slime.stats]
+level = 3
+max_hp = 20
+damage = 2
+attack_bonus = 2
+defence_bonus = 0
+attack_range = 1
+aggro_range = 999
+chase_range = 999
+move_cooldown_ms = 500
+attack_cooldown_ms = 2000
+respawn_time_ms = 999999
+
+[koth_slime.rewards]
+exp_base = 20
+gold_min = 0
+gold_max = 0
+
+[koth_slime.behaviors]
+hostile = true
+wander_enabled = false
+
+# =============================================================================
+# KOTH Skeleton - Waves 6-10
+# =============================================================================
+
+[koth_skeleton]
+display_name = "Hill Skeleton"
+sprite = "skeleton"
+animation_type = "humanoid"
+description = "A skeletal warrior ascending the hill."
+
+[koth_skeleton.stats]
+level = 8
+max_hp = 35
+damage = 4
+attack_bonus = 5
+defence_bonus = 3
+attack_range = 1
+aggro_range = 999
+chase_range = 999
+move_cooldown_ms = 450
+attack_cooldown_ms = 1800
+respawn_time_ms = 999999
+
+[koth_skeleton.rewards]
+exp_base = 35
+gold_min = 0
+gold_max = 0
+
+[koth_skeleton.behaviors]
+hostile = true
+wander_enabled = false
+
+# =============================================================================
+# KOTH Spider - Waves 11-15
+# =============================================================================
+
+[koth_spider]
+display_name = "Hill Spider"
+sprite = "spider"
+animation_type = "standard"
+description = "A massive spider scaling the hillside."
+
+[koth_spider.stats]
+level = 14
+max_hp = 50
+damage = 6
+attack_bonus = 10
+defence_bonus = 5
+attack_range = 1
+aggro_range = 999
+chase_range = 999
+move_cooldown_ms = 350
+attack_cooldown_ms = 1500
+respawn_time_ms = 999999
+
+[koth_spider.rewards]
+exp_base = 50
+gold_min = 0
+gold_max = 0
+
+[koth_spider.behaviors]
+hostile = true
+wander_enabled = false
+
+# =============================================================================
+# KOTH Demon - Waves 16+ (hardest)
+# =============================================================================
+
+[koth_demon]
+display_name = "Hill Demon"
+sprite = "demon"
+animation_type = "standard"
+description = "A fearsome demon drawn to the hilltop's power."
+
+[koth_demon.stats]
+level = 20
+max_hp = 75
+damage = 8
+attack_bonus = 15
+defence_bonus = 8
+attack_range = 1
+aggro_range = 999
+chase_range = 999
+move_cooldown_ms = 400
+attack_cooldown_ms = 1500
+respawn_time_ms = 999999
+
+[koth_demon.rewards]
+exp_base = 70
+gold_min = 0
+gold_max = 0
+
+[koth_demon.behaviors]
+hostile = true
+wander_enabled = false

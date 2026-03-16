@@ -111,6 +111,10 @@ pub struct Npc {
     wander_best_distance: i32,
     /// Number of move attempts without getting closer to wander target
     wander_stuck_count: u8,
+    /// Boss mechanic: when true, NPC cannot take damage
+    pub invulnerable: bool,
+    /// When true, NPC is hidden from state sync (e.g. boss underground)
+    pub hidden: bool,
 }
 
 impl Npc {
@@ -198,6 +202,8 @@ impl Npc {
             next_speech_at: 0,
             wander_best_distance: i32::MAX,
             wander_stuck_count: 0,
+            invulnerable: false,
+            hidden: false,
             stats,
         }
     }
@@ -227,7 +233,7 @@ impl Npc {
         self.stats.attack_cooldown_ms
     }
 
-    fn get_respawn_time_ms(&self) -> u64 {
+    pub fn get_respawn_time_ms(&self) -> u64 {
         self.stats.respawn_time_ms
     }
 
@@ -296,6 +302,9 @@ impl Npc {
         current_time: u64,
         attacker_id: Option<&str>,
     ) -> bool {
+        if self.invulnerable {
+            return false;
+        }
         self.hp = (self.hp - damage).max(0);
         if self.hp <= 0 {
             self.state = NpcState::Dead;

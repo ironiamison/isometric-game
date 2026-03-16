@@ -1,0 +1,18 @@
+id = "jewel_shop"
+display_name = "Jewel Shop"
+
+# Gems - up to ruby (no diamond)
+[[stock]]
+item_id = "uncut_sapphire"
+max_quantity = 10
+restock_rate = 2
+
+[[stock]]
+item_id = "uncut_emerald"
+max_quantity = 5
+restock_rate = 1
+
+[[stock]]
+item_id = "uncut_ruby"
+max_quantity = 3
+restock_rate = 1

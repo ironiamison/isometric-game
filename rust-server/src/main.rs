@@ -36,6 +36,8 @@ mod gathering;
 mod ground_spawn;
 mod instance;
 mod interior;
+mod koth;
+mod boss;
 mod interior_registry;
 mod item;
 mod log_buffer;
@@ -2546,6 +2548,34 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             );
 
                             if should_save {
+                                // If player is in a KOTH instance, move them back to
+                                // overworld before saving so they don't respawn inside it
+                                {
+                                    let instance_id = recv_state
+                                        .player_instances
+                                        .read()
+                                        .await
+                                        .get(&player_id)
+                                        .cloned();
+                                    if let Some(ref inst_id) = instance_id {
+                                        if let Some((ex, ey)) =
+                                            recv_room.get_koth_entrance(inst_id).await
+                                        {
+                                            // Reset player to overworld position before save
+                                            recv_room
+                                                .set_player_position_and_z(&player_id, ex, ey, 0)
+                                                .await;
+                                            // Remove from instance tracking so save doesn't
+                                            // record the KOTH map as current_map
+                                            recv_state
+                                                .player_instances
+                                                .write()
+                                                .await
+                                                .remove(&player_id);
+                                        }
+                                    }
+                                }
+
                                 // Compute played time delta
                                 let played_time_delta = recv_state
                                     .play_time_anchors
@@ -2728,6 +2758,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                     recv_state.player_instances.write().await.remove(&player_id);
                                 recv_room.reset_sync_state(&player_id).await;
                                 if let Some(instance_id) = removed_instance_id {
+                                    // Clean up KOTH session if player was in one
+                                    recv_room.cleanup_koth_session(&instance_id).await;
                                     if let Some(instance) =
                                         recv_state.instance_manager.get_by_instance_id(&instance_id)
                                     {
@@ -3826,6 +3858,9 @@ async fn auto_enter_instance(
             portals,
             objects,
             walls,
+            heightmap: interior.heightmap.clone(),
+            block_types_down: interior.block_types_down.clone(),
+            block_types_right: interior.block_types_right.clone(),
         },
     )
     .await;
@@ -3973,6 +4008,8 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                     let mut instances = state.player_instances.write().await;
                     instances.remove(player_id);
                 }
+                // Clean up KOTH state if exiting a KOTH instance
+                room.cleanup_koth_session(&instance_id).await;
                 room.reset_sync_state(player_id).await;
 
                 if let Some(instance) = state.instance_manager.get_by_instance_id(&instance_id) {
@@ -4221,6 +4258,10 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                 instance.set_collision(&bytes).await;
             }
         }
+        // Load heightmap if present
+        if let Some(ref hm) = interior.heightmap {
+            instance.set_heightmap(hm.clone()).await;
+        }
         instance
             .spawn_npcs(&interior.entities, &state.entity_registry)
             .await;
@@ -4258,8 +4299,12 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
     // Add player to instance
     instance.add_player(player_id).await;
 
-    // Update player position to spawn point
-    room.set_player_position(player_id, spawn.x as i32, spawn.y as i32)
+    // Update player position to spawn point, including Z from heightmap
+    let spawn_z = {
+        let hm = instance.heightmap.read().await;
+        instance.get_height_at_sync(&hm, spawn.x as i32, spawn.y as i32)
+    };
+    room.set_player_position_and_z(player_id, spawn.x as i32, spawn.y as i32, spawn_z)
         .await;
 
     // Notify other players in the instance that this player joined
@@ -4327,6 +4372,59 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
         "Player {} entered instance {} (map: {}) at ({}, {})",
         player_id, instance.id, interior.id, spawn.x, spawn.y
     );
+
+    // Start KOTH session if entering KOTH arena
+    if interior.id == crate::game::koth_tick::KOTH_MAP_ID {
+        let ct = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        // Save the player's overworld position so we can teleport them back
+        let (entrance_x, entrance_y) = room
+            .get_player_position(player_id)
+            .await
+            .unwrap_or((0, 0));
+        room.start_koth_session(
+            &instance.id,
+            player_id,
+            interior.size.width,
+            interior.size.height,
+            ct,
+            entrance_x,
+            entrance_y,
+        )
+        .await;
+    }
+
+    // Start or join boss session if entering desert wurm arena
+    if interior.id == crate::game::boss_tick::BOSS_MAP_ID {
+        let ct = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        if room.has_boss_session(&instance.id).await {
+            // Add player to existing boss fight
+            room.add_boss_player(&instance.id, player_id).await;
+        } else {
+            // Find the desert_wurm NPC in the instance and start a new boss session
+            let npcs = instance.npcs.read().await;
+            if let Some(boss_npc) = npcs.values().find(|n| n.prototype_id == "desert_wurm") {
+                room.start_boss_session(
+                    &instance.id,
+                    &boss_npc.id,
+                    boss_npc.hp,
+                    boss_npc.max_hp,
+                    boss_npc.x,
+                    boss_npc.y,
+                    instance.map_width as i32,
+                    instance.map_height as i32,
+                    ct,
+                )
+                .await;
+            }
+        }
+    }
 
     // Send transition message to client
     room.send_to_player(
@@ -4417,6 +4515,9 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
             portals,
             objects,
             walls,
+            heightmap: interior.heightmap.clone(),
+            block_types_down: interior.block_types_down.clone(),
+            block_types_right: interior.block_types_right.clone(),
         },
     )
     .await;
@@ -4951,6 +5052,20 @@ async fn handle_client_message(
             } else {
                 tracing::warn!("Player {} sent invalid combat style: {}", player_id, style);
             }
+        }
+        ClientMessage::KothContinue => {
+            let ct = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            room.handle_koth_continue(player_id, ct).await;
+        }
+        ClientMessage::KothLeave => {
+            let ct = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            room.handle_koth_leave(player_id, ct).await;
         }
     }
 

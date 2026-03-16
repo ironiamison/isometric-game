@@ -527,13 +527,17 @@ export function PropertiesPanel() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Level</label>
+            <label className={styles.label}>Level Override</label>
             <input
               type="number"
               className={styles.input}
-              value={spawn.level}
+              value={spawn.level ?? ''}
+              placeholder="(prototype)"
               min={1}
-              onChange={(e) => handleChange('level', parseInt(e.target.value) || 1)}
+              onChange={(e) => {
+                const val = e.target.value.trim();
+                handleChange('level', val === '' ? undefined : (parseInt(val) || 1));
+              }}
             />
           </div>
 
@@ -685,13 +689,17 @@ export function PropertiesPanel() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Level</label>
+            <label className={styles.label}>Level Override</label>
             <input
               type="number"
               className={styles.input}
-              value={spawn.level}
+              value={spawn.level ?? ''}
+              placeholder="(prototype)"
               min={1}
-              onChange={(e) => handleChange('level', parseInt(e.target.value) || 1)}
+              onChange={(e) => {
+                const val = e.target.value.trim();
+                handleChange('level', val === '' ? undefined : (parseInt(val) || 1));
+              }}
             />
           </div>
 

@@ -6,9 +6,13 @@ use std::collections::{HashMap, HashSet};
 type InstancePlayerPosition = (String, i32, i32);
 type InstancePlayerTickPosition = (String, i32, i32, i32);
 
+/// Minion explosion contact: (npc_id, instance_id, npc_x, npc_y)
+pub(in crate::game) type MinionContactExplosion = (String, String, i32, i32);
+
 pub(in crate::game) struct InstanceNpcTickResult {
     pub npc_attacks: Vec<NpcAttack>,
     pub speech_events: Vec<NpcSpeechEvent>,
+    pub minion_explosions: Vec<MinionContactExplosion>,
 }
 
 fn build_instance_occupied_tiles(
@@ -61,6 +65,7 @@ impl GameRoom {
         let instance_players = self.collect_instance_players().await;
         let mut npc_attacks = Vec::new();
         let mut speech_events = Vec::new();
+        let mut minion_explosions: Vec<MinionContactExplosion> = Vec::new();
 
         for entry in self
             .instance_manager
@@ -90,6 +95,7 @@ impl GameRoom {
                 };
 
             let collision = entry.collision.read().await;
+            let heightmap = entry.heightmap.read().await;
             let walkable_check = |world_x: i32, world_y: i32| -> bool {
                 entry.is_walkable_sync(&collision, world_x, world_y)
             };
@@ -108,10 +114,17 @@ impl GameRoom {
                     occupied_tiles.insert((npc.x, npc.y));
                 }
 
+                // Skip AI for hidden NPCs (e.g. boss underground)
+                if npc.hidden {
+                    continue;
+                }
+
                 let old_pos = (npc.x, npc.y);
                 occupied_tiles.remove(&old_pos);
 
-                let height_check = |_wx: i32, _wy: i32| -> i32 { 0 };
+                let height_check = |wx: i32, wy: i32| -> i32 {
+                    entry.get_height_at_sync(&heightmap, wx, wy)
+                };
                 if let Some((target_id, max_hit)) = npc.update(
                     delta_time,
                     &inst_player_list,
@@ -129,6 +142,25 @@ impl GameRoom {
                     ));
                 }
 
+                // Check explosive minion contact with players
+                if npc.is_alive() && npc.prototype_id == "wurm_minion" {
+                    for (player_id, px, py, _php) in &inst_player_list {
+                        if npc.x == *px && npc.y == *py {
+                            // Contact! Kill the minion to trigger explosion
+                            npc.hp = 0;
+                            npc.state = crate::npc::NpcState::Dead;
+                            npc.death_time = current_time;
+                            minion_explosions.push((
+                                npc.id.clone(),
+                                entry.id.clone(),
+                                npc.x,
+                                npc.y,
+                            ));
+                            break;
+                        }
+                    }
+                }
+
                 if npc.is_alive() {
                     occupied_tiles.insert((npc.x, npc.y));
                 }
@@ -138,11 +170,24 @@ impl GameRoom {
                 let player_refs = speech_refs_for_instance_players(&inst_player_list);
                 check_npc_speech(npc, &player_refs, current_time, &mut speech_events);
             }
+
+            // Remove dead NPCs that won't respawn after 2 seconds (allows death animation)
+            const DEAD_CLEANUP_MS: u64 = 2000;
+            npcs.retain(|_, npc| {
+                if npc.state == crate::npc::NpcState::Dead
+                    && npc.get_respawn_time_ms() == 0
+                    && current_time.saturating_sub(npc.death_time) >= DEAD_CLEANUP_MS
+                {
+                    return false;
+                }
+                true
+            });
         }
 
         InstanceNpcTickResult {
             npc_attacks,
             speech_events,
+            minion_explosions,
         }
     }
 }

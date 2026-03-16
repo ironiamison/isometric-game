@@ -12,6 +12,7 @@ const ADMIN_COMMANDS: &[&str] = &[
     "/god",
     "/announce",
     "/arena",
+    "/boss",
 ];
 
 fn sanitize_chat_text(text: &str) -> Option<String> {
@@ -880,6 +881,289 @@ impl GameRoom {
                         .await;
                     }
                 }
+            }
+            "/boss" => {
+                use base64::Engine;
+                use crate::protocol::{ChunkLayerData, ChunkPortalData, ChunkObjectData, ChunkWallData};
+
+                let map_id = crate::game::boss_tick::BOSS_MAP_ID;
+
+                let interior = match self.interior_registry.get(map_id) {
+                    Some(i) => i,
+                    None => {
+                        self.send_system_message(player_id, "Boss arena map not found.")
+                            .await;
+                        return;
+                    }
+                };
+
+                let spawn = match interior.spawn_points.values().next() {
+                    Some(s) => s.clone(),
+                    None => {
+                        self.send_system_message(player_id, "Boss arena has no spawn point.")
+                            .await;
+                        return;
+                    }
+                };
+
+                // Get or create public instance
+                let (instance, is_new) = self.instance_manager.get_or_create_public(
+                    &interior.id,
+                    interior.size.width,
+                    interior.size.height,
+                );
+
+                // Spawn NPCs and set collision if new instance
+                if is_new || !*instance.npcs_spawned.read().await {
+                    if !interior.collision.is_empty() {
+                        if let Ok(bytes) =
+                            base64::engine::general_purpose::STANDARD.decode(&interior.collision)
+                        {
+                            instance.set_collision(&bytes).await;
+                        }
+                    }
+                    instance
+                        .spawn_npcs(&interior.entities, &self.entity_registry)
+                        .await;
+                }
+
+                // Save current overworld position for return
+                let (entrance_x, entrance_y) = self
+                    .get_player_position(player_id)
+                    .await
+                    .unwrap_or((0, 0));
+
+                // Track player's instance
+                {
+                    let mut player_instances = self.player_instances.write().await;
+                    player_instances.insert(player_id.to_string(), instance.id.clone());
+                }
+                self.reset_sync_state(player_id).await;
+
+                // Notify overworld players that this player has "left"
+                self.send_to_overworld_players(
+                    ServerMessage::PlayerLeft {
+                        id: player_id.to_string(),
+                    },
+                    Some(player_id),
+                )
+                .await;
+
+                // Get other players already in the instance BEFORE adding
+                let other_players_in_instance: Vec<String> = instance.get_player_ids().await;
+
+                instance.add_player(player_id).await;
+
+                // Set player position to spawn point
+                self.set_player_position(player_id, spawn.x as i32, spawn.y as i32)
+                    .await;
+
+                // Notify other instance players about this player joining
+                if !other_players_in_instance.is_empty() {
+                    let player_name = self.get_player_name(player_id).await.unwrap_or_default();
+                    let (gender, skin) = self
+                        .get_player_appearance(player_id)
+                        .await
+                        .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                    let (hair_style, hair_color) = self
+                        .get_player_hair(player_id)
+                        .await
+                        .unwrap_or((None, None));
+
+                    for other_id in &other_players_in_instance {
+                        self.send_to_player(
+                            other_id,
+                            ServerMessage::PlayerJoined {
+                                id: player_id.to_string(),
+                                name: player_name.clone(),
+                                x: spawn.x as i32,
+                                y: spawn.y as i32,
+                                gender: gender.clone(),
+                                skin: skin.clone(),
+                                hair_style: hair_style.clone(),
+                                hair_color: hair_color.clone(),
+                            },
+                        )
+                        .await;
+                    }
+
+                    // Tell the entering player about other players already in the instance
+                    for other_id in &other_players_in_instance {
+                        if let Some(other_name) = self.get_player_name(other_id).await {
+                            let (other_x, other_y) = self
+                                .get_player_position(other_id)
+                                .await
+                                .unwrap_or((spawn.x as i32, spawn.y as i32));
+                            let (other_gender, other_skin) = self
+                                .get_player_appearance(other_id)
+                                .await
+                                .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                            let (other_hair_style, other_hair_color) =
+                                self.get_player_hair(other_id).await.unwrap_or((None, None));
+
+                            self.send_to_player(
+                                player_id,
+                                ServerMessage::PlayerJoined {
+                                    id: other_id.clone(),
+                                    name: other_name,
+                                    x: other_x,
+                                    y: other_y,
+                                    gender: other_gender,
+                                    skin: other_skin,
+                                    hair_style: other_hair_style,
+                                    hair_color: other_hair_color,
+                                },
+                            )
+                            .await;
+                        }
+                    }
+                }
+
+                // Start or join boss session
+                let ct = chat_timestamp_ms();
+
+                if self.has_boss_session(&instance.id).await {
+                    self.add_boss_player(&instance.id, player_id).await;
+                } else {
+                    let npcs = instance.npcs.read().await;
+                    if let Some(boss_npc) = npcs.values().find(|n| n.prototype_id == "desert_wurm")
+                    {
+                        self.start_boss_session(
+                            &instance.id,
+                            &boss_npc.id,
+                            boss_npc.hp,
+                            boss_npc.max_hp,
+                            boss_npc.x,
+                            boss_npc.y,
+                            instance.map_width as i32,
+                            instance.map_height as i32,
+                            ct,
+                        )
+                        .await;
+                    }
+                }
+
+                // Send transition message
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::MapTransition {
+                        map_type: "interior".to_string(),
+                        map_id: interior.id.clone(),
+                        spawn_x: spawn.x,
+                        spawn_y: spawn.y,
+                        instance_id: instance.id.clone(),
+                    },
+                )
+                .await;
+
+                // Build and send interior data
+                let layers = vec![
+                    ChunkLayerData {
+                        layer_type: 0,
+                        tiles: interior.layers.ground.clone(),
+                    },
+                    ChunkLayerData {
+                        layer_type: 1,
+                        tiles: interior.layers.objects.clone(),
+                    },
+                    ChunkLayerData {
+                        layer_type: 2,
+                        tiles: interior.layers.overhead.clone(),
+                    },
+                ];
+
+                let collision = if interior.collision.is_empty() {
+                    vec![]
+                } else {
+                    base64::engine::general_purpose::STANDARD
+                        .decode(&interior.collision)
+                        .unwrap_or_default()
+                };
+
+                let portals: Vec<ChunkPortalData> = interior
+                    .portals
+                    .iter()
+                    .map(|p| ChunkPortalData {
+                        id: p.id.clone(),
+                        x: p.x,
+                        y: p.y,
+                        width: p.width,
+                        height: p.height,
+                        target_map: p.target_map.clone(),
+                        target_spawn: p.target_spawn.clone().unwrap_or_default(),
+                    })
+                    .collect();
+
+                let objects: Vec<ChunkObjectData> = interior
+                    .map_objects
+                    .iter()
+                    .map(|o| ChunkObjectData {
+                        gid: o.gid,
+                        tile_x: o.x,
+                        tile_y: o.y,
+                        width: o.width,
+                        height: o.height,
+                    })
+                    .collect();
+
+                let walls: Vec<ChunkWallData> = interior
+                    .walls
+                    .iter()
+                    .map(|w| ChunkWallData {
+                        gid: w.gid,
+                        tile_x: w.x,
+                        tile_y: w.y,
+                        edge: w.edge.clone(),
+                    })
+                    .collect();
+
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::InteriorData {
+                        map_id: interior.id.clone(),
+                        name: interior.name.clone(),
+                        instance_id: instance.id.clone(),
+                        width: interior.size.width,
+                        height: interior.size.height,
+                        spawn_x: spawn.x,
+                        spawn_y: spawn.y,
+                        layers,
+                        collision,
+                        portals,
+                        objects,
+                        walls,
+                        heightmap: interior.heightmap.clone(),
+                        block_types_down: interior.block_types_down.clone(),
+                        block_types_right: interior.block_types_right.clone(),
+                    },
+                )
+                .await;
+
+                // Send NPC updates for this instance
+                let npc_updates = instance.get_npc_updates().await;
+                if !npc_updates.is_empty() {
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::StateSync {
+                            tick: 0,
+                            players: vec![],
+                            npcs: npc_updates,
+                            instance_id: instance.id.clone(),
+                        },
+                    )
+                    .await;
+                }
+
+                tracing::info!(
+                    "Admin {} entered boss arena (instance: {}) at ({}, {})",
+                    player_id,
+                    instance.id,
+                    spawn.x,
+                    spawn.y
+                );
+
+                self.send_system_message(player_id, "Entering the Desert Wurm arena...")
+                    .await;
             }
             _ => {
                 self.send_system_message(

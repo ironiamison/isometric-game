@@ -3374,6 +3374,10 @@ impl Renderer {
         // 1.8. Render bonus tile indicators (pulsing glow)
         self.render_bonus_tiles(state);
 
+        // 1.9. Render AOE warning zones and explosion effects (boss fight)
+        self.render_aoe_warnings(state);
+        self.render_explosions(state);
+
         timings.ground_ms = (get_time() - t0) * 1000.0;
 
         // Skip entity/world rendering until world is ready
@@ -8514,6 +8518,121 @@ impl Renderer {
         }
     }
 
+    /// Render AOE warning zones as pulsing overlays on tiles
+    fn render_aoe_warnings(&self, state: &GameState) {
+        let zoom = state.camera.zoom;
+        let time = macroquad::time::get_time();
+        let (sw, sh) = virtual_screen_size();
+
+        for warning in &state.aoe_warnings {
+            let elapsed_ms = (time - warning.created_at) * 1000.0;
+            let progress = (elapsed_ms / warning.delay_ms as f64).min(1.0) as f32;
+
+            // Pulse faster as landing time approaches
+            let pulse_speed = 4.0 + progress as f64 * 12.0;
+            let pulse = ((time * pulse_speed).sin() as f32 * 0.5 + 0.5) * 0.4 + 0.15;
+
+            // Color based on effect type - default red for damage
+            let base_color = match warning.effect.as_str() {
+                "sandstorm" => Color::new(0.9, 0.7, 0.2, pulse * progress),
+                _ => Color::new(0.9, 0.2, 0.1, pulse * progress),
+            };
+
+            for &(tx, ty) in &warning.tiles {
+                let (screen_x, screen_y) =
+                    world_to_screen(tx as f32, ty as f32, &state.camera);
+
+                // Viewport culling
+                let margin = 64.0 * zoom;
+                if screen_x < -margin
+                    || screen_x > sw + margin
+                    || screen_y < -margin
+                    || screen_y > sh + margin
+                {
+                    continue;
+                }
+
+                // Draw isometric diamond highlight
+                let half_w = (TILE_WIDTH / 2.0) * zoom * 0.5;
+                let half_h = (TILE_HEIGHT / 2.0) * zoom * 0.5;
+
+                draw_triangle(
+                    Vec2::new(screen_x, screen_y - half_h),
+                    Vec2::new(screen_x + half_w, screen_y),
+                    Vec2::new(screen_x, screen_y + half_h),
+                    base_color,
+                );
+                draw_triangle(
+                    Vec2::new(screen_x, screen_y - half_h),
+                    Vec2::new(screen_x - half_w, screen_y),
+                    Vec2::new(screen_x, screen_y + half_h),
+                    base_color,
+                );
+            }
+        }
+    }
+
+    /// Render explosion effects as expanding/fading circles on tile areas
+    fn render_explosions(&self, state: &GameState) {
+        let zoom = state.camera.zoom;
+        let time = macroquad::time::get_time();
+        let (sw, sh) = virtual_screen_size();
+
+        for explosion in &state.explosions {
+            let elapsed = (time - explosion.created_at) as f32;
+            if elapsed > 1.0 {
+                continue;
+            }
+
+            // Fade out over 1 second
+            let alpha = (1.0 - elapsed).max(0.0) * 0.6;
+            // Expand slightly
+            let scale = 1.0 + elapsed * 0.3;
+
+            let (center_x, center_y) =
+                world_to_screen(explosion.x as f32, explosion.y as f32, &state.camera);
+
+            // Viewport culling
+            let radius_px = explosion.radius as f32 * TILE_WIDTH * zoom * scale;
+            if center_x + radius_px < 0.0
+                || center_x - radius_px > sw
+                || center_y + radius_px < 0.0
+                || center_y - radius_px > sh
+            {
+                continue;
+            }
+
+            // Draw colored overlay on each tile in the radius
+            let r = explosion.radius;
+            for dx in -r..=r {
+                for dy in -r..=r {
+                    let tx = explosion.x + dx;
+                    let ty = explosion.y + dy;
+                    let (sx, sy) = world_to_screen(tx as f32, ty as f32, &state.camera);
+
+                    let half_w = (TILE_WIDTH / 2.0) * zoom * 0.5 * scale;
+                    let half_h = (TILE_HEIGHT / 2.0) * zoom * 0.5 * scale;
+
+                    // Orange-red explosion color
+                    let color = Color::new(1.0, 0.4 + elapsed * 0.3, 0.1, alpha);
+
+                    draw_triangle(
+                        Vec2::new(sx, sy - half_h),
+                        Vec2::new(sx + half_w, sy),
+                        Vec2::new(sx, sy + half_h),
+                        color,
+                    );
+                    draw_triangle(
+                        Vec2::new(sx, sy - half_h),
+                        Vec2::new(sx - half_w, sy),
+                        Vec2::new(sx, sy + half_h),
+                        color,
+                    );
+                }
+            }
+        }
+    }
+
     /// Render exit portal arrows on interior map edges
     fn render_exit_portal_arrows(&self, state: &GameState) {
         // Only render in interior mode
@@ -10408,6 +10527,14 @@ impl Renderer {
         if let Some(ref dialog) = state.ui_state.stall_price_dialog {
             self.render_stall_price_dialog(dialog, hovered, &mut layout);
         }
+
+        // KOTH HUD (always visible during KOTH), checkpoint dialog, and game over
+        self.render_koth_hud(state);
+        self.render_koth_checkpoint(state, hovered, &mut layout);
+        self.render_koth_game_over(state, hovered, &mut layout);
+
+        // Boss fight HUD
+        self.render_boss_hud(state);
 
         // Quest completion notifications (on top of dialogue/panels)
         self.render_quest_completed(state);

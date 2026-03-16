@@ -1,0 +1,44 @@
+id = "weapon_shop"
+display_name = "Weapon Shop"
+
+# Swords - up to mithril
+[[stock]]
+item_id = "bronze_sword"
+max_quantity = 5
+restock_rate = 1
+
+[[stock]]
+item_id = "iron_sword"
+max_quantity = 3
+restock_rate = 1
+
+[[stock]]
+item_id = "steel_sword"
+max_quantity = 2
+restock_rate = 1
+
+[[stock]]
+item_id = "mithril_sword"
+max_quantity = 1
+restock_rate = 1
+
+# Scimitars - up to mithril
+[[stock]]
+item_id = "bronze_scimitar"
+max_quantity = 5
+restock_rate = 1
+
+[[stock]]
+item_id = "iron_scimitar"
+max_quantity = 3
+restock_rate = 1
+
+[[stock]]
+item_id = "steel_scimitar"
+max_quantity = 2
+restock_rate = 1
+
+[[stock]]
+item_id = "mithril_scimitar"
+max_quantity = 1
+restock_rate = 1

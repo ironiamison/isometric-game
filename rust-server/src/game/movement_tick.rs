@@ -75,12 +75,46 @@ impl GameRoom {
 
         // Jump and gravity phase - process every tick for airborne players
         {
+            // Snapshot instance heightmaps for players in instances
+            let gravity_instance_map: HashMap<String, Option<String>> = {
+                let pi = self.player_instances.read().await;
+                let players = self.players.read().await;
+                players
+                    .values()
+                    .filter(|p| p.active && !p.is_dead)
+                    .map(|p| (p.id.clone(), pi.get(&p.id).cloned()))
+                    .collect()
+            };
+            let mut gravity_heightmaps: HashMap<String, Option<Vec<u8>>> = HashMap::new();
+            for inst_id in gravity_instance_map.values().flatten() {
+                if !gravity_heightmaps.contains_key(inst_id) {
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                        let hm = instance.heightmap.read().await;
+                        gravity_heightmaps.insert(inst_id.clone(), hm.clone());
+                    }
+                }
+            }
+
             let mut players = self.players.write().await;
             let chunks_guard = self.world.chunks_read().await;
             for player in players
                 .values_mut()
                 .filter(|p| p.active && !p.is_dead)
             {
+                let ground_height_fn = |px: i32, py: i32| -> i32 {
+                    if let Some(Some(inst_id)) = gravity_instance_map.get(&player.id) {
+                        if let Some(Some(hm)) = gravity_heightmaps.get(inst_id) {
+                            // Use instance heightmap
+                            if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                                return instance.get_height_at_sync(&Some(hm.clone()), px, py);
+                            }
+                        }
+                        0
+                    } else {
+                        self.world.get_height_at_sync(px, py, &chunks_guard)
+                    }
+                };
+
                 if player.jump_ticks > 0 {
                     player.jump_ticks -= 1;
                     if player.jump_ticks >= 3 {
@@ -88,7 +122,7 @@ impl GameRoom {
                         player.z += 1;
                     } else {
                         // Falling phase: -1z per tick for last 3 ticks
-                        let ground_height = self.world.get_height_at_sync(player.x, player.y, &chunks_guard);
+                        let ground_height = ground_height_fn(player.x, player.y);
                         if player.z > ground_height {
                             player.z -= 1;
                             // Clamp to ground if we've reached it
@@ -119,7 +153,7 @@ impl GameRoom {
                         true // 20 blocks/sec (every tick)
                     };
                     if should_drop {
-                        let ground_height = self.world.get_height_at_sync(player.x, player.y, &chunks_guard);
+                        let ground_height = ground_height_fn(player.x, player.y);
                         if player.z > ground_height {
                             player.z -= 1;
                             if player.z <= ground_height {
@@ -212,7 +246,7 @@ impl GameRoom {
                 .collect()
         };
 
-        let mut instance_collision_snapshots: HashMap<String, (Vec<bool>, u32, u32)> =
+        let mut instance_collision_snapshots: HashMap<String, (Vec<bool>, u32, u32, Option<Vec<u8>>)> =
             HashMap::new();
         let mut instance_npc_positions: HashMap<String, HashSet<(i32, i32)>> = HashMap::new();
         {
@@ -224,9 +258,10 @@ impl GameRoom {
             for instance_id in needed_instances {
                 if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
                     let collision = instance.collision.read().await;
+                    let heightmap = instance.heightmap.read().await;
                     instance_collision_snapshots.insert(
                         instance_id.clone(),
-                        (collision.clone(), instance.map_width, instance.map_height),
+                        (collision.clone(), instance.map_width, instance.map_height, heightmap.clone()),
                     );
 
                     let npcs = instance.npcs.read().await;
@@ -290,7 +325,7 @@ impl GameRoom {
                     return MoveCheck::BlockedTile;
                 }
             } else if let Some(instance_id) = player_instance {
-                let walkable = if let Some((collision, map_width, map_height)) =
+                let walkable = if let Some((collision, map_width, map_height, _)) =
                     instance_collision_snapshots.get(instance_id)
                 {
                     if target_x < 0
@@ -311,6 +346,20 @@ impl GameRoom {
                         tick_telemetry.rejected_tile_blocked += 1;
                     }
                     return MoveCheck::BlockedTile;
+                }
+                // Height check for instances with heightmaps
+                if let Some((_, map_width, _, Some(hm))) =
+                    instance_collision_snapshots.get(instance_id)
+                {
+                    let index = (target_y as u32 * map_width + target_x as u32) as usize;
+                    let target_height = hm.get(index).copied().unwrap_or(0) as i32;
+                    let height_diff = target_height - player_z;
+                    if height_diff > 1 && player_grounded {
+                        if record_telemetry {
+                            tick_telemetry.rejected_tile_blocked += 1;
+                        }
+                        return MoveCheck::BlockedTile;
+                    }
                 }
             }
 
@@ -382,8 +431,24 @@ impl GameRoom {
                     // On ground or stepping up/down 1 block - snap to terrain height
                     (target_height, true)
                 }
+            } else if let Some(instance_id) = player_instance {
+                if let Some((_, map_width, _, Some(hm))) =
+                    instance_collision_snapshots.get(instance_id)
+                {
+                    let index = (target_y as u32 * map_width + target_x as u32) as usize;
+                    let target_height = hm.get(index).copied().unwrap_or(0) as i32;
+                    if !player_grounded && player_z > target_height + 1 {
+                        (player_z, false)
+                    } else if player_grounded && player_z > target_height + 1 {
+                        (player_z, false)
+                    } else {
+                        (target_height, true)
+                    }
+                } else {
+                    (player_z, player_grounded)
+                }
             } else {
-                (player_z, player_grounded) // Instances stay at same Z for now
+                (player_z, player_grounded)
             };
 
             MoveCheck::Valid(result_z, result_grounded)

@@ -17,6 +17,8 @@ pub mod fletching;
 pub mod furnace;
 pub mod gold_drop_dialog;
 pub mod inventory;
+pub mod boss_hud;
+pub mod koth;
 pub mod menu;
 pub mod prayer;
 pub mod quest;
