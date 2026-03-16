@@ -4150,20 +4150,20 @@
   ],
   "portals": [
     {
-      "x": 21,
-      "y": 20,
-      "width": 1,
-      "height": 1,
-      "targetMap": "deep_desert_bank",
-      "targetSpawn": ""
-    },
-    {
       "x": 6,
       "y": 30,
       "width": 1,
       "height": 1,
       "targetMap": "deep_desert_range_shop",
       "targetSpawn": "entrance"
+    },
+    {
+      "x": 21,
+      "y": 20,
+      "width": 1,
+      "height": 1,
+      "targetMap": "deep_desert_bank",
+      "targetSpawn": ""
     }
   ],
   "gatheringZones": []

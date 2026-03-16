@@ -42,6 +42,7 @@ quantity_max = 1
 
 [evil_cactus.behaviors]
 hostile = true
+no_shadow = true
 wander_enabled = true
 wander_radius = 2
 wander_pause_min_ms = 4000
