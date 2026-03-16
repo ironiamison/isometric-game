@@ -218,6 +218,7 @@ pub enum SpritesheetStore {
     Individual(HashMap<String, Texture2D>),
 }
 
+
 impl SpritesheetStore {
     /// Look up a spritesheet by key.
     /// Returns (texture, atlas_offset) where:
@@ -333,6 +334,8 @@ pub struct Renderer {
     wall_sprites: SpriteStore,
     /// NPC sprites by entity type (e.g., "pig" -> Texture2D)
     pub(crate) npc_sprites: SpritesheetStore,
+    /// NPC sprites too large for the atlas, loaded individually
+    npc_overflow_sprites: HashMap<String, Texture2D>,
     /// Set of entity types whose idle frames (1 and 3) are non-transparent
     npc_idle_anim_set: HashSet<String>,
     /// Multi-size pixel font for sharp text rendering at various sizes
@@ -754,6 +757,7 @@ impl Renderer {
             object_sprites,
             wall_sprites,
             npc_sprites,
+            npc_overflow_sprites,
             farming_sprites,
             spell_effect_textures,
         ) = {
@@ -937,17 +941,28 @@ impl Renderer {
 
             // Load NPCs/enemies - atlas if available
             set_loading!("Loading NPCs...");
-            let npcs: SpritesheetStore = if let Some(ref atlas_info) = manifest.enemies_atlas {
+            let (npcs, npc_overflow): (SpritesheetStore, HashMap<String, Texture2D>) = if let Some(ref atlas_info) = manifest.enemies_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
                     loaded += manifest.enemies.len();
                     #[cfg(target_arch = "wasm32")]
                     Self::update_loading(loaded, total, "Loading NPCs...");
-                    SpritesheetStore::Atlas {
+                    // Load any sprites from manifest that didn't fit in the atlas
+                    let mut overflow = HashMap::new();
+                    for name in &manifest.enemies {
+                        if !rects.contains_key(name.as_str()) {
+                            let path = asset_path(&format!("assets/sprites/enemies/{}.png", name));
+                            if let Ok(tex) = load_texture(&path).await {
+                                tex.set_filter(FilterMode::Nearest);
+                                overflow.insert(name.clone(), tex);
+                            }
+                        }
+                    }
+                    (SpritesheetStore::Atlas {
                         texture: tex,
                         rects,
-                    }
+                    }, overflow)
                 } else {
-                    SpritesheetStore::Individual(
+                    (SpritesheetStore::Individual(
                         load_individual_sprites(
                             &manifest.enemies,
                             "assets/sprites/enemies",
@@ -956,10 +971,10 @@ impl Renderer {
                             "Loading NPCs...",
                         )
                         .await,
-                    )
+                    ), HashMap::new())
                 }
             } else {
-                SpritesheetStore::Individual(
+                (SpritesheetStore::Individual(
                     load_individual_sprites(
                         &manifest.enemies,
                         "assets/sprites/enemies",
@@ -968,7 +983,7 @@ impl Renderer {
                         "Loading NPCs...",
                     )
                     .await,
-                )
+                ), HashMap::new())
             };
 
             // Load farming sprites - atlas if available
@@ -1075,7 +1090,7 @@ impl Renderer {
             };
 
             (
-                equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects,
+                equipment, weapons, wf_sizes, items, objects, walls, npcs, npc_overflow, farming, effects,
             )
         };
 
@@ -1088,6 +1103,7 @@ impl Renderer {
             object_sprites,
             wall_sprites,
             npc_sprites,
+            npc_overflow_sprites,
             farming_sprites,
             spell_effect_textures,
         ) = {
@@ -1225,31 +1241,42 @@ impl Renderer {
                 )
             };
 
-            let npcs = if let Some(ref atlas_info) = manifest.enemies_atlas {
+            let (npcs, npc_overflow) = if let Some(ref atlas_info) = manifest.enemies_atlas {
                 if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
-                    SpritesheetStore::Atlas {
+                    // Load any sprites from manifest that didn't fit in the atlas
+                    let mut overflow = HashMap::new();
+                    for name in &manifest.enemies {
+                        if !rects.contains_key(name.as_str()) {
+                            let path = format!("assets/sprites/enemies/{}.png", name);
+                            if let Ok(tex) = load_texture(&path).await {
+                                tex.set_filter(FilterMode::Nearest);
+                                overflow.insert(name.clone(), tex);
+                            }
+                        }
+                    }
+                    (SpritesheetStore::Atlas {
                         texture: tex,
                         rects,
-                    }
+                    }, overflow)
                 } else {
-                    SpritesheetStore::Individual(
+                    (SpritesheetStore::Individual(
                         load_sprites_from_dir_or_manifest(
                             "assets/sprites/enemies",
                             &manifest.enemies,
                             "assets/sprites/enemies",
                         )
                         .await,
-                    )
+                    ), HashMap::new())
                 }
             } else {
-                SpritesheetStore::Individual(
+                (SpritesheetStore::Individual(
                     load_sprites_from_dir_or_manifest(
                         "assets/sprites/enemies",
                         &manifest.enemies,
                         "assets/sprites/enemies",
                     )
                     .await,
-                )
+                ), HashMap::new())
             };
 
             let farming = if let Some(ref atlas_info) = manifest.farming_atlas {
@@ -1331,7 +1358,7 @@ impl Renderer {
             };
 
             (
-                equipment, weapons, wf_sizes, items, objects, walls, npcs, farming, effects,
+                equipment, weapons, wf_sizes, items, objects, walls, npcs, npc_overflow, farming, effects,
             )
         };
 
@@ -1729,6 +1756,7 @@ impl Renderer {
             object_sprites,
             wall_sprites,
             npc_sprites,
+            npc_overflow_sprites,
             npc_idle_anim_set,
             font,
             quest_complete_texture,
@@ -3763,16 +3791,19 @@ impl Renderer {
 
         // Add NPCs
         for npc in state.npcs.values() {
-            if !is_visible_world(npc.x, npc.y) {
+            let center_offset = (npc.size - 1) as f32 * 0.5;
+            let cx = npc.x + center_offset;
+            let cy = npc.y + center_offset;
+            if !is_visible_world(cx, cy) {
                 continue;
             }
             let descending_away = npc.target_z < npc.z
                 && npc.target_x <= npc.x.floor()
                 && npc.target_y <= npc.y.floor();
             let depth = if descending_away {
-                calculate_depth_z(npc.x.floor(), npc.y.floor(), npc.z, 1) - 0.02
+                calculate_depth_z(cx.floor(), cy.floor(), npc.z, 1) - 0.02
             } else {
-                let ceil_depth = calculate_depth_z(npc.x.ceil(), npc.y.ceil(), npc.z, 1);
+                let ceil_depth = calculate_depth_z(cx.ceil(), cy.ceil(), npc.z, 1);
                 let target_depth = calculate_depth_z(npc.target_x, npc.target_y, npc.target_z, 1);
                 ceil_depth.max(target_depth) + 0.25
             };
@@ -4735,7 +4766,8 @@ impl Renderer {
 
             // Compute sprite height to find top_y
             let sprite_height =
-                if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type) {
+                if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type)
+                    .or_else(|| self.npc_overflow_sprites.get(&npc.entity_type).map(|t| (t.width(), t.height()))) {
                     (h * zoom).round()
                 } else {
                     // Fallback ellipse sizing
@@ -5702,7 +5734,8 @@ impl Renderer {
                 (SPRITE_HEIGHT - 8.0) * zoom / 2.0 // Center of player sprite
             } else if let Some(npc) = state.npcs.get(&event.target_id) {
                 // Use actual sprite height if available, otherwise fallback to ellipse size
-                if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type) {
+                if let Some((_, h)) = self.npc_sprites.get_dimensions(&npc.entity_type)
+                    .or_else(|| self.npc_overflow_sprites.get(&npc.entity_type).map(|t| (t.width(), t.height()))) {
                     h * zoom / 2.0 // Center of NPC sprite
                 } else {
                     12.0 * zoom // Center of fallback ellipse
@@ -7782,7 +7815,13 @@ impl Renderer {
     }
 
     fn render_npc(&self, npc: &Npc, is_selected: bool, is_hovered: bool, camera: &Camera) {
-        let (screen_x, screen_y) = world_to_screen_z(npc.x, npc.y, npc.z, camera);
+        let center_offset = (npc.size - 1) as f32 * 0.5;
+        let (screen_x, screen_y) = world_to_screen_z(
+            npc.x + center_offset,
+            npc.y + center_offset,
+            npc.z,
+            camera,
+        );
         let zoom = camera.zoom;
 
         // Don't render if death animation is complete
@@ -7815,11 +7854,14 @@ impl Renderer {
 
         // Try to render with sprite, fall back to ellipse
         let sprite_height =
-            if let Some((npc_texture, npc_atlas_offset)) = self.npc_sprites.get(&npc.entity_type) {
-                // Auto-detect frame size from texture (16 frames per sheet)
+            if let Some((npc_texture, npc_atlas_offset)) = self.npc_sprites.get(&npc.entity_type)
+                .or_else(|| self.npc_overflow_sprites.get(&npc.entity_type).map(|t| (t, None)))
+            {
+                // Auto-detect frame size from texture
                 let (tex_w, tex_h) = self
                     .npc_sprites
                     .get_dimensions(&npc.entity_type)
+                    .or_else(|| self.npc_overflow_sprites.get(&npc.entity_type).map(|t| (t.width(), t.height())))
                     .unwrap_or((npc_texture.width(), npc_texture.height()));
                 let total_frames = if npc.animation.layout == NpcAnimationLayout::BossWurm {
                     38.0
@@ -7849,11 +7891,12 @@ impl Renderer {
                 // Draw shadow (unless disabled)
                 if !npc.no_shadow {
                     let shadow_scale = (frame_width / 50.0).clamp(0.5, 2.0);
+                    let size_scale = npc.size as f32;
                     draw_ellipse(
                         screen_x,
                         screen_y,
-                        16.0 * shadow_scale * zoom,
-                        6.0 * shadow_scale * zoom,
+                        16.0 * shadow_scale * zoom * size_scale,
+                        6.0 * shadow_scale * zoom * size_scale,
                         0.0,
                         Color::from_rgba(0, 0, 0, 60),
                     );
