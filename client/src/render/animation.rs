@@ -295,6 +295,14 @@ impl SpriteCoords {
 // NPC Animation System
 // ============================================================================
 
+/// Layout variant for NPC sprite sheets
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NpcAnimationLayout {
+    #[default]
+    Standard,
+    BossWurm,
+}
+
 /// Animation states for NPCs (simpler than players)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NpcAnimationState {
@@ -302,6 +310,8 @@ pub enum NpcAnimationState {
     Idle,
     Walking,
     Attacking,
+    Submerging,
+    Emerging,
 }
 
 /// NPC animation controller
@@ -318,6 +328,7 @@ pub struct NpcAnimation {
     pub state: NpcAnimationState,
     pub frame: f32,
     finished: bool,
+    pub layout: NpcAnimationLayout,
 }
 
 impl Default for NpcAnimation {
@@ -326,6 +337,7 @@ impl Default for NpcAnimation {
             state: NpcAnimationState::Idle,
             frame: 0.0,
             finished: false,
+            layout: NpcAnimationLayout::Standard,
         }
     }
 }
@@ -347,6 +359,14 @@ impl NpcAnimation {
             NpcAnimationState::Idle => (Self::IDLE_FRAMES, Self::IDLE_FPS, true),
             NpcAnimationState::Walking => (Self::WALK_FRAMES, Self::WALK_FPS, true),
             NpcAnimationState::Attacking => (Self::ATTACK_FRAMES, Self::ATTACK_FPS, false),
+            NpcAnimationState::Submerging => match self.layout {
+                NpcAnimationLayout::BossWurm => (4, 8.0, false),
+                _ => (2, Self::IDLE_FPS, false),
+            },
+            NpcAnimationState::Emerging => match self.layout {
+                NpcAnimationLayout::BossWurm => (8, 6.0, false),
+                _ => (2, Self::IDLE_FPS, false),
+            },
         };
 
         self.frame += delta * fps;
@@ -381,28 +401,55 @@ impl NpcAnimation {
         self.finished = false;
     }
 
-    /// Get the sprite frame index (0-15) based on state and direction.
+    /// Get the sprite frame index based on state, direction, and layout.
     /// When `has_idle_animation` is true, cycles between both idle frames.
     pub fn get_frame_index(&self, direction: Direction, has_idle_animation: bool) -> u32 {
         let use_up_left = is_up_or_left_direction(direction);
         let frame_in_anim = self.frame as u32;
 
-        match self.state {
-            NpcAnimationState::Idle => {
-                let base = if use_up_left { 2 } else { 0 };
-                if has_idle_animation {
-                    base + (frame_in_anim % 2)
-                } else {
-                    base
+        match self.layout {
+            NpcAnimationLayout::Standard => {
+                match self.state {
+                    NpcAnimationState::Idle => {
+                        let base = if use_up_left { 2 } else { 0 };
+                        if has_idle_animation { base + (frame_in_anim % 2) } else { base }
+                    }
+                    NpcAnimationState::Walking => {
+                        let base = if use_up_left { 8 } else { 4 };
+                        base + (frame_in_anim % Self::WALK_FRAMES)
+                    }
+                    NpcAnimationState::Attacking => {
+                        let base = if use_up_left { 14 } else { 12 };
+                        base + (frame_in_anim % Self::ATTACK_FRAMES)
+                    }
+                    NpcAnimationState::Submerging | NpcAnimationState::Emerging => {
+                        if use_up_left { 2 } else { 0 }
+                    }
                 }
             }
-            NpcAnimationState::Walking => {
-                let base = if use_up_left { 8 } else { 4 };
-                base + (frame_in_anim % Self::WALK_FRAMES)
-            }
-            NpcAnimationState::Attacking => {
-                let base = if use_up_left { 14 } else { 12 };
-                base + (frame_in_anim % Self::ATTACK_FRAMES)
+            NpcAnimationLayout::BossWurm => {
+                match self.state {
+                    NpcAnimationState::Idle => {
+                        let base = if use_up_left { 2 } else { 0 };
+                        if has_idle_animation { base + (frame_in_anim % 2) } else { base }
+                    }
+                    NpcAnimationState::Walking => {
+                        let base = if use_up_left { 8 } else { 4 };
+                        base + (frame_in_anim % 4)
+                    }
+                    NpcAnimationState::Attacking => {
+                        let base = if use_up_left { 16 } else { 12 };
+                        base + (frame_in_anim % 4)
+                    }
+                    NpcAnimationState::Submerging => {
+                        let base = if use_up_left { 16 } else { 12 };
+                        let reverse_frame = 3u32.saturating_sub(frame_in_anim.min(3));
+                        base + reverse_frame
+                    }
+                    NpcAnimationState::Emerging => {
+                        30 + (frame_in_anim % 8)
+                    }
+                }
             }
         }
     }

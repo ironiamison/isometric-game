@@ -2,7 +2,7 @@ use super::animation::{
     get_back_static_frame, get_back_static_offset, get_body_armor_frame, get_body_armor_offset,
     get_boot_frame, get_boot_offset, get_hair_offset, get_head_frame, get_head_offset,
     get_offhand_frame, get_offhand_offset, get_weapon_frame, get_weapon_offset, AnimationState,
-    Gender, NpcAnimation, BACK_STATIC_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH,
+    Gender, NpcAnimation, NpcAnimationLayout, BACK_STATIC_SPRITE_HEIGHT, BACK_STATIC_SPRITE_WIDTH,
     BODY_ARMOR_SPRITE_HEIGHT, BODY_ARMOR_SPRITE_WIDTH, BOOT_SPRITE_HEIGHT, BOOT_SPRITE_WIDTH,
     HAIR_SPRITE_HEIGHT, HAIR_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT, HEAD_SPRITE_WIDTH,
     OFFHAND_SPRITE_HEIGHT, OFFHAND_SPRITE_WIDTH, SPRITE_HEIGHT, SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT,
@@ -7815,7 +7815,12 @@ impl Renderer {
                     .npc_sprites
                     .get_dimensions(&npc.entity_type)
                     .unwrap_or((npc_texture.width(), npc_texture.height()));
-                let frame_width = tex_w / 16.0;
+                let total_frames = if npc.animation.layout == NpcAnimationLayout::BossWurm {
+                    38.0
+                } else {
+                    16.0
+                };
+                let frame_width = tex_w / total_frames;
                 let frame_height = tex_h;
                 let (npc_atlas_x, npc_atlas_y) = npc_atlas_offset.unwrap_or((0.0, 0.0));
 

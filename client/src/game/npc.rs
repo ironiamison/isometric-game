@@ -333,6 +333,18 @@ impl Npc {
             return;
         }
 
+        // Handle special NPC states (submerging/emerging)
+        if self.state == NpcState::Submerging {
+            self.animation.set_state(NpcAnimationState::Submerging);
+            self.animation.update(delta);
+            return;
+        }
+        if self.state == NpcState::Emerging {
+            self.animation.set_state(NpcAnimationState::Emerging);
+            self.animation.update(delta);
+            return;
+        }
+
         // Attack animation is triggered by trigger_attack_animation() when damage event received
         if self.animation.state == NpcAnimationState::Attacking {
             // Let attack animation play through

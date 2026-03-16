@@ -3,6 +3,7 @@ use super::protocol::{
     extract_u64, extract_u8,
 };
 use crate::game::npc::{Npc, NpcState};
+use crate::render::animation::NpcAnimationLayout;
 use crate::game::{
     ActiveDialogue, ActivePotionBuff, ActiveQuest, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
@@ -823,6 +824,9 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             } else {
                 // New NPC - add to state
                 let mut npc = Npc::new(id.clone(), entity_type, x, y);
+                if npc.entity_type == "desert_wurm" {
+                    npc.animation.layout = NpcAnimationLayout::BossWurm;
+                }
                 // Snap Z immediately so NPCs on elevated platforms render correctly
                 npc.z = npc_z;
                 npc.server_z = npc_z;
