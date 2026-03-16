@@ -381,18 +381,19 @@ impl NpcAnimation {
         self.finished = false;
     }
 
-    /// Get the sprite frame index (0-15) based on state and direction
-    pub fn get_frame_index(&self, direction: Direction) -> u32 {
+    /// Get the sprite frame index (0-15) based on state and direction.
+    /// When `has_idle_animation` is true, cycles between both idle frames.
+    pub fn get_frame_index(&self, direction: Direction, has_idle_animation: bool) -> u32 {
         let use_up_left = is_up_or_left_direction(direction);
         let frame_in_anim = self.frame as u32;
 
         match self.state {
             NpcAnimationState::Idle => {
-                // Use only first idle frame (not all enemies have 2 idle frames)
-                if use_up_left {
-                    2
+                let base = if use_up_left { 2 } else { 0 };
+                if has_idle_animation {
+                    base + (frame_in_anim % 2)
                 } else {
-                    0
+                    base
                 }
             }
             NpcAnimationState::Walking => {

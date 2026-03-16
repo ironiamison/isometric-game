@@ -333,6 +333,8 @@ pub struct Renderer {
     wall_sprites: SpriteStore,
     /// NPC sprites by entity type (e.g., "pig" -> Texture2D)
     pub(crate) npc_sprites: SpritesheetStore,
+    /// Set of entity types whose idle frames (1 and 3) are non-transparent
+    npc_idle_anim_set: HashSet<String>,
     /// Multi-size pixel font for sharp text rendering at various sizes
     font: BitmapFont,
     /// Quest complete banner texture
@@ -1703,6 +1705,12 @@ impl Renderer {
             log::info!("Found {} animated wall sprites", animated_walls.len());
         }
 
+        // Detect which NPC sprites have non-transparent second idle frames
+        let npc_idle_anim_set = Self::detect_npc_idle_animations(&npc_sprites);
+        if !npc_idle_anim_set.is_empty() {
+            log::info!("Found {} NPCs with idle animations: {:?}", npc_idle_anim_set.len(), npc_idle_anim_set);
+        }
+
         #[cfg(target_arch = "wasm32")]
         Self::hide_loading();
 
@@ -1719,6 +1727,7 @@ impl Renderer {
             object_sprites,
             wall_sprites,
             npc_sprites,
+            npc_idle_anim_set,
             font,
             quest_complete_texture,
             gold_nugget_texture,
@@ -1773,6 +1782,78 @@ impl Renderer {
             }
         }
         map
+    }
+
+    /// Detect which NPC sprites have non-transparent second idle frames.
+    /// Frame 1 is the 2nd idle frame for down/right, frame 3 is for up/left.
+    /// If either frame contains any non-transparent pixels, the NPC has an idle animation.
+    fn detect_npc_idle_animations(npc_sprites: &SpritesheetStore) -> HashSet<String> {
+        let mut set = HashSet::new();
+
+        // Get the image data we need to sample pixels from
+        let (image, keys_and_rects): (Option<Image>, Vec<(String, f32, f32, f32, f32)>) = match npc_sprites {
+            SpritesheetStore::Atlas { texture, rects } => {
+                let img = texture.get_texture_data();
+                let entries: Vec<_> = rects.iter().map(|(key, rect)| {
+                    (key.clone(), rect.x, rect.y, rect.w, rect.h)
+                }).collect();
+                (Some(img), entries)
+            }
+            SpritesheetStore::Individual(map) => {
+                // For individual textures, check each one separately
+                for (key, tex) in map {
+                    let w = tex.width();
+                    let h = tex.height();
+                    let frame_w = w / 16.0;
+                    let img = tex.get_texture_data();
+                    if Self::frame_has_visible_pixels(&img, frame_w as u32 * 1, 0, frame_w as u32, h as u32)
+                        || Self::frame_has_visible_pixels(&img, frame_w as u32 * 3, 0, frame_w as u32, h as u32)
+                    {
+                        set.insert(key.clone());
+                    }
+                }
+                return set;
+            }
+        };
+
+        if let Some(ref img) = image {
+            for (key, atlas_x, atlas_y, w, h) in &keys_and_rects {
+                let frame_w = (*w / 16.0) as u32;
+                let ax = *atlas_x as u32;
+                let ay = *atlas_y as u32;
+                let fh = *h as u32;
+                // Check frame 1 (2nd idle down/right) and frame 3 (2nd idle up/left)
+                if Self::frame_has_visible_pixels(img, ax + frame_w * 1, ay, frame_w, fh)
+                    || Self::frame_has_visible_pixels(img, ax + frame_w * 3, ay, frame_w, fh)
+                {
+                    set.insert(key.clone());
+                }
+            }
+        }
+
+        set
+    }
+
+    /// Check if a rectangular region of an image contains any non-transparent pixels.
+    /// Samples a grid of pixels rather than checking every single one for performance.
+    fn frame_has_visible_pixels(img: &Image, x: u32, y: u32, w: u32, h: u32) -> bool {
+        // Sample every 2 pixels for speed — transparent frames will have 0 alpha everywhere
+        let step = 2;
+        let img_w = img.width() as u32;
+        let img_h = img.height() as u32;
+        for py in (0..h).step_by(step) {
+            for px in (0..w).step_by(step) {
+                let sx = x + px;
+                let sy = y + py;
+                if sx < img_w && sy < img_h {
+                    let color = img.get_pixel(sx, sy);
+                    if color.a > 0.0 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Get the animation source rect for a multi-frame sprite.
@@ -7742,7 +7823,8 @@ impl Renderer {
                 let (npc_atlas_x, npc_atlas_y) = npc_atlas_offset.unwrap_or((0.0, 0.0));
 
                 // Get current frame based on animation state and direction
-                let frame_index = npc.animation.get_frame_index(npc.direction);
+                let has_idle_anim = self.npc_idle_anim_set.contains(&npc.entity_type);
+                let frame_index = npc.animation.get_frame_index(npc.direction, has_idle_anim);
                 let src_x = npc_atlas_x + frame_index as f32 * frame_width;
 
                 // Flip horizontally for Right/Left directions
