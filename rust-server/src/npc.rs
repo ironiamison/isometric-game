@@ -4,9 +4,17 @@ use serde::Serialize;
 use std::collections::HashSet;
 
 /// Returns an iterator over all tiles occupied by an NPC of the given size,
-/// anchored at (x, y) as the top-left corner.
+/// anchored at (x, y).
 pub fn npc_occupied_tiles(x: i32, y: i32, size: i32) -> impl Iterator<Item = (i32, i32)> {
-    (0..size).flat_map(move |dy| (0..size).map(move |dx| (x + dx, y + dy)))
+    npc_occupied_tiles_offset(x, y, size, 0, 0)
+}
+
+/// Like `npc_occupied_tiles` but with explicit tile offsets in both axes.
+/// In isometric, a screen-down shift requires offsetting both x and y.
+pub fn npc_occupied_tiles_offset(x: i32, y: i32, size: i32, offset_x: i32, offset_y: i32) -> impl Iterator<Item = (i32, i32)> {
+    let ax = x + offset_x;
+    let ay = y + offset_y;
+    (0..size).flat_map(move |dy| (0..size).map(move |dx| (ax + dx, ay + dy)))
 }
 
 // ============================================================================
@@ -39,6 +47,7 @@ pub enum NpcState {
     Wandering,  // 5 - added at end to preserve existing state values
     Submerging, // 6
     Emerging,   // 7
+    Burrowing,  // 8 - moving underground (boss dig phase)
 }
 
 // ============================================================================
@@ -218,6 +227,16 @@ impl Npc {
             hidden: false,
             stats,
         }
+    }
+
+    /// Tile offset (reserved for future use).
+    pub fn tile_offset(&self) -> (i32, i32) {
+        (0, 0)
+    }
+
+    /// Returns all tiles this NPC occupies, accounting for size.
+    pub fn occupied_tiles(&self) -> impl Iterator<Item = (i32, i32)> {
+        npc_occupied_tiles(self.x, self.y, self.stats.size)
     }
 
     // Helper methods to get stats
@@ -423,9 +442,11 @@ impl Npc {
     }
 
     /// Minimum Chebyshev distance from point (px, py) to any tile in a size-N NPC at (nx, ny).
-    fn grid_distance_to_npc(px: i32, py: i32, nx: i32, ny: i32, size: i32) -> i32 {
-        let closest_x = px.clamp(nx, nx + size - 1);
-        let closest_y = py.clamp(ny, ny + size - 1);
+    fn grid_distance_to_npc(px: i32, py: i32, nx: i32, ny: i32, size: i32, offset_x: i32, offset_y: i32) -> i32 {
+        let ax = nx + offset_x;
+        let ay = ny + offset_y;
+        let closest_x = px.clamp(ax, ax + size - 1);
+        let closest_y = py.clamp(ay, ay + size - 1);
         (px - closest_x).abs().max((py - closest_y).abs())
     }
 
@@ -503,7 +524,8 @@ impl Npc {
             let new_y = self.y + move_y;
 
             // Check if all tiles in the NPC's footprint are walkable
-            let all_walkable = npc_occupied_tiles(new_x, new_y, self.stats.size)
+            let (off_x, off_y) = self.tile_offset();
+            let all_walkable = npc_occupied_tiles_offset(new_x, new_y, self.stats.size, off_x, off_y)
                 .all(|(tx, ty)| walkable_check(tx, ty));
             if !all_walkable {
                 continue; // Tile has collision
@@ -517,7 +539,7 @@ impl Npc {
             }
 
             // Check if any tile in the NPC's footprint is occupied by another NPC or player
-            let blocked = npc_occupied_tiles(new_x, new_y, self.stats.size)
+            let blocked = npc_occupied_tiles_offset(new_x, new_y, self.stats.size, off_x, off_y)
                 .any(|tile| occupied_tiles.contains(&tile));
             if blocked {
                 continue; // Try next candidate
@@ -569,7 +591,7 @@ impl Npc {
                             if *hp <= 0 {
                                 continue; // Skip dead players
                             }
-                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size);
+                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
                             if dist <= aggro_range {
                                 if nearest.is_none() || dist < nearest.as_ref().unwrap().1 {
                                     nearest = Some((player_id.clone(), dist));
@@ -611,7 +633,7 @@ impl Npc {
                             if *hp <= 0 {
                                 continue;
                             }
-                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size);
+                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
                             if dist <= aggro_range {
                                 self.target_id = Some(player_id.clone());
                                 self.state = NpcState::Chasing;
@@ -682,7 +704,7 @@ impl Npc {
                 if let Some((tx, ty)) = target_pos {
                     let spawn_dist =
                         Self::grid_distance(self.x, self.y, self.spawn_x, self.spawn_y);
-                    let target_dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size);
+                    let target_dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
                     let movement_done =
                         current_time - self.last_move_time >= self.get_move_cooldown_ms();
 
@@ -691,7 +713,7 @@ impl Npc {
                         self.state = NpcState::Returning;
                         self.target_id = None;
                     } else {
-                    let dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size);
+                    let dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
                     let in_range = dist > 0 && dist <= self.get_attack_range();
                     if in_range && movement_done
                     {
@@ -727,7 +749,7 @@ impl Npc {
                 });
 
                 if let Some((target_id, tx, ty)) = target_info {
-                    let dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size);
+                    let dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
                     let in_range = dist > 0 && dist <= self.get_attack_range();
                     if !in_range {
                         // Target moved out of range, chase again
@@ -788,7 +810,7 @@ impl Npc {
             }
 
             NpcState::Dead => {}
-            NpcState::Submerging | NpcState::Emerging => {
+            NpcState::Submerging | NpcState::Emerging | NpcState::Burrowing => {
                 // Handled by boss_tick; no generic AI behavior
             }
         }

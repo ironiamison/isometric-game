@@ -234,7 +234,7 @@ impl GameRoom {
             let npcs = self.npcs.read().await;
             npcs.values()
                 .filter(|npc| npc.is_alive())
-                .map(|npc| (npc.x, npc.y))
+                .flat_map(|npc| npc.occupied_tiles())
                 .collect()
         };
 
@@ -268,7 +268,7 @@ impl GameRoom {
                     let npc_positions: HashSet<(i32, i32)> = npcs
                         .values()
                         .filter(|npc| npc.is_alive())
-                        .map(|npc| (npc.x, npc.y))
+                        .flat_map(|npc| npc.occupied_tiles())
                         .collect();
                     instance_npc_positions.insert(instance_id.clone(), npc_positions);
                 }

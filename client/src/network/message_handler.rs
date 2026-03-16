@@ -3,7 +3,7 @@ use super::protocol::{
     extract_u64, extract_u8,
 };
 use crate::game::npc::{Npc, NpcState};
-use crate::render::animation::NpcAnimationLayout;
+use crate::render::animation::{NpcAnimationLayout, NpcAnimationState};
 use crate::game::{
     ActiveDialogue, ActivePotionBuff, ActiveQuest, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
@@ -828,6 +828,8 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 let mut npc = Npc::new(id.clone(), entity_type, x, y);
                 if npc.entity_type == "big_wurm" {
                     npc.animation.layout = NpcAnimationLayout::BossWurm;
+                } else if npc.entity_type == "rockexplode" {
+                    npc.animation.layout = NpcAnimationLayout::ExplodingRock;
                 }
                 // Snap Z immediately so NPCs on elevated platforms render correctly
                 npc.z = npc_z;
@@ -839,6 +841,14 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 npc.max_hp = max_hp;
                 npc.level = level;
                 npc.state = NpcState::from_u8(npc_state);
+                // Sync animation state immediately to avoid a flash of idle frame
+                match npc.state {
+                    NpcState::Submerging => npc.animation.set_state(NpcAnimationState::Submerging),
+                    NpcState::Emerging => npc.animation.set_state(NpcAnimationState::Emerging),
+                    NpcState::Burrowing => npc.animation.set_state(NpcAnimationState::Burrowing),
+                    NpcState::Dead => { npc.start_death(); }
+                    _ => {}
+                }
                 npc.hostile = hostile;
                 npc.is_quest_giver = is_quest_giver;
                 npc.can_turn_in_quest = can_turn_in_quest;
@@ -863,7 +873,11 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
         if let Some(removed) = extract_array(value, "removedNpcs") {
             for rv in removed {
                 if let Some(id) = rv.as_str() {
-                    state.npcs.remove(id);
+                    // Keep dying NPCs so their death animation can finish
+                    let is_dying = state.npcs.get(id).map(|n| n.is_dying()).unwrap_or(false);
+                    if !is_dying {
+                        state.npcs.remove(id);
+                    }
                 }
             }
         }
@@ -871,7 +885,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
 
     // Instance full sync: remove NPCs no longer present in the server's list
     if is_full_sync && !sync_instance.is_empty() {
-        state.npcs.retain(|id, _| synced_npc_ids.contains(id));
+        state.npcs.retain(|id, npc| synced_npc_ids.contains(id) || npc.is_dying());
     }
 
     // Push NPC regen events as healing numbers (negative damage = green +X)

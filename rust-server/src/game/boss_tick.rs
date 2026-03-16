@@ -3,7 +3,7 @@ use crate::boss::BossEvent;
 use crate::npc::{Npc, NpcState};
 use crate::protocol::ServerMessage;
 
-pub const BOSS_MAP_ID: &str = "desert_wurm_arena";
+pub const BOSS_MAP_ID: &str = "desert_boss_cave";
 
 impl GameRoom {
     /// Process all active boss fight sessions each tick
@@ -261,7 +261,7 @@ impl GameRoom {
                     {
                         let npcs = instance.npcs.read().await;
                         for (npc_id, npc) in npcs.iter() {
-                            if npc_id.starts_with("boss_minion_") {
+                            if npc_id.starts_with("boss_minion_") && npc.is_alive() {
                                 let nx = npc.x;
                                 let ny = npc.y;
                                 if blast_tiles.contains(&(nx, ny)) {
@@ -344,6 +344,7 @@ impl GameRoom {
                         npc.state = match state {
                             6 => NpcState::Submerging,
                             7 => NpcState::Emerging,
+                            8 => NpcState::Burrowing,
                             _ => NpcState::Idle,
                         };
                     }

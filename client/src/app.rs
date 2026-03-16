@@ -18,15 +18,15 @@ use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Scree
 
 use crate::game::tutorial::TutorialManager;
 
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
 // pub const SERVER_URL: &str = "https://aeven.xyz";
 // pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
-pub const DEV_MODE: bool = false;
+pub const DEV_MODE: bool = true;
 
 /// Show the control scheme choice dialogue if the player hasn't chosen yet.
 /// Skipped on Android (no keyboard).

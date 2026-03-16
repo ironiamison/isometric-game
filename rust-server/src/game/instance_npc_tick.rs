@@ -104,14 +104,14 @@ impl GameRoom {
             let mut occupied_tiles = build_instance_occupied_tiles(
                 npcs.values()
                     .filter(|npc| npc.is_alive())
-                    .flat_map(|npc| crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size)),
+                    .flat_map(|npc| npc.occupied_tiles()),
                 &inst_player_list,
             );
 
             for npc in npcs.values_mut() {
                 if npc.ready_to_respawn(current_time) {
                     npc.respawn();
-                    for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                    for tile in npc.occupied_tiles() {
                         occupied_tiles.insert(tile);
                     }
                 }
@@ -121,7 +121,7 @@ impl GameRoom {
                     continue;
                 }
 
-                for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                for tile in npc.occupied_tiles() {
                     occupied_tiles.remove(&tile);
                 }
 
@@ -145,12 +145,16 @@ impl GameRoom {
                     ));
                 }
 
-                // Check explosive minion contact with players
+                // Check explosive minion proximity with players (explode within attack range)
                 if npc.is_alive() && npc.prototype_id == "wurm_minion" {
-                    for (player_id, px, py, _php) in &inst_player_list {
-                        if crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size)
-                            .any(|(tx, ty)| tx == *px && ty == *py) {
-                            // Contact! Kill the minion to trigger explosion
+                    let attack_range = npc.stats.attack_range;
+                    for (_player_id, px, py, _php) in &inst_player_list {
+                        let dist = npc.occupied_tiles()
+                            .map(|(tx, ty)| (tx - *px).abs().max((ty - *py).abs()))
+                            .min()
+                            .unwrap_or(i32::MAX);
+                        if dist <= attack_range {
+                            // In range! Kill the minion to trigger explosion
                             npc.hp = 0;
                             npc.state = crate::npc::NpcState::Dead;
                             npc.death_time = current_time;
@@ -166,7 +170,7 @@ impl GameRoom {
                 }
 
                 if npc.is_alive() {
-                    for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                    for tile in npc.occupied_tiles() {
                         occupied_tiles.insert(tile);
                     }
                 }

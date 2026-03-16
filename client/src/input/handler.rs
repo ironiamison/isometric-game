@@ -534,7 +534,17 @@ fn auto_action_target_pos(
         "npc" => state
             .npcs
             .get(&aa.target_id)
-            .map(|n| (n.server_x, n.server_y)),
+            .and_then(|n| {
+                // For multi-tile NPCs, target the nearest tile of the footprint
+                let player = state.get_local_player()?;
+                let px = player.server_x.round() as i32;
+                let py = player.server_y.round() as i32;
+                let nx = n.server_x.round() as i32;
+                let ny = n.server_y.round() as i32;
+                let closest_x = px.clamp(nx, nx + n.size - 1);
+                let closest_y = py.clamp(ny, ny + n.size - 1);
+                Some((closest_x as f32, closest_y as f32))
+            }),
         "player" => state
             .players
             .get(&aa.target_id)
@@ -981,14 +991,23 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                 let py = player.server_y.round() as i32;
                 let nx = npc.server_x.round() as i32;
                 let ny = npc.server_y.round() as i32;
+                // For multi-tile NPCs, use the nearest footprint tile for range/pathfinding
+                let closest_x = px.clamp(nx, nx + npc.size - 1);
+                let closest_y = py.clamp(ny, ny + npc.size - 1);
                 let weapon_range = get_local_weapon_range(state);
-                if !in_attack_range(px, py, nx, ny, weapon_range) {
-                    let occupied = build_occupied_set(state, true);
+                if !in_attack_range(px, py, closest_x, closest_y, weapon_range) {
+                    let mut occupied = build_occupied_set(state, true);
+                    // Remove NPC footprint tiles so pathfinding can route to them
+                    for dy in 0..npc.size {
+                        for dx in 0..npc.size {
+                            occupied.remove(&(nx + dx, ny + dy));
+                        }
+                    }
                     const MAX_PATH_DISTANCE: i32 = 32;
                     if let Some((dest, path)) = find_path_to_attack_with_optimistic_splice(
                         state,
                         (px, py),
-                        (nx, ny),
+                        (closest_x, closest_y),
                         &occupied,
                         MAX_PATH_DISTANCE,
                         weapon_range,
@@ -1006,8 +1025,8 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                     }
                 } else {
                     let dir = crate::game::Direction::from_velocity(
-                        npc.server_x - player.x,
-                        npc.server_y - player.y,
+                        closest_x as f32 - player.x,
+                        closest_y as f32 - player.y,
                     );
                     queue_face(state, commands, dir as u8);
                     if let Some(aa) = state.auto_action_state.as_ref() {
@@ -1220,7 +1239,18 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
             let mut occupied = build_occupied_set(state, true);
             match aa.target_type.as_str() {
                 "npc" => {
-                    occupied.remove(&target);
+                    // Remove all footprint tiles for multi-tile NPCs
+                    if let Some(npc) = state.npcs.get(&aa.target_id) {
+                        let nx = npc.server_x.round() as i32;
+                        let ny = npc.server_y.round() as i32;
+                        for dy in 0..npc.size {
+                            for dx in 0..npc.size {
+                                occupied.remove(&(nx + dx, ny + dy));
+                            }
+                        }
+                    } else {
+                        occupied.remove(&target);
+                    }
                 }
                 "player" => {
                     occupied.remove(&target);
@@ -2046,19 +2076,21 @@ impl InputHandler {
             let hover_radius_sq = hover_radius_px * hover_radius_px;
             let mut hovered_entity: Option<String> = None;
 
-            for npc in state.npcs.values() {
+            'npc_loop: for npc in state.npcs.values() {
                 if npc.state != crate::game::npc::NpcState::Dead {
-                    let center_offset = (npc.size - 1) as f32 * 0.5;
-                    let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
-                        npc.x + center_offset, npc.y + center_offset, npc.z, &state.camera,
-                    );
-                    let size_scale = npc.size as f32;
-                    let npc_hover_radius_sq = hover_radius_sq * size_scale * size_scale;
-                    let dx = mx - sx;
-                    let dy = my - sy;
-                    if dx * dx + dy * dy < npc_hover_radius_sq {
-                        hovered_entity = Some(npc.id.clone());
-                        break;
+                    // Check each tile in the NPC's footprint
+                    for dy in 0..npc.size {
+                        for dx in 0..npc.size {
+                            let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
+                                npc.x + dx as f32, npc.y + dy as f32, npc.z, &state.camera,
+                            );
+                            let dmx = mx - sx;
+                            let dmy = my - sy;
+                            if dmx * dmx + dmy * dmy < hover_radius_sq {
+                                hovered_entity = Some(npc.id.clone());
+                                break 'npc_loop;
+                            }
+                        }
                     }
                 }
             }
@@ -9722,7 +9754,15 @@ impl InputHandler {
                 let npc_tile_x = npc.x.round() as i32;
                 let npc_tile_y = npc.y.round() as i32;
 
-                if npc_tile_x == clicked_tile_x && npc_tile_y == clicked_tile_y {
+                let mut on_footprint = false;
+                for dy in 0..npc.size {
+                    for dx in 0..npc.size {
+                        if npc_tile_x + dx == clicked_tile_x && npc_tile_y + dy == clicked_tile_y {
+                            on_footprint = true;
+                        }
+                    }
+                }
+                if on_footprint {
                     clicked_npc = Some(id.clone());
                     break;
                 }

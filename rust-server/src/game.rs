@@ -3257,7 +3257,7 @@ impl GameRoom {
             let npc_pos: std::collections::HashSet<(i32, i32)> = npcs
                 .values()
                 .filter(|n| n.is_alive())
-                .map(|n| (n.x, n.y))
+                .flat_map(|n| n.occupied_tiles())
                 .collect();
             drop(npcs);
 
@@ -3280,7 +3280,7 @@ impl GameRoom {
                     let npc_pos: std::collections::HashSet<(i32, i32)> = npcs
                         .values()
                         .filter(|n| n.is_alive())
-                        .map(|n| (n.x, n.y))
+                        .flat_map(|n| n.occupied_tiles())
                         .collect();
 
                     let players = self.players.read().await;
@@ -3723,8 +3723,7 @@ impl GameRoom {
                     for (npc_id, npc) in npcs.iter() {
                         if npc.is_alive()
                             && npc.is_attackable()
-                            && npc.x == check_x
-                            && npc.y == check_y
+                            && npc.occupied_tiles().any(|(tx, ty)| tx == check_x && ty == check_y)
                         {
                             target_id = Some(npc_id.clone());
                             is_npc = true;
@@ -3748,8 +3747,7 @@ impl GameRoom {
                         for (npc_id, npc) in npcs.iter() {
                             if npc.is_alive()
                                 && npc.is_attackable()
-                                && npc.x == check_x
-                                && npc.y == check_y
+                                && npc.occupied_tiles().any(|(tx, ty)| tx == check_x && ty == check_y)
                             {
                                 target_id = Some(npc_id.clone());
                                 is_npc = true;
@@ -5548,14 +5546,14 @@ impl GameRoom {
                             {
                                 let npcs = instance.npcs.read().await;
                                 npcs.get(npc_id)
-                                    .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size))))
+                                    .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size, n.tile_offset()))))
                             } else {
                                 (false, None)
                             }
                         } else {
                             let npcs = self.npcs.read().await;
                             npcs.get(npc_id)
-                                .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size))))
+                                .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size, n.tile_offset()))))
                         };
 
                         if !npc_alive {
@@ -5564,11 +5562,11 @@ impl GameRoom {
                         }
 
                         // Check if in range and cooldown ready
-                        let (in_range, cooldown_ready) = if let Some((npc_x, npc_y, npc_size)) = npc_pos {
+                        let (in_range, cooldown_ready) = if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos {
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
-                                let closest_x = player.x.clamp(npc_x, npc_x + npc_size - 1);
-                                let closest_y = player.y.clamp(npc_y, npc_y + npc_size - 1);
+                                let closest_x = player.x.clamp(npc_x + npc_off_x, npc_x + npc_off_x + npc_size - 1);
+                                let closest_y = player.y.clamp(npc_y + npc_off_y, npc_y + npc_off_y + npc_size - 1);
                                 let dx = (player.x - closest_x).abs();
                                 let dy = (player.y - closest_y).abs();
                                 let (weapon_range, weapon_is_ranged) =
@@ -5588,6 +5586,13 @@ impl GameRoom {
                                 } else {
                                     (dx + dy) <= weapon_range && (dx > 0 || dy > 0)
                                 };
+                                if npc_size > 1 {
+                                    tracing::info!(
+                                        "COMBAT: player({},{}) npc_anchor({},{}) size={} closest=({},{}) dx={} dy={} range={} in_range={}",
+                                        player.x, player.y, npc_x, npc_y, npc_size,
+                                        closest_x, closest_y, dx, dy, weapon_range, in_range
+                                    );
+                                }
                                 let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= cd;
@@ -5601,11 +5606,11 @@ impl GameRoom {
 
                         if in_range && cooldown_ready {
                             // Compute facing direction toward NPC target
-                            let face_dir = if let Some((npc_x, npc_y, npc_size)) = npc_pos {
+                            let face_dir = if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos {
                                 let players = self.players.read().await;
                                 if let Some(player) = players.get(&pid) {
-                                    let closest_x = player.x.clamp(npc_x, npc_x + npc_size - 1);
-                                    let closest_y = player.y.clamp(npc_y, npc_y + npc_size - 1);
+                                    let closest_x = player.x.clamp(npc_x + npc_off_x, npc_x + npc_off_x + npc_size - 1);
+                                    let closest_y = player.y.clamp(npc_y + npc_off_y, npc_y + npc_off_y + npc_size - 1);
                                     let dx = closest_x - player.x;
                                     let dy = closest_y - player.y;
                                     Some(direction_from_delta(dx, dy))
@@ -6230,7 +6235,11 @@ impl GameRoom {
             let done_npcs = all_npc_quests_done_by_player.get(player_id.as_str());
             let nearby_npcs: HashMap<String, NpcUpdate> = npc_map
                 .iter()
-                .filter(|(_, n)| (n.x - px).abs().max((n.y - py).abs()) <= VIEW_DISTANCE)
+                .filter(|(_, n)| {
+                    let closest_x = px.clamp(n.x, n.x + n.size.max(1) - 1);
+                    let closest_y = py.clamp(n.y, n.y + n.size.max(1) - 1);
+                    (closest_x - px).abs().max((closest_y - py).abs()) <= VIEW_DISTANCE
+                })
                 .map(|(_, n)| {
                     let mut n_for_player = (*n).clone();
                     // Hide quest giver icon for merchant NPCs whose quests are all done

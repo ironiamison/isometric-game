@@ -82,7 +82,7 @@ impl GameRoom {
             let mut occupied_tiles = build_overworld_occupied_tiles(
                 npcs.values()
                     .filter(|npc| npc.is_alive())
-                    .flat_map(|npc| crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size)),
+                    .flat_map(|npc| npc.occupied_tiles()),
                 player_positions,
                 &self.portal_tiles,
             );
@@ -91,13 +91,13 @@ impl GameRoom {
                 if npc.ready_to_respawn(current_time) {
                     npc.respawn();
                     respawned_npcs.push((npc.id.clone(), npc.x, npc.y));
-                    for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                    for tile in npc.occupied_tiles() {
                         occupied_tiles.insert(tile);
                     }
                 }
 
                 let old_pos = (npc.x, npc.y);
-                for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                for tile in npc.occupied_tiles() {
                     occupied_tiles.remove(&tile);
                 }
 
@@ -126,7 +126,7 @@ impl GameRoom {
                 }
 
                 if npc.is_alive() {
-                    for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                    for tile in npc.occupied_tiles() {
                         occupied_tiles.insert(tile);
                     }
                 }

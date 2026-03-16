@@ -2120,6 +2120,12 @@ pub fn npc_update_to_value(n: &NpcUpdate) -> rmpv::Value {
         Value::String("render_offset_y".into()),
         Value::F32(n.render_offset_y),
     ));
+    if n.size > 1 {
+        nmap.push((
+            Value::String("size".into()),
+            Value::Integer((n.size as i64).into()),
+        ));
+    }
     Value::Map(nmap)
 }
 

@@ -3486,6 +3486,9 @@ impl Renderer {
         self.render_aoe_warnings(state);
         self.render_explosions(state);
 
+        // DEBUG: Render NPC occupied tile footprints for multi-tile NPCs
+        self.render_npc_debug_tiles(state);
+
         timings.ground_ms = (get_time() - t0) * 1000.0;
 
         // Skip entity/world rendering until world is ready
@@ -5744,7 +5747,14 @@ impl Renderer {
                 25.0 * zoom // Fallback for unknown entities
             };
 
-            let (screen_x, screen_y) = world_to_screen(event.x, event.y, &state.camera);
+            // For multi-tile NPCs, center damage numbers on the footprint
+            let (dmg_x, dmg_y) = if let Some(npc) = state.npcs.get(&event.target_id) {
+                let center_offset = (npc.size - 1) as f32 * 0.5;
+                (event.x + center_offset, event.y + center_offset)
+            } else {
+                (event.x, event.y)
+            };
+            let (screen_x, screen_y) = world_to_screen(dmg_x, dmg_y, &state.camera);
 
             // Viewport culling - skip off-screen damage numbers
             let (sw, sh) = virtual_screen_size();
@@ -6377,6 +6387,32 @@ impl Renderer {
 
         // Draw yellow diamond outline
         let line_width = 2.0 * camera.zoom;
+        draw_line(top.0, top.1, right.0, right.1, line_width, color);
+        draw_line(right.0, right.1, bottom.0, bottom.1, line_width, color);
+        draw_line(bottom.0, bottom.1, left.0, left.1, line_width, color);
+        draw_line(left.0, left.1, top.0, top.1, line_width, color);
+    }
+
+    /// Draw a single large diamond selection outline covering an NxN tile footprint.
+    fn render_multi_tile_selection(&self, world_x: f32, world_y: f32, world_z: f32, size: i32, render_offset_y: f32, camera: &Camera) {
+        let s = size as f32;
+        let y_off = -render_offset_y * camera.zoom;
+        // The 4 corners of the NxN diamond in world space:
+        // top = (x, y), right = (x+s, y), bottom = (x+s, y+s), left = (x, y+s)
+        let top = world_to_screen_z(world_x, world_y, world_z, camera);
+        let right = world_to_screen_z(world_x + s, world_y, world_z, camera);
+        let bottom = world_to_screen_z(world_x + s, world_y + s, world_z, camera);
+        let left = world_to_screen_z(world_x, world_y + s, world_z, camera);
+        let top = (top.0, top.1 + y_off);
+        let right = (right.0, right.1 + y_off);
+        let bottom = (bottom.0, bottom.1 + y_off);
+        let left = (left.0, left.1 + y_off);
+
+        let pulse = (macroquad::time::get_time() * 3.0).sin() as f32 * 0.3 + 0.7;
+        let alpha = (pulse * 255.0) as u8;
+        let color = Color::from_rgba(255, 255, 0, alpha);
+        let line_width = 2.0 * camera.zoom;
+
         draw_line(top.0, top.1, right.0, right.1, line_width, color);
         draw_line(right.0, right.1, bottom.0, bottom.1, line_width, color);
         draw_line(bottom.0, bottom.1, left.0, left.1, line_width, color);
@@ -7834,7 +7870,11 @@ impl Renderer {
 
         // Selection highlight (draw first, behind NPC) - skip while dying
         if is_selected && npc.death_timer.is_none() {
-            self.render_tile_selection(npc.x, npc.y, npc.z, camera);
+            if npc.size > 1 {
+                self.render_multi_tile_selection(npc.x, npc.y, npc.z, npc.size, npc.render_offset_y, camera);
+            } else {
+                self.render_tile_selection(npc.x, npc.y, npc.z, camera);
+            }
         }
 
         // Name color based on NPC type
@@ -7863,10 +7903,10 @@ impl Renderer {
                     .get_dimensions(&npc.entity_type)
                     .or_else(|| self.npc_overflow_sprites.get(&npc.entity_type).map(|t| (t.width(), t.height())))
                     .unwrap_or((npc_texture.width(), npc_texture.height()));
-                let total_frames = if npc.animation.layout == NpcAnimationLayout::BossWurm {
-                    38.0
-                } else {
-                    16.0
+                let total_frames = match npc.animation.layout {
+                    NpcAnimationLayout::BossWurm => 48.0,
+                    NpcAnimationLayout::ExplodingRock => 22.0,
+                    _ => 16.0,
                 };
                 let frame_width = tex_w / total_frames;
                 let frame_height = tex_h;
@@ -8702,6 +8742,47 @@ impl Renderer {
                     base_color,
                 );
             }
+        }
+    }
+
+    /// DEBUG: Render occupied tile footprints for multi-tile NPCs
+    fn render_npc_debug_tiles(&self, state: &GameState) {
+        let zoom = state.camera.zoom;
+        for npc in state.npcs.values() {
+            if npc.size <= 1 {
+                continue;
+            }
+            // Show the raw anchor footprint (green) — tiles (x,y) to (x+size-1, y+size-1)
+            for dy in 0..npc.size {
+                for dx in 0..npc.size {
+                    let tx = npc.x as f32 + dx as f32;
+                    let ty = npc.y as f32 + dy as f32;
+                    let (sx, sy) = world_to_screen(tx, ty, &state.camera);
+                    let half_w = (TILE_WIDTH / 2.0) * zoom * 0.5;
+                    let half_h = (TILE_HEIGHT / 2.0) * zoom * 0.5;
+                    let color = Color::new(0.0, 1.0, 0.0, 0.3);
+                    draw_triangle(
+                        Vec2::new(sx, sy - half_h),
+                        Vec2::new(sx + half_w, sy),
+                        Vec2::new(sx, sy + half_h),
+                        color,
+                    );
+                    draw_triangle(
+                        Vec2::new(sx, sy - half_h),
+                        Vec2::new(sx - half_w, sy),
+                        Vec2::new(sx, sy + half_h),
+                        color,
+                    );
+                }
+            }
+            // Show sprite center (blue dot)
+            let center_offset = (npc.size - 1) as f32 * 0.5;
+            let (cx, cy) = world_to_screen(
+                npc.x as f32 + center_offset,
+                npc.y as f32 + center_offset,
+                &state.camera,
+            );
+            draw_circle(cx, cy, 4.0 * zoom, Color::new(0.0, 0.5, 1.0, 0.8));
         }
     }
 

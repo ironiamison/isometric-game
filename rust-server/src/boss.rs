@@ -5,7 +5,7 @@ use std::collections::HashMap;
 // ---------------------------------------------------------------------------
 
 const DIG_DURATION_MS: u64 = 3000;
-const SUBMERGE_ANIM_MS: u64 = 500;
+const SUBMERGE_ANIM_MS: u64 = 750;
 const EMERGE_DURATION_MS: u64 = 1500;
 const AOE_WARNING_DELAY_MS: u64 = 1500;
 pub const MINION_EXPLOSION_DAMAGE: i32 = 10;
@@ -31,7 +31,7 @@ pub enum BossPhase {
 pub enum WurmState {
     Surface,
     Submerging { ends_at: u64 },
-    Digging { ends_at: u64 },
+    Digging { ends_at: u64, target_x: i32, target_y: i32 },
     Emerging { ends_at: u64, target_x: i32, target_y: i32 },
     Dead,
 }
@@ -179,6 +179,8 @@ pub struct BossState {
     pub aoe_zones: Vec<AoeZone>,
     pub player_ids: Vec<String>,
     pub live_minion_count: u32,
+    /// Last time the boss moved a tile while burrowing
+    pub last_burrow_move_time: u64,
     /// Timestamp when the boss died (0 = alive)
     pub death_time: u64,
     /// Countdown seconds already announced (3, 2, 1)
@@ -189,53 +191,62 @@ pub struct BossState {
 // Helper functions
 // ---------------------------------------------------------------------------
 
+// Arena bounds — all spawns, effects, and movement are clamped to this region
+const ARENA_MIN: i32 = 7;
+const ARENA_MAX: i32 = 27;
+
+/// Clamp a coordinate pair to the arena bounds.
+fn clamp_arena(x: i32, y: i32) -> (i32, i32) {
+    (x.clamp(ARENA_MIN, ARENA_MAX), y.clamp(ARENA_MIN, ARENA_MAX))
+}
+
 /// Generate random rock-throw target tiles within 8 tiles of a position.
 fn generate_rock_targets(
     boss_x: i32,
     boss_y: i32,
     count: u32,
-    map_w: i32,
-    map_h: i32,
+    _map_w: i32,
+    _map_h: i32,
 ) -> Vec<(i32, i32)> {
     let mut targets = Vec::new();
-    // Deterministic-ish spread using simple hash mixing (no rand crate needed)
     for i in 0..count {
         let hash = ((boss_x as u64).wrapping_mul(31))
             .wrapping_add((boss_y as u64).wrapping_mul(17))
             .wrapping_add(i as u64 * 53);
-        let dx = ((hash % 17) as i32) - 8; // range -8..8
+        let dx = ((hash % 17) as i32) - 8;
         let dy = (((hash / 17) % 17) as i32) - 8;
-        let tx = (boss_x + dx).clamp(2, map_w - 3);
-        let ty = (boss_y + dy).clamp(2, map_h - 3);
+        let (tx, ty) = clamp_arena(boss_x + dx, boss_y + dy);
         targets.push((tx, ty));
     }
     targets
 }
 
-/// Pick a random-ish emerge position away from map edges.
-fn pick_emerge_position(map_w: i32, map_h: i32, seed: u64) -> (i32, i32) {
-    let x = 4 + ((seed.wrapping_mul(7) % (map_w as u64 - 8).max(1))) as i32;
-    let y = 4 + (((seed / 3).wrapping_mul(13) % (map_h as u64 - 8).max(1))) as i32;
-    (x.clamp(4, map_w - 5), y.clamp(4, map_h - 5))
+/// Pick a random-ish emerge position within the arena bounds.
+fn pick_emerge_position(_map_w: i32, _map_h: i32, seed: u64) -> (i32, i32) {
+    let range = (ARENA_MAX - ARENA_MIN + 1) as u64;
+    let x = ARENA_MIN + (seed.wrapping_mul(7) % range) as i32;
+    let y = ARENA_MIN + ((seed / 3).wrapping_mul(13) % range) as i32;
+    clamp_arena(x, y)
 }
 
-/// Pick a minion spawn position on map edges.
-fn pick_minion_spawn(map_w: i32, map_h: i32, seed: u64) -> (i32, i32) {
-    let perimeter = 2 * (map_w + map_h) - 4;
+/// Pick a minion spawn position on the arena edges.
+fn pick_minion_spawn(_map_w: i32, _map_h: i32, seed: u64) -> (i32, i32) {
+    let side_len = ARENA_MAX - ARENA_MIN + 1;
+    let perimeter = 4 * side_len - 4;
     let pos = (seed % perimeter.max(1) as u64) as i32;
 
-    if pos < map_w {
+    if pos < side_len {
         // Top edge
-        (pos.clamp(2, map_w - 3), 2)
-    } else if pos < map_w + map_h {
+        (ARENA_MIN + pos, ARENA_MIN)
+    } else if pos < 2 * side_len - 1 {
         // Right edge
-        (map_w - 3, (pos - map_w).clamp(2, map_h - 3))
-    } else if pos < 2 * map_w + map_h {
+        (ARENA_MAX, ARENA_MIN + (pos - side_len + 1))
+    } else if pos < 3 * side_len - 2 {
         // Bottom edge
-        ((pos - map_w - map_h).clamp(2, map_w - 3), map_h - 3)
+        (ARENA_MAX - (pos - 2 * side_len + 2), ARENA_MAX)
     } else {
         // Left edge
-        (2, (pos - 2 * map_w - map_h).clamp(2, map_h - 3))
+        (ARENA_MIN, ARENA_MAX - (pos - 3 * side_len + 3))
     }
 }
 
@@ -272,6 +283,7 @@ impl BossState {
             aoe_zones: Vec::new(),
             player_ids: Vec::new(),
             live_minion_count: 0,
+            last_burrow_move_time: 0,
             death_time: 0,
             countdown_sent: 0,
         }
@@ -343,25 +355,33 @@ impl BossState {
             }
             WurmState::Submerging { ends_at } => {
                 if current_time >= ends_at {
-                    // Submerge animation finished, now actually hide and start digging
-                    self.wurm_state = WurmState::Digging {
-                        ends_at: current_time + DIG_DURATION_MS,
-                    };
-
-                    events.push(BossEvent::HideBoss {
-                        instance_id: self.instance_id.clone(),
-                        npc_id: self.boss_npc_id.clone(),
-                        hidden: true,
-                    });
-                }
-            }
-            WurmState::Digging { ends_at } => {
-                if current_time >= ends_at {
-                    // Transition to Emerging at a random position
+                    // Submerge animation finished — pick emerge target and start burrowing toward it
                     let seed = current_time.wrapping_mul(31).wrapping_add(self.boss_hp as u64);
                     let (tx, ty) = pick_emerge_position(self.map_width, self.map_height, seed);
 
-                    // Generate rock throw AoE zones at the emerge point
+                    self.wurm_state = WurmState::Digging {
+                        ends_at: current_time + DIG_DURATION_MS,
+                        target_x: tx,
+                        target_y: ty,
+                    };
+
+                    // Set burrowing animation (state 8) — boss moves tile-by-tile during Digging
+                    events.push(BossEvent::SetBossNpcState {
+                        instance_id: self.instance_id.clone(),
+                        npc_id: self.boss_npc_id.clone(),
+                        state: 8,
+                    });
+
+                    self.last_burrow_move_time = current_time;
+                }
+            }
+            WurmState::Digging { ends_at: _, target_x, target_y } => {
+                let tx = target_x;
+                let ty = target_y;
+                let at_target = self.boss_x == tx && self.boss_y == ty;
+
+                if at_target {
+                    // Arrived at target — emerge
                     let rock_targets = generate_rock_targets(
                         tx,
                         ty,
@@ -370,15 +390,20 @@ impl BossState {
                         self.map_height,
                     );
 
-                    // Merge all rocks into a single AoE zone so each tile only damages once
                     let mut all_tiles = std::collections::HashSet::new();
                     for target in &rock_targets {
-                        // Each rock hits a small cross pattern (the tile + 4 neighbors)
-                        all_tiles.insert(*target);
-                        all_tiles.insert((target.0 + 1, target.1));
-                        all_tiles.insert((target.0 - 1, target.1));
-                        all_tiles.insert((target.0, target.1 + 1));
-                        all_tiles.insert((target.0, target.1 - 1));
+                        // Cross pattern clamped to arena bounds
+                        for &(tx, ty) in &[
+                            *target,
+                            (target.0 + 1, target.1),
+                            (target.0 - 1, target.1),
+                            (target.0, target.1 + 1),
+                            (target.0, target.1 - 1),
+                        ] {
+                            if tx >= ARENA_MIN && tx <= ARENA_MAX && ty >= ARENA_MIN && ty <= ARENA_MAX {
+                                all_tiles.insert((tx, ty));
+                            }
+                        }
                     }
                     self.aoe_zones.push(AoeZone {
                         tiles: all_tiles.into_iter().collect(),
@@ -393,25 +418,39 @@ impl BossState {
                         target_y: ty,
                     };
 
-                    // Move boss to new position, unhide, and play emerge animation
-                    events.push(BossEvent::MoveBoss {
-                        instance_id: self.instance_id.clone(),
-                        npc_id: self.boss_npc_id.clone(),
-                        x: tx,
-                        y: ty,
-                    });
-
-                    events.push(BossEvent::HideBoss {
-                        instance_id: self.instance_id.clone(),
-                        npc_id: self.boss_npc_id.clone(),
-                        hidden: false,
-                    });
-
                     events.push(BossEvent::SetBossNpcState {
                         instance_id: self.instance_id.clone(),
                         npc_id: self.boss_npc_id.clone(),
                         state: 7,
                     });
+                } else {
+                    // Move one tile toward target every 150ms
+                    const BURROW_MOVE_MS: u64 = 150;
+                    if current_time.saturating_sub(self.last_burrow_move_time) >= BURROW_MOVE_MS {
+                        self.last_burrow_move_time = current_time;
+
+                        let dx = tx - self.boss_x;
+                        let dy = ty - self.boss_y;
+
+                        // Move along the axis with greater distance
+                        let (step_x, step_y) = if dx.abs() >= dy.abs() {
+                            (dx.signum(), 0)
+                        } else {
+                            (0, dy.signum())
+                        };
+
+                        let new_x = self.boss_x + step_x;
+                        let new_y = self.boss_y + step_y;
+                        self.boss_x = new_x;
+                        self.boss_y = new_y;
+
+                        events.push(BossEvent::MoveBoss {
+                            instance_id: self.instance_id.clone(),
+                            npc_id: self.boss_npc_id.clone(),
+                            x: new_x,
+                            y: new_y,
+                        });
+                    }
                 }
             }
             WurmState::Emerging {

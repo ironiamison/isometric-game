@@ -1,5 +1,5 @@
 use super::entities::Direction;
-use crate::render::animation::{NpcAnimation, NpcAnimationState};
+use crate::render::animation::{NpcAnimation, NpcAnimationLayout, NpcAnimationState};
 
 // ============================================================================
 // NPC State
@@ -14,6 +14,7 @@ pub enum NpcState {
     Dead = 4,
     Submerging = 6,
     Emerging = 7,
+    Burrowing = 8,
 }
 
 impl NpcState {
@@ -26,6 +27,7 @@ impl NpcState {
             4 => NpcState::Dead,
             6 => NpcState::Submerging,
             7 => NpcState::Emerging,
+            8 => NpcState::Burrowing,
             _ => NpcState::Idle,
         }
     }
@@ -190,18 +192,34 @@ impl Npc {
     pub fn start_death(&mut self) {
         self.state = NpcState::Dead;
         self.hp = 0;
-        self.pending_death = true;
-        // death_timer starts when NPC reaches target position (in update())
+        if self.animation.layout == NpcAnimationLayout::ExplodingRock {
+            // Exploding rocks start death animation immediately (no walk-to-target)
+            self.death_timer = Some(0.0);
+            self.pending_death = false;
+        } else {
+            self.pending_death = true;
+            // death_timer starts when NPC reaches target position (in update())
+        }
     }
 
-    /// Check if death animation is complete (0.5s total)
+    /// Check if death animation is complete
     pub fn is_death_animation_complete(&self) -> bool {
-        self.death_timer.map(|t| t >= 0.5).unwrap_or(false)
+        let duration = if self.animation.layout == NpcAnimationLayout::ExplodingRock {
+            0.6 // 6 frames at 10fps
+        } else {
+            0.5
+        };
+        self.death_timer.map(|t| t >= duration).unwrap_or(false)
     }
 
     /// Get death animation color tint (fade to red while fading out)
     pub fn get_death_color(&self) -> Option<macroquad::color::Color> {
         use macroquad::color::Color;
+
+        // Exploding rocks use their own explosion frames, no color tint
+        if self.animation.layout == NpcAnimationLayout::ExplodingRock {
+            return self.death_timer.map(|_| Color::from_rgba(255, 255, 255, 255));
+        }
 
         self.death_timer.map(|t| {
             let progress = (t / 0.5).min(1.0);
@@ -246,6 +264,11 @@ impl Npc {
         // Update death animation timer
         if let Some(ref mut t) = self.death_timer {
             *t += delta;
+            // For exploding rocks, play the explosion animation during death
+            if self.animation.layout == NpcAnimationLayout::ExplodingRock {
+                self.animation.set_state(NpcAnimationState::Exploding);
+                self.animation.update(delta);
+            }
             return; // Don't update position/animation while dying
         }
 
@@ -310,7 +333,13 @@ impl Npc {
             // Move faster when far behind to avoid visible teleport snaps
             // while still converging quickly to authoritative state.
             let catchup = (dist * 0.5).clamp(1.0, 3.0);
-            let speed = (self.move_speed * 1.2 * catchup).max(2.0);
+            let base_speed = if self.state == NpcState::Burrowing {
+                // Burrowing boss moves fast underground (matches server 150ms/tile)
+                6.67
+            } else {
+                self.move_speed * 1.2
+            };
+            let speed = (base_speed * catchup).max(2.0);
             let move_dist = speed * delta;
 
             if dist <= move_dist {
@@ -342,9 +371,19 @@ impl Npc {
             self.animation.update(delta);
             return;
         }
-        if self.state == NpcState::Emerging {
-            self.animation.set_state(NpcAnimationState::Emerging);
+        if self.state == NpcState::Burrowing {
+            self.animation.set_state(NpcAnimationState::Burrowing);
             self.animation.update(delta);
+            return;
+        }
+        if self.state == NpcState::Emerging {
+            if self.animation.state != NpcAnimationState::Idle {
+                self.animation.set_state(NpcAnimationState::Emerging);
+                self.animation.update(delta);
+                if self.animation.is_finished() {
+                    self.animation.set_state(NpcAnimationState::Idle);
+                }
+            }
             return;
         }
 

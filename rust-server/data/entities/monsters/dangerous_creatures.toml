@@ -1099,6 +1099,7 @@ wander_enabled = true
 wander_radius = 3
 wander_pause_min_ms = 3000
 wander_pause_max_ms = 6000
+no_shadow = true
 
 # =============================================================================
 # Wurm - Slayer-only variant
