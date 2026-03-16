@@ -104,14 +104,16 @@ impl GameRoom {
             let mut occupied_tiles = build_instance_occupied_tiles(
                 npcs.values()
                     .filter(|npc| npc.is_alive())
-                    .map(|npc| (npc.x, npc.y)),
+                    .flat_map(|npc| crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size)),
                 &inst_player_list,
             );
 
             for npc in npcs.values_mut() {
                 if npc.ready_to_respawn(current_time) {
                     npc.respawn();
-                    occupied_tiles.insert((npc.x, npc.y));
+                    for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                        occupied_tiles.insert(tile);
+                    }
                 }
 
                 // Skip AI for hidden NPCs (e.g. boss underground)
@@ -119,8 +121,9 @@ impl GameRoom {
                     continue;
                 }
 
-                let old_pos = (npc.x, npc.y);
-                occupied_tiles.remove(&old_pos);
+                for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                    occupied_tiles.remove(&tile);
+                }
 
                 let height_check = |wx: i32, wy: i32| -> i32 {
                     entry.get_height_at_sync(&heightmap, wx, wy)
@@ -162,7 +165,9 @@ impl GameRoom {
                 }
 
                 if npc.is_alive() {
-                    occupied_tiles.insert((npc.x, npc.y));
+                    for tile in crate::npc::npc_occupied_tiles(npc.x, npc.y, npc.stats.size) {
+                        occupied_tiles.insert(tile);
+                    }
                 }
 
                 npc.apply_regen(current_time);

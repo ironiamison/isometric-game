@@ -495,8 +495,10 @@ impl Npc {
             let new_x = self.x + move_x;
             let new_y = self.y + move_y;
 
-            // Check if tile is walkable (collision check)
-            if !walkable_check(new_x, new_y) {
+            // Check if all tiles in the NPC's footprint are walkable
+            let all_walkable = npc_occupied_tiles(new_x, new_y, self.stats.size)
+                .all(|(tx, ty)| walkable_check(tx, ty));
+            if !all_walkable {
                 continue; // Tile has collision
             }
 
@@ -507,8 +509,10 @@ impl Npc {
                 continue; // Too high to step up
             }
 
-            // Check if tile is occupied by another NPC or player
-            if occupied_tiles.contains(&(new_x, new_y)) {
+            // Check if any tile in the NPC's footprint is occupied by another NPC or player
+            let blocked = npc_occupied_tiles(new_x, new_y, self.stats.size)
+                .any(|tile| occupied_tiles.contains(&tile));
+            if blocked {
                 continue; // Try next candidate
             }
 
