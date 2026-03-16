@@ -4971,6 +4971,19 @@ impl GameRoom {
             return;
         }
 
+        // Port master interaction - show travel destinations
+        let is_port_master = self
+            .entity_registry
+            .get(&entity_type)
+            .map(|p| p.behaviors.port_master)
+            .unwrap_or(false);
+
+        if is_port_master {
+            self.show_port_master_dialogue(player_id, &npc_id, &entity_type)
+                .await;
+            return;
+        }
+
         if self
             .try_open_merchant_shop(player_id, &npc_id, &entity_type)
             .await
@@ -5072,8 +5085,170 @@ impl GameRoom {
             return;
         }
 
+        // Handle port master travel choices (format: "port:{npc_id}")
+        if let Some(npc_id) = quest_id.strip_prefix("port:") {
+            if let Some(dest_str) = choice_id.strip_prefix("port_dest_") {
+                if let Ok(dest_index) = dest_str.parse::<usize>() {
+                    self.handle_port_travel(player_id, npc_id, dest_index).await;
+                }
+            } else {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+            }
+            return;
+        }
+
         self.handle_quest_dialogue_choice(player_id, quest_id, choice_id)
             .await;
+    }
+
+    // ========================================================================
+    // Port Master System
+    // ========================================================================
+
+    async fn show_port_master_dialogue(&self, player_id: &str, npc_id: &str, entity_type: &str) {
+        let prototype = match self.entity_registry.get(entity_type) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let port_config = match &prototype.port {
+            Some(c) => c,
+            None => return,
+        };
+
+        let player_gold = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(p) => p.inventory.gold,
+                None => return,
+            }
+        };
+
+        let speaker = prototype.display_name.clone();
+        let greeting = prototype
+            .dialogue
+            .greeting
+            .clone()
+            .unwrap_or_else(|| "Where would you like to travel?".to_string());
+
+        let mut choices: Vec<crate::protocol::DialogueChoice> = port_config
+            .destinations
+            .iter()
+            .enumerate()
+            .map(|(i, dest)| {
+                let affordable = player_gold >= dest.cost;
+                let label = if affordable {
+                    format!("{} - {}g", dest.name, dest.cost)
+                } else {
+                    format!("{} - {}g (not enough gold)", dest.name, dest.cost)
+                };
+                crate::protocol::DialogueChoice {
+                    id: format!("port_dest_{}", i),
+                    text: label,
+                }
+            })
+            .collect();
+
+        choices.push(crate::protocol::DialogueChoice {
+            id: "close".to_string(),
+            text: "Nevermind".to_string(),
+        });
+
+        self.send_to_player(
+            player_id,
+            ServerMessage::ShowDialogue {
+                quest_id: format!("port:{}", npc_id),
+                npc_id: npc_id.to_string(),
+                speaker,
+                text: greeting,
+                choices,
+            },
+        )
+        .await;
+    }
+
+    async fn handle_port_travel(&self, player_id: &str, npc_id: &str, dest_index: usize) {
+        // Close dialogue first
+        self.send_to_player(player_id, ServerMessage::DialogueClosed)
+            .await;
+
+        // Look up the NPC's prototype to get the port config
+        let (entity_type, npc_x, npc_y) = {
+            let npcs = self.npcs.read().await;
+            match npcs.get(npc_id) {
+                Some(npc) => (npc.prototype_id.clone(), npc.x, npc.y),
+                None => return,
+            }
+        };
+
+        let prototype = match self.entity_registry.get(&entity_type) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let port_config = match &prototype.port {
+            Some(c) => c,
+            None => return,
+        };
+
+        let destination = match port_config.destinations.get(dest_index) {
+            Some(d) => d,
+            None => return,
+        };
+
+        // Verify player is still near the NPC
+        let mut players = self.players.write().await;
+        let player = match players.get_mut(player_id) {
+            Some(p) if p.active && !p.is_dead => p,
+            _ => return,
+        };
+
+        let dx = (player.x - npc_x) as f32;
+        let dy = (player.y - npc_y) as f32;
+        if (dx * dx + dy * dy).sqrt() > 5.0 {
+            return;
+        }
+
+        // Check gold
+        if player.inventory.gold < destination.cost {
+            drop(players);
+            self.send_system_message(player_id, "You don't have enough gold for that trip.")
+                .await;
+            return;
+        }
+
+        // Deduct gold and teleport
+        player.inventory.gold -= destination.cost;
+        player.x = destination.x;
+        player.y = destination.y;
+        // Reset movement state
+        player.last_move_vel_x = 0;
+        player.last_move_vel_y = 0;
+        player.move_dx = 0;
+        player.move_dy = 0;
+
+        let new_gold = player.inventory.gold;
+        let slots = player.inventory.to_update();
+        drop(players);
+
+        // Send inventory update with new gold
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots,
+                gold: new_gold,
+            },
+        )
+        .await;
+
+        // Send system message
+        self.send_system_message(
+            player_id,
+            &format!("You travel to {}. (-{}g)", destination.name, destination.cost),
+        )
+        .await;
     }
 
     // ========================================================================
