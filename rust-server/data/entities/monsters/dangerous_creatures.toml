@@ -1076,7 +1076,7 @@ gold_min = 30
 gold_max = 70
 
 [[desert_wurm.loot]]
-item_id = "big_bones"
+item_id = "wyvern_bones"
 drop_chance = 0.6
 quantity_min = 1
 quantity_max = 1
@@ -1105,10 +1105,10 @@ wander_pause_max_ms = 6000
 # =============================================================================
 
 [wurm]
-display_name = "Wurm"
+display_name = "Wyvern"
 sprite = "wurm"
 animation_type = "standard"
-description = "A vicious burrowing wurm. Only assigned as a slayer task by Chaeldar."
+description = "A vicious burrowing wyvern. Only assigned as a slayer task by Chaeldar."
 
 [wurm.stats]
 level = 22
@@ -1129,7 +1129,7 @@ gold_min = 25
 gold_max = 55
 
 [[wurm.loot]]
-item_id = "big_bones"
+item_id = "wyvern_bones"
 drop_chance = 0.6
 quantity_min = 1
 quantity_max = 1

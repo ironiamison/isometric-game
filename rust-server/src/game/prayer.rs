@@ -26,6 +26,7 @@ fn altar_xp_for_item(item_id: &str, base_prayer_xp: i32) -> i32 {
     match item_id {
         "regular_bones" => 12,
         "big_bones" => 37,
+        "wyvern_bones" => 75,
         "dragon_bones" => 180,
         _ => (base_prayer_xp as f32 * 2.5) as i32,
     }

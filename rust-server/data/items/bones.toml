@@ -21,6 +21,16 @@ base_price = 25
 sellable = true
 prayer_xp = 15
 
+[wyvern_bones]
+display_name = "Wyvern bones"
+sprite = "big_bones"
+description = "Heavy bones from a wyvern. Grants considerable Prayer experience when buried."
+category = "material"
+max_stack = 99
+base_price = 60
+sellable = true
+prayer_xp = 30
+
 [dragon_bones]
 display_name = "Dragon bones"
 sprite = "dragon_bones"
