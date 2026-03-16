@@ -1043,6 +1043,7 @@ impl Renderer {
                         "self_heal",
                         "bubbles_warp",
                         "tornado",
+                        "rocks_aoe",
                     ] {
                         let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                         if let Ok(tex) = load_texture(&path).await {
@@ -1062,6 +1063,7 @@ impl Renderer {
                     "self_heal",
                     "bubbles_warp",
                     "tornado",
+                    "rocks_aoe",
                 ] {
                     let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                     if let Ok(tex) = load_texture(&path).await {
@@ -5601,6 +5603,7 @@ impl Renderer {
                 "heal" => "self_heal",
                 "teleport" | "return_home" => "bubbles_warp",
                 "tornado" => "tornado",
+                "rocks_aoe" => "rocks_aoe",
                 _ => continue,
             };
 
@@ -5614,7 +5617,10 @@ impl Renderer {
                 .spell_effect_textures
                 .get_dimensions(sprite_name)
                 .unwrap_or((texture.width(), texture.height()));
-            let frame_count = 5usize;
+            let frame_count = match sprite_name {
+                "rocks_aoe" => 8usize,
+                _ => 5usize,
+            };
             let frame_w = tex_w / frame_count as f32;
             let frame_h = tex_h;
             let fps = 10.0_f64;

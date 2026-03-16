@@ -4493,14 +4493,29 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     }
                 }
 
-                // Spawn a small impact effect on each damaged tile
-                for (tx, ty) in tiles {
-                    state.explosions.push(crate::game::state::ExplosionEffect {
-                        x: tx,
-                        y: ty,
-                        radius: 0,
-                        created_at: current_time(),
-                    });
+                let effect = extract_string(value, "effect").unwrap_or_default();
+
+                if !effect.is_empty() {
+                    for (tx, ty) in &tiles {
+                        state.spell_effects.push(SpellEffect {
+                            caster_id: String::new(),
+                            target_id: None,
+                            spell_id: effect.clone(),
+                            target_x: *tx,
+                            target_y: *ty,
+                            time: current_time(),
+                        });
+                    }
+                } else {
+                    // Legacy fallback: orange diamond overlay
+                    for (tx, ty) in tiles {
+                        state.explosions.push(crate::game::state::ExplosionEffect {
+                            x: tx,
+                            y: ty,
+                            radius: 0,
+                            created_at: current_time(),
+                        });
+                    }
                 }
             }
         }
