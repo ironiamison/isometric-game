@@ -2048,12 +2048,15 @@ impl InputHandler {
 
             for npc in state.npcs.values() {
                 if npc.state != crate::game::npc::NpcState::Dead {
+                    let center_offset = (npc.size - 1) as f32 * 0.5;
                     let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
-                        npc.x, npc.y, npc.z, &state.camera,
+                        npc.x + center_offset, npc.y + center_offset, npc.z, &state.camera,
                     );
+                    let size_scale = npc.size as f32;
+                    let npc_hover_radius_sq = hover_radius_sq * size_scale * size_scale;
                     let dx = mx - sx;
                     let dy = my - sy;
-                    if dx * dx + dy * dy < hover_radius_sq {
+                    if dx * dx + dy * dy < npc_hover_radius_sq {
                         hovered_entity = Some(npc.id.clone());
                         break;
                     }
