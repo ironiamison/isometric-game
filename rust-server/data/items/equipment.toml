@@ -1846,7 +1846,7 @@ mine_success_bonus = 0.08
 
 [rune_pickaxe]
 display_name = "Rune Pickaxe"
-sprite = "rune_pickaxe"
+sprite = "adamant_pickaxe"
 category = "equipment"
 max_stack = 1
 base_price = 5000

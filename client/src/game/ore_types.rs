@@ -28,6 +28,18 @@ const STEEL: OreTypeInfo = OreTypeInfo {
     name: "Steel Rock",
     level_required: 30,
 };
+const MITHRIL: OreTypeInfo = OreTypeInfo {
+    name: "Mithril Rock",
+    level_required: 30,
+};
+const ADAMANT: OreTypeInfo = OreTypeInfo {
+    name: "Adamantite Rock",
+    level_required: 40,
+};
+const RUNE: OreTypeInfo = OreTypeInfo {
+    name: "Runite Rock",
+    level_required: 50,
+};
 
 /// Get ore info for a given GID, if it's a rock
 pub fn get_ore_info(gid: u32) -> Option<&'static OreTypeInfo> {
@@ -46,6 +58,15 @@ pub fn get_ore_info(gid: u32) -> Option<&'static OreTypeInfo> {
 
         // Steel rocks: GID 9997
         9997 => Some(&STEEL),
+
+        // Mithril rocks: mapper id 1838 → GID 3000
+        3000 => Some(&MITHRIL),
+
+        // Adamantite rocks: mapper id 1837 → GID 2999
+        2999 => Some(&ADAMANT),
+
+        // Runite rocks: mapper id 1839 → GID 3001
+        3001 => Some(&RUNE),
 
         _ => None,
     }
