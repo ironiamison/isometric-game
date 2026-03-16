@@ -59,6 +59,7 @@ pub struct PrototypeStats {
     pub is_banker: bool,
     pub is_slayer_master: bool,
     pub is_friendly: bool,
+    pub is_port_master: bool,
     pub wander_enabled: bool,
     pub wander_radius: i32,
     pub wander_pause_min_ms: u64,
@@ -149,6 +150,7 @@ impl Npc {
             is_banker: prototype.behaviors.banker,
             is_slayer_master: prototype.behaviors.slayer_master,
             is_friendly: prototype.behaviors.friendly,
+            is_port_master: prototype.behaviors.port_master,
             wander_enabled: prototype.behaviors.wander_enabled,
             wander_radius: prototype.behaviors.wander_radius,
             wander_pause_min_ms: prototype.behaviors.wander_pause_min_ms,
@@ -265,6 +267,10 @@ impl Npc {
         self.stats.is_friendly
     }
 
+    pub fn is_port_master(&self) -> bool {
+        self.stats.is_port_master
+    }
+
     pub fn station_type(&self) -> Option<&str> {
         self.stats.station_type.as_deref()
     }
@@ -278,6 +284,7 @@ impl Npc {
             && !self.stats.is_altar
             && !self.stats.is_banker
             && !self.stats.is_slayer_master
+            && !self.stats.is_port_master
             && self.stats.station_type.is_none()
     }
 
@@ -807,6 +814,8 @@ pub struct NpcUpdate {
     pub is_slayer_master: bool,
     /// Whether this NPC is friendly (non-attackable, no level shown)
     pub is_friendly: bool,
+    /// Whether this NPC is a port master (travel services)
+    pub is_port_master: bool,
     /// Movement speed in tiles per second (for client interpolation)
     pub move_speed: f32,
     /// True only on the tick when this NPC attacks (for animation sync)
@@ -850,6 +859,7 @@ impl From<&Npc> for NpcUpdate {
             is_banker: npc.is_banker(),
             is_slayer_master: npc.is_slayer_master(),
             is_friendly: npc.is_friendly(),
+            is_port_master: npc.is_port_master(),
             move_speed,
             just_attacked: npc.just_attacked,
             no_shadow: npc.stats.no_shadow,
