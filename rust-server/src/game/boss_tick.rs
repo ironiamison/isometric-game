@@ -721,4 +721,134 @@ impl GameRoom {
             boss_npc_id
         );
     }
+
+    /// Show pending boss rewards dialogue to a player
+    pub async fn show_boss_rewards_dialogue(&self, player_id: &str, npc_id: &str) {
+        let pending = if let Some(ref db) = self.db {
+            match db.get_boss_pending_rewards(player_id).await {
+                Ok(rewards) => rewards,
+                Err(e) => {
+                    tracing::error!("Failed to get boss pending rewards for {}: {}", player_id, e);
+                    return;
+                }
+            }
+        } else {
+            return;
+        };
+
+        if pending.is_empty() {
+            self.send_to_player(
+                player_id,
+                ServerMessage::ShowDialogue {
+                    quest_id: String::new(),
+                    npc_id: npc_id.to_string(),
+                    speaker: "Battle Master".to_string(),
+                    text: "Hail, hunter! Defeat the Desert Wurm and I'll distribute the spoils."
+                        .to_string(),
+                    choices: vec![crate::protocol::DialogueChoice {
+                        id: "close".to_string(),
+                        text: "Farewell".to_string(),
+                    }],
+                },
+            )
+            .await;
+            return;
+        }
+
+        // Aggregate rewards by item_id
+        let mut aggregated: std::collections::HashMap<String, u32> =
+            std::collections::HashMap::new();
+        for (_id, item_id, quantity) in &pending {
+            *aggregated.entry(item_id.clone()).or_insert(0) += quantity;
+        }
+
+        let mut text = String::from("Your unclaimed boss rewards:\n\n");
+        for (item_id, quantity) in &aggregated {
+            if item_id == "gold" {
+                text.push_str(&format!("  {} gold\n", quantity));
+            } else {
+                let display_name = self
+                    .item_registry
+                    .get(item_id)
+                    .map(|def| def.display_name.clone())
+                    .unwrap_or_else(|| item_id.clone());
+                text.push_str(&format!("  {} x{}\n", display_name, quantity));
+            }
+        }
+        text.push_str("\nClaim all rewards to your inventory?");
+
+        self.send_to_player(
+            player_id,
+            ServerMessage::ShowDialogue {
+                quest_id: format!("boss_rewards:{}", npc_id),
+                npc_id: npc_id.to_string(),
+                speaker: "Battle Master".to_string(),
+                text,
+                choices: vec![
+                    crate::protocol::DialogueChoice {
+                        id: "claim".to_string(),
+                        text: "Claim Rewards".to_string(),
+                    },
+                    crate::protocol::DialogueChoice {
+                        id: "close".to_string(),
+                        text: "Not Yet".to_string(),
+                    },
+                ],
+            },
+        )
+        .await;
+    }
+
+    /// Claim all pending boss rewards and add to inventory
+    pub async fn claim_boss_rewards(&self, player_id: &str) {
+        let rewards = if let Some(ref db) = self.db {
+            match db.claim_boss_pending_rewards(player_id).await {
+                Ok(rewards) => rewards,
+                Err(e) => {
+                    tracing::error!("Failed to claim boss rewards for {}: {}", player_id, e);
+                    return;
+                }
+            }
+        } else {
+            return;
+        };
+
+        if rewards.is_empty() {
+            self.send_system_message(player_id, "No rewards to claim.")
+                .await;
+            return;
+        }
+
+        let mut total_gold = 0u32;
+        let mut item_count = 0u32;
+
+        for (item_id, quantity) in &rewards {
+            if item_id == "gold" {
+                total_gold += quantity;
+            } else {
+                self.grant_item_to_player(player_id, item_id, *quantity)
+                    .await;
+                item_count += quantity;
+            }
+        }
+
+        if total_gold > 0 {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.inventory.gold += total_gold as i32;
+            }
+        }
+
+        let msg = if total_gold > 0 && item_count > 0 {
+            format!(
+                "Claimed {} gold and {} items from boss rewards!",
+                total_gold, item_count
+            )
+        } else if total_gold > 0 {
+            format!("Claimed {} gold from boss rewards!", total_gold)
+        } else {
+            format!("Claimed {} items from boss rewards!", item_count)
+        };
+        self.send_system_message(player_id, &msg).await;
+    }
 }

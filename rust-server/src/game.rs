@@ -4978,6 +4978,18 @@ impl GameRoom {
             return;
         }
 
+        // Boss rewards NPC - show pending boss loot
+        let is_boss_rewards = self
+            .entity_registry
+            .get(&entity_type)
+            .map(|p| p.behaviors.boss_rewards)
+            .unwrap_or(false);
+
+        if is_boss_rewards {
+            self.show_boss_rewards_dialogue(player_id, &npc_id).await;
+            return;
+        }
+
         // Port master interaction - show travel destinations
         let is_port_master = self
             .entity_registry
@@ -5075,6 +5087,19 @@ impl GameRoom {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
                 self.claim_koth_rewards(player_id).await;
+            } else {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+            }
+            return;
+        }
+
+        // Handle boss rewards dialogue choices (format: "boss_rewards:{npc_id}")
+        if quest_id.starts_with("boss_rewards:") {
+            if choice_id == "claim" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+                self.claim_boss_rewards(player_id).await;
             } else {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;

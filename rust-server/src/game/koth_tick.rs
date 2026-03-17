@@ -393,7 +393,7 @@ impl GameRoom {
     }
 
     /// Helper to grant a non-gold item to a player
-    async fn grant_item_to_player(&self, player_id: &str, item_id: &str, quantity: u32) {
+    pub(crate) async fn grant_item_to_player(&self, player_id: &str, item_id: &str, quantity: u32) {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
             player
