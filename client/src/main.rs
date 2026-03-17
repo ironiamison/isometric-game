@@ -806,6 +806,11 @@ fn run_game_frame(
         }
     }
 
+    // Play pending music track change
+    if let Some(music_path) = game_state.pending_music.take() {
+        audio.play_music_preloaded(&music_path);
+    }
+
     // 2. Render and get UI layout for hit detection
     clear_background(Color::from_rgba(30, 30, 40, 255));
     let (layout, render_timings) = renderer.render(game_state);

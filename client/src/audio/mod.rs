@@ -67,7 +67,7 @@ impl AudioManager {
 
     /// Preload music tracks at startup
     pub async fn preload_music(&mut self) {
-        let music_files = ["assets/audio/menu.ogg", "assets/audio/start.ogg"];
+        let music_files = ["assets/audio/menu.ogg", "assets/audio/start.ogg", "assets/audio/desert-boss-battle.ogg"];
 
         for path in music_files {
             match load_sound(&asset_path(path)).await {
@@ -103,6 +103,8 @@ impl AudioManager {
             ("furnace", "assets/audio/sfx/misc/furnace.ogg"),
             ("death", "assets/audio/sfx/misc/death.ogg"),
             ("error", "assets/audio/sfx/error.wav"),
+            ("rock_explode", "assets/audio/sfx/rock_explode.ogg"),
+            ("aoe_rockfall", "assets/audio/sfx/spells/aoe_rockfall.ogg"),
         ];
 
         for (name, path) in sfx_files {
@@ -194,6 +196,29 @@ impl AudioManager {
             AttackSoundType::Unarmed => {
                 self.play_sfx("unarmed");
             }
+        }
+    }
+
+    /// Play a preloaded music track (sync — won't load on demand)
+    pub fn play_music_preloaded(&mut self, path: &str) {
+        if self.current_music_path.as_deref() == Some(path) {
+            return;
+        }
+        self.stop_music();
+        let volume = self.effective_music_volume();
+        if let Some(sound) = self.music.get(path) {
+            log::info!("Playing preloaded music: {} (volume: {})", path, volume);
+            play_sound(
+                sound,
+                PlaySoundParams {
+                    looped: true,
+                    volume,
+                },
+            );
+            self.current_music = Some(sound.clone());
+            self.current_music_path = Some(path.to_string());
+        } else {
+            log::warn!("Music not preloaded: {}", path);
         }
     }
 

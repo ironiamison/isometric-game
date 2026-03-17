@@ -4443,12 +4443,12 @@ impl Renderer {
                 let alpha = bubble.get_alpha();
                 let size = bubble.size * state.camera.zoom;
 
-                // Semi-transparent white/light-blue bubble
-                let color = Color::new(0.8, 0.9, 1.0, alpha * 0.6);
+                // Subtle white/light-blue bubble
+                let color = Color::new(0.8, 0.9, 1.0, alpha * 0.35);
                 draw_circle(screen_x, screen_y, size, color);
 
                 // Tiny bright highlight on the bubble
-                let highlight = Color::new(1.0, 1.0, 1.0, alpha * 0.4);
+                let highlight = Color::new(1.0, 1.0, 1.0, alpha * 0.2);
                 draw_circle(
                     screen_x - size * 0.25,
                     screen_y - size * 0.25,
@@ -4832,7 +4832,8 @@ impl Renderer {
                 continue;
             }
 
-            let (screen_x, screen_y) = world_to_screen_z(npc.x, npc.y, npc.z, &state.camera);
+            let center_offset = (npc.size - 1) as f32 * 0.5;
+            let (screen_x, screen_y) = world_to_screen_z(npc.x + center_offset, npc.y + center_offset, npc.z, &state.camera);
             let zoom = state.camera.zoom;
 
             // Compute sprite height to find top_y

@@ -985,10 +985,10 @@
       1316,
       1316,
       1316,
-      351,
-      352,
-      352,
-      353,
+      1316,
+      1363,
+      1330,
+      1404,
       1379,
       1379,
       1380,
@@ -1017,10 +1017,10 @@
       1316,
       1316,
       1316,
-      350,
-      357,
-      357,
-      354,
+      1316,
+      1316,
+      1363,
+      1330,
       1351,
       1350,
       1348,
@@ -3085,43 +3085,13 @@
       0
     ]
   },
-  "collision": "MAAAAj8AAAAAAAAAAAAAAAAAABA/AAAAAAAAADAAAEAQAACAGAAAAAQAAAADAgCAAAAAAAAAAAAAAAAACAAAAAEAAAAOAAAA8AACAAAAAAAAAAAAAAAAAAAAAAAAOAAAACQABADk/w8IPAAEQAAAAAABAAAAIAAAAAEAABAAAAA=",
-  "entities": [
-    {
-      "entityId": "bandit_2",
-      "x": 10,
-      "y": 17
-    },
-    {
-      "entityId": "bandit_1",
-      "x": 27,
-      "y": 3
-    },
-    {
-      "entityId": "camel_transport",
-      "x": 20,
-      "y": 31
-    }
-  ],
+  "collision": "EAAAAD8AAAAAAAAAAAAAAAAAAAA/AAAAAAAAABAAAEAQAACAGAAAAAQAAAADAACAAAAAAAAAAAAAAAAAAAAAAAEAAAAOAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAACQABADk/wcIPAAAQAAAAAABAAAAIAAAAAEAABAAAAA=",
+  "entities": [],
   "mapObjects": [
     {
       "gid": 2072,
       "x": 26,
       "y": 25,
-      "width": 64,
-      "height": 186
-    },
-    {
-      "gid": 2072,
-      "x": 27,
-      "y": 25,
-      "width": 64,
-      "height": 186
-    },
-    {
-      "gid": 2072,
-      "x": 26,
-      "y": 26,
       "width": 64,
       "height": 186
     },
@@ -3152,55 +3122,6 @@
       "y": 30,
       "width": 55,
       "height": 72
-    },
-    {
-      "gid": 2309,
-      "x": 5,
-      "y": 7,
-      "width": 37,
-      "height": 76
-    },
-    {
-      "gid": 2309,
-      "x": 5,
-      "y": 0,
-      "width": 37,
-      "height": 76
-    },
-    {
-      "gid": 2435,
-      "x": 17,
-      "y": 18,
-      "width": 28,
-      "height": 28
-    },
-    {
-      "gid": 2436,
-      "x": 28,
-      "y": 4,
-      "width": 10,
-      "height": 21
-    },
-    {
-      "gid": 2429,
-      "x": 3,
-      "y": 15,
-      "width": 35,
-      "height": 57
-    },
-    {
-      "gid": 2432,
-      "x": 9,
-      "y": 11,
-      "width": 24,
-      "height": 30
-    },
-    {
-      "gid": 2968,
-      "x": 25,
-      "y": 0,
-      "width": 62,
-      "height": 63
     }
   ],
   "walls": [

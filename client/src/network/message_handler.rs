@@ -2718,6 +2718,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 if map_type == "overworld" {
                     // Returning to overworld from interior
 
+                    // Switch back to overworld music
+                    state.pending_music = Some("assets/audio/start.ogg".to_string());
+
                     // Trigger area banner for overworld
                     state.area_banner.show(OVERWORLD_NAME);
 
@@ -2756,6 +2759,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     state.map_transition.state = crate::game::state::TransitionState::FadingIn;
                     state.map_transition.progress = 1.0;
                 } else {
+                    // Switch to boss music if entering boss cave
+                    if map_id.contains("desert_boss_cave") {
+                        state.pending_music = Some("assets/audio/desert-boss-battle.ogg".to_string());
+                    }
+
                     // Transitioning to interior - wait for interiorData
                     state.start_transition(map_type, map_id, spawn_x, spawn_y, instance_id);
                 }
@@ -4518,6 +4526,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let effect = extract_string(value, "effect").unwrap_or_default();
 
                 if !effect.is_empty() {
+                    if effect == "rocks_aoe" {
+                        state.pending_sfx.push("aoe_rockfall".to_string());
+                    }
                     for (tx, ty) in &tiles {
                         state.spell_effects.push(SpellEffect {
                             caster_id: String::new(),
@@ -4554,6 +4565,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     radius,
                     created_at: current_time(),
                 });
+                state.pending_sfx.push("rock_explode".to_string());
             }
         }
 

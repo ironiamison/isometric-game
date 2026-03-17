@@ -756,8 +756,8 @@ impl BubbleParticle {
             tile_y: tile_y + gen_range(-0.15, 0.15),
             height: 0.0,
             drift_x: gen_range(-8.0, 8.0),
-            rise_speed: gen_range(18.0, 32.0),
-            size: gen_range(1.5, 3.5),
+            rise_speed: gen_range(12.0, 22.0),
+            size: gen_range(1.0, 2.5),
             started_at: macroquad::time::get_time(),
         }
     }
@@ -1919,6 +1919,8 @@ pub struct GameState {
     pub level_up_events: Vec<LevelUpEvent>,
     /// Pending sound effects to play (queued by message handler, played by main loop)
     pub pending_sfx: Vec<String>,
+    /// Pending music track change (queued by message handler, played by main loop)
+    pub pending_music: Option<String>,
     /// Pending attack sounds queued by message handler
     pub pending_attack_sounds: Vec<AttackSoundType>,
     pub skill_xp_events: Vec<SkillXpEvent>,
@@ -2119,6 +2121,7 @@ impl GameState {
             damage_events: Vec::new(),
             level_up_events: Vec::new(),
             pending_sfx: Vec::new(),
+            pending_music: None,
             pending_attack_sounds: Vec::new(),
             skill_xp_events: Vec::new(),
             xp_globes: XpGlobesManager::new(),
@@ -2440,7 +2443,7 @@ impl GameState {
         // Spawn new bubbles at fishing markers periodically
         self.bubble_spawn_timer -= delta as f64;
         if self.bubble_spawn_timer <= 0.0 {
-            self.bubble_spawn_timer = 0.3; // Spawn a batch every 0.3s
+            self.bubble_spawn_timer = 0.5; // Spawn a batch every 0.5s
             let fishing_markers: Vec<(f32, f32)> = self
                 .gathering_markers
                 .iter()
@@ -2448,8 +2451,8 @@ impl GameState {
                 .map(|m| (m.x as f32, m.y as f32))
                 .collect();
             for (mx, my) in &fishing_markers {
-                // ~50% chance per marker per batch for natural randomness
-                if macroquad::rand::gen_range(0u32, 100) < 50 {
+                // ~30% chance per marker per batch for subtle randomness
+                if macroquad::rand::gen_range(0u32, 100) < 30 {
                     self.fishing_bubbles.push(BubbleParticle::new(*mx, *my));
                 }
             }
