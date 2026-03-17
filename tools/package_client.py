@@ -87,9 +87,28 @@ def main() -> None:
                 "Atlas-only packaging requested, but missing atlases:\n"
                 + "\n".join(str(p) for p in missing_atlases)
             )
+        # Sprites too large for the atlas that must survive atlas-only packaging
+        overflow_sprites = {
+            "enemies": ["big_wurm.png"],
+        }
         for name in atlas_dirs:
             dir_path = sprites_root / name
-            if dir_path.exists():
+            if not dir_path.exists():
+                continue
+            keep = overflow_sprites.get(name, [])
+            if keep:
+                # Preserve overflow sprites, delete everything else
+                kept = {}
+                for fname in keep:
+                    src = dir_path / fname
+                    if src.exists():
+                        kept[fname] = src.read_bytes()
+                shutil.rmtree(dir_path)
+                if kept:
+                    dir_path.mkdir(parents=True)
+                    for fname, data in kept.items():
+                        (dir_path / fname).write_bytes(data)
+            else:
                 shutil.rmtree(dir_path)
 
     if args.include_db:
