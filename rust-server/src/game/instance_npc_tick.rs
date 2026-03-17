@@ -182,11 +182,13 @@ impl GameRoom {
             }
 
             // Remove dead NPCs that won't respawn after 2 seconds (allows death animation)
+            // Skip boss NPCs — they are reset by the boss state machine's TeleportOut handler
             const DEAD_CLEANUP_MS: u64 = 2000;
             npcs.retain(|_, npc| {
                 if npc.state == crate::npc::NpcState::Dead
                     && npc.get_respawn_time_ms() == 0
                     && current_time.saturating_sub(npc.death_time) >= DEAD_CLEANUP_MS
+                    && npc.prototype_id != "desert_wurm"
                 {
                     return false;
                 }

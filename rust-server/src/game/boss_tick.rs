@@ -547,8 +547,8 @@ impl GameRoom {
                             self.send_to_instance(
                                 &instance_id,
                                 ServerMessage::ChatMessage {
-                                    sender_id: String::new(),
-                                    sender_name: String::new(),
+                                    sender_id: "system".to_string(),
+                                    sender_name: "[System]".to_string(),
                                     text: line.clone(),
                                     timestamp: current_time,
                                     channel: "system".to_string(),
@@ -881,6 +881,25 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 player.inventory.gold += total_gold as i32;
+            }
+        }
+
+        // Send inventory update to client so items appear immediately
+        {
+            let players = self.players.read().await;
+            if let Some(player) = players.get(player_id) {
+                let inventory_update = player.inventory.to_update();
+                let gold = player.inventory.gold;
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::InventoryUpdate {
+                        player_id: player_id.to_string(),
+                        slots: inventory_update,
+                        gold,
+                    },
+                )
+                .await;
             }
         }
 

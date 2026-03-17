@@ -156,7 +156,7 @@ wander_enabled = false
 
 [bandit_1]
 display_name = "Desert Bandit"
-sprite = "bandit_1"
+sprite = "bandit_one"
 animation_type = "standard"
 description = "A desert bandit standing guard."
 

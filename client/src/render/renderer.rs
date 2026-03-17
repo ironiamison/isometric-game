@@ -4821,7 +4821,7 @@ impl Renderer {
                     let height_offset = (8.0 + wobble * 2.0) * zoom;
                     (height_offset + radius) * 2.0
                 };
-            let top_y = screen_y - sprite_height + 4.0 * zoom;
+            let top_y = screen_y - sprite_height + 4.0 * zoom + npc.render_offset_y * zoom;
 
             let name_color = if npc.is_hostile() {
                 Color::from_rgba(255, 150, 150, 255)
@@ -8109,8 +8109,8 @@ impl Renderer {
             return;
         }
 
-        // Top of NPC for UI elements
-        let top_y = screen_y - sprite_height + 4.0 * zoom;
+        // Top of NPC for UI elements (account for sprite y offset)
+        let top_y = screen_y - sprite_height + 4.0 * zoom + npc.render_offset_y * zoom;
 
         // Determine icon coords for friendly NPCs (quest givers only)
         let icon_coords: Option<(u32, u32)> =
@@ -10576,7 +10576,7 @@ impl Renderer {
         };
         let tracker_width = (preview.w + 88.0).max(120.0).min(tracker_right - 10.0);
         let tracker_x = (tracker_right - tracker_width).floor();
-        self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width);
+        state.ui_state.quest_tracker_rect.set(self.render_quest_tracker(state, tracker_x, tracker_y, tracker_width));
 
         // Inventory UI (when open)
         if state.ui_state.inventory_open {

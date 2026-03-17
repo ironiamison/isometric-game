@@ -883,9 +883,9 @@ impl Renderer {
         _tracker_x: f32,
         tracker_y: f32,
         tracker_width: f32,
-    ) {
+    ) -> Option<macroquad::math::Rect> {
         if state.ui_state.active_quests.is_empty() {
-            return;
+            return None;
         }
 
         // Minimized: just show "Quests (<)" right-aligned
@@ -902,7 +902,8 @@ impl Renderer {
                 font_size,
                 Color::from_rgba(255, 220, 100, 255),
             );
-            return;
+            let text_dims = self.measure_text_sharp(text, font_size);
+            return Some(macroquad::math::Rect::new(text_x, tracker_y, text_width, text_dims.height));
         }
 
         let s = state.ui_state.ui_scale;
@@ -999,10 +1000,12 @@ impl Renderer {
 
         // Draw all lines right-aligned (no background)
         let mut y = tracker_y;
+        let mut min_x = right_edge;
         for line in &lines {
             if !line.text.is_empty() {
                 let text_width = self.measure_text_sharp(&line.text, font_size).width;
                 let text_x = (right_edge - text_width).floor();
+                min_x = min_x.min(text_x);
                 self.draw_text_sharp(&line.text, text_x, y, font_size, line.color);
 
                 if line.underline {
@@ -1019,6 +1022,7 @@ impl Renderer {
             }
             y += line.height;
         }
+        Some(macroquad::math::Rect::new(min_x, tracker_y, right_edge - min_x, y - tracker_y))
     }
 
     /// Render farming contract tracker (left-aligned, below stat bars)

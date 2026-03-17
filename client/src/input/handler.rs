@@ -10444,36 +10444,18 @@ impl InputHandler {
         }
 
         // Right-click quest tracker detection
-        if mouse_right_clicked && !state.ui_state.active_quests.is_empty() {
-            let (raw_x, raw_y) = mouse_position();
-            let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
-            // Calculate minimap preview rect (mirrors Renderer::minimap_preview_rect)
-            let s = state.ui_state.ui_scale;
-            let (sw, _) = crate::util::virtual_screen_size();
-            let mm_width = 188.0 * s;
-            let mm_height = 140.0 * s;
-            let mm_margin = 12.0 * s;
-            let mm_y = 8.0 * s;
-            let mm_x = (sw - mm_width - mm_margin).floor();
-            // Calculate tracker bounds (must match render code)
-            let tracker_gap = 8.0 * s;
-            let tracker_right = mm_x + mm_width;
-            let tracker_y = if state.current_instance.is_some() {
-                8.0 * s
-            } else {
-                (mm_y + mm_height + tracker_gap).floor()
-            };
-            let tracker_width = (mm_width + 88.0).max(120.0);
-            let tracker_x = (tracker_right - tracker_width).floor();
-            let tracker_h = if state.ui_state.quest_tracker_minimized { 20.0 * s } else { 120.0 * s };
-            let tracker_bounds = macroquad::math::Rect::new(tracker_x, tracker_y, tracker_width, tracker_h);
-            if tracker_bounds.contains(macroquad::math::Vec2::new(mouse_vx, mouse_vy)) {
-                state.ui_state.context_menu = Some(ContextMenu {
-                    target: ContextMenuTarget::QuestTracker,
-                    x: mouse_vx,
-                    y: mouse_vy,
-                });
-                return commands;
+        if mouse_right_clicked {
+            if let Some(tracker_rect) = state.ui_state.quest_tracker_rect.get() {
+                let (raw_x, raw_y) = mouse_position();
+                let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
+                if tracker_rect.contains(macroquad::math::Vec2::new(mouse_vx, mouse_vy)) {
+                    state.ui_state.context_menu = Some(ContextMenu {
+                        target: ContextMenuTarget::QuestTracker,
+                        x: mouse_vx,
+                        y: mouse_vy,
+                    });
+                    return commands;
+                }
             }
         }
 
