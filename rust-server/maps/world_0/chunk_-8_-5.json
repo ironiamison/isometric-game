@@ -3086,13 +3086,7 @@
     ]
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAABwAAAHAAAAAABwgAAHAIBB4ADxTAAAAEAQ4AJADgwAMBAA5ABgBgQAgAAn8IAACAEAAAABAACAA=",
-  "entities": [
-    {
-      "entityId": "camel",
-      "x": 7,
-      "y": 26
-    }
-  ],
+  "entities": [],
   "mapObjects": [
     {
       "gid": 2001,
