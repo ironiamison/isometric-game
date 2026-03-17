@@ -272,6 +272,15 @@ max_stack = 99
 base_price = 180
 sellable = true
 
+[cactus]
+display_name = "Cactus"
+sprite = "cactus"
+description = "A hardy desert plant. Can be used in cooking and alchemy."
+category = "material"
+max_stack = 99
+base_price = 90
+sellable = true
+
 [vial_of_water]
 display_name = "Vial of Water"
 sprite = "vial_of_water"

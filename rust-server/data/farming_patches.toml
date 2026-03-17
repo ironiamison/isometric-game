@@ -150,6 +150,18 @@ xp_planting = 18
 xp_per_harvest = 55
 seed_return_chance = 0.15
 
+[cactus]
+seed_item = "cactus_seed"
+produce_item = "cactus"
+level_required = 50
+growth_time_minutes = 20
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 2
+xp_planting = 18
+xp_per_harvest = 55
+seed_return_chance = 0.15
+
 [bloodcap]
 seed_item = "bloodcap_seed"
 produce_item = "bloodcap"

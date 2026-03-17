@@ -1011,6 +1011,7 @@ impl Renderer {
                         "marshbloom",
                         "nightthorn",
                         "tangleroot",
+                        "cactus",
                     ];
                     let mut sprites = HashMap::new();
                     for crop in &crop_names {
@@ -1040,6 +1041,7 @@ impl Renderer {
                     "marshbloom",
                     "nightthorn",
                     "tangleroot",
+                    "cactus",
                 ];
                 let mut sprites = HashMap::new();
                 for crop in &crop_names {
@@ -1314,6 +1316,7 @@ impl Renderer {
                         "marshbloom",
                         "nightthorn",
                         "tangleroot",
+                        "cactus",
                     ];
                     let mut sprites = HashMap::new();
                     for crop in &crop_names {
@@ -1342,6 +1345,7 @@ impl Renderer {
                     "marshbloom",
                     "nightthorn",
                     "tangleroot",
+                    "cactus",
                 ];
                 let mut sprites = HashMap::new();
                 for crop in &crop_names {
