@@ -245,6 +245,7 @@ fn save_current_ui_settings(state: &GameState) {
         graphics_low: state.ui_state.graphics_low,
         chat_log_background: state.ui_state.chat_log_background,
         hotkey_bar: state.ui_state.hotkey_bar.clone(),
+        quest_tracker_minimized: state.ui_state.quest_tracker_minimized,
     };
     save_ui_settings(&settings);
 }
@@ -4397,6 +4398,7 @@ impl InputHandler {
                                     // Options: 0=Minimize or Expand
                                     if *option_idx == 0 {
                                         state.ui_state.quest_tracker_minimized = !state.ui_state.quest_tracker_minimized;
+                                        save_current_ui_settings(state);
                                     }
                                 }
                             }

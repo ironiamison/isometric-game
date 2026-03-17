@@ -17,6 +17,8 @@ pub struct UiSettings {
     pub chat_log_background: bool,
     #[serde(default)]
     pub hotkey_bar: HotkeyBarConfig,
+    #[serde(default)]
+    pub quest_tracker_minimized: bool,
 }
 
 impl Default for UiSettings {
@@ -40,6 +42,7 @@ impl Default for UiSettings {
             graphics_low: false,
             chat_log_background: true,
             hotkey_bar: HotkeyBarConfig::default(),
+            quest_tracker_minimized: false,
         }
     }
 }
