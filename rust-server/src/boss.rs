@@ -185,6 +185,8 @@ pub struct BossState {
     pub death_time: u64,
     /// Countdown seconds already announced (3, 2, 1)
     pub countdown_sent: u8,
+    /// Players who dealt damage to the boss (for loot distribution)
+    pub damage_dealers: std::collections::HashSet<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +294,7 @@ impl BossState {
             last_burrow_move_time: 0,
             death_time: 0,
             countdown_sent: 0,
+            damage_dealers: std::collections::HashSet::new(),
         }
     }
 

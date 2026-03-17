@@ -3961,6 +3961,15 @@ impl GameRoom {
                             max_hit,
                             npc.hp
                         );
+                        // Track damage dealer for boss loot distribution
+                        if damage > 0 {
+                            if let Some(ref inst_id) = attacker_instance {
+                                let mut boss_states = self.boss_states.write().await;
+                                if let Some(boss) = boss_states.get_mut(inst_id) {
+                                    boss.damage_dealers.insert(player_id.to_string());
+                                }
+                            }
+                        }
                         (npc.hp, name, died, damage)
                     }
                     } // end invulnerable else
