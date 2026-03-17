@@ -1006,6 +1006,11 @@ impl Renderer {
                         "carrot",
                         "spinach",
                         "greenleaf",
+                        "ashveil",
+                        "bloodcap",
+                        "marshbloom",
+                        "nightthorn",
+                        "tangleroot",
                     ];
                     let mut sprites = HashMap::new();
                     for crop in &crop_names {
@@ -1030,6 +1035,11 @@ impl Renderer {
                     "carrot",
                     "spinach",
                     "greenleaf",
+                    "ashveil",
+                    "bloodcap",
+                    "marshbloom",
+                    "nightthorn",
+                    "tangleroot",
                 ];
                 let mut sprites = HashMap::new();
                 for crop in &crop_names {
@@ -1299,6 +1309,11 @@ impl Renderer {
                         "carrot",
                         "spinach",
                         "greenleaf",
+                        "ashveil",
+                        "bloodcap",
+                        "marshbloom",
+                        "nightthorn",
+                        "tangleroot",
                     ];
                     let mut sprites = HashMap::new();
                     for crop in &crop_names {
@@ -1322,6 +1337,11 @@ impl Renderer {
                     "carrot",
                     "spinach",
                     "greenleaf",
+                    "ashveil",
+                    "bloodcap",
+                    "marshbloom",
+                    "nightthorn",
+                    "tangleroot",
                 ];
                 let mut sprites = HashMap::new();
                 for crop in &crop_names {
@@ -3477,8 +3497,7 @@ impl Renderer {
         self.render_tilemap_layer(state, LayerType::Ground);
 
         // (Drop zone highlights are now rendered in the depth-sorted pass)
-        // 1.7. Render farming patches
-        self.render_farming_patches(state);
+        // (Farming patches are now rendered in the depth-sorted pass)
 
         // 1.8. Render gathering marker overlays (fishing spots, etc.)
         self.render_gathering_markers(state);
@@ -3583,6 +3602,9 @@ impl Renderer {
             SpellEffect {
                 effect_idx: usize,
             },
+            FarmingPatch {
+                patch_id: String,
+            },
         }
 
         // Pre-allocate with estimated capacity to reduce allocations
@@ -3655,6 +3677,20 @@ impl Renderer {
             let item_z = state.chunk_manager.get_height(item.x.round() as i32, item.y.round() as i32) as f32;
             let depth = calculate_depth_z(item.x, item.y, item_z, 1) + 0.01;
             renderables.push((depth, Renderable::Item(item)));
+        }
+
+        // Add farming patches (depth-sorted with entities)
+        if state.current_interior.is_none() {
+            for (id, patch) in &state.farming_patches {
+                let wx = patch.x as f32;
+                let wy = patch.y as f32;
+                if !is_visible_world(wx, wy) {
+                    continue;
+                }
+                let patch_z = state.chunk_manager.get_height(patch.x, patch.y) as f32;
+                let depth = calculate_depth_z(wx, wy, patch_z, 1) + 0.01;
+                renderables.push((depth, Renderable::FarmingPatch { patch_id: id.clone() }));
+            }
         }
 
         // Add elevated ground tiles (z > 0) for depth-sorted rendering with entities
@@ -4297,6 +4333,9 @@ impl Renderer {
                 }
                 Renderable::SpellEffect { effect_idx } => {
                     self.render_single_spell_effect(state, effect_idx);
+                }
+                Renderable::FarmingPatch { patch_id } => {
+                    self.render_single_farming_patch(state, &patch_id);
                 }
             }
         }
@@ -8521,223 +8560,179 @@ impl Renderer {
         }
     }
 
-    /// Render farming patches in two passes: signs first (behind), then crops on top
-    fn render_farming_patches(&self, state: &GameState) {
-        if state.current_interior.is_some() {
-            return;
-        }
+    /// Render a single farming patch (called from the depth-sorted render loop)
+    fn render_single_farming_patch(&self, state: &GameState, patch_id: &str) {
+        let patch = match state.farming_patches.get(patch_id) {
+            Some(p) => p,
+            None => return,
+        };
         let zoom = state.camera.zoom;
         let time = macroquad::time::get_time();
+        let (screen_x, screen_y) =
+            world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+
         // Legacy sprite dimensions
         let legacy_frame_w = 16.0;
         let legacy_frame_h = 32.0;
 
-        // Pass 1: Draw signs behind crops (legacy sprites only - new format has no sign)
-        for patch in state.farming_patches.values() {
-            if patch.state != "growing" && patch.state != "harvestable" {
-                continue;
-            }
-            let sign_name = Self::crop_to_sprite_name(&patch.crop_id);
-            // Skip sign for large-format sprites (they have no sign frame)
-            if self.is_large_farming_sprite(&sign_name) {
-                continue;
-            }
-            if let Some((farm_texture, farm_atlas_offset)) =
-                self.farming_sprites.get(sign_name.as_str())
-            {
-                let (screen_x, screen_y) =
-                    world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
-                let sign_frame = 5u32;
-                let (farm_atlas_x, farm_atlas_y) = farm_atlas_offset.unwrap_or((0.0, 0.0));
-                let src_x = farm_atlas_x + sign_frame as f32 * legacy_frame_w;
-                let sign_w = legacy_frame_w * zoom;
-                let sign_h = legacy_frame_h * zoom;
-                // Position at the top (back) of the isometric tile
-                let sign_x = screen_x - sign_w / 2.0;
-                let sign_y = screen_y - sign_h - 4.0 * zoom;
-                draw_texture_ex(
-                    farm_texture,
-                    sign_x,
-                    sign_y,
-                    WHITE,
-                    DrawTextureParams {
-                        source: Some(Rect::new(src_x, farm_atlas_y, legacy_frame_w, legacy_frame_h)),
-                        dest_size: Some(Vec2::new(sign_w, sign_h)),
-                        ..Default::default()
-                    },
-                );
+        let sprite_name = match patch.state.as_str() {
+            "growing" | "harvestable" => Some(Self::crop_to_sprite_name(&patch.crop_id)),
+            _ => None,
+        };
+
+        // Draw sign behind crop (legacy sprites only)
+        if let Some(ref name) = sprite_name {
+            if !self.is_large_farming_sprite(name) {
+                if let Some((farm_texture, farm_atlas_offset)) =
+                    self.farming_sprites.get(name.as_str())
+                {
+                    let sign_frame = 5u32;
+                    let (farm_atlas_x, farm_atlas_y) = farm_atlas_offset.unwrap_or((0.0, 0.0));
+                    let src_x = farm_atlas_x + sign_frame as f32 * legacy_frame_w;
+                    let sign_w = legacy_frame_w * zoom;
+                    let sign_h = legacy_frame_h * zoom;
+                    let sign_x = screen_x - sign_w / 2.0;
+                    let sign_y = screen_y - sign_h - 4.0 * zoom;
+                    draw_texture_ex(
+                        farm_texture,
+                        sign_x,
+                        sign_y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(src_x, farm_atlas_y, legacy_frame_w, legacy_frame_h)),
+                            dest_size: Some(Vec2::new(sign_w, sign_h)),
+                            ..Default::default()
+                        },
+                    );
+                }
             }
         }
 
-        // Pass 2: Draw crops and empty patch fallbacks on top
-        for patch in state.farming_patches.values() {
-            let (screen_x, screen_y) =
-                world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+        // Draw crop sprite
+        let drew_sprite = if let Some(ref name) = sprite_name {
+            let is_large = self.is_large_farming_sprite(name);
+            if let Some((crop_texture, crop_atlas_offset)) =
+                self.farming_sprites.get(name.as_str())
+            {
+                let (crop_atlas_x, crop_atlas_y) = crop_atlas_offset.unwrap_or((0.0, 0.0));
 
-            // Determine which sprite frame to show
-            let sprite_name = match patch.state.as_str() {
-                "empty" => None,
-                "growing" | "harvestable" => Some(Self::crop_to_sprite_name(&patch.crop_id)),
-                _ => None,
-            };
+                if is_large {
+                    // New large format: 4 frames, derive frame size from sheet dimensions
+                    let (sheet_w, sheet_h) = self.farming_sprites.get_dimensions(name).unwrap();
+                    let num_frames = 4u32;
+                    let fw = sheet_w / num_frames as f32;
+                    let fh = sheet_h;
 
-            // Try to draw sprite
-            let drew_sprite = if let Some(ref name) = sprite_name {
-                let is_large = self.is_large_farming_sprite(name);
-                if let Some((crop_texture, crop_atlas_offset)) =
-                    self.farming_sprites.get(name.as_str())
-                {
-                    let (crop_atlas_x, crop_atlas_y) = crop_atlas_offset.unwrap_or((0.0, 0.0));
+                    let frame_index = match patch.state.as_str() {
+                        "growing" => patch.growth_stage.min(num_frames - 1),
+                        "harvestable" => num_frames - 1,
+                        _ => 0,
+                    };
 
-                    if is_large {
-                        // New large format: 4 frames, derive frame size from sheet dimensions
-                        let (sheet_w, sheet_h) = self.farming_sprites.get_dimensions(name).unwrap();
-                        let num_frames = 4u32;
-                        let fw = sheet_w / num_frames as f32;
-                        let fh = sheet_h;
+                    let src_x = crop_atlas_x + frame_index as f32 * fw;
+                    let draw_w = fw * zoom;
+                    let draw_h = fh * zoom;
 
-                        let frame_index = match patch.state.as_str() {
-                            "growing" => patch.growth_stage.min(num_frames - 1),
-                            "harvestable" => num_frames - 1,
-                            _ => 0,
-                        };
-
-                        let src_x = crop_atlas_x + frame_index as f32 * fw;
-                        let draw_w = fw * zoom;
-                        let draw_h = fh * zoom;
-
-                        draw_texture_ex(
-                            crop_texture,
-                            screen_x - draw_w / 2.0,
-                            screen_y - draw_h + 8.0 * zoom,
-                            WHITE,
-                            DrawTextureParams {
-                                source: Some(Rect::new(src_x, crop_atlas_y, fw, fh)),
-                                dest_size: Some(Vec2::new(draw_w, draw_h)),
-                                ..Default::default()
-                            },
-                        );
-                    } else {
-                        // Legacy format: 16x32 frames, frame mapping with gaps
-                        let frame_index = match patch.state.as_str() {
-                            "growing" => match patch.growth_stage {
-                                0 => 0,
-                                1 => 2,
-                                2 => 3,
-                                3 => 4,
-                                _ => 4,
-                            },
-                            "harvestable" => 4,
-                            _ => 0,
-                        };
-
-                        let src_x = crop_atlas_x + frame_index as f32 * legacy_frame_w;
-                        let draw_w = legacy_frame_w * zoom;
-                        let draw_h = legacy_frame_h * zoom;
-
-                        draw_texture_ex(
-                            crop_texture,
-                            screen_x - draw_w / 2.0,
-                            screen_y - draw_h + draw_h * 0.25,
-                            WHITE,
-                            DrawTextureParams {
-                                source: Some(Rect::new(src_x, crop_atlas_y, legacy_frame_w, legacy_frame_h)),
-                                dest_size: Some(Vec2::new(draw_w, draw_h)),
-                                ..Default::default()
-                            },
-                        );
-                    }
-                    true
+                    draw_texture_ex(
+                        crop_texture,
+                        screen_x - draw_w / 2.0,
+                        screen_y - draw_h + 8.0 * zoom,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(src_x, crop_atlas_y, fw, fh)),
+                            dest_size: Some(Vec2::new(draw_w, draw_h)),
+                            ..Default::default()
+                        },
+                    );
                 } else {
-                    false
+                    // Legacy format: 16x32 frames, frame mapping with gaps
+                    let frame_index = match patch.state.as_str() {
+                        "growing" => match patch.growth_stage {
+                            0 => 0,
+                            1 => 2,
+                            2 => 3,
+                            3 => 4,
+                            _ => 4,
+                        },
+                        "harvestable" => 4,
+                        _ => 0,
+                    };
+
+                    let src_x = crop_atlas_x + frame_index as f32 * legacy_frame_w;
+                    let draw_w = legacy_frame_w * zoom;
+                    let draw_h = legacy_frame_h * zoom;
+
+                    draw_texture_ex(
+                        crop_texture,
+                        screen_x - draw_w / 2.0,
+                        screen_y - draw_h + draw_h * 0.25,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(src_x, crop_atlas_y, legacy_frame_w, legacy_frame_h)),
+                            dest_size: Some(Vec2::new(draw_w, draw_h)),
+                            ..Default::default()
+                        },
+                    );
                 }
+                true
             } else {
                 false
-            };
-
-            // Fallback: draw colored diamond for empty patches or missing sprites
-            if !drew_sprite {
-                let half_w = 16.0 * zoom;
-                let half_h = 8.0 * zoom;
-                let base_color = Color::new(0.35, 0.25, 0.15, 0.5);
-                let border_color = Color::new(0.45, 0.35, 0.2, 0.6);
-
-                draw_triangle(
-                    Vec2::new(screen_x, screen_y - half_h),
-                    Vec2::new(screen_x - half_w, screen_y),
-                    Vec2::new(screen_x, screen_y + half_h),
-                    base_color,
-                );
-                draw_triangle(
-                    Vec2::new(screen_x, screen_y - half_h),
-                    Vec2::new(screen_x + half_w, screen_y),
-                    Vec2::new(screen_x, screen_y + half_h),
-                    base_color,
-                );
-                draw_line(
-                    screen_x,
-                    screen_y - half_h,
-                    screen_x - half_w,
-                    screen_y,
-                    1.0,
-                    border_color,
-                );
-                draw_line(
-                    screen_x - half_w,
-                    screen_y,
-                    screen_x,
-                    screen_y + half_h,
-                    1.0,
-                    border_color,
-                );
-                draw_line(
-                    screen_x,
-                    screen_y + half_h,
-                    screen_x + half_w,
-                    screen_y,
-                    1.0,
-                    border_color,
-                );
-                draw_line(
-                    screen_x + half_w,
-                    screen_y,
-                    screen_x,
-                    screen_y - half_h,
-                    1.0,
-                    border_color,
-                );
             }
+        } else {
+            false
+        };
 
-            // Draw soft pulsing green overlay on tile for harvestable crops
-            if patch.state == "harvestable" {
-                let half_w = 16.0 * zoom;
-                let half_h = 8.0 * zoom;
-                // Slow, gentle pulse between 0.08 and 0.18 alpha
-                let pulse_alpha = ((time * 1.2).sin() as f32 * 0.05 + 0.13).clamp(0.08, 0.18);
-                let glow = Color::new(0.2, 0.7, 0.3, pulse_alpha);
-                draw_triangle(
-                    Vec2::new(screen_x, screen_y - half_h),
-                    Vec2::new(screen_x - half_w, screen_y),
-                    Vec2::new(screen_x, screen_y + half_h),
-                    glow,
-                );
-                draw_triangle(
-                    Vec2::new(screen_x, screen_y - half_h),
-                    Vec2::new(screen_x + half_w, screen_y),
-                    Vec2::new(screen_x, screen_y + half_h),
-                    glow,
-                );
-            }
+        // Fallback: draw colored diamond for empty patches or missing sprites
+        if !drew_sprite {
+            let half_w = 16.0 * zoom;
+            let half_h = 8.0 * zoom;
+            let base_color = Color::new(0.35, 0.25, 0.15, 0.5);
+            let border_color = Color::new(0.45, 0.35, 0.2, 0.6);
+
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x - half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                base_color,
+            );
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x + half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                base_color,
+            );
+            draw_line(screen_x, screen_y - half_h, screen_x - half_w, screen_y, 1.0, border_color);
+            draw_line(screen_x - half_w, screen_y, screen_x, screen_y + half_h, 1.0, border_color);
+            draw_line(screen_x, screen_y + half_h, screen_x + half_w, screen_y, 1.0, border_color);
+            draw_line(screen_x + half_w, screen_y, screen_x, screen_y - half_h, 1.0, border_color);
+        }
+
+        // Draw soft pulsing green overlay on tile for harvestable crops
+        if patch.state == "harvestable" {
+            let half_w = 16.0 * zoom;
+            let half_h = 8.0 * zoom;
+            let pulse_alpha = ((time * 1.2).sin() as f32 * 0.05 + 0.13).clamp(0.08, 0.18);
+            let glow = Color::new(0.2, 0.7, 0.3, pulse_alpha);
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x - half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                glow,
+            );
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x + half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                glow,
+            );
         }
     }
 
     /// Map crop_id from farming config to sprite sheet name
     fn crop_to_sprite_name(crop_id: &str) -> String {
         match crop_id {
-            // Herbs without dedicated sprites use cabbage as placeholder
-            "tangleroots" | "marshbloom" | "ashveil" | "nightthorn" | "bloodcap" => {
-                "cabbage".to_string()
-            }
+            // Crop id has trailing 's' but sprite file does not
+            "tangleroots" => "tangleroot".to_string(),
             _ => crop_id.to_string(),
         }
     }
@@ -8813,7 +8808,16 @@ impl Renderer {
         let font_size = 16.0 * zoom;
         let label_width = self.measure_text_sharp(&label, font_size).width;
         let label_x = screen_x - label_width / 2.0;
-        let label_y = screen_y - 16.0 * zoom;
+        // Position label above the sprite - large sprites need more offset
+        let sprite_name = Self::crop_to_sprite_name(&patch.crop_id);
+        let label_offset = if self.is_large_farming_sprite(&sprite_name) {
+            // Large sprite: offset by sprite height minus ground anchor
+            let (_, sh) = self.farming_sprites.get_dimensions(&sprite_name).unwrap_or((0.0, 48.0));
+            (sh - 8.0) * zoom
+        } else {
+            16.0 * zoom
+        };
+        let label_y = screen_y - label_offset;
 
         // Background
         let padding = 4.0 * zoom;

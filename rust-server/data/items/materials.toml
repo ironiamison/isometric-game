@@ -220,7 +220,7 @@ sellable = true
 
 [greenleaf]
 display_name = "Greenleaf"
-sprite = "cabbage"
+sprite = "greenleaf"
 description = "A common herb with mild restorative properties. Used in basic alchemy."
 category = "material"
 max_stack = 99
@@ -229,7 +229,7 @@ sellable = true
 
 [tangleroots]
 display_name = "Tangleroots"
-sprite = "cabbage"
+sprite = "tangleroot"
 description = "Twisted roots with potent energy. A versatile alchemy ingredient."
 category = "material"
 max_stack = 99
@@ -238,7 +238,7 @@ sellable = true
 
 [marshbloom]
 display_name = "Marshbloom"
-sprite = "cabbage"
+sprite = "marshbloom"
 description = "A swamp flower that thrives in damp conditions. Essential for mid-tier potions."
 category = "material"
 max_stack = 99
@@ -247,7 +247,7 @@ sellable = true
 
 [ashveil]
 display_name = "Ashveil"
-sprite = "cabbage"
+sprite = "ashveil"
 description = "A rare herb that grows in volcanic soil. Used in powerful potions."
 category = "material"
 max_stack = 99
@@ -256,7 +256,7 @@ sellable = true
 
 [nightthorn]
 display_name = "Nightthorn"
-sprite = "cabbage"
+sprite = "nightthorn"
 description = "A thorny herb that only blooms at night. Prized by alchemists."
 category = "material"
 max_stack = 99
@@ -265,7 +265,7 @@ sellable = true
 
 [bloodcap]
 display_name = "Bloodcap"
-sprite = "cabbage"
+sprite = "bloodcap"
 description = "A crimson mushroom of legendary potency. The finest alchemy ingredient."
 category = "material"
 max_stack = 99
