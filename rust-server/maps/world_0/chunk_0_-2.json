@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AKgAAAAMAAAADAAAAPgfAAAAMAAAACAIAAAgIAAAIAAAACAAAAAgAAAAIAAAACAAAAAgIAAAIADw/z8AAIAgCACoKwAAADYAAJg8AAAAYAAAgGAAAAAgQAAAIAAgACAAAAAgAAAAAAAAAAAAAAAAAAAAABAAACAIAAAgAMDjfwA=",
+  "collision": "AAgAAAAMAAAADAAAAPgfAAAAMAAAACAIAAAgIAAAIAAAACAAAAAgAAAAIAAAACAAAAAgIAAAIADw/z8AAIAgCACoKwAAADYAAJg8AAAAYAAAgGAAAAAgQAAAIAAgACAAAAAgAAAAAAAAAAAAAAAAAAAAABAAACAIAAAgAMDjfwA=",
   "blockTypesDown": [
     0,
     0,
@@ -5469,34 +5469,6 @@
       "y": 19,
       "width": 66,
       "height": 77
-    },
-    {
-      "gid": 2999,
-      "x": 22,
-      "y": 27,
-      "width": 133,
-      "height": 86
-    },
-    {
-      "gid": 2997,
-      "x": 15,
-      "y": 0,
-      "width": 180,
-      "height": 59
-    },
-    {
-      "gid": 2999,
-      "x": 16,
-      "y": 1,
-      "width": 133,
-      "height": 86
-    },
-    {
-      "gid": 2100,
-      "x": 13,
-      "y": 0,
-      "width": 25,
-      "height": 54
     },
     {
       "gid": 2312,

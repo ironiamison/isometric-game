@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAYQAAAOAAAADgAAAA4AAAAAAAAAAAAAAAAAAAEAAAAA/EAAAf7hcAAHg3AAQwYwAAMccAIDOHAABkBiAQaA/wAWgIEADAAPBxiAHwMYgA8DMIAHA2CAHwHA4g8DwPsBAwAfBQAAHAUBQJz9IBQcAAAgHwAgABEAINDxfjjA//A=",
+  "collision": "AAYQAAAOAAAADgAAAA4AAAAAAAAAAAAAAAAAAAEAAAAA/EAAAf7hcAAHg3AAQwYwAAMccAIDOHAABkBiAQaA/wAWgIEADAAPBxiAHwMYgA8DMIAHA2CAHwHA4g8DwPsBAwAfBQAAHAUBQJz9IBQcAAAAHwAgABEAINDxfjjA//A=",
   "heightmap": [
     0,
     0,
@@ -6835,13 +6835,6 @@
       "y": 27,
       "width": 180,
       "height": 59
-    },
-    {
-      "gid": 2999,
-      "x": 13,
-      "y": 28,
-      "width": 133,
-      "height": 86
     }
   ],
   "walls": [

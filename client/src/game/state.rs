@@ -735,6 +735,57 @@ impl RockParticle {
     }
 }
 
+/// A water bubble particle for fishing spot indicators
+pub struct BubbleParticle {
+    pub tile_x: f32,
+    pub tile_y: f32,
+    pub height: f32,       // Rises from 0 upward
+    pub drift_x: f32,      // Small horizontal wobble
+    pub rise_speed: f32,
+    pub size: f32,
+    pub started_at: f64,
+}
+
+impl BubbleParticle {
+    pub const DURATION: f64 = 1.2;
+
+    pub fn new(tile_x: f32, tile_y: f32) -> Self {
+        use macroquad::rand::gen_range;
+        Self {
+            tile_x: tile_x + gen_range(-0.25, 0.25),
+            tile_y: tile_y + gen_range(-0.15, 0.15),
+            height: 0.0,
+            drift_x: gen_range(-8.0, 8.0),
+            rise_speed: gen_range(18.0, 32.0),
+            size: gen_range(1.5, 3.5),
+            started_at: macroquad::time::get_time(),
+        }
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.height += self.rise_speed * dt;
+        let sway = (macroquad::time::get_time() * 5.0 + self.drift_x as f64).sin() as f32;
+        self.tile_x += sway * 0.3 * dt;
+    }
+
+    pub fn get_alpha(&self) -> f32 {
+        let elapsed = macroquad::time::get_time() - self.started_at;
+        let progress = (elapsed / Self::DURATION) as f32;
+        // Fade in quickly, fade out in last 40%
+        if progress < 0.2 {
+            progress / 0.2
+        } else if progress > 0.6 {
+            1.0 - (progress - 0.6) / 0.4
+        } else {
+            1.0
+        }
+    }
+
+    pub fn is_finished(&self) -> bool {
+        macroquad::time::get_time() - self.started_at > Self::DURATION
+    }
+}
+
 /// A tree that's falling down after being chopped
 pub struct FallingTreeEffect {
     pub x: i32,
@@ -1853,6 +1904,10 @@ pub struct GameState {
     pub rock_shake_effects: Vec<RockShakeEffect>,
     /// Rock debris particles
     pub rock_particles: Vec<RockParticle>,
+    /// Bubble particles for fishing spot indicators
+    pub fishing_bubbles: Vec<BubbleParticle>,
+    /// Timer for spawning new bubbles at fishing markers
+    pub bubble_spawn_timer: f64,
     /// Rocks crumbling after being fully mined
     pub crumbling_rocks: Vec<CrumblingRockEffect>,
 
@@ -2057,6 +2112,8 @@ impl GameState {
             falling_trees: Vec::new(),
             rock_shake_effects: Vec::new(),
             rock_particles: Vec::new(),
+            fishing_bubbles: Vec::new(),
+            bubble_spawn_timer: 0.0,
             crumbling_rocks: Vec::new(),
             selected_entity_id: None,
             damage_events: Vec::new(),
@@ -2373,6 +2430,34 @@ impl GameState {
             particle.update(delta);
         }
         self.rock_particles.retain(|p| !p.is_finished());
+
+        // Update fishing bubble particles
+        for bubble in &mut self.fishing_bubbles {
+            bubble.update(delta);
+        }
+        self.fishing_bubbles.retain(|p| !p.is_finished());
+
+        // Spawn new bubbles at fishing markers periodically
+        self.bubble_spawn_timer -= delta as f64;
+        if self.bubble_spawn_timer <= 0.0 {
+            self.bubble_spawn_timer = 0.3; // Spawn a batch every 0.3s
+            let fishing_markers: Vec<(f32, f32)> = self
+                .gathering_markers
+                .iter()
+                .filter(|m| m.skill == "fishing")
+                .map(|m| (m.x as f32, m.y as f32))
+                .collect();
+            for (mx, my) in &fishing_markers {
+                // ~50% chance per marker per batch for natural randomness
+                if macroquad::rand::gen_range(0u32, 100) < 50 {
+                    self.fishing_bubbles.push(BubbleParticle::new(*mx, *my));
+                }
+            }
+            // Cap total bubbles to avoid runaway with many markers
+            if self.fishing_bubbles.len() > 500 {
+                self.fishing_bubbles.drain(0..self.fishing_bubbles.len() - 500);
+            }
+        }
 
         // Clean up old skill XP events (older than 1.5 seconds)
         self.skill_xp_events

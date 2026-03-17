@@ -4429,6 +4429,33 @@ impl Renderer {
                     color,
                 );
             }
+
+            // Render fishing bubble particles (small rising circles)
+            for bubble in &state.fishing_bubbles {
+                if !is_visible_world(bubble.tile_x, bubble.tile_y) {
+                    continue;
+                }
+
+                let (screen_x, base_screen_y) =
+                    world_to_screen(bubble.tile_x, bubble.tile_y, &state.camera);
+                let screen_y = base_screen_y - bubble.height * state.camera.zoom;
+
+                let alpha = bubble.get_alpha();
+                let size = bubble.size * state.camera.zoom;
+
+                // Semi-transparent white/light-blue bubble
+                let color = Color::new(0.8, 0.9, 1.0, alpha * 0.6);
+                draw_circle(screen_x, screen_y, size, color);
+
+                // Tiny bright highlight on the bubble
+                let highlight = Color::new(1.0, 1.0, 1.0, alpha * 0.4);
+                draw_circle(
+                    screen_x - size * 0.25,
+                    screen_y - size * 0.25,
+                    size * 0.35,
+                    highlight,
+                );
+            }
         } // end if !graphics_low (particle rendering)
 
         timings.entities_ms = (get_time() - t1) * 1000.0;
@@ -8215,9 +8242,10 @@ impl Renderer {
             let bar_width = 30.0 * zoom;
             let bar_height = 5.0 * zoom;
             let bar_x = screen_x - bar_width / 2.0;
-            // Position health bar where name would be if name isn't showing, otherwise above the name box
+            // Position health bar above the name box when visible
+            // Name box top sits at (top_y - 19*zoom), so place bar above it with a gap
             let bar_y = if show_name {
-                top_y - 26.0 * zoom
+                top_y - 19.0 * zoom - bar_height - 2.0 * zoom
             } else {
                 top_y - 5.0 * zoom
             };
