@@ -663,14 +663,14 @@ display_name = "Ancient Platemail (M)"
 description = "Reforge ancient fragments into legendary plate armor."
 category = "smithing"
 section = "equipment"
-level_required = 45
+level_required = 70
 station = "anvil"
-craft_time_ms = 10000
-xp = 200
+craft_time_ms = 15000
+xp = 350
 
 [[ancient_body.ingredients]]
 item_id = "ancient_fragment"
-count = 8
+count = 12
 
 [[ancient_body.results]]
 item_id = "ancient_body"
@@ -681,14 +681,14 @@ display_name = "Ancient Platemail (F)"
 description = "Reforge ancient fragments into legendary plate armor."
 category = "smithing"
 section = "equipment"
-level_required = 45
+level_required = 70
 station = "anvil"
-craft_time_ms = 10000
-xp = 200
+craft_time_ms = 15000
+xp = 350
 
 [[ancient_body_female.ingredients]]
 item_id = "ancient_fragment"
-count = 8
+count = 12
 
 [[ancient_body_female.results]]
 item_id = "ancient_body_female"
@@ -699,14 +699,14 @@ display_name = "Ancient Boots"
 description = "Reforge ancient fragments into powerful boots."
 category = "smithing"
 section = "equipment"
-level_required = 45
+level_required = 70
 station = "anvil"
-craft_time_ms = 7000
-xp = 150
+craft_time_ms = 10000
+xp = 250
 
 [[ancient_boots.ingredients]]
 item_id = "ancient_fragment"
-count = 5
+count = 8
 
 [[ancient_boots.results]]
 item_id = "ancient_boots"
@@ -717,14 +717,14 @@ display_name = "Ancient Gloves"
 description = "Reforge ancient fragments into fearsome gauntlets."
 category = "smithing"
 section = "equipment"
-level_required = 45
+level_required = 70
 station = "anvil"
-craft_time_ms = 7000
-xp = 130
+craft_time_ms = 10000
+xp = 220
 
 [[ancient_gloves.ingredients]]
 item_id = "ancient_fragment"
-count = 4
+count = 7
 
 [[ancient_gloves.results]]
 item_id = "ancient_gloves"
@@ -735,14 +735,14 @@ display_name = "Ancient Sword"
 description = "Reforge ancient fragments into a blade of immense power."
 category = "smithing"
 section = "equipment"
-level_required = 45
+level_required = 70
 station = "anvil"
-craft_time_ms = 10000
-xp = 250
+craft_time_ms = 15000
+xp = 400
 
 [[ancient_sword.ingredients]]
 item_id = "ancient_fragment"
-count = 7
+count = 10
 
 [[ancient_sword.results]]
 item_id = "ancient_sword"

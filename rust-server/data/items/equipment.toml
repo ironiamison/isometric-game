@@ -57,14 +57,14 @@ sprite = "ancient_boots"
 description = "Boots forged from fragments of a forgotten civilization. Radiates faint power."
 category = "equipment"
 max_stack = 1
-base_price = 3500
+base_price = 12000
 sellable = true
 [ancient_boots.equipment]
 slot_type = "feet"
-defence_level_required = 40
+defence_level_required = 65
 attack_bonus = 0
 strength_bonus = 3
-defence_bonus = 11
+defence_bonus = 19
 
 [royal_boots]
 display_name = "Royal Boots"
@@ -1574,14 +1574,14 @@ sprite = "ancient_platebody_male"
 description = "Armor from a lost age, reforged from fragments of immense power."
 category = "equipment"
 max_stack = 1
-base_price = 5000
+base_price = 21000
 sellable = true
 [ancient_body.equipment]
 slot_type = "body"
-defence_level_required = 40
+defence_level_required = 65
 attack_bonus = 0
-strength_bonus = 2
-defence_bonus = 17
+strength_bonus = 3
+defence_bonus = 31
 
 [ancient_body_female]
 display_name = "Ancient Platemail (F)"
@@ -1589,14 +1589,14 @@ sprite = "ancient_platebody_female"
 description = "Armor from a lost age, reforged from fragments of immense power."
 category = "equipment"
 max_stack = 1
-base_price = 5000
+base_price = 21000
 sellable = true
 [ancient_body_female.equipment]
 slot_type = "body"
-defence_level_required = 40
+defence_level_required = 65
 attack_bonus = 0
-strength_bonus = 2
-defence_bonus = 17
+strength_bonus = 3
+defence_bonus = 31
 
 [ancient_gloves]
 display_name = "Ancient Gloves"
@@ -1604,14 +1604,14 @@ sprite = "ancient_gloves"
 description = "Gauntlets humming with ancient energy. They feel alive."
 category = "equipment"
 max_stack = 1
-base_price = 3000
+base_price = 10000
 sellable = true
 [ancient_gloves.equipment]
 slot_type = "gloves"
-defence_level_required = 40
+defence_level_required = 65
 attack_bonus = 0
-strength_bonus = 5
-defence_bonus = 8
+strength_bonus = 8
+defence_bonus = 11
 
 [ancient_sword]
 display_name = "Ancient Sword"
@@ -1619,13 +1619,13 @@ sprite = "ancient_sword"
 description = "A blade from a forgotten era. Its edge never dulls."
 category = "equipment"
 max_stack = 1
-base_price = 6000
+base_price = 20000
 sellable = true
 [ancient_sword.equipment]
 slot_type = "weapon"
-attack_level_required = 40
-attack_bonus = 16
-strength_bonus = 11
+attack_level_required = 65
+attack_bonus = 28
+strength_bonus = 20
 defence_bonus = 0
 
 # --- Mithril Tier (Level 35) ---

@@ -96,6 +96,8 @@ pub struct RawEntityBehaviors {
     #[serde(default)]
     pub koth_rewards: bool,
     #[serde(default)]
+    pub boss_rewards: bool,
+    #[serde(default)]
     pub port_master: bool,
     #[serde(default)]
     pub friendly: bool,
@@ -315,6 +317,7 @@ pub struct EntityBehaviors {
     pub plot_seller: bool,
     pub slayer_master: bool,
     pub koth_rewards: bool,
+    pub boss_rewards: bool,
     pub port_master: bool,
     pub friendly: bool,
     pub wander_enabled: bool,
@@ -341,6 +344,7 @@ impl Default for EntityBehaviors {
             plot_seller: false,
             slayer_master: false,
             koth_rewards: false,
+            boss_rewards: false,
             port_master: false,
             friendly: false,
             wander_enabled: false,
@@ -368,6 +372,7 @@ impl From<&RawEntityBehaviors> for EntityBehaviors {
             plot_seller: raw.plot_seller,
             slayer_master: raw.slayer_master,
             koth_rewards: raw.koth_rewards,
+            boss_rewards: raw.boss_rewards,
             port_master: raw.port_master,
             friendly: raw.friendly,
             wander_enabled: raw.wander_enabled,

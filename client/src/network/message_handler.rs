@@ -3894,12 +3894,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             if let Some(value) = data {
                 let success = extract_bool(value, "success").unwrap_or(false);
                 let reason = extract_string(value, "reason");
+                let spell_id = extract_string(value, "spell_id");
 
                 if !success {
                     if let Some(reason) = &reason {
                         log::info!("Spell cast failed: {}", reason);
                         // Add system chat message for failure feedback
                         state.push_system_chat(format!("Spell failed: {}", reason));
+                    }
+                    // Clear client-side cooldown so the spell can be retried immediately
+                    if let Some(ref id) = spell_id {
+                        state.spell_cooldowns.remove(id);
                     }
                 }
             }

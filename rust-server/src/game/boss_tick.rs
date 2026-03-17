@@ -543,12 +543,19 @@ impl GameRoom {
                     }
 
                     if !all_loot_lines.is_empty() {
-                        let loot_text = format!("Loot Rolls:\n{}", all_loot_lines.join("\n"));
-                        self.send_to_instance(
-                            &instance_id,
-                            ServerMessage::Announcement { text: loot_text },
-                        )
-                        .await;
+                        for line in &all_loot_lines {
+                            self.send_to_instance(
+                                &instance_id,
+                                ServerMessage::ChatMessage {
+                                    sender_id: String::new(),
+                                    sender_name: "Battle Master".to_string(),
+                                    text: line.clone(),
+                                    timestamp: current_time,
+                                    channel: "system".to_string(),
+                                },
+                            )
+                            .await;
+                        }
                     }
                 } else {
                     tracing::error!("Could not find desert_wurm prototype for loot rolling");
@@ -576,6 +583,20 @@ impl GameRoom {
                 .await;
             }
             BossEvent::TeleportOut { instance_id } => {
+                // Reset boss NPC to full HP for the next fight
+                if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                    let mut npcs = instance.npcs.write().await;
+                    for npc in npcs.values_mut() {
+                        if npc.prototype_id == "desert_wurm" {
+                            npc.hp = npc.max_hp;
+                            npc.state = NpcState::Idle;
+                            npc.hidden = false;
+                            npc.invulnerable = false;
+                            npc.death_time = 0;
+                        }
+                    }
+                }
+
                 let player_ids = self.get_instance_player_ids(&instance_id).await;
                 for pid in player_ids {
                     self.player_instances.write().await.remove(&pid);
@@ -583,6 +604,16 @@ impl GameRoom {
 
                     if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
                         instance.remove_player(&pid).await;
+                    }
+
+                    // Update player position server-side
+                    {
+                        let mut players = self.players.write().await;
+                        if let Some(player) = players.get_mut(&pid) {
+                            player.x = -258;
+                            player.y = -125;
+                            player.z = 0;
+                        }
                     }
 
                     // Spawn at the boss cave exit
@@ -801,9 +832,13 @@ impl GameRoom {
 
     /// Claim all pending boss rewards and add to inventory
     pub async fn claim_boss_rewards(&self, player_id: &str) {
+        tracing::info!("claim_boss_rewards called for player_id='{}'", player_id);
         let rewards = if let Some(ref db) = self.db {
             match db.claim_boss_pending_rewards(player_id).await {
-                Ok(rewards) => rewards,
+                Ok(rewards) => {
+                    tracing::info!("claim_boss_rewards: got {} reward entries for '{}'", rewards.len(), player_id);
+                    rewards
+                }
                 Err(e) => {
                     tracing::error!("Failed to claim boss rewards for {}: {}", player_id, e);
                     return;
@@ -823,9 +858,11 @@ impl GameRoom {
         let mut item_count = 0u32;
 
         for (item_id, quantity) in &rewards {
+            tracing::info!("claim_boss_rewards: processing item='{}' qty={}", item_id, quantity);
             if item_id == "gold" {
                 total_gold += quantity;
             } else {
+                tracing::info!("claim_boss_rewards: granting {} x{} to '{}'", item_id, quantity, player_id);
                 self.grant_item_to_player(player_id, item_id, *quantity)
                     .await;
                 item_count += quantity;

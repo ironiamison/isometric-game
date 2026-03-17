@@ -27,24 +27,24 @@ respawn_time_ms = 0
 
 [desert_wurm.rewards]
 exp_base = 500
-gold_min = 200
-gold_max = 500
+gold_min = 10000
+gold_max = 50000
 
 [[desert_wurm.loot]]
 item_id = "ancient_fragment"
-drop_chance = 0.40
+drop_chance = 0.25
 quantity_min = 1
 quantity_max = 3
 
 [[desert_wurm.loot]]
 item_id = "cactus_seed"
-drop_chance = 0.50
+drop_chance = 1.0
 quantity_min = 2
 quantity_max = 5
 
 [[desert_wurm.loot]]
 item_id = "wurm_blade"
-drop_chance = 0.05
+drop_chance = 0.01
 quantity_min = 1
 quantity_max = 1
 
@@ -118,6 +118,7 @@ hostile = false
 friendly = true
 wander_enabled = false
 facing = "down"
+boss_rewards = true
 
 [wurm_battle_master.speech]
 radius = 5

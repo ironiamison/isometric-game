@@ -1104,6 +1104,7 @@ pub enum ServerMessage {
     SpellResult {
         success: bool,
         reason: Option<String>,
+        spell_id: Option<String>,
     },
 
     // ===== Woodcutting System Messages =====
@@ -5253,7 +5254,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::SpellResult { success, reason } => {
+        ServerMessage::SpellResult { success, reason, spell_id } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
             match reason {
@@ -5262,6 +5263,12 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     Value::String(r.clone().into()),
                 )),
                 None => map.push((Value::String("reason".into()), Value::Nil)),
+            }
+            if let Some(id) = spell_id {
+                map.push((
+                    Value::String("spell_id".into()),
+                    Value::String(id.clone().into()),
+                ));
             }
             Value::Map(map)
         }

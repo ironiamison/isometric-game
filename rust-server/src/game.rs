@@ -6930,6 +6930,7 @@ impl GameRoom {
                 ServerMessage::SpellResult {
                     success: false,
                     reason: Some("Unknown spell".to_string()),
+                    spell_id: Some(spell_id.to_string()),
                 },
             )
             .await;
@@ -6957,6 +6958,7 @@ impl GameRoom {
                         ServerMessage::SpellResult {
                             success: false,
                             reason: Some("You haven't learned this spell".to_string()),
+                            spell_id: Some(resolved.id.clone()),
                         },
                     )
                     .await;
@@ -6970,6 +6972,7 @@ impl GameRoom {
                         ServerMessage::SpellResult {
                             success: false,
                             reason: Some("Magic level too low".to_string()),
+                            spell_id: Some(resolved.id.clone()),
                         },
                     )
                     .await;
@@ -6983,6 +6986,7 @@ impl GameRoom {
                     ServerMessage::SpellResult {
                         success: false,
                         reason: Some("Not enough mana".to_string()),
+                        spell_id: Some(resolved.id.clone()),
                     },
                 )
                 .await;
@@ -6996,6 +7000,7 @@ impl GameRoom {
                         ServerMessage::SpellResult {
                             success: false,
                             reason: Some("Spell on cooldown".to_string()),
+                            spell_id: Some(resolved.id.clone()),
                         },
                     )
                     .await;
@@ -7069,6 +7074,7 @@ impl GameRoom {
                     ServerMessage::SpellResult {
                         success: false,
                         reason: Some("No target selected".to_string()),
+                        spell_id: Some(spell_def.id.clone()),
                     },
                 )
                 .await;
@@ -7137,6 +7143,7 @@ impl GameRoom {
                 ServerMessage::SpellResult {
                     success: false,
                     reason: Some("Invalid target".to_string()),
+                    spell_id: Some(spell_def.id.clone()),
                 },
             )
             .await;
@@ -7153,6 +7160,7 @@ impl GameRoom {
                 ServerMessage::SpellResult {
                     success: false,
                     reason: Some("Target out of range".to_string()),
+                    spell_id: Some(spell_def.id.clone()),
                 },
             )
             .await;
@@ -8030,6 +8038,7 @@ impl GameRoom {
                         ServerMessage::SpellResult {
                             success: false,
                             reason: Some("Spell on cooldown".to_string()),
+                            spell_id: Some(spell_def.id.to_string()),
                         },
                     )
                     .await;
@@ -8051,6 +8060,7 @@ impl GameRoom {
             ServerMessage::SpellResult {
                 success: true,
                 reason: None,
+                spell_id: Some(spell_def.id.to_string()),
             },
         )
         .await;
