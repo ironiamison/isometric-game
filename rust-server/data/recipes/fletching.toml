@@ -95,6 +95,72 @@ count = 15
 item_id = "steel_arrow"
 count = 15
 
+[fletch_mithril_arrow]
+display_name = "Mithril Arrows"
+description = "Tip arrow shafts with mithril arrowheads."
+category = "fletching"
+section = "arrows"
+level_required = 45
+craft_time_ms = 2000
+xp = 75
+required_tool = "knife"
+
+[[fletch_mithril_arrow.ingredients]]
+item_id = "arrow_shaft"
+count = 15
+
+[[fletch_mithril_arrow.ingredients]]
+item_id = "mithril_arrowhead"
+count = 15
+
+[[fletch_mithril_arrow.results]]
+item_id = "mithril_arrow"
+count = 15
+
+[fletch_adamant_arrow]
+display_name = "Adamant Arrows"
+description = "Tip arrow shafts with adamant arrowheads."
+category = "fletching"
+section = "arrows"
+level_required = 60
+craft_time_ms = 2000
+xp = 100
+required_tool = "knife"
+
+[[fletch_adamant_arrow.ingredients]]
+item_id = "arrow_shaft"
+count = 15
+
+[[fletch_adamant_arrow.ingredients]]
+item_id = "adamant_arrowhead"
+count = 15
+
+[[fletch_adamant_arrow.results]]
+item_id = "adamant_arrow"
+count = 15
+
+[fletch_rune_arrow]
+display_name = "Rune Arrows"
+description = "Tip arrow shafts with rune arrowheads."
+category = "fletching"
+section = "arrows"
+level_required = 75
+craft_time_ms = 2000
+xp = 130
+required_tool = "knife"
+
+[[fletch_rune_arrow.ingredients]]
+item_id = "arrow_shaft"
+count = 15
+
+[[fletch_rune_arrow.ingredients]]
+item_id = "rune_arrowhead"
+count = 15
+
+[[fletch_rune_arrow.results]]
+item_id = "rune_arrow"
+count = 15
+
 # -----------------------------------------------------------------------------
 # Unstrung Bows (cutting)
 # -----------------------------------------------------------------------------
