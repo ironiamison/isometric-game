@@ -1048,60 +1048,6 @@ wander_pause_min_ms = 3000
 wander_pause_max_ms = 6000
 
 # =============================================================================
-# Desert Wurm
-# =============================================================================
-
-[desert_wurm]
-display_name = "Desert Wurm"
-sprite = "desert_wurm"
-animation_type = "standard"
-description = "A massive burrowing wurm that lurks beneath the desert sands."
-
-[desert_wurm.stats]
-level = 25
-max_hp = 120
-damage = 15
-attack_bonus = 8
-defence_bonus = 12
-attack_range = 1
-aggro_range = 5
-chase_range = 7
-move_cooldown_ms = 500
-attack_cooldown_ms = 1800
-respawn_time_ms = 50000
-
-[desert_wurm.rewards]
-exp_base = 140
-gold_min = 30
-gold_max = 70
-
-[[desert_wurm.loot]]
-item_id = "wyvern_bones"
-drop_chance = 0.6
-quantity_min = 1
-quantity_max = 1
-
-[[desert_wurm.loot]]
-item_id = "wurm_blade"
-drop_chance = 0.001
-quantity_min = 1
-quantity_max = 1
-
-[[desert_wurm.loot]]
-item_id = "cactus_seed"
-drop_chance = 0.033
-quantity_min = 1
-quantity_max = 1
-
-[desert_wurm.behaviors]
-hostile = true
-wander_enabled = true
-wander_radius = 3
-wander_pause_min_ms = 3000
-wander_pause_max_ms = 6000
-no_shadow = true
-
-# =============================================================================
 # Wurm - Slayer-only variant
 # =============================================================================
 
