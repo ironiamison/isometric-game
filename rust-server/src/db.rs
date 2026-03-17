@@ -662,6 +662,21 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Boss pending rewards table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS boss_pending_rewards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -715,6 +730,65 @@ impl Database {
         .await?;
 
         sqlx::query("DELETE FROM koth_pending_rewards WHERE player_id = ?")
+            .bind(player_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(item_id, qty)| (item_id, qty as u32))
+            .collect())
+    }
+
+    // =========================================================================
+    // Boss Pending Rewards
+    // =========================================================================
+
+    pub async fn add_boss_pending_reward(
+        &self,
+        player_id: &str,
+        item_id: &str,
+        quantity: u32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO boss_pending_rewards (player_id, item_id, quantity) VALUES (?, ?, ?)",
+        )
+        .bind(player_id)
+        .bind(item_id)
+        .bind(quantity as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_boss_pending_rewards(
+        &self,
+        player_id: &str,
+    ) -> Result<Vec<(i64, String, u32)>, sqlx::Error> {
+        let rows: Vec<(i64, String, i64)> = sqlx::query_as(
+            "SELECT id, item_id, quantity FROM boss_pending_rewards WHERE player_id = ? ORDER BY created_at",
+        )
+        .bind(player_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, item_id, qty)| (id, item_id, qty as u32))
+            .collect())
+    }
+
+    pub async fn claim_boss_pending_rewards(
+        &self,
+        player_id: &str,
+    ) -> Result<Vec<(String, u32)>, sqlx::Error> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT item_id, quantity FROM boss_pending_rewards WHERE player_id = ?",
+        )
+        .bind(player_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        sqlx::query("DELETE FROM boss_pending_rewards WHERE player_id = ?")
             .bind(player_id)
             .execute(&self.pool)
             .await?;
