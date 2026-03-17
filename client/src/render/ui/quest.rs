@@ -888,6 +888,23 @@ impl Renderer {
             return;
         }
 
+        // Minimized: just show "Quests (<)" right-aligned
+        if state.ui_state.quest_tracker_minimized {
+            let font_size = 16.0;
+            let text = "Quests (<)";
+            let right_anchor = _tracker_x + tracker_width;
+            let text_width = self.measure_text_sharp(text, font_size).width;
+            let text_x = (right_anchor - text_width).floor();
+            self.draw_text_sharp(
+                text,
+                text_x,
+                tracker_y,
+                font_size,
+                Color::from_rgba(255, 220, 100, 255),
+            );
+            return;
+        }
+
         let s = state.ui_state.ui_scale;
         let line_height = 18.0 * s;
         let objective_line_height = line_height - 2.0 * s;

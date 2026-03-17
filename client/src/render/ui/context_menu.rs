@@ -206,6 +206,14 @@ impl Renderer {
                 push_option(&mut options, "Clear Slot");
                 "Hotkey Slot".to_string()
             }
+            ContextMenuTarget::QuestTracker => {
+                if state.ui_state.quest_tracker_minimized {
+                    push_option(&mut options, "Expand");
+                } else {
+                    push_option(&mut options, "Minimize");
+                }
+                "Quest Tracker".to_string()
+            }
         };
 
         if options.is_empty() {

@@ -83,6 +83,9 @@ impl GameRoom {
         for player in &respawned_players {
             let instance_id = self.player_instances.write().await.remove(&player.id);
             if let Some(instance_id) = instance_id {
+                // If respawning from the boss cave, use the cave exit coordinates
+                let is_boss_instance = instance_id.contains(crate::game::boss_tick::BOSS_MAP_ID);
+
                 self.reset_sync_state(&player.id).await;
                 if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
                     let other_players: Vec<String> = instance
@@ -120,12 +123,44 @@ impl GameRoom {
                     }
                 }
 
-                self.send_to_player(&player.id, overworld_transition_message())
+                if is_boss_instance {
+                    // Override respawn position to boss cave exit
+                    let boss_exit_x = -258;
+                    let boss_exit_y = -125;
+                    {
+                        let mut players = self.players.write().await;
+                        if let Some(p) = players.get_mut(&player.id) {
+                            p.x = boss_exit_x;
+                            p.y = boss_exit_y;
+                        }
+                    }
+                    self.send_to_player(
+                        &player.id,
+                        ServerMessage::MapTransition {
+                            map_type: "overworld".to_string(),
+                            map_id: "world_0".to_string(),
+                            spawn_x: boss_exit_x as f32,
+                            spawn_y: boss_exit_y as f32,
+                            instance_id: String::new(),
+                        },
+                    )
                     .await;
+                } else {
+                    self.send_to_player(&player.id, overworld_transition_message())
+                        .await;
+                }
             }
         }
 
-        for player in respawned_players {
+        for mut player in respawned_players {
+            // Update coordinates if they were overridden by boss exit
+            {
+                let players = self.players.read().await;
+                if let Some(p) = players.get(&player.id) {
+                    player.x = p.x;
+                    player.y = p.y;
+                }
+            }
             tracing::info!(
                 "Player {} respawned at ({}, {})",
                 player.id,

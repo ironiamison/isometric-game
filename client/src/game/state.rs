@@ -1021,6 +1021,7 @@ pub enum ContextMenuTarget {
     FarmingPatch { patch_id: String },
     Tile { x: i32, y: i32 },
     HotkeySlot(usize),
+    QuestTracker,
 }
 
 /// Context menu for right-clicking items
@@ -1288,6 +1289,7 @@ pub struct UiState {
     pub adventurer_selected_tier: usize,
     pub quest_completed_events: Vec<QuestCompletedEvent>,
     pub quest_log_open: bool,
+    pub quest_tracker_minimized: bool,
     pub quest_log_scroll: f32,
     pub quest_catalog: Vec<QuestCatalogEntry>,
     pub selected_quest_id: Option<String>,
@@ -1558,6 +1560,7 @@ impl Default for UiState {
             adventurer_selected_tier: 0,
             quest_completed_events: Vec::new(),
             quest_log_open: false,
+            quest_tracker_minimized: false,
             quest_log_scroll: 0.0,
             quest_catalog: Vec::new(),
             selected_quest_id: None,

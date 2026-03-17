@@ -94,7 +94,7 @@ no_shadow = true
 
 [wurm_battle_master]
 display_name = "Battle Master"
-sprite = "bandit_1"
+sprite = "bandit_one"
 animation_type = "standard"
 description = "A battle-hardened warrior who distributes the spoils of the wurm hunt."
 

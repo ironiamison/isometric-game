@@ -2244,7 +2244,7 @@ impl Renderer {
     }
 
     fn minimap_preview_enabled(&self, state: &GameState) -> bool {
-        !state.ui_state.graphics_low
+        !state.ui_state.graphics_low && state.current_instance.is_none()
     }
 
     fn minimap_panel_rect(&self) -> Rect {
@@ -3231,7 +3231,7 @@ impl Renderer {
         hovered: &Option<UiElementId>,
         layout: &mut UiLayout,
     ) {
-        if state.get_local_player().is_none() {
+        if state.get_local_player().is_none() || state.current_instance.is_some() {
             return;
         }
 
