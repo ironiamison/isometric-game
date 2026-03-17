@@ -8215,9 +8215,9 @@ impl Renderer {
             let bar_width = 30.0 * zoom;
             let bar_height = 5.0 * zoom;
             let bar_x = screen_x - bar_width / 2.0;
-            // Position health bar where name would be if name isn't showing, otherwise above the name
+            // Position health bar where name would be if name isn't showing, otherwise above the name box
             let bar_y = if show_name {
-                top_y - 20.0 * zoom
+                top_y - 26.0 * zoom
             } else {
                 top_y - 5.0 * zoom
             };

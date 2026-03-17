@@ -31,6 +31,16 @@ base_price = 60
 sellable = true
 prayer_xp = 30
 
+[wurm_bones]
+display_name = "Wurm bones"
+sprite = "big_bones"
+description = "Massive bones from the Desert Wurm. Radiates ancient power. Grants exceptional Prayer experience when buried."
+category = "material"
+max_stack = 99
+base_price = 300
+sellable = true
+prayer_xp = 120
+
 [dragon_bones]
 display_name = "Dragon bones"
 sprite = "dragon_bones"

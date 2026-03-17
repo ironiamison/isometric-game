@@ -3096,11 +3096,6 @@
       "entityId": "rock",
       "x": 9,
       "y": 2
-    },
-    {
-      "entityId": "biter",
-      "x": 16,
-      "y": 9
     }
   ],
   "mapObjects": [

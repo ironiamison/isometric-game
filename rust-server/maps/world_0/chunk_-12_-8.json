@@ -3086,7 +3086,13 @@
     ]
   },
   "collision": "eEAAAABAAAAAQACBAEAAJAB8/I8AAIBwAP4DAABQAQAAUAH/AFCAwAEI8AAAAAH4AACgBAAAIBQAAAAEAAD4BwAAAAAAAAAAAgAAASIAAAACAAAAAhAAAABAAAAAgAAAAAAEAAAAAADAAQAAPwRAAABwAAAAA0EA8AgEAQ9ggAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "forgotten_monk",
+      "x": 8,
+      "y": 31
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2997,

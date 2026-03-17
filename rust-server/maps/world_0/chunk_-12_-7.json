@@ -3088,29 +3088,9 @@
   "collision": "CADhAgAAAAAAAAAAAAEACgAAAAgAAAAEAAACBAAAACQAAACwAAAAIiAABAAAAACASAAAAAgACACIAAAEgAAAAJAAAAAQAAAEEAEAABABEAAQEQAACAEgAAgBAACIAEAAhAAAgIUAAHCEAIAOggAAAEIAAAFCAAAAQQAA4EAAAFg=",
   "entities": [
     {
-      "entityId": "golden_scarab",
-      "x": 7,
-      "y": 1
-    },
-    {
-      "entityId": "golden_scarab",
-      "x": 10,
-      "y": 14
-    },
-    {
-      "entityId": "golden_scarab",
-      "x": 14,
-      "y": 5
-    },
-    {
-      "entityId": "golden_scarab",
-      "x": 3,
-      "y": 5
-    },
-    {
-      "entityId": "golden_scarab",
-      "x": 20,
-      "y": 24
+      "entityId": "forgotten_monk",
+      "x": 13,
+      "y": 6
     }
   ],
   "mapObjects": [

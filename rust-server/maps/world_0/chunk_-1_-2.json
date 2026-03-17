@@ -3146,6 +3146,11 @@
       "x": 29,
       "y": 18,
       "level": 1
+    },
+    {
+      "entityId": "farmer_grace",
+      "x": 29,
+      "y": 16
     }
   ],
   "mapObjects": [
