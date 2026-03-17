@@ -2,6 +2,7 @@ use super::GameRoom;
 use crate::boss::BossEvent;
 use crate::npc::{Npc, NpcState};
 use crate::protocol::ServerMessage;
+use rand::Rng;
 
 pub const BOSS_MAP_ID: &str = "desert_boss_cave";
 
@@ -463,6 +464,94 @@ impl GameRoom {
                 if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
                     let mut npcs = instance.npcs.write().await;
                     npcs.retain(|id, _| !id.starts_with("boss_minion_"));
+                }
+
+                // Roll loot for each damage dealer
+                let damage_dealers = {
+                    let boss_states = self.boss_states.read().await;
+                    boss_states
+                        .get(&instance_id)
+                        .map(|b| b.damage_dealers.clone())
+                        .unwrap_or_default()
+                };
+
+                if let Some(prototype) = self.entity_registry.get("desert_wurm") {
+                    let player_names: std::collections::HashMap<String, String> = {
+                        let players = self.players.read().await;
+                        damage_dealers
+                            .iter()
+                            .filter_map(|pid| {
+                                players.get(pid).map(|p| (pid.clone(), p.name.clone()))
+                            })
+                            .collect()
+                    };
+
+                    // Roll all loot synchronously (ThreadRng is not Send)
+                    // Each entry: (player_id, player_name, gold, Vec<(item_id, quantity, display_name)>)
+                    let rolled_loot: Vec<(String, String, i32, Vec<(String, i32, String)>)> = {
+                        let mut rng = rand::thread_rng();
+                        damage_dealers
+                            .iter()
+                            .map(|pid| {
+                                let gold = rng.gen_range(prototype.rewards.gold_min..=prototype.rewards.gold_max);
+                                let mut items = Vec::new();
+                                for entry in &prototype.loot {
+                                    if rng.r#gen::<f32>() < entry.drop_chance {
+                                        let quantity = rng.gen_range(entry.quantity_min..=entry.quantity_max);
+                                        let display_name = self
+                                            .item_registry
+                                            .get(&entry.item_id)
+                                            .map(|item| item.display_name.clone())
+                                            .unwrap_or_else(|| entry.item_id.clone());
+                                        items.push((entry.item_id.clone(), quantity, display_name));
+                                    }
+                                }
+                                let player_name = player_names
+                                    .get(pid)
+                                    .cloned()
+                                    .unwrap_or_else(|| pid.clone());
+                                (pid.clone(), player_name, gold, items)
+                            })
+                            .collect()
+                    };
+
+                    // Persist to DB and build announcement
+                    let mut all_loot_lines: Vec<String> = Vec::new();
+                    for (pid, player_name, gold, items) in &rolled_loot {
+                        if let Some(db) = self.db.as_ref() {
+                            if let Err(e) = db.add_boss_pending_reward(pid, "gold", *gold as u32).await {
+                                tracing::error!("Failed to persist boss gold reward for {}: {}", pid, e);
+                            }
+                            for (item_id, quantity, _) in items {
+                                if let Err(e) = db.add_boss_pending_reward(pid, item_id, *quantity as u32).await {
+                                    tracing::error!("Failed to persist boss loot reward for {}: {}", pid, e);
+                                }
+                            }
+                        }
+
+                        let mut display_parts: Vec<String> = items
+                            .iter()
+                            .map(|(_, qty, name)| format!("{}x {}", qty, name))
+                            .collect();
+                        display_parts.push(format!("{} gold", gold));
+
+                        all_loot_lines.push(format!(
+                            "{} received: {}",
+                            player_name,
+                            display_parts.join(", ")
+                        ));
+                    }
+
+                    if !all_loot_lines.is_empty() {
+                        let loot_text = format!("Loot Rolls:\n{}", all_loot_lines.join("\n"));
+                        self.send_to_instance(
+                            &instance_id,
+                            ServerMessage::Announcement { text: loot_text },
+                        )
+                        .await;
+                    }
+                } else {
+                    tracing::error!("Could not find desert_wurm prototype for loot rolling");
                 }
 
                 // Send initial countdown
