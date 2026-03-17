@@ -89,6 +89,7 @@ export function Canvas() {
     setSelectedInteriorEntity,
     setSelectedInteriorMapObject,
     setSelectedInteriorWall,
+    toggleInteriorGatheringZone,
     findWallAtWorld,
     setSelectedWall,
     addNote,
@@ -440,6 +441,12 @@ export function Canvas() {
             }
             break;
           }
+          case Tool.GatheringZone: {
+            if (worldTile.wx >= 0 && worldTile.wx < currentInterior.width && worldTile.wy >= 0 && worldTile.wy < currentInterior.height) {
+              toggleInteriorGatheringZone(worldTile.wx, worldTile.wy);
+            }
+            break;
+          }
         }
         return;
       }
@@ -686,6 +693,7 @@ export function Canvas() {
       addInteriorMapObject,
       removeInteriorMapObject,
       toggleInteriorWall,
+      toggleInteriorGatheringZone,
       addSpawnPoint,
       removeSpawnPoint,
       addExitPortal,

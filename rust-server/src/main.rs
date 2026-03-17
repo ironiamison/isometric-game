@@ -2223,7 +2223,7 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Gathering markers
-                            let gathering_markers = recv_room.get_gathering_markers_message().await;
+                            let gathering_markers = recv_room.get_gathering_markers_message(None).await;
                             if let Ok(bytes) = protocol::encode_server_message(&gathering_markers) {
                                 let _ = recv_tx.send(bytes).await;
                             }
@@ -3035,7 +3035,7 @@ async fn handle_socket(
     }
 
     // Send gathering marker positions
-    let gathering_markers = room.get_gathering_markers_message().await;
+    let gathering_markers = room.get_gathering_markers_message(None).await;
     if let Ok(bytes) = protocol::encode_server_message(&gathering_markers) {
         let _ = sender.send(Message::Binary(bytes)).await;
     }
@@ -3675,6 +3675,20 @@ async fn auto_enter_instance(
         instance
             .spawn_npcs(&interior.entities, &state.entity_registry)
             .await;
+
+        // Register gathering markers for this instance
+        if !interior.gathering_zones.is_empty() {
+            let markers: Vec<crate::gathering::GatheringMarker> = interior
+                .gathering_zones
+                .iter()
+                .map(|gz| crate::gathering::GatheringMarker {
+                    x: gz.x,
+                    y: gz.y,
+                    zone_id: gz.zone_id.clone(),
+                })
+                .collect();
+            room.register_instance_gathering_markers(&instance.id, markers).await;
+        }
     }
 
     // Restore entrance position from DB (for use when exiting the interior)
@@ -3880,6 +3894,13 @@ async fn auto_enter_instance(
         .await;
     }
 
+    // Send gathering markers for this instance
+    room.send_to_player(
+        player_id,
+        room.get_gathering_markers_message(Some(&instance.id)).await,
+    )
+    .await;
+
     // Send ground items
     let ground_items = room.get_ground_items_in_instance(Some(&instance.id)).await;
     for item_msg in ground_items {
@@ -4079,7 +4100,7 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                     // Re-send overworld data that was cleared on instance entry
                     room.send_to_player(player_id, room.get_chair_positions_message().await)
                         .await;
-                    room.send_to_player(player_id, room.get_gathering_markers_message().await)
+                    room.send_to_player(player_id, room.get_gathering_markers_message(None).await)
                         .await;
                     room.send_to_player(player_id, room.get_chest_positions_message(None).await)
                         .await;
@@ -4265,6 +4286,20 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
         instance
             .spawn_npcs(&interior.entities, &state.entity_registry)
             .await;
+
+        // Register gathering markers for this instance
+        if !interior.gathering_zones.is_empty() {
+            let markers: Vec<crate::gathering::GatheringMarker> = interior
+                .gathering_zones
+                .iter()
+                .map(|gz| crate::gathering::GatheringMarker {
+                    x: gz.x,
+                    y: gz.y,
+                    zone_id: gz.zone_id.clone(),
+                })
+                .collect();
+            room.register_instance_gathering_markers(&instance.id, markers).await;
+        }
     }
 
     // Store player's entrance position (where they came from) for return teleport
@@ -4541,6 +4576,13 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
         )
         .await;
     }
+
+    // Send gathering markers for this instance
+    room.send_to_player(
+        player_id,
+        room.get_gathering_markers_message(Some(&instance.id)).await,
+    )
+    .await;
 
     // Send existing ground items in this instance
     let ground_items = room.get_ground_items_in_instance(Some(&instance.id)).await;
@@ -4851,7 +4893,7 @@ async fn handle_client_message(
                         // Re-send overworld data
                         room.send_to_player(player_id, room.get_chair_positions_message().await)
                             .await;
-                        room.send_to_player(player_id, room.get_gathering_markers_message().await)
+                        room.send_to_player(player_id, room.get_gathering_markers_message(None).await)
                             .await;
                         room.send_to_player(
                             player_id,

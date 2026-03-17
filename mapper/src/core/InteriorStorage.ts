@@ -62,6 +62,7 @@ class InteriorStorageManager {
       mapObjects: [],
       walls: [],
       exitPortals: [],
+      gatheringZones: [],
       dirty: true,
     };
 
@@ -152,6 +153,12 @@ class InteriorStorageManager {
         edge: w.edge,
       })),
       exitPortals,
+      gatheringZones: (data.gatheringZones || []).map((gz, i) => ({
+        id: `gz_${i}`,
+        x: gz.x,
+        y: gz.y,
+        zoneId: gz.zoneId,
+      })),
       dirty: false,
     };
   }
@@ -210,6 +217,11 @@ class InteriorStorageManager {
         target_map: 'overworld',
         target_x: p.targetX,
         target_y: p.targetY,
+      })),
+      gatheringZones: interior.gatheringZones.map((gz) => ({
+        x: gz.x,
+        y: gz.y,
+        zoneId: gz.zoneId,
       })),
     };
   }

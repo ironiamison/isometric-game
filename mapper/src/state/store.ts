@@ -305,6 +305,10 @@ interface EditorActions {
   setSelectedExitPortal: (selection: { portalId: string } | null) => void;
   findExitPortalAt: (x: number, y: number) => ExitPortal | null;
 
+  // Interior gathering zone actions
+  toggleInteriorGatheringZone: (x: number, y: number) => void;
+  removeInteriorGatheringZone: (zoneId: string) => void;
+
   // Resize interior
   resizeInterior: (newWidth: number, newHeight: number) => void;
 
@@ -2012,6 +2016,53 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     return interior.exitPortals.find((p) =>
       x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height
     ) || null;
+  },
+
+  // Interior gathering zone actions
+  toggleInteriorGatheringZone: (x, y) => {
+    const interior = get().currentInterior;
+    if (!interior) return;
+
+    const existing = interior.gatheringZones.find((gz) => gz.x === x && gz.y === y);
+    if (existing) {
+      // Remove existing
+      set({
+        currentInterior: {
+          ...interior,
+          gatheringZones: interior.gatheringZones.filter((gz) => gz.id !== existing.id),
+          dirty: true,
+        },
+      });
+    } else {
+      // Add new with currently selected zone ID
+      const selectedZoneId = get().selectedGatheringZoneId;
+      const newZone: GatheringZone = {
+        id: `gz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        x,
+        y,
+        zoneId: selectedZoneId || 'pond',
+      };
+      set({
+        currentInterior: {
+          ...interior,
+          gatheringZones: [...interior.gatheringZones, newZone],
+          dirty: true,
+        },
+      });
+    }
+  },
+
+  removeInteriorGatheringZone: (zoneId) => {
+    const interior = get().currentInterior;
+    if (!interior) return;
+
+    set({
+      currentInterior: {
+        ...interior,
+        gatheringZones: interior.gatheringZones.filter((gz) => gz.id !== zoneId),
+        dirty: true,
+      },
+    });
   },
 
   // Resize interior

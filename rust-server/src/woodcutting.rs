@@ -91,8 +91,8 @@ pub struct WoodcuttingSystem {
     pub tree_types: HashMap<String, TreeTypeConfig>,
     /// GID -> tree type ID mapping for fast lookup
     pub gid_to_tree_type: HashMap<u32, String>,
-    /// (x, y) -> depleted tree state
-    pub depleted_trees: HashMap<(i32, i32), DepletedTree>,
+    /// (instance_id, x, y) -> depleted tree state (None = overworld)
+    pub depleted_trees: HashMap<(Option<String>, i32, i32), DepletedTree>,
     /// Player ID -> woodcutting state
     pub player_states: HashMap<String, PlayerWoodcuttingState>,
 }
@@ -153,14 +153,15 @@ impl WoodcuttingSystem {
     }
 
     /// Check if a tree at given position is depleted
-    pub fn is_tree_depleted(&self, x: i32, y: i32) -> bool {
-        self.depleted_trees.contains_key(&(x, y))
+    pub fn is_tree_depleted(&self, instance_id: Option<&str>, x: i32, y: i32) -> bool {
+        self.depleted_trees.contains_key(&(instance_id.map(|s| s.to_string()), x, y))
     }
 
     /// Start woodcutting at a tree position
     pub fn start_woodcutting(
         &mut self,
         player_id: &str,
+        instance_id: Option<&str>,
         tree_x: i32,
         tree_y: i32,
         tree_gid: u32,
@@ -168,7 +169,7 @@ impl WoodcuttingSystem {
         current_time: u64,
     ) -> Result<String, String> {
         // Check if tree is depleted
-        if self.is_tree_depleted(tree_x, tree_y) {
+        if self.is_tree_depleted(instance_id, tree_x, tree_y) {
             return Err("This tree has been chopped down".to_string());
         }
 
@@ -236,6 +237,7 @@ impl WoodcuttingSystem {
     pub fn tick_woodcutting(
         &mut self,
         player_id: &str,
+        instance_id: Option<&str>,
         current_time: u64,
         chop_speed_multiplier: f32,
         chop_success_bonus: f32,
@@ -245,7 +247,7 @@ impl WoodcuttingSystem {
         let tree_config = self.tree_types.get(&state.tree_type_id)?;
 
         // Check if tree is still there (might have been chopped by another player)
-        if self.is_tree_depleted(state.tree_x, state.tree_y) {
+        if self.is_tree_depleted(instance_id, state.tree_x, state.tree_y) {
             return None;
         }
 
@@ -304,7 +306,7 @@ impl WoodcuttingSystem {
 
             // Mark tree as depleted
             self.depleted_trees.insert(
-                (tree_x, tree_y),
+                (instance_id.map(|s| s.to_string()), tree_x, tree_y),
                 DepletedTree {
                     gid: tree_gid,
                     tree_type_id: tree_type_id.clone(),
@@ -342,16 +344,16 @@ impl WoodcuttingSystem {
         let mut respawned = Vec::new();
 
         // Find trees that should respawn
-        let to_respawn: Vec<(i32, i32)> = self
+        let to_respawn: Vec<(Option<String>, i32, i32)> = self
             .depleted_trees
             .iter()
             .filter(|(_, tree)| current_time >= tree.respawn_at)
-            .map(|((x, y), _)| (*x, *y))
+            .map(|((inst, x, y), _)| (inst.clone(), *x, *y))
             .collect();
 
         // Respawn them
-        for (x, y) in to_respawn {
-            if let Some(tree) = self.depleted_trees.remove(&(x, y)) {
+        for key @ (_, x, y) in to_respawn {
+            if let Some(tree) = self.depleted_trees.remove(&key) {
                 info!("Tree at ({}, {}) respawned", x, y);
                 respawned.push(TreeRespawnEvent {
                     x,
@@ -365,16 +367,18 @@ impl WoodcuttingSystem {
     }
 
     /// Get all currently depleted trees (for syncing to new clients)
-    pub fn get_depleted_trees(&self) -> Vec<((i32, i32), &DepletedTree)> {
+    pub fn get_depleted_trees(&self, instance_id: Option<&str>) -> Vec<((i32, i32), &DepletedTree)> {
         self.depleted_trees
             .iter()
-            .map(|(pos, tree)| (*pos, tree))
+            .filter(|((inst, _, _), _)| inst.as_deref() == instance_id)
+            .map(|((_, x, y), tree)| ((*x, *y), tree))
             .collect()
     }
 
     /// Deplete a tree externally (used when loading from persistent state if needed)
     pub fn deplete_tree(
         &mut self,
+        instance_id: Option<String>,
         x: i32,
         y: i32,
         gid: u32,
@@ -383,7 +387,7 @@ impl WoodcuttingSystem {
         respawn_at: u64,
     ) {
         self.depleted_trees.insert(
-            (x, y),
+            (instance_id, x, y),
             DepletedTree {
                 gid,
                 tree_type_id,
@@ -399,6 +403,7 @@ impl WoodcuttingSystem {
     /// `tool_success_bonus` - bonus success chance from the equipped axe (0.0 for bronze, up to 0.25 for rune)
     pub fn chop_once(
         &mut self,
+        instance_id: Option<&str>,
         tree_x: i32,
         tree_y: i32,
         tree_gid: u32,
@@ -407,7 +412,7 @@ impl WoodcuttingSystem {
         current_time: u64,
     ) -> Result<ChopResult, String> {
         // Check if tree is depleted
-        if self.is_tree_depleted(tree_x, tree_y) {
+        if self.is_tree_depleted(instance_id, tree_x, tree_y) {
             return Err("This tree has already been chopped down".to_string());
         }
 
@@ -468,7 +473,7 @@ impl WoodcuttingSystem {
             let respawn_time = current_time + respawn_delay;
 
             self.depleted_trees.insert(
-                (tree_x, tree_y),
+                (instance_id.map(|s| s.to_string()), tree_x, tree_y),
                 DepletedTree {
                     gid: tree_gid,
                     tree_type_id: tree_type_id_for_depletion,

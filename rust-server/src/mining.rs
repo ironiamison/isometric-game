@@ -115,8 +115,8 @@ pub struct MiningSystem {
     pub ore_types: HashMap<String, OreTypeConfig>,
     /// GID -> ore type ID mapping for fast lookup
     pub gid_to_ore_type: HashMap<u32, String>,
-    /// (x, y) -> depleted rock state
-    pub depleted_rocks: HashMap<(i32, i32), DepletedRock>,
+    /// (instance_id, x, y) -> depleted rock state (None = overworld)
+    pub depleted_rocks: HashMap<(Option<String>, i32, i32), DepletedRock>,
     /// Player ID -> mining state
     pub player_states: HashMap<String, PlayerMiningState>,
 }
@@ -177,8 +177,8 @@ impl MiningSystem {
     }
 
     /// Check if a rock at given position is depleted
-    pub fn is_rock_depleted(&self, x: i32, y: i32) -> bool {
-        self.depleted_rocks.contains_key(&(x, y))
+    pub fn is_rock_depleted(&self, instance_id: Option<&str>, x: i32, y: i32) -> bool {
+        self.depleted_rocks.contains_key(&(instance_id.map(|s| s.to_string()), x, y))
     }
 
     /// Tick respawns and return list of rocks that respawned
@@ -186,16 +186,16 @@ impl MiningSystem {
         let mut respawned = Vec::new();
 
         // Find rocks that should respawn
-        let to_respawn: Vec<(i32, i32)> = self
+        let to_respawn: Vec<(Option<String>, i32, i32)> = self
             .depleted_rocks
             .iter()
             .filter(|(_, rock)| current_time >= rock.respawn_at)
-            .map(|((x, y), _)| (*x, *y))
+            .map(|((inst, x, y), _)| (inst.clone(), *x, *y))
             .collect();
 
         // Respawn them
-        for (x, y) in to_respawn {
-            if let Some(rock) = self.depleted_rocks.remove(&(x, y)) {
+        for key @ (_, x, y) in to_respawn {
+            if let Some(rock) = self.depleted_rocks.remove(&key) {
                 info!("Rock at ({}, {}) respawned", x, y);
                 respawned.push(RockRespawnEvent {
                     x,
@@ -209,16 +209,18 @@ impl MiningSystem {
     }
 
     /// Get all currently depleted rocks (for syncing to new clients)
-    pub fn get_depleted_rocks(&self) -> Vec<((i32, i32), &DepletedRock)> {
+    pub fn get_depleted_rocks(&self, instance_id: Option<&str>) -> Vec<((i32, i32), &DepletedRock)> {
         self.depleted_rocks
             .iter()
-            .map(|(pos, rock)| (*pos, rock))
+            .filter(|((inst, _, _), _)| inst.as_deref() == instance_id)
+            .map(|((_, x, y), rock)| ((*x, *y), rock))
             .collect()
     }
 
     /// Deplete a rock externally (used when loading from persistent state if needed)
     pub fn deplete_rock(
         &mut self,
+        instance_id: Option<String>,
         x: i32,
         y: i32,
         gid: u32,
@@ -227,7 +229,7 @@ impl MiningSystem {
         respawn_at: u64,
     ) {
         self.depleted_rocks.insert(
-            (x, y),
+            (instance_id, x, y),
             DepletedRock {
                 gid,
                 ore_type_id,
@@ -243,6 +245,7 @@ impl MiningSystem {
     /// `tool_success_bonus` - bonus success chance from the equipped pickaxe (0.0 for bronze, up to 0.25 for rune)
     pub fn mine_once(
         &mut self,
+        instance_id: Option<&str>,
         rock_x: i32,
         rock_y: i32,
         rock_gid: u32,
@@ -251,7 +254,7 @@ impl MiningSystem {
         current_time: u64,
     ) -> Result<MineResult, String> {
         // Check if rock is depleted
-        if self.is_rock_depleted(rock_x, rock_y) {
+        if self.is_rock_depleted(instance_id, rock_x, rock_y) {
             return Err("This rock has already been mined".to_string());
         }
 
@@ -312,7 +315,7 @@ impl MiningSystem {
             let respawn_time = current_time + respawn_delay;
 
             self.depleted_rocks.insert(
-                (rock_x, rock_y),
+                (instance_id.map(|s| s.to_string()), rock_x, rock_y),
                 DepletedRock {
                     gid: rock_gid,
                     ore_type_id: ore_type_id_for_depletion,

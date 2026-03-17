@@ -921,7 +921,13 @@
     ]
   },
   "collision": "APgPgACABwAEACAAgQEADgAQAAABADAAAAEAEAAQEQAQIAABAAI=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "fire_pit",
+      "x": 4,
+      "y": 12
+    }
+  ],
   "mapObjects": [
     {
       "gid": 1445,
@@ -1268,6 +1274,163 @@
       "target_map": "overworld",
       "target_x": 0,
       "target_y": 0
+    },
+    {
+      "id": "exit_1773719339042_1082j9np8",
+      "x": 19,
+      "y": 9,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719340511_41dq2frdb",
+      "x": 19,
+      "y": 11,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719341218_d7idf8nkn",
+      "x": 19,
+      "y": 7,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719341518_8xcoxf7o2",
+      "x": 19,
+      "y": 6,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719342041_cphxcewid",
+      "x": 19,
+      "y": 5,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719342969_vyqht2xoc",
+      "x": 19,
+      "y": 4,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719343249_enpnqwma3",
+      "x": 19,
+      "y": 3,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719343508_46yfr0rn7",
+      "x": 19,
+      "y": 2,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719344523_2ozg339vt",
+      "x": 19,
+      "y": 12,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1773719344921_bomlzy2lw",
+      "x": 19,
+      "y": 13,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    }
+  ],
+  "gatheringZones": [
+    {
+      "x": 11,
+      "y": 1,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 10,
+      "y": 2,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 9,
+      "y": 2,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "zoneId": "ocean"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "zoneId": "ocean"
     }
   ]
 }

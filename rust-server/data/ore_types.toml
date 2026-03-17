@@ -55,10 +55,10 @@ gids = [3000]
 level_required = 30
 ore_item_id = "mithril_ore"
 xp_per_ore = 80
-success_chance = 0.06
-depletion_chance = 0.08
-respawn_time_min = 12000
-respawn_time_max = 24000
+success_chance = 0.03
+depletion_chance = 0.12
+respawn_time_min = 20000
+respawn_time_max = 40000
 
 [rocks.adamant]
 # Adamantite ore rocks: mapper id 1837
@@ -66,10 +66,10 @@ gids = [2999]
 level_required = 40
 ore_item_id = "adamant_ore"
 xp_per_ore = 120
-success_chance = 0.04
-depletion_chance = 0.06
-respawn_time_min = 20000
-respawn_time_max = 40000
+success_chance = 0.02
+depletion_chance = 0.10
+respawn_time_min = 35000
+respawn_time_max = 70000
 
 [rocks.rune]
 # Runite ore rocks: mapper id 1839

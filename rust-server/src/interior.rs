@@ -71,6 +71,15 @@ fn default_true() -> bool {
     true
 }
 
+/// A gathering zone marker inside an interior (fishing spot)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteriorGatheringZone {
+    pub x: i32,
+    pub y: i32,
+    pub zone_id: String,
+}
+
 /// A chest spawn point inside an interior
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,6 +113,8 @@ pub struct InteriorMapDef {
     pub requires_slayer_task: bool,
     #[serde(default)]
     pub chests: Vec<InteriorChestSpawn>,
+    #[serde(default, rename = "gatheringZones")]
+    pub gathering_zones: Vec<InteriorGatheringZone>,
     /// Optional heightmap for interiors with elevation (e.g. KOTH arena)
     #[serde(default)]
     pub heightmap: Option<Vec<u8>>,

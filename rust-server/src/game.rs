@@ -5734,9 +5734,10 @@ impl GameRoom {
 
                     (AutoActionTarget::Resource { x, y, gid }, AutoActionType::Mine) => {
                         // Check if rock is depleted
+                        let player_inst = self.player_instances.read().await.get(&pid).cloned();
                         let is_depleted = {
                             let mining = self.mining.read().await;
-                            mining.is_rock_depleted(*x, *y)
+                            mining.is_rock_depleted(player_inst.as_deref(), *x, *y)
                         };
                         if is_depleted {
                             self.clear_auto_action(&pid, "target_depleted").await;
@@ -5789,9 +5790,10 @@ impl GameRoom {
 
                     (AutoActionTarget::Resource { x, y, gid }, AutoActionType::Chop) => {
                         // Check if tree is depleted
+                        let player_inst = self.player_instances.read().await.get(&pid).cloned();
                         let is_depleted = {
                             let woodcutting = self.woodcutting.read().await;
-                            woodcutting.is_tree_depleted(*x, *y)
+                            woodcutting.is_tree_depleted(player_inst.as_deref(), *x, *y)
                         };
                         if is_depleted {
                             self.clear_auto_action(&pid, "target_depleted").await;

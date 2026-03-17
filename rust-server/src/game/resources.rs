@@ -37,10 +37,24 @@ fn has_fishing_rod(equipped_weapon: Option<&str>) -> bool {
 }
 
 impl GameRoom {
-    pub async fn get_gathering_markers_message(&self) -> ServerMessage {
+    /// Register gathering markers for an instance (called when instance is created)
+    pub async fn register_instance_gathering_markers(
+        &self,
+        instance_id: &str,
+        markers: Vec<crate::gathering::GatheringMarker>,
+    ) {
+        let mut gathering = self.gathering.write().await;
+        gathering.register_instance_markers(instance_id, markers);
+    }
+
+    pub async fn get_gathering_markers_message(&self, instance_id: Option<&str>) -> ServerMessage {
         let gathering = self.gathering.read().await;
-        let markers = gathering
-            .markers
+        let source_markers: &[crate::gathering::GatheringMarker] = if let Some(inst_id) = instance_id {
+            gathering.get_instance_markers(inst_id)
+        } else {
+            &gathering.markers
+        };
+        let markers = source_markers
             .iter()
             .map(|marker| {
                 let skill = gathering
@@ -60,9 +74,7 @@ impl GameRoom {
     }
 
     pub async fn handle_start_gathering(&self, player_id: &str, marker_x: i32, marker_y: i32) {
-        if self.player_instances.read().await.contains_key(player_id) {
-            return;
-        }
+        let instance_id = self.player_instances.read().await.get(player_id).cloned();
 
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -97,7 +109,7 @@ impl GameRoom {
 
         {
             let gathering = self.gathering.read().await;
-            if let Some(zone) = gathering.get_zone_for_marker(marker_x, marker_y) {
+            if let Some(zone) = gathering.get_zone_for_marker(instance_id.as_deref(), marker_x, marker_y) {
                 if zone.skill.as_str() == "fishing" && !has_fishing_rod(equipped_weapon.as_deref())
                 {
                     drop(gathering);
@@ -115,7 +127,7 @@ impl GameRoom {
         }
 
         let mut gathering = self.gathering.write().await;
-        match gathering.start_gathering(player_id, marker_x, marker_y, fishing_level, current_time)
+        match gathering.start_gathering(player_id, instance_id.as_deref(), marker_x, marker_y, fishing_level, current_time)
         {
             Ok(zone_id) => {
                 self.broadcast(ServerMessage::GatheringStarted {
@@ -146,9 +158,7 @@ impl GameRoom {
 
     /// Handle a single chop attempt on a tree.
     pub async fn handle_chop_tree(&self, player_id: &str, tree_x: i32, tree_y: i32, tree_gid: u32) {
-        if self.player_instances.read().await.contains_key(player_id) {
-            return;
-        }
+        let instance_id = self.player_instances.read().await.get(player_id).cloned();
 
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -252,6 +262,7 @@ impl GameRoom {
 
         let mut woodcutting = self.woodcutting.write().await;
         let chop_result = woodcutting.chop_once(
+            instance_id.as_deref(),
             tree_x,
             tree_y,
             tree_gid,
@@ -373,9 +384,7 @@ impl GameRoom {
     }
 
     pub async fn handle_mine_rock(&self, player_id: &str, rock_x: i32, rock_y: i32, rock_gid: u32) {
-        if self.player_instances.read().await.contains_key(player_id) {
-            return;
-        }
+        let instance_id = self.player_instances.read().await.get(player_id).cloned();
 
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -479,6 +488,7 @@ impl GameRoom {
 
         let mut mining = self.mining.write().await;
         let mine_result = mining.mine_once(
+            instance_id.as_deref(),
             rock_x,
             rock_y,
             rock_gid,

@@ -59,6 +59,7 @@ pub struct GatheringMarker {
 #[derive(Debug, Clone)]
 pub struct PlayerGatheringState {
     pub zone_id: String,
+    pub instance_id: Option<String>,
     pub marker_x: i32,
     pub marker_y: i32,
     pub last_gather_tick: u64,
@@ -93,8 +94,12 @@ pub enum BonusTileEvent {
 pub struct GatheringSystem {
     pub zones: HashMap<String, GatheringZoneConfig>,
     pub loot_tables: HashMap<String, LootTable>,
+    /// Overworld gathering markers
     pub markers: Vec<GatheringMarker>,
-    pub occupied_markers: HashMap<(i32, i32), String>,
+    /// Instance-specific gathering markers (instance_id -> markers)
+    pub instance_markers: HashMap<String, Vec<GatheringMarker>>,
+    /// (instance_id, x, y) -> player_id (None = overworld)
+    pub occupied_markers: HashMap<(Option<String>, i32, i32), String>,
     pub player_states: HashMap<String, PlayerGatheringState>,
     pub bonus_tiles: Vec<BonusTile>,
     pub last_bonus_check: HashMap<String, u64>,
@@ -162,6 +167,7 @@ impl GatheringSystem {
             zones: HashMap::new(),
             loot_tables: HashMap::new(),
             markers: Vec::new(),
+            instance_markers: HashMap::new(),
             occupied_markers: HashMap::new(),
             player_states: HashMap::new(),
             bonus_tiles: Vec::new(),
@@ -183,6 +189,7 @@ impl GatheringSystem {
             zones,
             loot_tables,
             markers,
+            instance_markers: HashMap::new(),
             occupied_markers: HashMap::new(),
             player_states: HashMap::new(),
             bonus_tiles: Vec::new(),
@@ -193,22 +200,27 @@ impl GatheringSystem {
     pub fn start_gathering(
         &mut self,
         player_id: &str,
+        instance_id: Option<&str>,
         marker_x: i32,
         marker_y: i32,
         player_level: i32,
         current_time: u64,
     ) -> Result<String, String> {
-        // Find the marker at the given position
-        let marker = self
-            .markers
-            .iter()
-            .find(|m| m.x == marker_x && m.y == marker_y)
-            .ok_or_else(|| format!("No gathering marker at ({}, {})", marker_x, marker_y))?;
+        // Find the marker at the given position (check instance markers or overworld)
+        let marker = if let Some(inst_id) = instance_id {
+            self.instance_markers
+                .get(inst_id)
+                .and_then(|markers| markers.iter().find(|m| m.x == marker_x && m.y == marker_y))
+        } else {
+            self.markers.iter().find(|m| m.x == marker_x && m.y == marker_y)
+        }
+        .ok_or_else(|| format!("No gathering marker at ({}, {})", marker_x, marker_y))?;
 
         let zone_id = marker.zone_id.clone();
 
         // Check if marker is occupied
-        if self.occupied_markers.contains_key(&(marker_x, marker_y)) {
+        let key = (instance_id.map(|s| s.to_string()), marker_x, marker_y);
+        if self.occupied_markers.contains_key(&key) {
             return Err("Marker is already occupied".to_string());
         }
 
@@ -227,12 +239,13 @@ impl GatheringSystem {
 
         // Set occupied and player state
         self.occupied_markers
-            .insert((marker_x, marker_y), player_id.to_string());
+            .insert((instance_id.map(|s| s.to_string()), marker_x, marker_y), player_id.to_string());
 
         self.player_states.insert(
             player_id.to_string(),
             PlayerGatheringState {
                 zone_id: zone_id.clone(),
+                instance_id: instance_id.map(|s| s.to_string()),
                 marker_x,
                 marker_y,
                 last_gather_tick: current_time,
@@ -251,7 +264,7 @@ impl GatheringSystem {
     pub fn stop_gathering(&mut self, player_id: &str) -> Option<PlayerGatheringState> {
         let state = self.player_states.remove(player_id)?;
         self.occupied_markers
-            .remove(&(state.marker_x, state.marker_y));
+            .remove(&(state.instance_id.clone(), state.marker_x, state.marker_y));
         info!("Player {} stopped gathering", player_id);
         Some(state)
     }
@@ -261,8 +274,14 @@ impl GatheringSystem {
     }
 
     /// Get the zone config for a marker at the given position
-    pub fn get_zone_for_marker(&self, x: i32, y: i32) -> Option<&GatheringZoneConfig> {
-        let marker = self.markers.iter().find(|m| m.x == x && m.y == y)?;
+    pub fn get_zone_for_marker(&self, instance_id: Option<&str>, x: i32, y: i32) -> Option<&GatheringZoneConfig> {
+        let marker = if let Some(inst_id) = instance_id {
+            self.instance_markers
+                .get(inst_id)
+                .and_then(|markers| markers.iter().find(|m| m.x == x && m.y == y))
+        } else {
+            self.markers.iter().find(|m| m.x == x && m.y == y)
+        }?;
         self.zones.get(&marker.zone_id)
     }
 
@@ -384,6 +403,31 @@ impl GatheringSystem {
             marker.x, marker.y, marker.zone_id
         );
         self.markers.push(marker);
+    }
+
+    /// Register gathering markers for an instance
+    pub fn register_instance_markers(&mut self, instance_id: &str, markers: Vec<GatheringMarker>) {
+        info!(
+            "Registered {} gathering markers for instance '{}'",
+            markers.len(),
+            instance_id
+        );
+        self.instance_markers.insert(instance_id.to_string(), markers);
+    }
+
+    /// Unregister gathering markers for an instance (when instance is destroyed)
+    pub fn unregister_instance_markers(&mut self, instance_id: &str) {
+        self.instance_markers.remove(instance_id);
+        // Also clean up any occupied markers for this instance
+        self.occupied_markers.retain(|(inst, _, _), _| inst.as_deref() != Some(instance_id));
+    }
+
+    /// Get gathering markers for an instance
+    pub fn get_instance_markers(&self, instance_id: &str) -> &[GatheringMarker] {
+        self.instance_markers
+            .get(instance_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     pub fn tick_bonus_tiles(&mut self, current_time: u64) -> Vec<BonusTileEvent> {

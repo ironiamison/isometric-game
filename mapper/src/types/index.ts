@@ -380,6 +380,7 @@ export interface InteriorMap {
   mapObjects: MapObject[];
   walls: Wall[];
   exitPortals: ExitPortal[];
+  gatheringZones: GatheringZone[];
   dirty: boolean;
 }
 
@@ -409,6 +410,7 @@ export interface SerializedInteriorMap {
     target_x: number;
     target_y: number;
   }>;
+  gatheringZones: SimplifiedGatheringZone[];
 }
 
 // Editor mode

@@ -925,6 +925,20 @@ impl GameRoom {
                     instance
                         .spawn_npcs(&interior.entities, &self.entity_registry)
                         .await;
+
+                    // Register gathering markers for this instance
+                    if !interior.gathering_zones.is_empty() {
+                        let markers: Vec<crate::gathering::GatheringMarker> = interior
+                            .gathering_zones
+                            .iter()
+                            .map(|gz| crate::gathering::GatheringMarker {
+                                x: gz.x,
+                                y: gz.y,
+                                zone_id: gz.zone_id.clone(),
+                            })
+                            .collect();
+                        self.register_instance_gathering_markers(&instance.id, markers).await;
+                    }
                 }
 
                 // Save current overworld position for return

@@ -953,6 +953,9 @@ export class IsometricRenderer {
     // Render exit portals
     this.renderInteriorExitPortals(interior, viewport);
 
+    // Render gathering zones
+    this.renderInteriorGatheringZones(interior, viewport);
+
     // Render dev notes
     this.renderNotes(viewport);
 
@@ -1272,6 +1275,47 @@ export class IsometricRenderer {
         this.ctx.textBaseline = "middle";
         this.ctx.fillText(
           "EXIT",
+          screen.sx,
+          screen.sy + (TILE_HEIGHT / 2) * viewport.zoom,
+        );
+      }
+    }
+  }
+
+  private renderInteriorGatheringZones(
+    interior: InteriorMap,
+    viewport: Viewport,
+  ): void {
+    if (!this.ctx || !interior.gatheringZones || interior.gatheringZones.length === 0)
+      return;
+
+    for (const gz of interior.gatheringZones) {
+      const worldCoord: WorldCoord = { wx: gz.x, wy: gz.y };
+      const screen = worldToScreen(worldCoord, viewport);
+
+      const hw = (TILE_WIDTH / 2) * viewport.zoom;
+      const hh = (TILE_HEIGHT / 2) * viewport.zoom;
+
+      this.ctx.fillStyle = "rgba(0, 180, 220, 0.4)";
+      this.ctx.beginPath();
+      this.ctx.moveTo(screen.sx, screen.sy);
+      this.ctx.lineTo(screen.sx + hw, screen.sy + hh);
+      this.ctx.lineTo(screen.sx, screen.sy + TILE_HEIGHT * viewport.zoom);
+      this.ctx.lineTo(screen.sx - hw, screen.sy + hh);
+      this.ctx.closePath();
+      this.ctx.fill();
+
+      this.ctx.strokeStyle = "rgba(0, 220, 255, 0.8)";
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke();
+
+      if (viewport.zoom >= 0.5) {
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.font = `bold ${9 * Math.max(1, viewport.zoom)}px sans-serif`;
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "middle";
+        this.ctx.fillText(
+          gz.zoneId,
           screen.sx,
           screen.sy + (TILE_HEIGHT / 2) * viewport.zoom,
         );
