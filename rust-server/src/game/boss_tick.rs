@@ -548,7 +548,7 @@ impl GameRoom {
                                 &instance_id,
                                 ServerMessage::ChatMessage {
                                     sender_id: String::new(),
-                                    sender_name: "Battle Master".to_string(),
+                                    sender_name: String::new(),
                                     text: line.clone(),
                                     timestamp: current_time,
                                     channel: "system".to_string(),
@@ -561,11 +561,15 @@ impl GameRoom {
                     tracing::error!("Could not find desert_wurm prototype for loot rolling");
                 }
 
-                // Send initial countdown
+                // Send initial countdown as system message
                 self.send_to_instance(
                     &instance_id,
-                    ServerMessage::Announcement {
+                    ServerMessage::ChatMessage {
+                        sender_id: String::new(),
+                        sender_name: String::new(),
                         text: "Returning to overworld in 3...".to_string(),
+                        timestamp: current_time,
+                        channel: "system".to_string(),
                     },
                 )
                 .await;
@@ -576,8 +580,12 @@ impl GameRoom {
             } => {
                 self.send_to_instance(
                     &instance_id,
-                    ServerMessage::Announcement {
+                    ServerMessage::ChatMessage {
+                        sender_id: String::new(),
+                        sender_name: String::new(),
                         text: message,
+                        timestamp: current_time,
+                        channel: "system".to_string(),
                     },
                 )
                 .await;
