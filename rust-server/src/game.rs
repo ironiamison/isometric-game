@@ -5586,13 +5586,6 @@ impl GameRoom {
                                 } else {
                                     (dx + dy) <= weapon_range && (dx > 0 || dy > 0)
                                 };
-                                if npc_size > 1 {
-                                    tracing::info!(
-                                        "COMBAT: player({},{}) npc_anchor({},{}) size={} closest=({},{}) dx={} dy={} range={} in_range={}",
-                                        player.x, player.y, npc_x, npc_y, npc_size,
-                                        closest_x, closest_y, dx, dy, weapon_range, in_range
-                                    );
-                                }
                                 let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= cd;

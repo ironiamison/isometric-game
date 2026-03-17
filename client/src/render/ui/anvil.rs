@@ -23,7 +23,7 @@ impl Renderer {
         let s = state.ui_state.ui_scale;
 
         let panel_width = (560.0 * s).min(sw - 16.0);
-        let panel_height = (480.0 * s).min(sh - 16.0);
+        let panel_height = (580.0 * s).min(sh - 16.0);
         let panel_x = (sw - panel_width) / 2.0;
         let panel_y = (sh - panel_height) / 2.0;
 

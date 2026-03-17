@@ -86,6 +86,7 @@ gold_max = 0
 hostile = true
 wander_enabled = false
 render_offset_y = 32.0
+no_shadow = true
 
 # =============================================================================
 # Wurm Battle Master - Loot distribution NPC for the desert wurm boss fight
@@ -116,7 +117,7 @@ gold_max = 0
 hostile = false
 friendly = true
 wander_enabled = false
-facing = "left"
+facing = "down"
 
 [wurm_battle_master.speech]
 radius = 5

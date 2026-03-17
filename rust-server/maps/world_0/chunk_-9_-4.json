@@ -3086,7 +3086,13 @@
     ]
   },
   "collision": "AAAgcAAAIIAAACAAAAA5AAEAAgAAAAQAAAAAkAcAQHQAAAAQAAAgEAAAABAAAAD/AAAAEAAAABAAAAAgAAAAwAAAAAAAAAAAAAAAAAAgAAAAIAAAACAAAAgAAAAAAAAAACAAAAAgAAAAAAAAAAACAAAAAEAAAAAAAAAAAAgAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "wurm_battle_master",
+      "x": 30,
+      "y": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2024,

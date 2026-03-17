@@ -361,7 +361,10 @@ impl NpcAnimation {
         let (frame_count, fps, looping) = match self.state {
             NpcAnimationState::Idle => (Self::IDLE_FRAMES, Self::IDLE_FPS, true),
             NpcAnimationState::Walking => (Self::WALK_FRAMES, Self::WALK_FPS, true),
-            NpcAnimationState::Attacking => (Self::ATTACK_FRAMES, Self::ATTACK_FPS, false),
+            NpcAnimationState::Attacking => match self.layout {
+                NpcAnimationLayout::BossWurm => (6, Self::ATTACK_FPS, false),
+                _ => (Self::ATTACK_FRAMES, Self::ATTACK_FPS, false),
+            },
             NpcAnimationState::Submerging => match self.layout {
                 NpcAnimationLayout::BossWurm => (6, 8.0, false),
                 _ => (2, Self::IDLE_FPS, false),
@@ -472,8 +475,11 @@ impl NpcAnimation {
                         base + (frame_in_anim % 4)
                     }
                     NpcAnimationState::Attacking => {
+                        // 7-frame sequence: dig down 4 frames, then reverse 3 to come back up
+                        // down/right: 12,13,14,15,13,12  up/left: 18,19,20,21,19,18
                         let base = if use_up_left { 18 } else { 12 };
-                        base + (frame_in_anim % 4)
+                        let offsets = [0, 1, 2, 3, 1, 0];
+                        base + offsets[(frame_in_anim % 6) as usize]
                     }
                     NpcAnimationState::Submerging => {
                         // Frames 12-17 (down/right), 18-23 (up/left)

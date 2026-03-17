@@ -64,21 +64,21 @@ fn phase_config(phase: &BossPhase) -> PhaseConfig {
     match phase {
         BossPhase::Hunt => PhaseConfig {
             dig_interval: 15_000,
-            rock_count: 4,
+            rock_count: 10,
             minion_count: 1,
             minion_interval: 25_000,
             melee_dmg_mult: 1.0,
         },
         BossPhase::Storm => PhaseConfig {
             dig_interval: 18_000,
-            rock_count: 6,
+            rock_count: 15,
             minion_count: 1,
             minion_interval: 20_000,
             melee_dmg_mult: 1.3,
         },
         BossPhase::Frenzy => PhaseConfig {
             dig_interval: 15_000,
-            rock_count: 9,
+            rock_count: 22,
             minion_count: 2,
             minion_interval: 15_000,
             melee_dmg_mult: 1.6,
@@ -200,7 +200,7 @@ fn clamp_arena(x: i32, y: i32) -> (i32, i32) {
     (x.clamp(ARENA_MIN, ARENA_MAX), y.clamp(ARENA_MIN, ARENA_MAX))
 }
 
-/// Generate random rock-throw target tiles within 8 tiles of a position.
+/// Generate random rock-throw target tiles spread across the arena.
 fn generate_rock_targets(
     boss_x: i32,
     boss_y: i32,
@@ -208,14 +208,20 @@ fn generate_rock_targets(
     _map_w: i32,
     _map_h: i32,
 ) -> Vec<(i32, i32)> {
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let arena_w = (ARENA_MAX - ARENA_MIN + 1) as u64;
     let mut targets = Vec::new();
     for i in 0..count {
-        let hash = ((boss_x as u64).wrapping_mul(31))
-            .wrapping_add((boss_y as u64).wrapping_mul(17))
+        let hash = seed
+            .wrapping_mul(31)
+            .wrapping_add((boss_x as u64).wrapping_mul(17))
+            .wrapping_add((boss_y as u64).wrapping_mul(7))
             .wrapping_add(i as u64 * 53);
-        let dx = ((hash % 17) as i32) - 8;
-        let dy = (((hash / 17) % 17) as i32) - 8;
-        let (tx, ty) = clamp_arena(boss_x + dx, boss_y + dy);
+        let tx = ARENA_MIN + (hash % arena_w) as i32;
+        let ty = ARENA_MIN + ((hash / arena_w) % arena_w) as i32;
         targets.push((tx, ty));
     }
     targets
@@ -392,18 +398,7 @@ impl BossState {
 
                     let mut all_tiles = std::collections::HashSet::new();
                     for target in &rock_targets {
-                        // Cross pattern clamped to arena bounds
-                        for &(tx, ty) in &[
-                            *target,
-                            (target.0 + 1, target.1),
-                            (target.0 - 1, target.1),
-                            (target.0, target.1 + 1),
-                            (target.0, target.1 - 1),
-                        ] {
-                            if tx >= ARENA_MIN && tx <= ARENA_MAX && ty >= ARENA_MIN && ty <= ARENA_MAX {
-                                all_tiles.insert((tx, ty));
-                            }
-                        }
+                        all_tiles.insert(*target);
                     }
                     self.aoe_zones.push(AoeZone {
                         tiles: all_tiles.into_iter().collect(),

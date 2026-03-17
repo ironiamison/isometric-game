@@ -3486,8 +3486,8 @@ impl Renderer {
         self.render_aoe_warnings(state);
         self.render_explosions(state);
 
-        // DEBUG: Render NPC occupied tile footprints for multi-tile NPCs
-        self.render_npc_debug_tiles(state);
+        // // DEBUG: Render NPC occupied tile footprints for multi-tile NPCs
+        // self.render_npc_debug_tiles(state);
 
         timings.ground_ms = (get_time() - t0) * 1000.0;
 
@@ -3575,6 +3575,9 @@ impl Renderer {
                 tile_y: i32,
                 tile_z: f32,
                 progress: f32,
+            },
+            SpellEffect {
+                effect_idx: usize,
             },
         }
 
@@ -3811,6 +3814,41 @@ impl Renderer {
                 ceil_depth.max(target_depth) + 0.25
             };
             renderables.push((depth, Renderable::Npc(npc)));
+        }
+
+        // Add spell effects as depth-sorted renderables
+        {
+            let current_time = macroquad::time::get_time();
+            for (idx, effect) in state.spell_effects.iter().enumerate() {
+                let elapsed = current_time - effect.time;
+                let sprite_name = match effect.spell_id.as_str() {
+                    "dark_hand" => "dark_hand",
+                    "lightning_bolt" => "lightning_bolt",
+                    "dark_eater" => "dark_eater",
+                    "rock_fall" => "rock_fall",
+                    "heal" => "self_heal",
+                    "teleport" | "return_home" => "bubbles_warp",
+                    "tornado" => "tornado",
+                    "rocks_aoe" => "rocks_aoe",
+                    _ => continue,
+                };
+                let frame_count = match sprite_name {
+                    "rocks_aoe" => 8usize,
+                    _ => 5usize,
+                };
+                let fps = 10.0_f64;
+                let total_duration = frame_count as f64 / fps;
+                if elapsed > total_duration {
+                    continue;
+                }
+                let ex = effect.target_x as f32;
+                let ey = effect.target_y as f32;
+                if !is_visible_world(ex, ey) {
+                    continue;
+                }
+                let depth = calculate_depth(ex, ey, 1) + 0.25;
+                renderables.push((depth, Renderable::SpellEffect { effect_idx: idx }));
+            }
         }
 
         // Add legacy object-layer tiles only when chunk data is unavailable.
@@ -4252,6 +4290,9 @@ impl Renderer {
                 } => {
                     // Reuse tree timer rendering — same pie chart style
                     self.render_tree_timer(tile_x, tile_y, tile_z, progress, &state.camera);
+                }
+                Renderable::SpellEffect { effect_idx } => {
+                    self.render_single_spell_effect(state, effect_idx);
                 }
             }
         }
@@ -5630,6 +5671,7 @@ impl Renderer {
             let elapsed = current_time - effect.time;
 
             // Look up the effect sprite based on spell_id
+            // Skip rocks_aoe — it's depth-sorted with entities
             let sprite_name = match effect.spell_id.as_str() {
                 "dark_hand" => "dark_hand",
                 "lightning_bolt" => "lightning_bolt",
@@ -5638,7 +5680,7 @@ impl Renderer {
                 "heal" => "self_heal",
                 "teleport" | "return_home" => "bubbles_warp",
                 "tornado" => "tornado",
-                "rocks_aoe" => "rocks_aoe",
+                "rocks_aoe" => continue,
                 _ => continue,
             };
 
@@ -5698,13 +5740,11 @@ impl Renderer {
                 frame_h,
             );
 
-            // Align like isometric objects: center on slightly elevated tile position
-            let elevated_y = screen_y - TILE_HEIGHT * zoom * 0.25 - 22.0 * zoom;
-
+            // Align sprite so its bottom edge sits at the tile center
             draw_texture_ex(
                 texture,
                 screen_x - draw_w / 2.0,
-                elevated_y - draw_h / 2.0,
+                screen_y - draw_h,
                 WHITE,
                 DrawTextureParams {
                     source: Some(source_rect),
@@ -5713,6 +5753,74 @@ impl Renderer {
                 },
             );
         }
+    }
+
+    /// Render a single spell effect by index (used for depth-sorted effects like rocks_aoe).
+    fn render_single_spell_effect(&self, state: &GameState, idx: usize) {
+        let effect = match state.spell_effects.get(idx) {
+            Some(e) => e,
+            None => return,
+        };
+        let current_time = macroquad::time::get_time();
+        let elapsed = current_time - effect.time;
+
+        let sprite_name = match effect.spell_id.as_str() {
+            "rocks_aoe" => "rocks_aoe",
+            other => other,
+        };
+
+        let (texture, atlas_offset) = match self.spell_effect_textures.get(sprite_name) {
+            Some(t) => t,
+            None => return,
+        };
+
+        let (tex_w, tex_h) = self
+            .spell_effect_textures
+            .get_dimensions(sprite_name)
+            .unwrap_or((texture.width(), texture.height()));
+        let frame_count = match sprite_name {
+            "rocks_aoe" => 8usize,
+            _ => 5usize,
+        };
+        let frame_w = tex_w / frame_count as f32;
+        let frame_h = tex_h;
+        let fps = 10.0_f64;
+        let total_duration = frame_count as f64 / fps;
+
+        if elapsed > total_duration {
+            return;
+        }
+
+        let frame_idx = ((elapsed * fps) as usize).min(frame_count - 1);
+        let zoom = state.camera.zoom;
+
+        let (screen_x, screen_y) = world_to_screen(
+            effect.target_x as f32,
+            effect.target_y as f32,
+            &state.camera,
+        );
+
+        let draw_w = frame_w * zoom;
+        let draw_h = frame_h * zoom;
+        let (offset_x, offset_y) = atlas_offset.unwrap_or((0.0, 0.0));
+        let source_rect = Rect::new(
+            offset_x + frame_idx as f32 * frame_w,
+            offset_y,
+            frame_w,
+            frame_h,
+        );
+
+        draw_texture_ex(
+            texture,
+            screen_x - draw_w / 2.0,
+            screen_y - draw_h,
+            WHITE,
+            DrawTextureParams {
+                source: Some(source_rect),
+                dest_size: Some(Vec2::new(draw_w, draw_h)),
+                ..Default::default()
+            },
+        );
     }
 
     fn render_damage_numbers(&self, state: &GameState) {
@@ -7683,8 +7791,42 @@ impl Renderer {
                 }
             }
 
-            // Hair (when no head equipment)
-            if player.equipped_head.is_none() {
+            // Hair (when no head equipment) or headgear
+            if let Some(ref head_item_id) = player.equipped_head {
+                let head_sprite_key = item_registry.get_sprite_key(head_item_id);
+                if let Some((head_texture, head_atlas_offset)) =
+                    self.equipment_sprites.get(head_sprite_key)
+                {
+                    let anim_frame = player.animation.frame as u32;
+                    let head_frame = get_head_frame(player.animation.direction);
+                    let (head_pos_offset_x, head_pos_offset_y) = get_head_offset(
+                        player.animation.state,
+                        player.animation.direction,
+                        anim_frame,
+                        player_gender,
+                    );
+                    let (head_atlas_x, head_atlas_y) = head_atlas_offset.unwrap_or((0.0, 0.0));
+                    let head_src_x = head_atlas_x + head_frame.frame as f32 * HEAD_SPRITE_WIDTH;
+
+                    draw_texture_ex(
+                        head_texture,
+                        draw_x + head_pos_offset_x,
+                        draw_y + head_pos_offset_y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(
+                                head_src_x,
+                                head_atlas_y,
+                                HEAD_SPRITE_WIDTH,
+                                HEAD_SPRITE_HEIGHT,
+                            )),
+                            dest_size: Some(Vec2::new(HEAD_SPRITE_WIDTH, HEAD_SPRITE_HEIGHT)),
+                            flip_x: head_frame.flip_h,
+                            ..Default::default()
+                        },
+                    );
+                }
+            } else {
                 if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
                     let hair_key = format!("{}_{}", player.gender, style);
                     if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {

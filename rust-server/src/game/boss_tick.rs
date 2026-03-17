@@ -175,7 +175,8 @@ impl GameRoom {
                     }
                 }
 
-                // Apply damage to hit players
+                // Apply damage to hit players and send damage events
+                let mut died_players = Vec::new();
                 {
                     let mut players = self.players.write().await;
                     for pid in &hit_players {
@@ -183,7 +184,38 @@ impl GameRoom {
                             player.hp = (player.hp - damage).max(0);
                             if player.hp <= 0 && !player.is_dead {
                                 player.die(current_time);
+                                died_players.push(pid.clone());
                             }
+                        }
+                    }
+                }
+
+                // Send PlayerDied for any players killed by AOE
+                for pid in &died_players {
+                    self.broadcast(ServerMessage::PlayerDied {
+                        id: pid.clone(),
+                        killer_id: "desert_wurm".to_string(),
+                    }).await;
+                }
+
+                // Send floating damage numbers for each hit player
+                {
+                    let players = self.players.read().await;
+                    for pid in &hit_players {
+                        if let Some(player) = players.get(pid) {
+                            self.send_to_instance(
+                                &instance_id,
+                                ServerMessage::DamageEvent {
+                                    source_id: String::new(),
+                                    target_id: pid.clone(),
+                                    damage,
+                                    target_hp: player.hp,
+                                    target_x: player.x as f32,
+                                    target_y: player.y as f32,
+                                    projectile: None,
+                                },
+                            )
+                            .await;
                         }
                     }
                 }
@@ -211,6 +243,8 @@ impl GameRoom {
 
                 // Damage players in blast zone
                 let player_ids = self.get_instance_player_ids(&instance_id).await;
+                let mut hit_players = Vec::new();
+                let mut died_players = Vec::new();
                 {
                     let mut players = self.players.write().await;
                     for pid in &player_ids {
@@ -221,8 +255,40 @@ impl GameRoom {
                                 player.hp = (player.hp - damage).max(0);
                                 if player.hp <= 0 && !player.is_dead {
                                     player.die(current_time);
+                                    died_players.push(pid.clone());
                                 }
+                                hit_players.push(pid.clone());
                             }
+                        }
+                    }
+                }
+
+                // Send PlayerDied for any players killed by explosion
+                for pid in &died_players {
+                    self.broadcast(ServerMessage::PlayerDied {
+                        id: pid.clone(),
+                        killer_id: "exploding_rock".to_string(),
+                    }).await;
+                }
+
+                // Send floating damage numbers for explosion hits
+                {
+                    let players = self.players.read().await;
+                    for pid in &hit_players {
+                        if let Some(player) = players.get(pid) {
+                            self.send_to_instance(
+                                &instance_id,
+                                ServerMessage::DamageEvent {
+                                    source_id: String::new(),
+                                    target_id: pid.clone(),
+                                    damage,
+                                    target_hp: player.hp,
+                                    target_x: player.x as f32,
+                                    target_y: player.y as f32,
+                                    projectile: None,
+                                },
+                            )
+                            .await;
                         }
                     }
                 }
@@ -430,13 +496,14 @@ impl GameRoom {
                         instance.remove_player(&pid).await;
                     }
 
+                    // Spawn at the boss cave exit
                     self.send_to_player(
                         &pid,
                         ServerMessage::MapTransition {
                             map_type: "overworld".to_string(),
                             map_id: "world_0".to_string(),
-                            spawn_x: crate::game::WORLD_SPAWN_X as f32,
-                            spawn_y: crate::game::WORLD_SPAWN_Y as f32,
+                            spawn_x: -258.0,
+                            spawn_y: -125.0,
                             instance_id: String::new(),
                         },
                     )
@@ -451,7 +518,7 @@ impl GameRoom {
     async fn send_to_instance(&self, instance_id: &str, msg: ServerMessage) {
         let player_ids = self.get_instance_player_ids(instance_id).await;
         if player_ids.is_empty() {
-            tracing::warn!("send_to_instance: no players found for instance '{}'", instance_id);
+            return;
         }
         for pid in player_ids {
             self.send_to_player(&pid, msg.clone()).await;
