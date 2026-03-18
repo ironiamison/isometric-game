@@ -94,7 +94,7 @@ quantity_max = 3
 hostile = true
 wander_enabled = false
 no_shadow = true
-render_offset_y = 16.0
+render_offset_y = 21.0
 
 # =============================================================================
 # Exploding Rock - Explosive minion (1 HP, chases player, explodes on contact)

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 const DIG_DURATION_MS: u64 = 3000;
 const SUBMERGE_ANIM_MS: u64 = 750;
 const EMERGE_DURATION_MS: u64 = 1500;
-const AOE_WARNING_DELAY_MS: u64 = 1500;
+const AOE_WARNING_DELAY_MS: u64 = 1250;
 pub const MINION_EXPLOSION_DAMAGE: i32 = 10;
 /// Maximum number of live minions allowed per boss instance
 const MAX_MINIONS: u32 = 4;
@@ -64,21 +64,21 @@ fn phase_config(phase: &BossPhase) -> PhaseConfig {
     match phase {
         BossPhase::Hunt => PhaseConfig {
             dig_interval: 15_000,
-            rock_count: 10,
+            rock_count: 3,
             minion_count: 1,
             minion_interval: 25_000,
             melee_dmg_mult: 1.0,
         },
         BossPhase::Storm => PhaseConfig {
             dig_interval: 18_000,
-            rock_count: 15,
+            rock_count: 5,
             minion_count: 1,
             minion_interval: 20_000,
             melee_dmg_mult: 1.3,
         },
         BossPhase::Frenzy => PhaseConfig {
             dig_interval: 15_000,
-            rock_count: 22,
+            rock_count: 7,
             minion_count: 2,
             minion_interval: 15_000,
             melee_dmg_mult: 1.6,
@@ -400,8 +400,12 @@ impl BossState {
                     );
 
                     let mut all_tiles = std::collections::HashSet::new();
-                    for target in &rock_targets {
-                        all_tiles.insert(*target);
+                    for &(rx, ry) in &rock_targets {
+                        // + cross pattern: center + 4 cardinal neighbours
+                        for &(dx, dy) in &[(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)] {
+                            let (cx, cy) = clamp_arena(rx + dx, ry + dy);
+                            all_tiles.insert((cx, cy));
+                        }
                     }
                     self.aoe_zones.push(AoeZone {
                         tiles: all_tiles.into_iter().collect(),
