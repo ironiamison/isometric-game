@@ -338,6 +338,8 @@ impl Player {
         self.target_x = x;
         self.target_y = y;
         self.target_z = 0.0;
+        self.vel_x = 0.0;
+        self.vel_y = 0.0;
         // Reset animation to standing (in case player died while sitting)
         self.animation.state = AnimationState::Idle;
     }

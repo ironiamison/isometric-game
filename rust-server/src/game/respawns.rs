@@ -124,25 +124,18 @@ impl GameRoom {
                 }
 
                 if is_boss_instance {
-                    // Override respawn position to boss cave exit
-                    let boss_exit_x = -258;
-                    let boss_exit_y = -125;
+                    // Death in boss cave = respawn at world spawn (starting village),
+                    // not at the cave entrance
                     {
                         let mut players = self.players.write().await;
                         if let Some(p) = players.get_mut(&player.id) {
-                            p.x = boss_exit_x;
-                            p.y = boss_exit_y;
+                            p.x = WORLD_SPAWN_X;
+                            p.y = WORLD_SPAWN_Y;
                         }
                     }
                     self.send_to_player(
                         &player.id,
-                        ServerMessage::MapTransition {
-                            map_type: "overworld".to_string(),
-                            map_id: "world_0".to_string(),
-                            spawn_x: boss_exit_x as f32,
-                            spawn_y: boss_exit_y as f32,
-                            instance_id: String::new(),
-                        },
+                        overworld_transition_message(),
                     )
                     .await;
                 } else {

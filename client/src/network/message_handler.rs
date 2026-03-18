@@ -2738,6 +2738,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             player.server_y = spawn_y;
                             player.target_x = spawn_x;
                             player.target_y = spawn_y;
+                            player.vel_x = 0.0;
+                            player.vel_y = 0.0;
                         }
                     }
 

@@ -8586,10 +8586,11 @@ impl Renderer {
         };
 
         // Draw sign behind crop (legacy sprites only)
-        if let Some(ref name) = sprite_name {
-            if !self.is_large_farming_sprite(name) {
+        if let Some(name) = sprite_name {
+            let is_large = self.farming_sprites.get_dimensions(name).map_or(false, |(_, h)| h > 32.0);
+            if !is_large {
                 if let Some((farm_texture, farm_atlas_offset)) =
-                    self.farming_sprites.get(name.as_str())
+                    self.farming_sprites.get(name)
                 {
                     let sign_frame = 5u32;
                     let (farm_atlas_x, farm_atlas_y) = farm_atlas_offset.unwrap_or((0.0, 0.0));
@@ -8614,16 +8615,18 @@ impl Renderer {
         }
 
         // Draw crop sprite
-        let drew_sprite = if let Some(ref name) = sprite_name {
-            let is_large = self.is_large_farming_sprite(name);
+        let drew_sprite = if let Some(name) = sprite_name {
             if let Some((crop_texture, crop_atlas_offset)) =
-                self.farming_sprites.get(name.as_str())
+                self.farming_sprites.get(name)
             {
                 let (crop_atlas_x, crop_atlas_y) = crop_atlas_offset.unwrap_or((0.0, 0.0));
+                // Check if large format using dimensions (avoids extra lookup)
+                let dims = self.farming_sprites.get_dimensions(name);
+                let is_large = dims.map_or(false, |(_, h)| h > 32.0);
 
                 if is_large {
                     // New large format: 4 frames, derive frame size from sheet dimensions
-                    let (sheet_w, sheet_h) = self.farming_sprites.get_dimensions(name).unwrap();
+                    let (sheet_w, sheet_h) = dims.unwrap();
                     let num_frames = 4u32;
                     let fw = sheet_w / num_frames as f32;
                     let fh = sheet_h;
@@ -8734,11 +8737,11 @@ impl Renderer {
     }
 
     /// Map crop_id from farming config to sprite sheet name
-    fn crop_to_sprite_name(crop_id: &str) -> String {
+    fn crop_to_sprite_name<'a>(crop_id: &'a str) -> &'a str {
         match crop_id {
             // Crop id has trailing 's' but sprite file does not
-            "tangleroots" => "tangleroot".to_string(),
-            _ => crop_id.to_string(),
+            "tangleroots" => "tangleroot",
+            _ => crop_id,
         }
     }
 

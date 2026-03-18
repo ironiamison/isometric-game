@@ -294,20 +294,44 @@ impl GameRoom {
                     }
                 }
 
-                // Damage boss if in blast zone
+                // Damage boss if any of its occupied tiles are in blast zone
                 {
                     let boss_npc_id = {
                         let boss_states = self.boss_states.read().await;
                         boss_states.get(&instance_id).map(|b| (b.boss_npc_id.clone(), b.boss_x, b.boss_y))
                     };
                     if let Some((npc_id, bx, by)) = boss_npc_id {
-                        if blast_tiles.contains(&(bx, by)) {
+                        // Boss is 2x2 — check all occupied tiles
+                        let boss_hit = crate::npc::npc_occupied_tiles(bx, by, 2)
+                            .any(|tile| blast_tiles.contains(&tile));
+                        if boss_hit {
                             // Apply damage to the actual NPC
-                            if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                            let boss_hp_after = if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
                                 let mut npcs = instance.npcs.write().await;
                                 if let Some(npc) = npcs.get_mut(&npc_id) {
                                     npc.hp = (npc.hp - damage).max(0);
+                                    Some(npc.hp)
+                                } else {
+                                    None
                                 }
+                            } else {
+                                None
+                            };
+                            // Show damage number on boss
+                            if let Some(hp) = boss_hp_after {
+                                self.send_to_instance(
+                                    &instance_id,
+                                    ServerMessage::DamageEvent {
+                                        source_id: String::new(),
+                                        target_id: npc_id.clone(),
+                                        damage,
+                                        target_hp: hp,
+                                        target_x: bx as f32,
+                                        target_y: by as f32,
+                                        projectile: None,
+                                    },
+                                )
+                                .await;
                             }
                             // Update boss state machine
                             let mut boss_states = self.boss_states.write().await;
