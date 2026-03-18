@@ -117,6 +117,7 @@ pub enum UiElementId {
 
     // Bank Quantity Dialog
     BankQuantityConfirm,
+    BankQuantityMax,
     BankQuantityCancel,
 
     // Chat Panel

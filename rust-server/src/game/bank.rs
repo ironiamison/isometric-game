@@ -259,7 +259,10 @@ impl GameRoom {
             _ => return,
         };
 
-        if !player.bank.has_item(item_id, quantity) {
+        // Clamp to what's actually in the bank
+        let bank_has = player.bank.count_item(item_id);
+        let quantity = quantity.min(bank_has);
+        if quantity <= 0 {
             let msg = ServerMessage::BankResult {
                 success: false,
                 action: "withdraw".to_string(),
@@ -270,10 +273,10 @@ impl GameRoom {
             return;
         }
 
-        if !player
-            .inventory
-            .has_space_for(item_id, quantity, &self.item_registry)
-        {
+        // Clamp to what inventory can hold
+        let space = player.inventory.available_space_for(item_id, &self.item_registry);
+        let quantity = quantity.min(space);
+        if quantity <= 0 {
             let msg = ServerMessage::BankResult {
                 success: false,
                 action: "withdraw".to_string(),

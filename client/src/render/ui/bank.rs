@@ -1046,7 +1046,8 @@ impl Renderer {
 
         // ===== BUTTONS =====
         let button_y = input_y + input_height + 12.0 * s;
-        let button_width = (content_width - 12.0 * s) / 2.0;
+        let gap = 8.0 * s;
+        let button_width = (content_width - gap * 2.0) / 3.0;
         let button_height = 28.0 * s;
 
         // Confirm button
@@ -1102,8 +1103,55 @@ impl Renderer {
             confirm_text_color,
         );
 
+        // Max button
+        let max_x = content_x + button_width + gap;
+        let max_bounds = Rect::new(max_x, button_y, button_width, button_height);
+        layout.add(UiElementId::BankQuantityMax, max_bounds);
+
+        let max_hovered = matches!(hovered, Some(UiElementId::BankQuantityMax));
+        let (max_bg, max_border) = if max_hovered {
+            (Color::new(0.141, 0.204, 0.235, 1.0), Color::new(0.4, 0.7, 0.9, 1.0))
+        } else {
+            (Color::new(0.110, 0.141, 0.157, 1.0), FRAME_MID)
+        };
+
+        draw_rectangle(max_x, button_y, button_width, button_height, max_border);
+        draw_rectangle(
+            max_x + 1.0,
+            button_y + 1.0,
+            button_width - 2.0,
+            button_height - 2.0,
+            max_bg,
+        );
+
+        if max_hovered {
+            draw_line(
+                max_x + 2.0,
+                button_y + 2.0,
+                max_x + button_width - 2.0,
+                button_y + 2.0,
+                1.0,
+                FRAME_INNER,
+            );
+        }
+
+        let max_text_color = if max_hovered {
+            TEXT_TITLE
+        } else {
+            TEXT_NORMAL
+        };
+        let max_text = "Max";
+        let max_text_width = self.measure_text_sharp(max_text, 16.0).width;
+        self.draw_text_sharp(
+            max_text,
+            max_x + (button_width - max_text_width) / 2.0,
+            button_y + button_height * 0.68,
+            16.0,
+            max_text_color,
+        );
+
         // Cancel button
-        let cancel_x = content_x + button_width + 12.0 * s;
+        let cancel_x = content_x + (button_width + gap) * 2.0;
         let cancel_bounds = Rect::new(cancel_x, button_y, button_width, button_height);
         layout.add(UiElementId::BankQuantityCancel, cancel_bounds);
 

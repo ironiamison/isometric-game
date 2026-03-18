@@ -212,6 +212,33 @@ impl Inventory {
 
         empty_slots >= slots_needed
     }
+
+    /// Calculate how many of an item can fit in inventory
+    pub fn available_space_for(&self, item_id: &str, registry: &ItemRegistry) -> i32 {
+        if item_id == GOLD_ITEM_ID {
+            return i32::MAX;
+        }
+
+        let max_stack = registry
+            .get(item_id)
+            .map(|def| def.max_stack)
+            .unwrap_or(DEFAULT_MAX_STACK);
+        let mut space = 0;
+
+        for slot in &self.slots {
+            match slot {
+                Some(inv_slot) if inv_slot.item_id == item_id => {
+                    space += max_stack - inv_slot.quantity;
+                }
+                None => {
+                    space += max_stack;
+                }
+                _ => {}
+            }
+        }
+
+        space
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
