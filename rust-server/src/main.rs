@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sqlx::Row;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::sync::{RwLock, broadcast, mpsc};
+use tokio::sync::{RwLock, broadcast, mpsc, watch};
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -2057,6 +2057,9 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
 
     // Spawn recv loop task — ignore all messages except SpectatorUpgrade
     // Returns Some((session_id, player_id, character_name, character_id)) if upgraded
+    // Shutdown signal: send_task can notify recv_task to stop so it can run cleanup
+    let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+
     let recv_room = room.clone();
     let recv_spectator_id = spectator_id.clone();
     let recv_state = state.clone();
@@ -2498,31 +2501,52 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             );
 
                             // --- Phase 2: Normal player message handling loop ---
+                            let mut last_app_msg = std::time::Instant::now();
                             loop {
-                                match tokio::time::timeout(Duration::from_secs(45), receiver.next()).await {
-                                    Ok(Some(Ok(msg))) => match msg {
-                                        Message::Binary(data) => {
-                                            if let Err(e) = handle_client_message(
-                                                &recv_state,
-                                                &recv_room,
-                                                &player_id,
-                                                &data,
-                                            )
-                                            .await
-                                            {
-                                                warn!(
-                                                    "Error handling message from upgraded player {}: {}",
-                                                    player_id, e
-                                                );
+                                tokio::select! {
+                                    biased;
+                                    // Check if send_task died (connection broken)
+                                    _ = shutdown_rx.changed() => {
+                                        warn!("Send task died for upgraded player {}, proceeding to cleanup", player_id);
+                                        break;
+                                    }
+                                    result = tokio::time::timeout(Duration::from_secs(15), receiver.next()) => {
+                                        match result {
+                                            Ok(Some(Ok(msg))) => match msg {
+                                                Message::Binary(data) => {
+                                                    last_app_msg = std::time::Instant::now();
+                                                    if let Err(e) = handle_client_message(
+                                                        &recv_state,
+                                                        &recv_room,
+                                                        &player_id,
+                                                        &data,
+                                                    )
+                                                    .await
+                                                    {
+                                                        warn!(
+                                                            "Error handling message from upgraded player {}: {}",
+                                                            player_id, e
+                                                        );
+                                                    }
+                                                }
+                                                Message::Close(_) => break,
+                                                _ => {
+                                                    // Pong or other control frame — don't reset app timer
+                                                    if last_app_msg.elapsed() > Duration::from_secs(45) {
+                                                        warn!("Upgraded player {} timed out (no app messages for 45s)", player_id);
+                                                        break;
+                                                    }
+                                                }
+                                            },
+                                            Ok(Some(Err(_))) | Ok(None) => break,
+                                            Err(_) => {
+                                                // Short timeout expired, check app-level activity
+                                                if last_app_msg.elapsed() > Duration::from_secs(45) {
+                                                    warn!("Upgraded player {} connection timed out (no data for 45s)", player_id);
+                                                    break;
+                                                }
                                             }
                                         }
-                                        Message::Close(_) => break,
-                                        _ => {}
-                                    },
-                                    Ok(Some(Err(_))) | Ok(None) => break,
-                                    Err(_) => {
-                                        warn!("Upgraded player {} connection timed out (no data for 45s)", player_id);
-                                        break;
                                     }
                                 }
                             }
@@ -2846,7 +2870,23 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
 
     // Wait for either task to finish
     tokio::select! {
-        _ = &mut send_task => recv_task.abort(),
+        _ = &mut send_task => {
+            // Send task died (connection broken) — signal recv_task to stop
+            // so it can run Phase 3 cleanup instead of being aborted
+            let _ = shutdown_tx.send(true);
+            // Wait for recv_task to finish cleanup (with safety timeout)
+            match tokio::time::timeout(Duration::from_secs(10), recv_task).await {
+                Ok(Ok(true)) => {
+                    // recv_task completed and handled player cleanup
+                    return;
+                }
+                _ => {
+                    // recv_task didn't complete or wasn't upgraded — clean up spectator
+                    room.remove_spectator(&spectator_id).await;
+                    info!("Spectator {} disconnected (send task ended)", spectator_id);
+                }
+            }
+        }
         result = &mut recv_task => {
             send_task.abort();
             // If recv_task completed with Ok(true), the player cleanup was already handled
@@ -2856,13 +2896,8 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                 room.remove_spectator(&spectator_id).await;
                 info!("Spectator {} disconnected", spectator_id);
             }
-            return;
         }
     }
-
-    // If send_task finished first (recv_task was aborted), spectator is still registered
-    room.remove_spectator(&spectator_id).await;
-    info!("Spectator {} disconnected (send task ended)", spectator_id);
 }
 
 // ============================================================================
@@ -3335,10 +3370,12 @@ async fn handle_socket(
     let player_id_clone = player_id.clone();
     let state_clone = state.clone();
     let mut recv_task = tokio::spawn(async move {
+        let mut last_app_msg = std::time::Instant::now();
         loop {
-            match tokio::time::timeout(Duration::from_secs(45), receiver.next()).await {
+            match tokio::time::timeout(Duration::from_secs(15), receiver.next()).await {
                 Ok(Some(Ok(msg))) => match msg {
                     Message::Binary(data) => {
+                        last_app_msg = std::time::Instant::now();
                         if let Err(e) =
                             handle_client_message(&state_clone, &room_clone, &player_id_clone, &data)
                                 .await
@@ -3347,12 +3384,21 @@ async fn handle_socket(
                         }
                     }
                     Message::Close(_) => break,
-                    _ => {}
+                    _ => {
+                        // Pong or other control frame — don't reset app timer
+                        if last_app_msg.elapsed() > Duration::from_secs(45) {
+                            warn!("Player {} timed out (no app messages for 45s)", player_id_clone);
+                            break;
+                        }
+                    }
                 },
                 Ok(Some(Err(_))) | Ok(None) => break,
                 Err(_) => {
-                    warn!("Player {} connection timed out (no data for 45s)", player_id_clone);
-                    break;
+                    // Short timeout expired, check app-level activity
+                    if last_app_msg.elapsed() > Duration::from_secs(45) {
+                        warn!("Player {} connection timed out (no data for 45s)", player_id_clone);
+                        break;
+                    }
                 }
             }
         }
