@@ -760,14 +760,14 @@ impl BubbleParticle {
         }
     }
 
-    pub fn update(&mut self, dt: f32) {
+    pub fn update(&mut self, dt: f32, now: f64) {
         self.height += self.rise_speed * dt;
-        let sway = (macroquad::time::get_time() * 5.0 + self.drift_x as f64).sin() as f32;
+        let sway = (now * 5.0 + self.drift_x as f64).sin() as f32;
         self.tile_x += sway * 0.3 * dt;
     }
 
-    pub fn get_alpha(&self) -> f32 {
-        let elapsed = macroquad::time::get_time() - self.started_at;
+    pub fn get_alpha(&self, now: f64) -> f32 {
+        let elapsed = now - self.started_at;
         let progress = (elapsed / Self::DURATION) as f32;
         // Fade in quickly, fade out in last 40%
         if progress < 0.2 {
@@ -779,8 +779,8 @@ impl BubbleParticle {
         }
     }
 
-    pub fn is_finished(&self) -> bool {
-        macroquad::time::get_time() - self.started_at > Self::DURATION
+    pub fn is_finished(&self, now: f64) -> bool {
+        now - self.started_at > Self::DURATION
     }
 }
 
@@ -2365,14 +2365,14 @@ impl GameState {
 
         // Update fishing bubble particles
         for bubble in &mut self.fishing_bubbles {
-            bubble.update(delta);
+            bubble.update(delta, now);
         }
-        self.fishing_bubbles.retain(|p| !p.is_finished());
+        self.fishing_bubbles.retain(|p| !p.is_finished(now));
 
         // Spawn new bubbles at fishing markers periodically
         self.bubble_spawn_timer -= delta as f64;
         if self.bubble_spawn_timer <= 0.0 {
-            self.bubble_spawn_timer = 0.5; // Spawn a batch every 0.5s
+            self.bubble_spawn_timer = 0.8; // Spawn a batch every 0.8s
             let fishing_markers: Vec<(f32, f32)> = self
                 .gathering_markers
                 .iter()
@@ -2380,14 +2380,14 @@ impl GameState {
                 .map(|m| (m.x as f32, m.y as f32))
                 .collect();
             for (mx, my) in &fishing_markers {
-                // ~30% chance per marker per batch for subtle randomness
-                if macroquad::rand::gen_range(0u32, 100) < 30 {
+                // ~20% chance per marker per batch for subtle randomness
+                if macroquad::rand::gen_range(0u32, 100) < 20 {
                     self.fishing_bubbles.push(BubbleParticle::new(*mx, *my));
                 }
             }
             // Cap total bubbles to avoid runaway with many markers
-            if self.fishing_bubbles.len() > 500 {
-                self.fishing_bubbles.drain(0..self.fishing_bubbles.len() - 500);
+            if self.fishing_bubbles.len() > 80 {
+                self.fishing_bubbles.drain(0..self.fishing_bubbles.len() - 80);
             }
         }
 

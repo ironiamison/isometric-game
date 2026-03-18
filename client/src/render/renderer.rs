@@ -3607,7 +3607,7 @@ impl Renderer {
                 effect_idx: usize,
             },
             FarmingPatch {
-                patch_id: String,
+                patch_id: &'a str,
             },
         }
 
@@ -3693,7 +3693,7 @@ impl Renderer {
                 }
                 let patch_z = state.chunk_manager.get_height(patch.x, patch.y) as f32;
                 let depth = calculate_depth_z(wx, wy, patch_z, 1) + 0.01;
-                renderables.push((depth, Renderable::FarmingPatch { patch_id: id.clone() }));
+                renderables.push((depth, Renderable::FarmingPatch { patch_id: id.as_str() }));
             }
         }
 
@@ -4339,7 +4339,7 @@ impl Renderer {
                     self.render_single_spell_effect(state, effect_idx);
                 }
                 Renderable::FarmingPatch { patch_id } => {
-                    self.render_single_farming_patch(state, &patch_id);
+                    self.render_single_farming_patch(state, patch_id);
                 }
             }
         }
@@ -4478,6 +4478,7 @@ impl Renderer {
             }
 
             // Render fishing bubble particles (small rising circles)
+            let bubble_time = get_time();
             for bubble in &state.fishing_bubbles {
                 if !is_visible_world(bubble.tile_x, bubble.tile_y) {
                     continue;
@@ -4487,7 +4488,7 @@ impl Renderer {
                     world_to_screen(bubble.tile_x, bubble.tile_y, &state.camera);
                 let screen_y = base_screen_y - bubble.height * state.camera.zoom;
 
-                let alpha = bubble.get_alpha();
+                let alpha = bubble.get_alpha(bubble_time);
                 let size = bubble.size * state.camera.zoom;
 
                 // Subtle white/light-blue bubble
