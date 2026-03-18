@@ -374,7 +374,7 @@ impl NpcAnimation {
                 _ => (2, Self::IDLE_FPS, false),
             },
             NpcAnimationState::Burrowing => match self.layout {
-                NpcAnimationLayout::BossWurm => (3, Self::WALK_FPS, true),
+                NpcAnimationLayout::BossWurm => (3, 14.0, true),
                 _ => (2, Self::IDLE_FPS, true),
             },
             NpcAnimationState::Exploding => match self.layout {

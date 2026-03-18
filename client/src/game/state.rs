@@ -21,8 +21,6 @@ pub enum AttackSoundType {
 }
 
 const MAX_CHAT_LOG_MESSAGES: usize = 120;
-const HIGH_PING_ENABLE_MS: f64 = 120.0;
-const HIGH_PING_DISABLE_MS: f64 = 95.0;
 
 /// State of a map transition (fade effect)
 #[derive(Debug, Clone, PartialEq)]
@@ -2240,74 +2238,6 @@ impl GameState {
         self.pending_move_seqs.clear();
     }
 
-    pub fn refresh_high_ping_movement_mode(&mut self) {
-        if !self.ping_stats.has_data() {
-            self.high_ping_movement_mode = false;
-            return;
-        }
-
-        let avg = self.ping_stats.avg_ms;
-        if self.high_ping_movement_mode {
-            if avg < HIGH_PING_DISABLE_MS {
-                self.high_ping_movement_mode = false;
-            }
-        } else if avg > HIGH_PING_ENABLE_MS {
-            self.high_ping_movement_mode = true;
-        }
-    }
-
-    pub fn local_prediction_lead_scale(&self) -> f32 {
-        let mut scale = if !self.ping_stats.has_data() {
-            1.0
-        } else {
-            let avg = self.ping_stats.avg_ms as f32;
-            if avg < 40.0 {
-                let t = (avg / 40.0).clamp(0.0, 1.0);
-                0.75 + t * 0.25
-            } else if !self.high_ping_movement_mode {
-                1.0
-            } else {
-                let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
-                1.0 - t * 0.55
-            }
-        };
-
-        // During auto-actions, keep visual lead under half a tile to avoid
-        // "attacking from too far" when the server is authoritative.
-        if self.auto_action_state.is_some() {
-            scale = scale.min(0.55);
-        }
-
-        scale
-    }
-
-    pub fn local_reconciliation_softness(&self) -> f32 {
-        if !self.high_ping_movement_mode || !self.ping_stats.has_data() {
-            return 1.0;
-        }
-
-        let avg = self.ping_stats.avg_ms as f32;
-        let t = ((avg - 120.0) / 100.0).clamp(0.0, 1.0);
-        1.0 + t * 0.5
-    }
-
-    pub fn sync_catchup_softness(&self) -> f32 {
-        let extra_ticks = self.state_sync_catchup_ticks.saturating_sub(1) as f32;
-        if extra_ticks <= 0.0 {
-            return 1.0;
-        }
-        let softness = 1.0 + extra_ticks * 0.35;
-        softness.min(2.0)
-    }
-
-    pub fn sync_catchup_lead_scale(&self) -> f32 {
-        let extra_ticks = self.state_sync_catchup_ticks.saturating_sub(1) as f32;
-        if extra_ticks <= 0.0 {
-            return 1.0;
-        }
-        let scale = 1.0 - extra_ticks * 0.15;
-        scale.clamp(0.55, 1.0)
-    }
 
     /// Append a chat message and bump revision so renderer cache invalidates once.
     pub fn push_chat_message(&mut self, message: ChatMessage) {
@@ -2322,7 +2252,6 @@ impl GameState {
 
     /// Update all players in a server-authoritative step model.
     pub fn update(&mut self, delta: f32) {
-        self.refresh_high_ping_movement_mode();
 
         // Prune expired potion buffs
         let now = macroquad::time::get_time();

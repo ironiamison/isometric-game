@@ -89,13 +89,8 @@ pub const TILES_PER_SECOND: f32 = 4.0;
 // Linear interpolation speed - must match server movement rate
 // Server: 250ms per tile = 4 tiles per second
 const VISUAL_SPEED: f32 = 4.0;
-// Local player prediction lead: enough to prevent per-step micro-pauses
-// between server-confirmed grid moves, while still avoiding long overshoot.
-const LOCAL_PREDICTION_LOOKAHEAD: f32 = 0.9;
-// Hard cap on visual lead versus server-authoritative position.
-const LOCAL_MAX_LEAD_TILES: f32 = 1.1;
-// Allow direction changes near the end of a segment (fractional tiles).
-const LOCAL_TURN_ACCEPT_WINDOW_TILES: f32 = 0.35;
+// Threshold for considering visual position "at tile center"
+const TILE_CENTER_THRESHOLD: f32 = 0.15;
 // Ignore tiny/ambiguous per-frame displacement for facing updates.
 const DIRECTION_FRAME_DELTA_EPS: f32 = 0.01;
 const DIRECTION_AMBIGUITY_EPS: f32 = 0.01;
@@ -358,14 +353,11 @@ impl Player {
             self.direction,
             false,
             false,
-            1.0,
-            1.0,
         );
     }
 
-    /// Set server state - simple server-authoritative model
-    /// Server is single source of truth, client just animates smoothly
-    /// is_local_player: local direction is controlled from input while moving/idle.
+    /// Set server state - strict tile-center-to-tile-center model.
+    /// Target is ALWAYS a tile center. Direction changes queue until arrival.
     pub fn set_server_state(
         &mut self,
         x: f32,
@@ -376,13 +368,9 @@ impl Player {
         dir: Direction,
         is_local_player: bool,
         has_pending_local_moves: bool,
-        local_lead_scale: f32,
-        local_reconciliation_softness: f32,
     ) {
         let old_server_x = self.server_x;
         let old_server_y = self.server_y;
-        let old_vel_x = self.vel_x;
-        let old_vel_y = self.vel_y;
         self.is_local_player = is_local_player;
 
         self.server_x = x;
@@ -394,11 +382,10 @@ impl Player {
 
         let step_dx = x - old_server_x;
         let step_dy = y - old_server_y;
-        // Server position changed = server confirmed a tile step.
         let server_moved = step_dx.abs() > 0.01 || step_dy.abs() > 0.01;
 
         // Remote players always follow server facing.
-        // Local player keeps input-facing unless sitting (chair controlled).
+        // Local player keeps input-facing unless sitting.
         let is_sitting = matches!(
             self.animation.state,
             crate::render::animation::AnimationState::SittingChair
@@ -407,10 +394,6 @@ impl Player {
         if !is_local_player || is_sitting {
             self.direction = dir;
         } else if server_moved {
-            // During attack/cast animations, trust the server's authoritative direction
-            // which includes the attack-facing override. Otherwise the movement-derived
-            // direction from the last walk step would snap the player back to the walk
-            // direction instead of keeping the attack-facing direction.
             let in_attack = matches!(
                 self.animation.state,
                 crate::render::animation::AnimationState::Attacking
@@ -420,8 +403,6 @@ impl Player {
             if in_attack {
                 self.direction = dir;
             } else {
-                // Local facing is committed from authoritative server tile steps,
-                // not from speculative/correction interpolation.
                 let adx = step_dx.abs();
                 let ady = step_dy.abs();
                 if (adx - ady).abs() > DIRECTION_AMBIGUITY_EPS {
@@ -430,10 +411,8 @@ impl Player {
             }
         }
 
-        // If dashing, set target to new position for fast slide interpolation (don't snap)
+        // Dashing: slide to target without prediction
         if self.is_dashing {
-            self.server_x = x;
-            self.server_y = y;
             self.target_x = x;
             self.target_y = y;
             self.vel_x = 0.0;
@@ -441,80 +420,37 @@ impl Player {
             return;
         }
 
-        // Teleport detection. For local play, prefer soft correction when
-        // we're only a few tiles off, and reserve hard snaps for truly large
-        // divergences (map transitions, respawns, etc.).
-        let softness = local_reconciliation_softness.clamp(1.0, 2.5);
-        let teleport_snap_distance = if is_local_player { 2.0 * softness } else { 2.0 };
-        let hard_snap_distance = if is_local_player {
-            6.0 * softness
-        } else {
-            teleport_snap_distance
-        };
+        // Teleport detection: snap if too far away
         let dist = ((self.x - x).powi(2) + (self.y - y).powi(2)).sqrt();
-        if dist > hard_snap_distance {
+        if dist > 3.0 {
             self.x = x;
             self.y = y;
             self.target_x = x;
             self.target_y = y;
             return;
         }
-        if is_local_player && dist > teleport_snap_distance {
+
+        // ── Strict tile-center model ──
+        // Target is always a tile center (integer coords).
+        // Only predict from server position — never re-predict from a
+        // predicted-ahead tile, which would cause wrong-direction glitches
+        // on direction changes.
+        let stopped = vel_x == 0.0 && vel_y == 0.0;
+        let at_server_pos = (self.x - x).abs() < TILE_CENTER_THRESHOLD
+            && (self.y - y).abs() < TILE_CENTER_THRESHOLD;
+
+        if stopped || (is_local_player && !has_pending_local_moves) {
+            // No movement intent: target = server position
             self.target_x = x;
             self.target_y = y;
-            return;
+        } else if server_moved || at_server_pos {
+            // Server confirmed a tile step, or visual is at server pos
+            // (e.g. first move from standstill). Predict next tile center.
+            self.target_x = x + vel_x;
+            self.target_y = y + vel_y;
         }
-
-        let stopped = vel_x == 0.0 && vel_y == 0.0;
-        let at_tile_center =
-            (self.x - self.x.round()).abs() < 0.1 && (self.y - self.y.round()).abs() < 0.1;
-        let rem_x = self.target_x - self.x;
-        let rem_y = self.target_y - self.y;
-        let near_target = rem_x.abs() < LOCAL_TURN_ACCEPT_WINDOW_TILES
-            && rem_y.abs() < LOCAL_TURN_ACCEPT_WINDOW_TILES;
-        let lookahead = if is_local_player {
-            if !has_pending_local_moves {
-                0.0
-            } else {
-                LOCAL_PREDICTION_LOOKAHEAD * local_lead_scale.clamp(0.35, 1.0)
-            }
-        } else {
-            1.0
-        };
-
-        if is_local_player {
-            let max_lead = LOCAL_MAX_LEAD_TILES * local_reconciliation_softness.clamp(1.0, 1.75);
-            let lead = (self.x - x).abs().max((self.y - y).abs());
-            if lead > max_lead {
-                self.target_x = x;
-                self.target_y = y;
-                return;
-            }
-        }
-
-        // Local player: only defer true reversals mid-segment.
-        // This removes left-right flip-flop while still allowing clean
-        // perpendicular turns without feeling blocked.
-        let reversing_mid_segment = is_local_player
-            && has_pending_local_moves
-            && !server_moved
-            && !stopped
-            && !near_target
-            && ((rem_x.abs() > 0.01 && vel_x != 0.0 && vel_x.signum() != rem_x.signum())
-                || (rem_y.abs() > 0.01 && vel_y != 0.0 && vel_y.signum() != rem_y.signum()));
-        if reversing_mid_segment {
-            return;
-        }
-
-        if server_moved || stopped || at_tile_center || near_target {
-            if vel_x != 0.0 || vel_y != 0.0 {
-                self.target_x = x + vel_x * lookahead;
-                self.target_y = y + vel_y * lookahead;
-            } else {
-                self.target_x = x;
-                self.target_y = y;
-            }
-        }
+        // else: mid-interpolation or at predicted tile waiting for server
+        // confirmation. Keep current target.
     }
 
     /// Smooth visual interpolation toward target position

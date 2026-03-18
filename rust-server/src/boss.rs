@@ -64,21 +64,21 @@ fn phase_config(phase: &BossPhase) -> PhaseConfig {
     match phase {
         BossPhase::Hunt => PhaseConfig {
             dig_interval: 15_000,
-            rock_count: 3,
+            rock_count: 6,
             minion_count: 1,
             minion_interval: 25_000,
             melee_dmg_mult: 1.0,
         },
         BossPhase::Storm => PhaseConfig {
             dig_interval: 18_000,
-            rock_count: 5,
+            rock_count: 10,
             minion_count: 1,
             minion_interval: 20_000,
             melee_dmg_mult: 1.3,
         },
         BossPhase::Frenzy => PhaseConfig {
             dig_interval: 15_000,
-            rock_count: 7,
+            rock_count: 14,
             minion_count: 2,
             minion_interval: 15_000,
             melee_dmg_mult: 1.6,
