@@ -72,8 +72,8 @@ const STARTING_HP: i32 = 100;
 
 // Combat constants
 const ATTACK_RANGE: i32 = 1; // Maximum distance to attack (in tiles)
-const ATTACK_COOLDOWN_MS: u64 = 700; // Melee: slightly shorter than client's 800ms to absorb jitter
-const RANGED_ATTACK_COOLDOWN_MS: u64 = 1000; // Ranged: slower to balance range advantage
+const ATTACK_COOLDOWN_MS: u64 = 700;
+const RANGED_ATTACK_COOLDOWN_MS: u64 = 700;
 const PLAYER_HP_REGEN_PERCENT: f32 = 2.0;
 const REGEN_INTERVAL_MS: u64 = 15000;
 
@@ -7607,6 +7607,11 @@ impl GameRoom {
                 // Process slayer kill event
                 self.process_slayer_kill(player_id, &prototype_id).await;
 
+                // Skip loot drops in boss arena (rewards come from battle master)
+                let in_boss_arena = caster_instance.as_ref()
+                    .map(|id| id.contains(crate::game::boss_tick::BOSS_MAP_ID))
+                    .unwrap_or(false);
+
                 // Spawn item drops from prototype loot table
                 let drop_time = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -7618,7 +7623,9 @@ impl GameRoom {
                     instances.get(player_id).cloned()
                 };
 
-                let drops = if let Some(prototype) = self.entity_registry.get(&prototype_id) {
+                let drops = if in_boss_arena {
+                    vec![]
+                } else if let Some(prototype) = self.entity_registry.get(&prototype_id) {
                     crate::entity::generate_loot_from_prototype(
                         prototype,
                         target_x as f32,
