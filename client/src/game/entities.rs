@@ -86,7 +86,7 @@ impl Direction {
 // Movement speed in tiles per second (must match server: 250ms per tile)
 pub const TILES_PER_SECOND: f32 = 4.0;
 
-// Linear interpolation speed - must match server movement rate
+// Linear interpolation speed - matches server movement rate
 // Server: 250ms per tile = 4 tiles per second
 const VISUAL_SPEED: f32 = 4.0;
 // Threshold for considering visual position "at tile center"
@@ -485,7 +485,11 @@ impl Player {
         if dx.abs() < 0.01 && dy.abs() < 0.01 {
             self.x = self.target_x;
             self.y = self.target_y;
-            self.is_moving = false;
+            // Keep walking animation alive while server indicates movement,
+            // even during the brief positional pause waiting for the next
+            // server confirmation. Prevents walk→idle flicker at tile centers.
+            let has_vel = self.vel_x != 0.0 || self.vel_y != 0.0;
+            self.is_moving = has_vel;
             self.is_dashing = false; // Dash slide complete
         } else {
             // Use fast speed during dash (normal movement remains 4 tiles/sec).
