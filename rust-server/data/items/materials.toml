@@ -630,7 +630,7 @@ sellable = true
 
 [maple_log]
 display_name = "Maple Logs"
-sprite = "yew_log"
+sprite = "maple_log"
 description = "Strong maple logs. Popular with fletchers."
 category = "material"
 max_stack = 5
