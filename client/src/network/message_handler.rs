@@ -1048,36 +1048,38 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     projectile: projectile.clone(),
                 });
 
-                // Spawn projectile for ranged attacks
+                // Spawn projectile for ranged attacks (blast handled by spellEffect)
                 if let Some(ref projectile_type) = projectile {
-                    if let Some(ref source_id) = source_id {
-                        // Get source position + Z (check players then NPCs)
-                        let source_pos = if let Some(player) = state.players.get(source_id) {
-                            Some((player.x.round(), player.y.round(), player.z))
-                        } else if let Some(npc) = state.npcs.get(source_id) {
-                            Some((npc.x.round(), npc.y.round(), npc.z))
-                        } else {
-                            None
-                        };
+                    if projectile_type != "blast" {
+                        if let Some(ref source_id) = source_id {
+                            // Get source position + Z (check players then NPCs)
+                            let source_pos = if let Some(player) = state.players.get(source_id) {
+                                Some((player.x.round(), player.y.round(), player.z))
+                            } else if let Some(npc) = state.npcs.get(source_id) {
+                                Some((npc.x.round(), npc.y.round(), npc.z))
+                            } else {
+                                None
+                            };
 
-                        if let Some((src_x, src_y, src_z)) = source_pos {
-                            // Target tile center (rounded for straight isometric lines)
-                            let end_x = target_x.round();
-                            let end_y = target_y.round();
-                            // Look up target Z from terrain height
-                            let end_z = state.chunk_manager.get_height(end_x as i32, end_y as i32) as f32;
+                            if let Some((src_x, src_y, src_z)) = source_pos {
+                                // Target tile center (rounded for straight isometric lines)
+                                let end_x = target_x.round();
+                                let end_y = target_y.round();
+                                // Look up target Z from terrain height
+                                let end_z = state.chunk_manager.get_height(end_x as i32, end_y as i32) as f32;
 
-                            state.projectiles.push(crate::game::Projectile {
-                                sprite: projectile_type.clone(),
-                                start_x: src_x,
-                                start_y: src_y,
-                                start_z: src_z,
-                                end_x,
-                                end_y,
-                                end_z,
-                                start_time: current_time,
-                                duration: 0.15, // Fast arrow travel
-                            });
+                                state.projectiles.push(crate::game::Projectile {
+                                    sprite: projectile_type.clone(),
+                                    start_x: src_x,
+                                    start_y: src_y,
+                                    start_z: src_z,
+                                    end_x,
+                                    end_y,
+                                    end_z,
+                                    start_time: current_time,
+                                    duration: 0.15, // Fast arrow travel
+                                });
+                            }
                         }
                     }
                 }
@@ -3876,15 +3878,39 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     player.play_cast();
                 }
 
-                // Store for rendering (Task 9)
-                state.spell_effects.push(SpellEffect {
-                    caster_id,
-                    target_id,
-                    spell_id,
-                    target_x,
-                    target_y,
-                    time: macroquad::time::get_time(),
-                });
+                // Blast spell: spawn a projectile instead of on-target effect
+                if spell_id == "blast" {
+                    let source_pos = if let Some(player) = state.players.get(&caster_id) {
+                        Some((player.x.round(), player.y.round(), player.z))
+                    } else {
+                        None
+                    };
+
+                    if let Some((src_x, src_y, src_z)) = source_pos {
+                        let end_z = state.chunk_manager.get_height(target_x, target_y) as f32;
+                        state.projectiles.push(crate::game::Projectile {
+                            sprite: "blast".to_string(),
+                            start_x: src_x,
+                            start_y: src_y,
+                            start_z: src_z,
+                            end_x: target_x as f32,
+                            end_y: target_y as f32,
+                            end_z,
+                            start_time: macroquad::time::get_time(),
+                            duration: 0.3,
+                        });
+                    }
+                } else {
+                    // Store for rendering - existing on-target effects
+                    state.spell_effects.push(SpellEffect {
+                        caster_id,
+                        target_id,
+                        spell_id,
+                        target_x,
+                        target_y,
+                        time: macroquad::time::get_time(),
+                    });
+                }
             }
         }
 
@@ -4092,7 +4118,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let target_id = extract_string(value, "target_id").unwrap_or_default();
                 let action = extract_string(value, "action").unwrap_or_default();
                 if let Some(ref mut aa) = state.auto_action_state {
-                    aa.confirmed = true;
+                    // Only confirm if this ack matches the current target.
+                    // Stale acks from a previous target (still in flight when
+                    // we switched) must not confirm the new target.
+                    if aa.target_type == target_type && aa.target_id == target_id {
+                        aa.confirmed = true;
+                    }
                 }
                 log::debug!(
                     "Auto-action started: {} {} {}",
