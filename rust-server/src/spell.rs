@@ -33,6 +33,16 @@ pub const SPELLS: &[SpellDef] = &[
         effect_sprite: "dark_hand",
     },
     SpellDef {
+        id: "blast",
+        name: "Blast",
+        spell_type: SpellType::Damage,
+        magic_level_req: 1,
+        mana_cost: 2,
+        cooldown_ms: 1000,
+        base_power: 2,
+        effect_sprite: "projectile",
+    },
+    SpellDef {
         id: "lightning_bolt",
         name: "Lightning Bolt",
         spell_type: SpellType::Damage,
