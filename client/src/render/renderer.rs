@@ -1073,6 +1073,7 @@ impl Renderer {
                         "bubbles_warp",
                         "tornado",
                         "rocks_aoe",
+                        "projectile",
                     ] {
                         let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                         if let Ok(tex) = load_texture(&path).await {
@@ -1093,6 +1094,7 @@ impl Renderer {
                     "bubbles_warp",
                     "tornado",
                     "rocks_aoe",
+                    "projectile",
                 ] {
                     let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                     if let Ok(tex) = load_texture(&path).await {
@@ -5603,6 +5605,50 @@ impl Renderer {
             let (screen_x, screen_y_raw) =
                 world_to_screen_z(world_x, world_y, world_z, &state.camera);
 
+            // Sprite-based projectile (blast spell)
+            if projectile.sprite == "blast" {
+                if let Some((texture, atlas_offset)) = self.spell_effect_textures.get("projectile") {
+                    let (tex_w, tex_h) = self
+                        .spell_effect_textures
+                        .get_dimensions("projectile")
+                        .unwrap_or((texture.width(), texture.height()));
+                    let frame_count = 4usize;
+                    let frame_w = tex_w / frame_count as f32;
+                    let frame_h = tex_h;
+
+                    // Animate: cycle through frames
+                    let elapsed = current_time - projectile.start_time;
+                    let fps = 10.0;
+                    let frame_idx = ((elapsed * fps) as usize) % frame_count;
+
+                    let (offset_x, offset_y) = atlas_offset.unwrap_or((0.0, 0.0));
+                    let source_rect = Rect::new(
+                        offset_x + frame_idx as f32 * frame_w,
+                        offset_y,
+                        frame_w,
+                        frame_h,
+                    );
+
+                    let zoom = state.camera.zoom;
+                    let draw_w = frame_w * zoom;
+                    let draw_h = frame_h * zoom;
+                    let y_offset = -24.0 * zoom;
+
+                    draw_texture_ex(
+                        texture,
+                        screen_x - draw_w / 2.0,
+                        screen_y_raw + y_offset - draw_h / 2.0,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(source_rect),
+                            dest_size: Some(Vec2::new(draw_w, draw_h)),
+                            ..Default::default()
+                        },
+                    );
+                }
+                continue;
+            }
+
             // Offset arrow vertically to match player center (not feet)
             let arrow_y_offset = -24.0 * state.camera.zoom;
             let screen_y = screen_y_raw + arrow_y_offset;
@@ -5756,6 +5802,7 @@ impl Renderer {
                 "heal" => "self_heal",
                 "teleport" | "return_home" => "bubbles_warp",
                 "tornado" => "tornado",
+                "blast" => continue,
                 "rocks_aoe" => continue,
                 _ => continue,
             };
@@ -5841,6 +5888,7 @@ impl Renderer {
         let elapsed = current_time - effect.time;
 
         let sprite_name = match effect.spell_id.as_str() {
+            "blast" => return,
             "rocks_aoe" => "rocks_aoe",
             other => other,
         };
