@@ -849,13 +849,15 @@ impl Player {
         self.move_dx = 0;
         self.move_dy = 0;
         self.pending_move_seq = None;
+        // Also clear last-move vel so the StateSync vel snapshot doesn't
+        // leak a stale direction when no move is actually pending.
+        self.last_move_vel_x = 0;
+        self.last_move_vel_y = 0;
     }
 
     /// Clear intent and also reset the last-move vel (explicit stop).
     fn stop_moving(&mut self) {
         self.clear_move_intent();
-        self.last_move_vel_x = 0;
-        self.last_move_vel_y = 0;
     }
 
     fn reject_pending_move(&mut self) {
@@ -7352,7 +7354,11 @@ impl GameRoom {
             target_hp,
             target_x: target_x as f32,
             target_y: target_y as f32,
-            projectile: None,
+            projectile: if spell_def.effect_sprite == "projectile" {
+                Some("blast".to_string())
+            } else {
+                None
+            },
         };
         self.broadcast_to_zone(player_id, damage_msg).await;
 
