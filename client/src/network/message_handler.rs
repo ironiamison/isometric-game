@@ -4118,12 +4118,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let target_id = extract_string(value, "target_id").unwrap_or_default();
                 let action = extract_string(value, "action").unwrap_or_default();
                 if let Some(ref mut aa) = state.auto_action_state {
-                    // Only confirm if this ack matches the current target.
-                    // Stale acks from a previous target (still in flight when
-                    // we switched) must not confirm the new target.
-                    if aa.target_type == target_type && aa.target_id == target_id {
-                        aa.confirmed = true;
-                    }
+                    aa.confirmed = true;
                 }
                 log::debug!(
                     "Auto-action started: {} {} {}",
