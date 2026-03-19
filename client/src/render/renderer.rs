@@ -1690,6 +1690,7 @@ impl Renderer {
                 ("return_home", "return_home"),
                 ("greater_heal", "greater_heal"),
                 ("tornado", "tornado"),
+                ("blast", "blast"),
             ];
             let mut icons = HashMap::new();
             for (spell_id, icon_name) in &spell_icon_mappings {
