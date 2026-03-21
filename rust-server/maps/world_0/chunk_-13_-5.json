@@ -3088,7 +3088,7 @@
   "collision": "AACCAAAAghACwEMAAT5AAPEBQHAAAOADAAQeHADAAeAAPgAAgP8/AnABQAAPAYAA/wEAAQABAAL+AQAGAgEABgIBAAICAwACAwYABgQMIAYICNgDkPgHAuAAAAJAAAACQAAAAsAAAAJAAAAAQAAAAMAAAABAAAAAIQAAAH8AAAA=",
   "entities": [
     {
-      "entityId": "camel",
+      "entityId": "camel_transport",
       "x": 5,
       "y": 17
     }
