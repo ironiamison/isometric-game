@@ -1,5 +1,6 @@
 use super::GameRoom;
 use crate::boss::BossEvent;
+use crate::chunk::ChunkCoord;
 use crate::npc::{Npc, NpcState};
 use crate::protocol::ServerMessage;
 use rand::Rng;
@@ -630,6 +631,9 @@ impl GameRoom {
                 }
 
                 let player_ids = self.get_instance_player_ids(&instance_id).await;
+                let spawn_x: i32 = -258;
+                let spawn_y: i32 = -125;
+
                 for pid in player_ids {
                     self.player_instances.write().await.remove(&pid);
                     self.reset_sync_state(&pid).await;
@@ -642,11 +646,17 @@ impl GameRoom {
                     {
                         let mut players = self.players.write().await;
                         if let Some(player) = players.get_mut(&pid) {
-                            player.x = -258;
-                            player.y = -125;
+                            player.x = spawn_x;
+                            player.y = spawn_y;
                             player.z = 0;
                         }
                     }
+
+                    // Preload overworld chunks around the exit before transitioning
+                    let exit_chunk = ChunkCoord::from_world(spawn_x, spawn_y);
+                    self.world()
+                        .preload_chunks(exit_chunk, super::SPAWN_PRELOAD_RADIUS)
+                        .await;
 
                     // Spawn at the boss cave exit
                     self.send_to_player(
@@ -654,12 +664,52 @@ impl GameRoom {
                         ServerMessage::MapTransition {
                             map_type: "overworld".to_string(),
                             map_id: "world_0".to_string(),
-                            spawn_x: -258.0,
-                            spawn_y: -125.0,
+                            spawn_x: spawn_x as f32,
+                            spawn_y: spawn_y as f32,
                             instance_id: String::new(),
                         },
                     )
                     .await;
+
+                    // Re-send overworld data that was cleared on instance entry
+                    self.send_to_player(&pid, self.get_chair_positions_message().await)
+                        .await;
+                    self.send_to_player(&pid, self.get_gathering_markers_message(None).await)
+                        .await;
+                    self.send_to_player(&pid, self.get_chest_positions_message(None).await)
+                        .await;
+
+                    // Send overworld ground items
+                    for item_msg in self.get_ground_items_in_instance(None).await {
+                        self.send_to_player(&pid, item_msg).await;
+                    }
+
+                    // Notify overworld players that this player has returned
+                    {
+                        let player_name = self.get_player_name(&pid).await.unwrap_or_default();
+                        let (gender, skin) = self
+                            .get_player_appearance(&pid)
+                            .await
+                            .unwrap_or_else(|| ("male".to_string(), "tan".to_string()));
+                        let (hair_style, hair_color) = self
+                            .get_player_hair(&pid)
+                            .await
+                            .unwrap_or((None, None));
+                        self.send_to_overworld_players(
+                            ServerMessage::PlayerJoined {
+                                id: pid.clone(),
+                                name: player_name,
+                                x: spawn_x,
+                                y: spawn_y,
+                                gender,
+                                skin,
+                                hair_style,
+                                hair_color,
+                            },
+                            Some(&pid),
+                        )
+                        .await;
+                    }
                 }
             }
         }
