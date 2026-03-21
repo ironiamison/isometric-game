@@ -31697,55 +31697,55 @@
   "spells_atlas": {
     "file": "ui/spells_atlas.png",
     "sprites": {
-      "dark_eater": {
+      "blast": {
         "x": 0,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "dark_hand": {
+      "dark_eater": {
         "x": 32,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "greater_heal": {
+      "dark_hand": {
         "x": 64,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "heal": {
+      "greater_heal": {
         "x": 96,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "lightning_bolt": {
+      "heal": {
         "x": 128,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "return_home": {
+      "lightning_bolt": {
         "x": 160,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "rock_fall": {
+      "return_home": {
         "x": 192,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "tornado": {
+      "rock_fall": {
         "x": 224,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "blast": {
+      "tornado": {
         "x": 256,
         "y": 0,
         "w": 32,
@@ -31810,23 +31810,23 @@
         "w": 32,
         "h": 32
       },
-      "chat_small": {
+      "gold_nugget": {
         "x": 717,
         "y": 0,
         "w": 16,
         "h": 16
       },
-      "coin_small": {
+      "chat_small": {
         "x": 733,
         "y": 0,
         "w": 16,
         "h": 16
       },
-      "gold_nugget": {
+      "coin_small": {
         "x": 749,
         "y": 0,
-        "w": 12,
-        "h": 12
+        "w": 16,
+        "h": 16
       }
     }
   }
