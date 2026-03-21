@@ -3085,8 +3085,14 @@
       0
     ]
   },
-  "collision": "IMABACAIEAAgAAAAIAAAACAAAAAgAAEEIAAAACAAAAAgAAABIAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAACAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAEQAAAAAAAAAAAAAAAAgAIAAAIAAAAAAAAAAAACAA=",
-  "entities": [],
+  "collision": "IMARACAAIAAgACAAIAAgACAAIAAgACEEIAAgACAAIAAgACABIAAQAD8AEAAAABAAAAAIAAAACAAAAAQAAAAEAAAAAwAAAAEgAICBAABAAAAAMAAAAAgAAAAEAAAAAwEAAAEEQOAAAAAcAAAAAgAAAgIIAAAKAAAAAgAAAAIACAA=",
+  "entities": [
+    {
+      "entityId": "camel",
+      "x": 11,
+      "y": 1
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2997,
@@ -3094,13 +3100,6 @@
       "y": 5,
       "width": 180,
       "height": 59
-    },
-    {
-      "gid": 2860,
-      "x": 11,
-      "y": 1,
-      "width": 34,
-      "height": 55
     },
     {
       "gid": 1703,

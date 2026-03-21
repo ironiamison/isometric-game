@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AgIgAAIAQAAKAIAAAQAAAQAAACIAAADdAQAAigEAAAIAAAACAAABAgQAAAIAAAAAAAAAAAkAAAAAAAAAAgAgAAB/AAAEAQAABAECAQABHgEIAQIBAAECABABAMAQAQIAEQICEBAEBpAP+AMAAIABBAAABAQAAAAEAEAABAAAAAA=",
+  "collision": "AgIgAAIAQAAKAIAAAQAAAQAAACIAAADdAQAAigEAAAIAAAACAAABAgQAAAIAAAAAAAAAAAkAAAABAAAAAwAgAAN/AAAGAQAABgECAQYBHgEKAQIBCgECABEBAMAQAQIAEQICEBAEBpAP+AMAAIABBAAABAQAAAAEAEAABAAAAAA=",
   "entities": [
     {
       "entityId": "cactus",
@@ -3254,18 +3254,18 @@
       "height": 53
     },
     {
-      "gid": 2437,
-      "x": 31,
-      "y": 25,
-      "width": 64,
-      "height": 81
-    },
-    {
       "gid": 1619,
       "x": 14,
       "y": 30,
       "width": 33,
       "height": 45
+    },
+    {
+      "gid": 2995,
+      "x": 31,
+      "y": 25,
+      "width": 92,
+      "height": 117
     }
   ],
   "walls": [

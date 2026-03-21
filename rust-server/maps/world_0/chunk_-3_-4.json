@@ -3085,142 +3085,9 @@
       0
     ]
   },
-  "collision": "////Pw0AAAQAAAAAAAAAAAAAAIAAAADAAAAAwAAAAIAAAACAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAIAAAACAAAAAgAAAAIAAAACAAAAAgAAAAIAAAACAAAAAwAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "////Pw0AAAQAAAAAAQAAAAEAAIABAADAAQAAwAEAAIABAACAAQAAgAEAAAABAAAAAQAAAAEAAAABAAAAAAAAgAAAAIAAAACAAAAAgAAAAIAAAACAAAAAgAAAAIAAAACAAAAAwAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [],
   "mapObjects": [
-    {
-      "gid": 1326,
-      "x": 15,
-      "y": 18,
-      "width": 40,
-      "height": 42
-    },
-    {
-      "gid": 1328,
-      "x": 15,
-      "y": 17,
-      "width": 40,
-      "height": 57
-    },
-    {
-      "gid": 1326,
-      "x": 16,
-      "y": 18,
-      "width": 40,
-      "height": 42
-    },
-    {
-      "gid": 1325,
-      "x": 16,
-      "y": 17,
-      "width": 40,
-      "height": 39
-    },
-    {
-      "gid": 1401,
-      "x": 13,
-      "y": 7,
-      "width": 30,
-      "height": 41
-    },
-    {
-      "gid": 1404,
-      "x": 5,
-      "y": 13,
-      "width": 30,
-      "height": 41
-    },
-    {
-      "gid": 1421,
-      "x": 7,
-      "y": 10,
-      "width": 47,
-      "height": 53
-    },
-    {
-      "gid": 1420,
-      "x": 15,
-      "y": 9,
-      "width": 47,
-      "height": 53
-    },
-    {
-      "gid": 1420,
-      "x": 16,
-      "y": 9,
-      "width": 47,
-      "height": 53
-    },
-    {
-      "gid": 1420,
-      "x": 17,
-      "y": 9,
-      "width": 47,
-      "height": 53
-    },
-    {
-      "gid": 1421,
-      "x": 7,
-      "y": 9,
-      "width": 47,
-      "height": 53
-    },
-    {
-      "gid": 1421,
-      "x": 7,
-      "y": 16,
-      "width": 47,
-      "height": 53
-    },
-    {
-      "gid": 1421,
-      "x": 7,
-      "y": 15,
-      "width": 47,
-      "height": 53
-    },
-    {
-      "gid": 1513,
-      "x": 5,
-      "y": 10,
-      "width": 28,
-      "height": 36
-    },
-    {
-      "gid": 1513,
-      "x": 5,
-      "y": 9,
-      "width": 28,
-      "height": 36
-    },
-    {
-      "gid": 1576,
-      "x": 13,
-      "y": 30,
-      "width": 42,
-      "height": 27
-    },
-    {
-      "gid": 1792,
-      "x": 14,
-      "y": 12,
-      "width": 64,
-      "height": 132
-    },
-    {
-      "gid": 1793,
-      "x": 12,
-      "y": 12,
-      "width": 62,
-      "height": 127
-    },
-    {
-      "gid": 1958,
-      "x": 13,
-      "y": 12,
-      "width": 55,
-      "height": 163
-    },
     {
       "gid": 2015,
       "x": 31,
@@ -3248,13 +3115,6 @@
       "y": 26,
       "width": 54,
       "height": 60
-    },
-    {
-      "gid": 2117,
-      "x": 17,
-      "y": 17,
-      "width": 23,
-      "height": 74
     },
     {
       "gid": 1754,

@@ -803,7 +803,7 @@
       396,
       396,
       396,
-      396,
+      1671,
       1319,
       1447,
       418,
@@ -834,7 +834,7 @@
       396,
       396,
       396,
-      396,
+      1671,
       1317,
       1451,
       418,
@@ -865,7 +865,7 @@
       396,
       396,
       396,
-      396,
+      1671,
       1317,
       1451,
       418,
@@ -896,7 +896,7 @@
       396,
       396,
       396,
-      396,
+      1671,
       1317,
       1451,
       418,
@@ -927,7 +927,7 @@
       396,
       396,
       396,
-      396,
+      1671,
       1317,
       1451,
       418,
@@ -956,9 +956,9 @@
       396,
       396,
       396,
-      396,
-      396,
-      396,
+      1671,
+      1671,
+      1671,
       1317,
       1451,
       418,
@@ -967,6 +967,9 @@
       418,
       418,
       418,
+      1671,
+      1671,
+      1671,
       396,
       396,
       396,
@@ -982,12 +985,9 @@
       396,
       396,
       396,
-      396,
-      396,
-      396,
-      396,
-      396,
-      396,
+      1671,
+      1671,
+      1671,
       1317,
       1318,
       1318,
@@ -1002,6 +1002,8 @@
       1318,
       1318,
       1318,
+      1671,
+      1671,
       396,
       396,
       396,
@@ -1012,11 +1014,9 @@
       396,
       396,
       396,
-      396,
-      396,
-      396,
-      396,
-      396,
+      1671,
+      1671,
+      1671,
       1317,
       1318,
       1318,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAQAEAAgAAAAAAAA+AcAAAcwACAAgAAAgAACAAAgAAACABAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAABAAAAAAAAAAAEAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAABAAAAAAgAAAAQAAAAgAAAA=",
+  "collision": "AAQA0AAgAIAAAACA+AcAAAcwACAAgAAAgAACAAAgAAACABAAAAAAAIAAQAAAAIAAAAAAAQAAAAIAAAAEAABAiAAAAJBAAADgAAAAIAEAECAAAAAgAAAAIAAAACAAAAAgAAAAIAAAABAAABAYAAAABBAAAAIAgAABAADgAAcAHAA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3307,6 +3307,54 @@
       "gid": 1295,
       "x": 3,
       "y": 31,
+      "edge": "down"
+    },
+    {
+      "gid": 1294,
+      "x": 21,
+      "y": 10,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 23,
+      "y": 11,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 24,
+      "y": 13,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 25,
+      "y": 14,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 26,
+      "y": 15,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 27,
+      "y": 16,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 28,
+      "y": 17,
+      "edge": "right"
+    },
+    {
+      "gid": 1297,
+      "x": 23,
+      "y": 11,
       "edge": "down"
     }
   ],

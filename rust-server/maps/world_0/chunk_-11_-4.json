@@ -116,8 +116,8 @@
       1337,
       1316,
       649,
-      642,
-      641,
+      1316,
+      1319,
       1316,
       1316,
       1316,
@@ -148,9 +148,9 @@
       1338,
       1316,
       649,
-      644,
       1316,
       1316,
+      1319,
       1316,
       1316,
       1316,
@@ -180,9 +180,9 @@
       1337,
       1316,
       649,
-      644,
       1316,
       1316,
+      1319,
       1316,
       1316,
       1316,
@@ -211,11 +211,11 @@
       1326,
       1366,
       1342,
-      649,
-      644,
       1316,
       1316,
       1316,
+      1316,
+      1319,
       1316,
       1316,
       1316,
@@ -247,7 +247,7 @@
       1329,
       1316,
       1316,
-      1316,
+      1319,
       1316,
       1316,
       1316,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAACAAAMIgAAIyFAAAARAAAAEAAgBBAAAAAfgAA+AEAgAcAAQAAAAQAAACQAAAAQgAAAAACAAAAEAAAEAAAAAAAAAAAAAAAAAAAAAAQBAAEAAQAAAAEAAAABAAAAAIAEAACAAAAAgAAAAEAgAABAAAAAQAAgAAACIAAAACAAAA=",
+  "collision": "AEAACABAMIgAQIyFAEAARACAAEAAgBBAAAAAQAAAAUAAAAJAAAAMgAMAMICMAMABMgAAAsABAAwADgAQEHAAYACAAIAAAAEAAAACAAAQBAAEAAQAAAAEAAAABAAAAAIAEAACAAAAAgAAAAEAgAABAAAAAQAAgAAACIAAAACAAAA=",
   "entities": [
     {
       "entityId": "evil_cactus",
@@ -3204,117 +3204,9 @@
     },
     {
       "gid": 1312,
-      "x": 30,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 29,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 28,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 27,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 25,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 26,
-      "y": 6,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 24,
-      "y": 7,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 23,
-      "y": 7,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 21,
-      "y": 7,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 22,
-      "y": 7,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 20,
-      "y": 7,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 19,
-      "y": 7,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 18,
-      "y": 8,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 17,
-      "y": 8,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 16,
-      "y": 8,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
-      "x": 15,
-      "y": 8,
-      "edge": "down"
-    },
-    {
-      "gid": 1312,
       "x": 31,
       "y": 2,
       "edge": "down"
-    },
-    {
-      "gid": 1303,
-      "x": 18,
-      "y": 8,
-      "edge": "right"
-    },
-    {
-      "gid": 1304,
-      "x": 24,
-      "y": 7,
-      "edge": "right"
     },
     {
       "gid": 1297,
@@ -3531,6 +3423,66 @@
       "x": 12,
       "y": 14,
       "edge": "down"
+    },
+    {
+      "gid": 1311,
+      "x": 29,
+      "y": 15,
+      "edge": "down"
+    },
+    {
+      "gid": 1311,
+      "x": 26,
+      "y": 13,
+      "edge": "down"
+    },
+    {
+      "gid": 1311,
+      "x": 23,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1311,
+      "x": 22,
+      "y": 11,
+      "edge": "down"
+    },
+    {
+      "gid": 1311,
+      "x": 20,
+      "y": 10,
+      "edge": "down"
+    },
+    {
+      "gid": 1311,
+      "x": 18,
+      "y": 9,
+      "edge": "down"
+    },
+    {
+      "gid": 1294,
+      "x": 14,
+      "y": 4,
+      "edge": "right"
+    },
+    {
+      "gid": 1294,
+      "x": 15,
+      "y": 6,
+      "edge": "right"
+    },
+    {
+      "gid": 1303,
+      "x": 30,
+      "y": 7,
+      "edge": "right"
+    },
+    {
+      "gid": 1303,
+      "x": 31,
+      "y": 9,
+      "edge": "right"
     }
   ],
   "portals": [],

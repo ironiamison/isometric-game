@@ -162,7 +162,7 @@
       1326,
       1326,
       1326,
-      418,
+      1326,
       1326,
       641,
       641,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AgAAAOL/QxAiAAQAIgAIBiIAEAAjABAgMQAQACAAEAAgADgAIIA3ACBAAARAQAACkEAAAAB/AAAAYAAAAMAA/wSAAAEEgAABAIgAAQCAAAEAgAABAIAAAsADAAQAAAB4AAAAcACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "AgAgAOL/wxAiAAQBIgAIDiIAEBAjABBgMQAQgCAAEAAgADgAIIA3ACBAAARAQAACkEAAAAB/AAAAYAAAAMAA/wSAAAEEgAABAIgAAQCAAAEAgAABAIAAAsADAAQAAAB4AAAAcACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [
     {
       "entityId": "cactus",
@@ -3567,14 +3567,14 @@
       "width": 1,
       "height": 1,
       "targetMap": "desert_jewel_shop",
-      "targetSpawn": "entrance"
+      "targetSpawn": ""
     },
     {
       "x": 19,
       "y": 9,
       "width": 1,
       "height": 1,
-      "targetMap": "desert_jewel_shop",
+      "targetMap": "desert_slayer_master",
       "targetSpawn": ""
     }
   ],

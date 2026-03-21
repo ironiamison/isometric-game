@@ -689,11 +689,11 @@
       1316,
       1316,
       1316,
+      1320,
       1316,
       1316,
       1316,
-      1316,
-      1316,
+      1320,
       1316,
       1316,
       1316,
@@ -1005,7 +1005,7 @@
       1316,
       1316,
       1316,
-      1316,
+      1320,
       1316,
       1316,
       1316,
@@ -3085,21 +3085,21 @@
       0
     ]
   },
-  "collision": "AAAAEAAAABAAAAAQAAAACAAAAAgAAAAIAAAACAAAAAgAQAAIAAAACAAAAAQAAAAEwACABwAeeAAAwAcAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAA=",
+  "collision": "QAAAUCAAAFAQAABQCAAASAQAAEgEIABIBAAAKAQAACgEAAAYCAAAGBAAABQgAAAUwAGAFwA+eBAAwAcQIAAAEAAQABAAAAAQAAAAEAAAACAAAAAhAAAAIAACAEAAAABACAAAQAEAAIABAACAAQAAAAEAAAABAAAAAQAAAAEAAIA=",
   "entities": [
     {
       "entityId": "rock_golem",
-      "x": 9,
-      "y": 26
-    },
-    {
-      "entityId": "rock_golem",
-      "x": 23,
+      "x": 3,
       "y": 18
     },
     {
       "entityId": "rock_golem",
-      "x": 19,
+      "x": 21,
+      "y": 22
+    },
+    {
+      "entityId": "rock_golem",
+      "x": 6,
       "y": 28
     }
   ],
@@ -3112,11 +3112,53 @@
       "height": 57
     },
     {
-      "gid": 1615,
-      "x": 14,
-      "y": 8,
-      "width": 51,
-      "height": 81
+      "gid": 2429,
+      "x": 9,
+      "y": 22,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2429,
+      "x": 13,
+      "y": 5,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2429,
+      "x": 5,
+      "y": 15,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2429,
+      "x": 3,
+      "y": 24,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2429,
+      "x": 31,
+      "y": 31,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 2429,
+      "x": 24,
+      "y": 20,
+      "width": 35,
+      "height": 57
+    },
+    {
+      "gid": 1619,
+      "x": 7,
+      "y": 28,
+      "width": 33,
+      "height": 45
     }
   ],
   "walls": [

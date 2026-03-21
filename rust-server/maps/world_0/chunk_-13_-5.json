@@ -3085,10 +3085,10 @@
       0
     ]
   },
-  "collision": "AACCAAAAghACwEMAAT5AAPEBQHAAAOABAAQeDADAAeAAPgAAgP8/AnABQAAPAYAA/wEAAQABAAL+AQAGAgEABgIBAAISAwACAwYABgQMIAYICNgDkPgHAuAAAAJAAAACQAAAAsAAAAJAAAAAQAAAAMAAAABAAAAAIQAAAH8AAAA=",
+  "collision": "AACCAAAAghACwEMAAT5AAPEBQHAAAOADAAQeHADAAeAAPgAAgP8/AnABQAAPAYAA/wEAAQABAAL+AQAGAgEABgIBAAICAwACAwYABgQMIAYICNgDkPgHAuAAAAJAAAACQAAAAsAAAAJAAAAAQAAAAMAAAABAAAAAIQAAAH8AAAA=",
   "entities": [
     {
-      "entityId": "camel_transport",
+      "entityId": "camel",
       "x": 5,
       "y": 17
     }
@@ -3198,13 +3198,6 @@
       "y": 22,
       "width": 35,
       "height": 56
-    },
-    {
-      "gid": 2861,
-      "x": 4,
-      "y": 17,
-      "width": 34,
-      "height": 55
     },
     {
       "gid": 2259,

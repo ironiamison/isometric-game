@@ -1005,8 +1005,8 @@
       1316,
       1316,
       1316,
-      418,
-      418,
+      1316,
+      1316,
       1316,
       1316,
       1316,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAIAAA/wAA5PxAAJgDQABmACABHCAwAQAACAIAAAgEAAEECAAABBAAAALgAwACACQAAQAIAAAAEgAAACAIAADAgAAAAAEAAAACAAAADAAAABA=",
+  "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAQAAAAIAAAAGAAAABAAAAAgAAAAQAAAAIAAA/yAA5PxAAJgDQABmACABHCAwAQAACAIAAAgEAAEECAAABBAAAALgAwACACQAAQAIAAAAEgAAACAIAADAgAAAAAEAAAACAAAADADgBxA=",
   "entities": [
     {
       "entityId": "rock",
@@ -3096,6 +3096,11 @@
       "entityId": "rock",
       "x": 9,
       "y": 2
+    },
+    {
+      "entityId": "biter",
+      "x": 16,
+      "y": 9
     }
   ],
   "mapObjects": [
