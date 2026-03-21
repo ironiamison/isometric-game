@@ -31723,56 +31723,50 @@
   "spells_atlas": {
     "file": "ui/spells_atlas.png",
     "sprites": {
-      "blast": {
+      "dark_eater": {
         "x": 0,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "dark_eater": {
+      "dark_hand": {
         "x": 32,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "dark_hand": {
+      "greater_heal": {
         "x": 64,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "greater_heal": {
+      "heal": {
         "x": 96,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "heal": {
+      "lightning_bolt": {
         "x": 128,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "lightning_bolt": {
+      "return_home": {
         "x": 160,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "return_home": {
+      "rock_fall": {
         "x": 192,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "rock_fall": {
-        "x": 224,
-        "y": 0,
-        "w": 32,
-        "h": 32
-      },
       "tornado": {
-        "x": 256,
+        "x": 224,
         "y": 0,
         "w": 32,
         "h": 32
