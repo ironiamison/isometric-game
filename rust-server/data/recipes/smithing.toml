@@ -538,6 +538,42 @@ count = 3
 item_id = "mithril_scimitar"
 count = 1
 
+[mithril_boots]
+display_name = "Mithril Boots"
+description = "Forge lightweight mithril boots."
+category = "smithing"
+section = "equipment"
+level_required = 40
+station = "anvil"
+craft_time_ms = 6000
+xp = 100
+
+[[mithril_boots.ingredients]]
+item_id = "mithril_bar"
+count = 3
+
+[[mithril_boots.results]]
+item_id = "mithril_boots"
+count = 1
+
+[mithril_gloves]
+display_name = "Mithril Gloves"
+description = "Forge lightweight mithril gauntlets."
+category = "smithing"
+section = "equipment"
+level_required = 40
+station = "anvil"
+craft_time_ms = 6000
+xp = 85
+
+[[mithril_gloves.ingredients]]
+item_id = "mithril_bar"
+count = 2
+
+[[mithril_gloves.results]]
+item_id = "mithril_gloves"
+count = 1
+
 # =============================================================================
 # Adamant Gear (Smithing Level 50)
 # =============================================================================
@@ -596,6 +632,42 @@ count = 3
 item_id = "adamant_scimitar"
 count = 1
 
+[adamant_boots]
+display_name = "Adamant Boots"
+description = "Forge dense adamant boots."
+category = "smithing"
+section = "equipment"
+level_required = 50
+station = "anvil"
+craft_time_ms = 8000
+xp = 135
+
+[[adamant_boots.ingredients]]
+item_id = "adamant_bar"
+count = 3
+
+[[adamant_boots.results]]
+item_id = "adamant_boots"
+count = 1
+
+[adamant_gloves]
+display_name = "Adamant Gloves"
+description = "Forge dense adamant gauntlets."
+category = "smithing"
+section = "equipment"
+level_required = 50
+station = "anvil"
+craft_time_ms = 8000
+xp = 115
+
+[[adamant_gloves.ingredients]]
+item_id = "adamant_bar"
+count = 2
+
+[[adamant_gloves.results]]
+item_id = "adamant_gloves"
+count = 1
+
 # =============================================================================
 # Rune Gear (Smithing Level 60)
 # =============================================================================
@@ -652,6 +724,42 @@ count = 3
 
 [[rune_scimitar.results]]
 item_id = "rune_scimitar"
+count = 1
+
+[rune_boots]
+display_name = "Rune Boots"
+description = "Forge runite boots pulsing with power."
+category = "smithing"
+section = "equipment"
+level_required = 60
+station = "anvil"
+craft_time_ms = 10000
+xp = 175
+
+[[rune_boots.ingredients]]
+item_id = "rune_bar"
+count = 3
+
+[[rune_boots.results]]
+item_id = "rune_boots"
+count = 1
+
+[rune_gloves]
+display_name = "Rune Gloves"
+description = "Forge runite gauntlets pulsing with power."
+category = "smithing"
+section = "equipment"
+level_required = 60
+station = "anvil"
+craft_time_ms = 10000
+xp = 150
+
+[[rune_gloves.ingredients]]
+item_id = "rune_bar"
+count = 2
+
+[[rune_gloves.results]]
+item_id = "rune_gloves"
 count = 1
 
 # =============================================================================
