@@ -118,8 +118,8 @@ export function Dashboard() {
           </Link>
         </div>
 
-        {/* Spotlight: Top Total Level — spans wider */}
-        <div className="col-span-2 md:col-span-3">
+        {/* Spotlight: Top Total Level — full width */}
+        <div className="col-span-3 md:col-span-6">
           <SpotlightBoard
             title="Top Total Level"
             icon={<Crown size={14} className="text-[var(--gold)]" />}
@@ -130,8 +130,8 @@ export function Dashboard() {
           />
         </div>
 
-        {/* Spotlight: Top Monster Hunters */}
-        <div className="col-span-2 md:col-span-3">
+        {/* Spotlight: Top Monster Hunters — full width */}
+        <div className="col-span-3 md:col-span-6">
           <SpotlightBoard
             title="Top Monster Hunters"
             icon={<Crosshair size={14} className="text-[var(--ember)]" />}
