@@ -5100,6 +5100,10 @@ impl GameRoom {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
                 self.claim_boss_rewards(player_id).await;
+            } else if choice_id == "bank" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+                self.claim_boss_rewards_to_bank(player_id).await;
             } else {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;

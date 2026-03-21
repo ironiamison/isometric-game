@@ -838,7 +838,7 @@ impl GameRoom {
                 text.push_str(&format!("  {} x{}\n", display_name, quantity));
             }
         }
-        text.push_str("\nClaim all rewards to your inventory?");
+        text.push_str("\nWhere would you like your rewards?");
 
         self.send_to_player(
             player_id,
@@ -850,7 +850,11 @@ impl GameRoom {
                 choices: vec![
                     crate::protocol::DialogueChoice {
                         id: "claim".to_string(),
-                        text: "Claim Rewards".to_string(),
+                        text: "Send to Inventory".to_string(),
+                    },
+                    crate::protocol::DialogueChoice {
+                        id: "bank".to_string(),
+                        text: "Send to Bank".to_string(),
                     },
                     crate::protocol::DialogueChoice {
                         id: "close".to_string(),
@@ -937,6 +941,91 @@ impl GameRoom {
         } else {
             format!("Claimed {} items from boss rewards!", item_count)
         };
+        self.send_system_message(player_id, &msg).await;
+    }
+
+    /// Claim all pending boss rewards and send directly to bank
+    pub async fn claim_boss_rewards_to_bank(&self, player_id: &str) {
+        let rewards = if let Some(ref db) = self.db {
+            match db.claim_boss_pending_rewards(player_id).await {
+                Ok(rewards) => rewards,
+                Err(e) => {
+                    tracing::error!("Failed to claim boss rewards for {}: {}", player_id, e);
+                    return;
+                }
+            }
+        } else {
+            return;
+        };
+
+        if rewards.is_empty() {
+            self.send_system_message(player_id, "No rewards to claim.")
+                .await;
+            return;
+        }
+
+        let mut total_gold = 0u32;
+        let mut item_count = 0u32;
+        let mut overflow_items: Vec<(String, u32)> = Vec::new();
+
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                for (item_id, quantity) in &rewards {
+                    if item_id == "gold" {
+                        player.bank.gold += *quantity as i32;
+                        total_gold += quantity;
+                    } else if player.bank.has_space_for(item_id, *quantity as i32, &self.item_registry) {
+                        player.bank.add_item(item_id, *quantity as i32, &self.item_registry);
+                        item_count += quantity;
+                    } else {
+                        overflow_items.push((item_id.clone(), *quantity));
+                    }
+                }
+            }
+        }
+
+        // Grant overflow items to inventory instead
+        for (item_id, quantity) in &overflow_items {
+            self.grant_item_to_player(player_id, item_id, *quantity)
+                .await;
+            item_count += quantity;
+        }
+
+        // Send bank update
+        {
+            let players = self.players.read().await;
+            if let Some(player) = players.get(player_id) {
+                let bank_msg = ServerMessage::BankUpdate {
+                    slots: player.bank.to_update(),
+                    gold: player.bank.gold,
+                };
+                let inv_msg = ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots: player.inventory.to_update(),
+                    gold: player.inventory.gold,
+                };
+                drop(players);
+                self.send_to_player(player_id, bank_msg).await;
+                self.send_to_player(player_id, inv_msg).await;
+            }
+        }
+
+        let mut msg = if total_gold > 0 && item_count > 0 {
+            format!(
+                "Sent {} gold and {} items to your bank!",
+                total_gold, item_count
+            )
+        } else if total_gold > 0 {
+            format!("Sent {} gold to your bank!", total_gold)
+        } else {
+            format!("Sent {} items to your bank!", item_count)
+        };
+
+        if !overflow_items.is_empty() {
+            msg.push_str(" Some items were sent to inventory (bank full).");
+        }
+
         self.send_system_message(player_id, &msg).await;
     }
 }
