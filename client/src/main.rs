@@ -38,7 +38,7 @@ const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
-const DEV_MODE: bool = true;
+const DEV_MODE: bool = false;
 static FULLSCREEN: AtomicBool = AtomicBool::new(cfg!(target_os = "windows"));
 
 fn window_conf() -> Conf {

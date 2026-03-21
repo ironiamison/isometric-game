@@ -26,7 +26,7 @@ pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
-pub const DEV_MODE: bool = true;
+pub const DEV_MODE: bool = false;
 
 /// Show the control scheme choice dialogue if the player hasn't chosen yet.
 /// Skipped on Android (no keyboard).
