@@ -323,6 +323,10 @@ impl Renderer {
                 };
                 max_w = max_w.max(self.measure_text_sharp(&magic_text, small_font_size).width);
             }
+            if equip.ranged_strength_bonus != 0 {
+                let rs_text = format!("+{} Ranged Str", equip.ranged_strength_bonus);
+                max_w = max_w.max(self.measure_text_sharp(&rs_text, small_font_size).width);
+            }
             // Measure requirement text
             let is_weapon = equip.slot_type == "weapon";
             let req_text = if is_weapon && equip.ranged_level_required > 0 {
@@ -399,6 +403,9 @@ impl Renderer {
                     total_h += line_height;
                 }
                 if equip.magic_bonus != 0 {
+                    total_h += line_height;
+                }
+                if equip.ranged_strength_bonus != 0 {
                     total_h += line_height;
                 }
                 // Level requirement lines (only if > 1)
@@ -603,6 +610,19 @@ impl Renderer {
                     y,
                     small_font_size,
                     magic_color,
+                );
+                y += line_height;
+            }
+
+            // Ranged strength bonus (equipment)
+            if equip.ranged_strength_bonus != 0 {
+                let rs_text = format!("+{} Ranged Str", equip.ranged_strength_bonus);
+                self.draw_text_sharp(
+                    &rs_text,
+                    tooltip_x + padding,
+                    y,
+                    small_font_size,
+                    stat_green,
                 );
                 y += line_height;
             }

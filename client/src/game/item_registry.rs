@@ -17,6 +17,7 @@ pub struct EquipmentStats {
     pub chop_speed_multiplier: f32,      // Woodcutting speed (0.0 if not an axe)
     pub mining_level_required: i32,      // For pickaxes
     pub mine_speed_multiplier: f32,      // Mining speed (0.0 if not a pickaxe)
+    pub ranged_strength_bonus: i32,      // Ranged max hit bonus
 }
 
 /// Item definition received from server

@@ -663,7 +663,7 @@ gold_min = 8
 gold_max = 18
 
 [[biter.loot]]
-item_id = "bones"
+item_id = "regular_bones"
 drop_chance = 0.5
 quantity_min = 1
 quantity_max = 1

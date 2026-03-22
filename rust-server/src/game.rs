@@ -676,6 +676,21 @@ impl Player {
         bonus + self.buff_bonus("strength")
     }
 
+    /// Calculate total ranged strength bonus from equipped items
+    pub fn ranged_strength_bonus(&self, item_registry: &ItemRegistry) -> i32 {
+        let mut bonus = 0;
+        for equipped in self.all_equipped() {
+            if let Some(item_id) = equipped {
+                if let Some(def) = item_registry.get(item_id) {
+                    if let Some(equip) = &def.equipment {
+                        bonus += equip.ranged_strength_bonus;
+                    }
+                }
+            }
+        }
+        bonus
+    }
+
     /// Calculate total defence bonus from equipped items
     pub fn defence_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
@@ -3487,6 +3502,7 @@ impl GameRoom {
             equipped_head,
             equipped_back,
             combat_style,
+            equip_ranged_str_bonus,
         ) = {
             let mut players = self.players.write().await;
             let player = match players.get_mut(player_id) {
@@ -3509,6 +3525,7 @@ impl GameRoom {
 
             let base_atk_bonus = player.attack_bonus(&self.item_registry);
             let base_str_bonus = player.strength_bonus(&self.item_registry);
+            let ranged_str = player.ranged_strength_bonus(&self.item_registry);
 
             // Apply prayer bonuses to attack and strength
             let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
@@ -3529,6 +3546,7 @@ impl GameRoom {
                 player.equipped_head.clone(),
                 player.equipped_back.clone(),
                 player.combat_style,
+                ranged_str,
             )
         };
 
@@ -3914,7 +3932,7 @@ impl GameRoom {
         } else {
             0
         };
-        let strength_bonus = strength_bonus + arrow_strength_bonus;
+        let strength_bonus = strength_bonus + arrow_strength_bonus + equip_ranged_str_bonus;
 
         // Fetch slayer state for helmet damage boost check (only if wearing slayer helmet)
         let slayer_task_monster = if equipped_head.as_deref() == Some("slayer_helmet") {

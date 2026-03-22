@@ -2047,6 +2047,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     )
                                     .unwrap_or(1),
                                     mine_speed_multiplier: mine_speed,
+                                    ranged_strength_bonus: extract_i32(item_value, "ranged_strength_bonus").unwrap_or(0),
                                 }
                             });
 

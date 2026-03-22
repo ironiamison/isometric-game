@@ -1763,6 +1763,7 @@ struct StatsEquipment {
     attack_bonus: i32,
     strength_bonus: i32,
     defence_bonus: i32,
+    ranged_strength_bonus: i32,
     weapon_type: String,
     range: i32,
 }
@@ -1835,6 +1836,7 @@ async fn stats_items(State(state): State<AppState>) -> impl IntoResponse {
                     attack_bonus: eq.attack_bonus,
                     strength_bonus: eq.strength_bonus,
                     defence_bonus: eq.defence_bonus,
+                    ranged_strength_bonus: eq.ranged_strength_bonus,
                     weapon_type: format!("{:?}", eq.weapon_type),
                     range: eq.range,
                 })

@@ -160,6 +160,10 @@ pub struct EquipmentStats {
     /// Ammo save chance (0.0 - 1.0) — probability of NOT consuming an arrow on ranged attack
     #[serde(default)]
     pub ammo_save_chance: f32,
+
+    /// Ranged strength bonus — added to max hit for ranged attacks
+    #[serde(default)]
+    pub ranged_strength_bonus: i32,
 }
 
 // ============================================================================

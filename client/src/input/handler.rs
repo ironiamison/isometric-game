@@ -8732,8 +8732,6 @@ impl InputHandler {
                         self.last_dy = dy;
                         self.last_send_time = current_time;
                         self.move_sent = true;
-                        // Close context menu when player starts moving
-                        state.ui_state.context_menu = None;
                         // Also track D-pad move sent
                         if has_dpad_input {
                             self.touch_controls.set_dpad_move_sent(true);
@@ -9362,7 +9360,7 @@ impl InputHandler {
 
             let attack_cooldown = {
                 let weapon_range = get_local_weapon_range(state);
-                if weapon_range > 1 { 0.7 } else { 0.8 }
+                if weapon_range > 1 { 0.8 } else { 0.8 }
             };
             if current_time - self.last_attack_time >= attack_cooldown {
                 // Check if we should gather instead of attack

@@ -856,6 +856,24 @@ count = 10
 item_id = "ancient_sword"
 count = 1
 
+[ancient_belt]
+display_name = "Ancient Belt"
+description = "Reforge ancient fragments into a belt of ranged might."
+category = "smithing"
+section = "equipment"
+level_required = 70
+station = "workbench"
+craft_time_ms = 10000
+xp = 220
+
+[[ancient_belt.ingredients]]
+item_id = "ancient_fragment"
+count = 5
+
+[[ancient_belt.results]]
+item_id = "ancient_belt"
+count = 1
+
 # =============================================================================
 # Scavenger Set - Components (Level 1)
 # =============================================================================
@@ -1372,6 +1390,28 @@ count = 1
 
 [[diamond_pendant.results]]
 item_id = "diamond_pendant"
+count = 1
+
+[ancient_necklace]
+display_name = "Ancient Necklace"
+description = "Reforge ancient fragments into a necklace of ranged power."
+category = "smithing"
+section = "jewelry"
+level_required = 70
+station = "furnace"
+craft_time_ms = 10000
+xp = 250
+
+[[ancient_necklace.ingredients]]
+item_id = "ancient_fragment"
+count = 6
+
+[[ancient_necklace.ingredients]]
+item_id = "uncut_diamond"
+count = 1
+
+[[ancient_necklace.results]]
+item_id = "ancient_necklace"
 count = 1
 
 # =============================================================================

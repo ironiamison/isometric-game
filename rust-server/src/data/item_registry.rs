@@ -175,6 +175,13 @@ impl ItemRegistry {
                     mine_speed_multiplier,
                     prayer_xp: item.prayer_xp,
                     ranged_strength: item.ranged_strength,
+                    ranged_strength_bonus: item.equipment.as_ref().and_then(|e| {
+                        if e.ranged_strength_bonus > 0 {
+                            Some(e.ranged_strength_bonus)
+                        } else {
+                            None
+                        }
+                    }),
                     use_effect_type: item.use_effect.as_ref().map(|e| match e {
                         super::UseEffect::Heal { .. } => "heal".to_string(),
                         super::UseEffect::RestoreMana { .. } => "restore_mana".to_string(),

@@ -907,6 +907,22 @@ attack_bonus = 5
 strength_bonus = 0
 defence_bonus = 10
 
+[ancient_necklace]
+display_name = "Ancient Necklace"
+sprite = "ancient_necklace"
+description = "A necklace of forgotten origin, etched with symbols that hum with ranged power."
+category = "equipment"
+max_stack = 1
+base_price = 900
+sellable = true
+[ancient_necklace.equipment]
+slot_type = "necklace"
+defence_level_required = 40
+attack_bonus = 5
+strength_bonus = 0
+defence_bonus = 10
+ranged_strength_bonus = 3
+
 # =============================================================================
 # BELTS (Defence requirement)
 # =============================================================================
@@ -984,6 +1000,22 @@ defence_level_required = 25
 attack_bonus = 0
 strength_bonus = 3
 defence_bonus = 5
+
+[ancient_belt]
+display_name = "Ancient Belt"
+sprite = "ancient_belt"
+description = "A belt of ancient craftsmanship, its runes pulse with ranged might."
+category = "equipment"
+max_stack = 1
+base_price = 350
+sellable = true
+[ancient_belt.equipment]
+slot_type = "belt"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 3
+defence_bonus = 5
+ranged_strength_bonus = 2
 
 # =============================================================================
 # GLOVES (Defence requirement)
