@@ -136,6 +136,9 @@ pub struct SpriteManifest {
     /// Weapons not listed here use the default 68x84.
     #[serde(default)]
     pub weapon_frame_sizes: std::collections::HashMap<String, [f32; 2]>,
+    /// Enemies that should NOT play idle animations (overrides auto-detection)
+    #[serde(default)]
+    pub no_idle_animation: Vec<String>,
 }
 
 impl SpriteManifest {

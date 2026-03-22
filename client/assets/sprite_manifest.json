@@ -30625,57 +30625,69 @@
         "w": 612,
         "h": 27
       },
-      "bronze_boots": {
+      "adamant_boots": {
         "x": 2136,
         "y": 539,
         "w": 544,
         "h": 27
       },
-      "iron_boots": {
+      "bronze_boots": {
         "x": 2680,
         "y": 539,
         "w": 544,
         "h": 27
       },
-      "peasant_boots": {
+      "iron_boots": {
         "x": 3224,
         "y": 539,
         "w": 544,
         "h": 27
       },
-      "royal_boots": {
+      "mithril_boots": {
         "x": 0,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "rusty_boots": {
+      "peasant_boots": {
         "x": 544,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "scavenger_boots": {
+      "royal_boots": {
         "x": 1088,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "training_boots": {
+      "rusty_boots": {
         "x": 1632,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "worn_boots": {
+      "scavenger_boots": {
         "x": 2176,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "worn_sandals": {
+      "training_boots": {
         "x": 2720,
         "y": 573,
+        "w": 544,
+        "h": 27
+      },
+      "worn_boots": {
+        "x": 3264,
+        "y": 573,
+        "w": 544,
+        "h": 27
+      },
+      "worn_sandals": {
+        "x": 0,
+        "y": 600,
         "w": 544,
         "h": 27
       }
@@ -31849,5 +31861,8 @@
         "h": 16
       }
     }
-  }
+  },
+  "no_idle_animation": [
+    "biter"
+  ]
 }

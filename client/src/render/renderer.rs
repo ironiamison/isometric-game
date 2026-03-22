@@ -1766,7 +1766,11 @@ impl Renderer {
         }
 
         // Detect which NPC sprites have non-transparent second idle frames
-        let npc_idle_anim_set = Self::detect_npc_idle_animations(&npc_sprites);
+        let mut npc_idle_anim_set = Self::detect_npc_idle_animations(&npc_sprites);
+        // Remove any entries explicitly marked as having no idle animation
+        for name in &manifest.no_idle_animation {
+            npc_idle_anim_set.remove(name);
+        }
         if !npc_idle_anim_set.is_empty() {
             log::info!("Found {} NPCs with idle animations: {:?}", npc_idle_anim_set.len(), npc_idle_anim_set);
         }
