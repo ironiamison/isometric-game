@@ -1846,6 +1846,26 @@ impl GameRoom {
         }
     }
 
+    /// Broadcast a message to all players in the given zone (instance_id).
+    /// None = overworld, Some(id) = that specific instance.
+    pub async fn broadcast_to_zone_by_instance(
+        &self,
+        instance_id: Option<&str>,
+        msg: ServerMessage,
+    ) {
+        let player_instances = self.player_instances.read().await;
+        let senders = self.player_senders.read().await;
+
+        if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+            for (player_id, sender) in senders.iter() {
+                let target_instance = player_instances.get(player_id).map(|id| id.as_str());
+                if target_instance == instance_id {
+                    let _ = sender.try_send(bytes.clone());
+                }
+            }
+        }
+    }
+
     /// Send a message to all overworld players (those not in any instance), optionally excluding one player
     pub async fn send_to_overworld_players(&self, msg: ServerMessage, exclude: Option<&str>) {
         let player_instances = self.player_instances.read().await;

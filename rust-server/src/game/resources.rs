@@ -130,7 +130,7 @@ impl GameRoom {
         match gathering.start_gathering(player_id, instance_id.as_deref(), marker_x, marker_y, fishing_level, current_time)
         {
             Ok(zone_id) => {
-                self.broadcast(ServerMessage::GatheringStarted {
+                self.broadcast_to_zone(player_id, ServerMessage::GatheringStarted {
                     player_id: player_id.to_string(),
                     marker_x,
                     marker_y,
@@ -148,7 +148,7 @@ impl GameRoom {
     pub async fn handle_stop_gathering(&self, player_id: &str) {
         let mut gathering = self.gathering.write().await;
         if gathering.stop_gathering(player_id).is_some() {
-            self.broadcast(ServerMessage::GatheringStopped {
+            self.broadcast_to_zone(player_id, ServerMessage::GatheringStopped {
                 player_id: player_id.to_string(),
                 reason: "cancelled".to_string(),
             })
@@ -281,7 +281,7 @@ impl GameRoom {
 
         match chop_result {
             Ok(result) => {
-                self.broadcast(ServerMessage::WoodcuttingSwing {
+                self.broadcast_to_zone(player_id, ServerMessage::WoodcuttingSwing {
                     player_id: player_id.to_string(),
                     tree_x,
                     tree_y,
@@ -359,7 +359,7 @@ impl GameRoom {
 
                 if result.tree_depleted {
                     let respawn_delay = result.respawn_delay_ms.unwrap_or(7500);
-                    self.broadcast(ServerMessage::TreeDepleted {
+                    self.broadcast_to_zone(player_id, ServerMessage::TreeDepleted {
                         x: tree_x,
                         y: tree_y,
                         gid: tree_gid,
@@ -507,7 +507,7 @@ impl GameRoom {
 
         match mine_result {
             Ok(result) => {
-                self.broadcast(ServerMessage::MiningSwing {
+                self.broadcast_to_zone(player_id, ServerMessage::MiningSwing {
                     player_id: player_id.to_string(),
                     rock_x,
                     rock_y,
@@ -645,7 +645,7 @@ impl GameRoom {
 
                 if result.rock_depleted {
                     let respawn_delay = result.respawn_delay_ms.unwrap_or(7500);
-                    self.broadcast(ServerMessage::RockDepleted {
+                    self.broadcast_to_zone(player_id, ServerMessage::RockDepleted {
                         x: rock_x,
                         y: rock_y,
                         gid: rock_gid,
@@ -820,8 +820,8 @@ impl GameRoom {
         }
 
         for player_id in inventory_full_players {
-            self.broadcast(ServerMessage::GatheringStopped {
-                player_id,
+            self.broadcast_to_zone(&player_id, ServerMessage::GatheringStopped {
+                player_id: player_id.clone(),
                 reason: "inventory_full".to_string(),
             })
             .await;
@@ -853,11 +853,14 @@ impl GameRoom {
             woodcutting.tick_respawns(current_time)
         };
         for event in tree_respawn_events {
-            self.broadcast(ServerMessage::TreeRespawned {
-                x: event.x,
-                y: event.y,
-                gid: event.gid,
-            })
+            self.broadcast_to_zone_by_instance(
+                event.instance_id.as_deref(),
+                ServerMessage::TreeRespawned {
+                    x: event.x,
+                    y: event.y,
+                    gid: event.gid,
+                },
+            )
             .await;
         }
 
@@ -866,11 +869,14 @@ impl GameRoom {
             mining.tick_respawns(current_time)
         };
         for event in rock_respawn_events {
-            self.broadcast(ServerMessage::RockRespawned {
-                x: event.x,
-                y: event.y,
-                gid: event.gid,
-            })
+            self.broadcast_to_zone_by_instance(
+                event.instance_id.as_deref(),
+                ServerMessage::RockRespawned {
+                    x: event.x,
+                    y: event.y,
+                    gid: event.gid,
+                },
+            )
             .await;
         }
     }

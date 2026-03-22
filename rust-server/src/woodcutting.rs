@@ -80,6 +80,7 @@ pub struct TreeRespawnEvent {
     pub x: i32,
     pub y: i32,
     pub gid: u32,
+    pub instance_id: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -352,13 +353,15 @@ impl WoodcuttingSystem {
             .collect();
 
         // Respawn them
-        for key @ (_, x, y) in to_respawn {
+        for (inst, x, y) in to_respawn {
+            let key = (inst.clone(), x, y);
             if let Some(tree) = self.depleted_trees.remove(&key) {
                 info!("Tree at ({}, {}) respawned", x, y);
                 respawned.push(TreeRespawnEvent {
                     x,
                     y,
                     gid: tree.gid,
+                    instance_id: inst,
                 });
             }
         }

@@ -104,6 +104,7 @@ pub struct RockRespawnEvent {
     pub x: i32,
     pub y: i32,
     pub gid: u32,
+    pub instance_id: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -194,13 +195,15 @@ impl MiningSystem {
             .collect();
 
         // Respawn them
-        for key @ (_, x, y) in to_respawn {
+        for (inst, x, y) in to_respawn {
+            let key = (inst.clone(), x, y);
             if let Some(rock) = self.depleted_rocks.remove(&key) {
                 info!("Rock at ({}, {}) respawned", x, y);
                 respawned.push(RockRespawnEvent {
                     x,
                     y,
                     gid: rock.gid,
+                    instance_id: inst,
                 });
             }
         }
