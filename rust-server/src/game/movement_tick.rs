@@ -49,6 +49,11 @@ impl GameRoom {
                 .values_mut()
                 .filter(|player| player.active && !player.is_dead)
             {
+                if player.cast_stall_ticks > 0 {
+                    player.cast_stall_ticks -= 1;
+                    player.reject_pending_move();
+                    continue;
+                }
                 if (player.move_dx == 0 && player.move_dy == 0) || player.pending_move_seq.is_none()
                 {
                     continue;

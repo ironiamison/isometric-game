@@ -375,6 +375,7 @@ pub struct Player {
     pub last_received_move_seq: u32,
     pub last_processed_move_seq: u32,
     pub last_move_tick: u64, // Tick-based movement cooldown
+    pub cast_stall_ticks: u64,
     pub last_move_input_ms: u64,
     pub last_move_input_warn_ms: u64,
     pub direction: Direction,
@@ -564,6 +565,7 @@ impl Player {
             last_received_move_seq: 0,
             last_processed_move_seq: 0,
             last_move_tick: 0,
+            cast_stall_ticks: 0,
             last_move_input_ms: 0,
             last_move_input_warn_ms: 0,
             direction: Direction::Down,
@@ -7241,8 +7243,8 @@ impl GameRoom {
                 player
                     .spell_cooldowns
                     .insert(spell_def.id.to_string(), current_time);
-                // Stop movement when casting
-                player.reject_pending_move();
+                // Stall movement for 5 ticks when casting damage spells
+                player.cast_stall_ticks = 5;
             }
         }
 
