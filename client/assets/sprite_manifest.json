@@ -30345,375 +30345,387 @@
   "equipment_atlas": {
     "file": "sprites/equipment_atlas.png",
     "sprites": {
-      "hero_armor": {
+      "mage_robe_female": {
         "x": 0,
+        "y": 0,
+        "w": 816,
+        "h": 77
+      },
+      "mage_robe_male": {
+        "x": 816,
+        "y": 0,
+        "w": 816,
+        "h": 77
+      },
+      "hero_armor": {
+        "x": 1632,
         "y": 0,
         "w": 789,
         "h": 77
       },
       "commander_armor": {
-        "x": 789,
+        "x": 2421,
         "y": 0,
         "w": 750,
         "h": 77
       },
       "adamant_platebody_male": {
-        "x": 1539,
+        "x": 3171,
         "y": 0,
         "w": 748,
         "h": 77
       },
       "admin_robes": {
-        "x": 2287,
-        "y": 0,
+        "x": 0,
+        "y": 77,
         "w": 748,
         "h": 77
       },
       "ancient_platebody_female": {
-        "x": 3035,
-        "y": 0,
+        "x": 748,
+        "y": 77,
         "w": 748,
         "h": 77
       },
       "ancient_platebody_male": {
-        "x": 0,
+        "x": 1496,
         "y": 77,
         "w": 748,
         "h": 77
       },
       "archery_armor": {
-        "x": 748,
+        "x": 2244,
         "y": 77,
         "w": 748,
         "h": 77
       },
       "bronze_platebody_female": {
-        "x": 1496,
+        "x": 2992,
         "y": 77,
         "w": 748,
         "h": 77
       },
       "bronze_platebody_male": {
-        "x": 2244,
-        "y": 77,
+        "x": 0,
+        "y": 154,
         "w": 748,
         "h": 77
       },
       "crusader_armor": {
-        "x": 2992,
-        "y": 77,
+        "x": 748,
+        "y": 154,
         "w": 748,
         "h": 77
       },
       "iron_platebody_female": {
-        "x": 0,
+        "x": 1496,
         "y": 154,
         "w": 748,
         "h": 77
       },
       "iron_platebody_male": {
-        "x": 748,
+        "x": 2244,
         "y": 154,
         "w": 748,
         "h": 77
       },
       "leather_armor_female": {
-        "x": 1496,
+        "x": 2992,
         "y": 154,
         "w": 748,
         "h": 77
       },
       "leather_body": {
-        "x": 2244,
-        "y": 154,
+        "x": 0,
+        "y": 231,
         "w": 748,
         "h": 77
       },
       "mithril_platebody_female": {
-        "x": 2992,
-        "y": 154,
+        "x": 748,
+        "y": 231,
         "w": 748,
         "h": 77
       },
       "mithril_platebody_male": {
-        "x": 0,
+        "x": 1496,
         "y": 231,
         "w": 748,
         "h": 77
       },
       "oblon_armor": {
-        "x": 748,
+        "x": 2244,
         "y": 231,
         "w": 748,
         "h": 77
       },
       "peasant_garb": {
-        "x": 1496,
+        "x": 2992,
         "y": 231,
         "w": 748,
         "h": 77
       },
       "peasant_suit": {
-        "x": 2244,
-        "y": 231,
+        "x": 0,
+        "y": 308,
         "w": 748,
         "h": 77
       },
       "peasant_suit_female": {
-        "x": 2992,
-        "y": 231,
+        "x": 748,
+        "y": 308,
         "w": 748,
         "h": 77
       },
       "rogue_garb": {
-        "x": 0,
+        "x": 1496,
         "y": 308,
         "w": 748,
         "h": 77
       },
       "rune_platebody_female": {
-        "x": 748,
+        "x": 2244,
         "y": 308,
         "w": 748,
         "h": 77
       },
       "rune_platebody_male": {
-        "x": 1496,
+        "x": 2992,
         "y": 308,
         "w": 748,
         "h": 77
       },
       "salvaged_tunic": {
-        "x": 2244,
-        "y": 308,
+        "x": 0,
+        "y": 385,
         "w": 748,
         "h": 77
       },
       "scavenger_tunic_female": {
-        "x": 2992,
-        "y": 308,
+        "x": 748,
+        "y": 385,
         "w": 748,
         "h": 77
       },
       "sorcerer_robe": {
-        "x": 0,
+        "x": 1496,
         "y": 385,
         "w": 748,
         "h": 77
       },
       "steel_platebody_female": {
-        "x": 748,
-        "y": 385,
-        "w": 748,
-        "h": 77
-      },
-      "steel_platebody_male": {
-        "x": 1496,
-        "y": 385,
-        "w": 748,
-        "h": 77
-      },
-      "stone_armor": {
         "x": 2244,
         "y": 385,
         "w": 748,
         "h": 77
       },
-      "sweater": {
+      "steel_platebody_male": {
         "x": 2992,
         "y": 385,
         "w": 748,
         "h": 77
       },
-      "torn_clothes": {
+      "stone_armor": {
         "x": 0,
         "y": 462,
         "w": 748,
         "h": 77
       },
-      "undead_armor": {
+      "sweater": {
         "x": 748,
         "y": 462,
         "w": 748,
         "h": 77
       },
-      "scavenger_tunic": {
+      "torn_clothes": {
         "x": 1496,
+        "y": 462,
+        "w": 748,
+        "h": 77
+      },
+      "undead_armor": {
+        "x": 2244,
+        "y": 462,
+        "w": 748,
+        "h": 77
+      },
+      "scavenger_tunic": {
+        "x": 2992,
         "y": 462,
         "w": 680,
         "h": 77
       },
       "scavenger_tunic_male": {
-        "x": 2176,
-        "y": 462,
+        "x": 0,
+        "y": 539,
         "w": 680,
         "h": 77
       },
       "backpack": {
-        "x": 2856,
-        "y": 462,
+        "x": 680,
+        "y": 539,
         "w": 100,
         "h": 63
       },
       "improved_attractor": {
-        "x": 2956,
-        "y": 462,
+        "x": 780,
+        "y": 539,
         "w": 100,
         "h": 63
       },
       "leather_attractor": {
-        "x": 3056,
-        "y": 462,
+        "x": 880,
+        "y": 539,
         "w": 100,
         "h": 63
       },
       "normal_quiver": {
-        "x": 3156,
-        "y": 462,
+        "x": 980,
+        "y": 539,
         "w": 100,
         "h": 63
       },
       "royal_protector": {
-        "x": 3256,
-        "y": 462,
+        "x": 1080,
+        "y": 539,
         "w": 616,
         "h": 38
       },
       "steel_helmet": {
-        "x": 3872,
-        "y": 462,
+        "x": 1696,
+        "y": 539,
         "w": 90,
         "h": 34
       },
       "helmet_of_darkness": {
-        "x": 3962,
-        "y": 462,
+        "x": 1786,
+        "y": 539,
         "w": 60,
         "h": 34
       },
       "hood_black": {
-        "x": 4022,
-        "y": 462,
+        "x": 1846,
+        "y": 539,
         "w": 60,
         "h": 34
       },
       "hood_brown": {
-        "x": 0,
+        "x": 1906,
         "y": 539,
         "w": 60,
         "h": 34
       },
       "leather_hat": {
-        "x": 60,
+        "x": 1966,
         "y": 539,
         "w": 60,
         "h": 34
       },
       "shades": {
-        "x": 120,
+        "x": 2026,
         "y": 539,
         "w": 60,
         "h": 34
       },
       "slayer_helmet": {
-        "x": 180,
+        "x": 2086,
         "y": 539,
         "w": 60,
         "h": 34
       },
       "wizard_hat": {
-        "x": 240,
+        "x": 2146,
         "y": 539,
         "w": 60,
         "h": 34
       },
       "ancient_boots": {
-        "x": 300,
+        "x": 2206,
         "y": 539,
         "w": 612,
         "h": 27
       },
       "leather_boots": {
-        "x": 912,
+        "x": 2818,
         "y": 539,
         "w": 612,
         "h": 27
       },
       "steel_boots": {
-        "x": 1524,
+        "x": 3430,
         "y": 539,
         "w": 612,
         "h": 27
       },
       "adamant_boots": {
-        "x": 2136,
-        "y": 539,
+        "x": 0,
+        "y": 616,
         "w": 544,
         "h": 27
       },
       "bronze_boots": {
-        "x": 2680,
-        "y": 539,
+        "x": 544,
+        "y": 616,
         "w": 544,
         "h": 27
       },
       "iron_boots": {
-        "x": 3224,
-        "y": 539,
+        "x": 1088,
+        "y": 616,
         "w": 544,
         "h": 27
       },
       "mithril_boots": {
-        "x": 0,
-        "y": 573,
+        "x": 1632,
+        "y": 616,
         "w": 544,
         "h": 27
       },
       "peasant_boots": {
-        "x": 544,
-        "y": 573,
+        "x": 2176,
+        "y": 616,
         "w": 544,
         "h": 27
       },
       "royal_boots": {
-        "x": 1088,
-        "y": 573,
+        "x": 2720,
+        "y": 616,
         "w": 544,
         "h": 27
       },
       "rune_boots": {
-        "x": 1632,
-        "y": 573,
+        "x": 3264,
+        "y": 616,
         "w": 544,
         "h": 27
       },
       "rusty_boots": {
-        "x": 2176,
-        "y": 573,
+        "x": 0,
+        "y": 643,
         "w": 544,
         "h": 27
       },
       "scavenger_boots": {
-        "x": 2720,
-        "y": 573,
+        "x": 544,
+        "y": 643,
         "w": 544,
         "h": 27
       },
       "training_boots": {
-        "x": 3264,
-        "y": 573,
+        "x": 1088,
+        "y": 643,
         "w": 544,
         "h": 27
       },
       "worn_boots": {
-        "x": 0,
-        "y": 600,
+        "x": 1632,
+        "y": 643,
         "w": 544,
         "h": 27
       },
       "worn_sandals": {
-        "x": 544,
-        "y": 600,
+        "x": 2176,
+        "y": 643,
         "w": 544,
         "h": 27
       }

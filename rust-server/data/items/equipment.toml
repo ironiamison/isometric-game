@@ -284,6 +284,38 @@ attack_bonus = 8
 strength_bonus = 0
 defence_bonus = 10
 
+[mage_robe_male]
+display_name = "Mage Robe"
+sprite = "mage_robe_male"
+description = "Flowing robes woven with arcane thread. Greatly enhances magical ability."
+category = "equipment"
+max_stack = 1
+base_price = 2000
+sellable = true
+[mage_robe_male.equipment]
+slot_type = "body"
+magic_level_required = 20
+magic_bonus = 10
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 6
+
+[mage_robe_female]
+display_name = "Mage Robe (F)"
+sprite = "mage_robe_female"
+description = "Flowing robes woven with arcane thread. Greatly enhances magical ability."
+category = "equipment"
+max_stack = 1
+base_price = 2000
+sellable = true
+[mage_robe_female.equipment]
+slot_type = "body"
+magic_level_required = 20
+magic_bonus = 10
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 6
+
 [peasant_garb]
 display_name = "Peasant Garb"
 sprite = "peasant_garb"
