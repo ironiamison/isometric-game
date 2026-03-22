@@ -7419,7 +7419,7 @@ impl GameRoom {
             target_x: target_x as f32,
             target_y: target_y as f32,
             projectile: if spell_def.effect_sprite == "projectile" {
-                Some("blast".to_string())
+                Some(spell_def.id.to_string())
             } else {
                 None
             },
