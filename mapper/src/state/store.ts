@@ -817,7 +817,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     const targetTileId = chunk.layers[layerKey][startIndex];
 
     // Find ALL tiles with the same ID in the chunk
-    const selectedTiles = new Set<string>();
+    const newSelectedTiles = new Set<string>();
     const baseX = chunkCoord.cx * chunk.width;
     const baseY = chunkCoord.cy * chunk.height;
 
@@ -827,11 +827,24 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const ly = Math.floor(index / chunk.width);
         const wx = baseX + lx;
         const wy = baseY + ly;
-        selectedTiles.add(`${wx},${wy}`);
+        newSelectedTiles.add(`${wx},${wy}`);
       }
     }
 
-    set({ selectedTiles });
+    // If clicking the same area (same tiles already selected), deselect
+    const currentSelected = get().selectedTiles;
+    if (currentSelected.size === newSelectedTiles.size && currentSelected.size > 0) {
+      let same = true;
+      for (const key of newSelectedTiles) {
+        if (!currentSelected.has(key)) { same = false; break; }
+      }
+      if (same) {
+        set({ selectedTiles: new Set() });
+        return;
+      }
+    }
+
+    set({ selectedTiles: newSelectedTiles });
   },
 
   clearSelectedTiles: () => {

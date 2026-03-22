@@ -245,7 +245,11 @@ function App() {
 
       // Handle Ctrl/Cmd shortcuts
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z') {
+        if (e.key === 'd') {
+          e.preventDefault();
+          store.clearSelectedTiles();
+          return;
+        } else if (e.key === 'z') {
           e.preventDefault();
           if (e.shiftKey) {
             store.redo();
