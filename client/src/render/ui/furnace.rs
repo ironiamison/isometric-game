@@ -422,9 +422,13 @@ impl Renderer {
                 );
             }
 
-            // Register click area
-            let row_bounds = Rect::new(content_x + 2.0, y + 1.0, content_w - 4.0, row_height - 2.0);
-            layout.add(UiElementId::FurnaceRecipeItem(i), row_bounds);
+            // Register click area (clamped to visible content so scrolled rows don't steal tab clicks)
+            let visible_top = (y + 1.0).max(content_y);
+            let visible_bottom = (y + row_height - 1.0).min(content_y + content_h);
+            if visible_bottom > visible_top {
+                let row_bounds = Rect::new(content_x + 2.0, visible_top, content_w - 4.0, visible_bottom - visible_top);
+                layout.add(UiElementId::FurnaceRecipeItem(i), row_bounds);
+            }
 
             // Icon (left side)
             let icon_size = 40.0 * s;

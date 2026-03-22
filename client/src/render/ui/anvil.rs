@@ -23,9 +23,12 @@ impl Renderer {
         let s = state.ui_state.ui_scale;
 
         let panel_width = (560.0 * s).min(sw - 16.0);
-        let panel_height = (580.0 * s).min(sh - 16.0);
+        // Reserve space for the hotkey bar / menu buttons at the bottom
+        let bottom_bar_h = (QUICK_SLOT_SIZE + EXP_BAR_GAP) * s + 8.0;
+        let max_panel_height = sh - bottom_bar_h - 8.0;
+        let panel_height = (500.0 * s).min(max_panel_height);
         let panel_x = (sw - panel_width) / 2.0;
-        let panel_y = (sh - panel_height) / 2.0;
+        let panel_y = ((sh - bottom_bar_h - panel_height) / 2.0).max(4.0);
 
         let header_h = HEADER_HEIGHT * s;
         let footer_h = FOOTER_HEIGHT * s;
@@ -781,7 +784,7 @@ impl Renderer {
         // SMITH button
         let smith_btn_w = 110.0 * s;
         let smith_btn_h = 26.0 * s;
-        let smith_btn_x = qty_disp_x + 50.0 * s;
+        let smith_btn_x = area_x + (_area_w - smith_btn_w) / 2.0;
         let smith_btn_y = controls_y - 1.0 * s;
 
         if can_craft {
