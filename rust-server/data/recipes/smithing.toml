@@ -632,24 +632,6 @@ count = 3
 item_id = "adamant_scimitar"
 count = 1
 
-[adamant_boots]
-display_name = "Adamant Boots"
-description = "Forge dense adamant boots."
-category = "smithing"
-section = "equipment"
-level_required = 50
-station = "anvil"
-craft_time_ms = 8000
-xp = 135
-
-[[adamant_boots.ingredients]]
-item_id = "adamant_bar"
-count = 3
-
-[[adamant_boots.results]]
-item_id = "adamant_boots"
-count = 1
-
 [adamant_gloves]
 display_name = "Adamant Gloves"
 description = "Forge dense adamant gauntlets."
@@ -724,24 +706,6 @@ count = 3
 
 [[rune_scimitar.results]]
 item_id = "rune_scimitar"
-count = 1
-
-[rune_boots]
-display_name = "Rune Boots"
-description = "Forge runite boots pulsing with power."
-category = "smithing"
-section = "equipment"
-level_required = 60
-station = "anvil"
-craft_time_ms = 10000
-xp = 175
-
-[[rune_boots.ingredients]]
-item_id = "rune_bar"
-count = 3
-
-[[rune_boots.results]]
-item_id = "rune_boots"
 count = 1
 
 [rune_gloves]
