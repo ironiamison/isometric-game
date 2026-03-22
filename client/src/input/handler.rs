@@ -1990,6 +1990,9 @@ pub struct InputHandler {
     // Auto-path movement is step-driven: one move per waypoint transition.
     auto_path_sent_waypoint: Option<(i32, i32)>,
     auto_path_sent_dir: Option<(f32, f32)>,
+    // When true, suppress keyboard movement so an attack auto-action can fire.
+    // Cleared when all movement keys are released.
+    suppress_move_for_attack: bool,
     // Touch controls for mobile devices
     pub touch_controls: TouchControls,
 }
@@ -2008,6 +2011,7 @@ impl InputHandler {
             move_sent: false,
             auto_path_sent_waypoint: None,
             auto_path_sent_dir: None,
+            suppress_move_for_attack: false,
             touch_controls: TouchControls::new(),
         }
     }
@@ -8674,24 +8678,34 @@ impl InputHandler {
         } else {
             is_key_down(KeyCode::Space)
         };
-        let is_attacking = attack_key_down
-            || self.touch_controls.attack_pressed()
-            || state.get_local_player().map_or(false, |p| {
-                matches!(
-                    p.animation.state,
-                    AnimationState::Attacking
-                        | AnimationState::Casting
-                        | AnimationState::ShootingBow
-                )
-            });
+        // Only block movement for manual attacks (key/button held), not for
+        // auto-action attack animations — those are handled by suppress_move_for_attack
+        // and the server-side cast_stall_ticks instead.
+        let is_attacking = attack_key_down || self.touch_controls.attack_pressed();
 
         // Check if we have any movement input (keyboard or D-pad)
         let has_movement_input = new_dir != MoveDir::None;
 
+        // Clear the attack-move suppression once the attack has actually fired
+        // (animation started), all movement keys are released, or the auto-action ends.
+        if self.suppress_move_for_attack {
+            let attack_fired = state.get_local_player().map_or(false, |p| {
+                matches!(
+                    p.animation.state,
+                    AnimationState::Attacking
+                        | AnimationState::ShootingBow
+                )
+            });
+            let auto_ended = state.auto_action_state.is_none();
+            if !has_movement_input || attack_fired || auto_ended {
+                self.suppress_move_for_attack = false;
+            }
+        }
+
         // Movement while sitting is handled server-side (direction-validated auto-stand)
         // Just let the move command go through - server will stand up if direction matches
 
-        if has_movement_input && !is_attacking {
+        if has_movement_input && !is_attacking && !self.suppress_move_for_attack {
             // Cancel auto-action and follow when player manually moves
             if state.auto_action_state.is_some() {
                 state.auto_action_state = None;
@@ -9100,8 +9114,11 @@ impl InputHandler {
         }
 
         // Path following - generate movement commands when auto-pathing
-        // Only follow path if not manually moving and not attacking
-        if dx == 0.0 && dy == 0.0 && !is_attacking {
+        // Only follow path if not manually moving and not attacking.
+        // When movement is suppressed for an attack auto-action, treat as no keyboard
+        // input so the auto-path can walk us into range.
+        let no_manual_move = (dx == 0.0 && dy == 0.0) || self.suppress_move_for_attack;
+        if no_manual_move && !is_attacking {
             if let (Some((player_x, player_y)), Some(ref mut path_state)) =
                 (player_pos, &mut state.auto_path)
             {
@@ -9809,6 +9826,16 @@ impl InputHandler {
 
                 if is_attackable {
                     // Attackable NPC - target it and set up auto-action chase
+                    // Stop any current movement so the player halts and the attack can fire.
+                    // Suppress keyboard movement until keys are released so held keys
+                    // don't immediately cancel the auto-action.
+                    if self.last_dx != 0.0 || self.last_dy != 0.0 {
+                        commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                        self.last_dx = 0.0;
+                        self.last_dy = 0.0;
+                        self.move_sent = false;
+                    }
+                    self.suppress_move_for_attack = true;
                     commands.push(InputCommand::Target {
                         entity_id: npc_id.clone(),
                     });
@@ -9859,23 +9886,33 @@ impl InputHandler {
                                             waystone_target: None,
                                             browse_stall_target: None,
                                         });
+                                    } else {
+                                        // Pathfinding failed but we're close — send auto-action
+                                        // anyway and let the server handle range checking.
+                                        let dir = crate::game::Direction::from_velocity(
+                                            npc_x as f32 - player_x as f32,
+                                            npc_y as f32 - player_y as f32,
+                                        );
+                                        queue_face(state, &mut commands, dir as u8);
+                                        commands.push(InputCommand::StartAutoAction {
+                                            target_type: "npc".to_string(),
+                                            target_id: npc_id.clone(),
+                                            action: "attack".to_string(),
+                                        });
                                     }
                                 } else {
-                                    // Already in range - face target and send immediately
+                                    // Already in range - face target and send immediately.
+                                    // Don't gate on NPC settle — server handles range/timing.
                                     let dir = crate::game::Direction::from_velocity(
                                         npc_x as f32 - player_x as f32,
                                         npc_y as f32 - player_y as f32,
                                     );
                                     queue_face(state, &mut commands, dir as u8);
-                                    if let Some(aa) = state.auto_action_state.as_ref() {
-                                        if auto_action_target_settled(aa, state) {
-                                            commands.push(InputCommand::StartAutoAction {
-                                                target_type: "npc".to_string(),
-                                                target_id: npc_id.clone(),
-                                                action: "attack".to_string(),
-                                            });
-                                        }
-                                    }
+                                    commands.push(InputCommand::StartAutoAction {
+                                        target_type: "npc".to_string(),
+                                        target_id: npc_id.clone(),
+                                        action: "attack".to_string(),
+                                    });
                                 }
                             }
                         }

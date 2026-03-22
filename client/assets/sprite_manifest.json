@@ -30345,97 +30345,97 @@
   "equipment_atlas": {
     "file": "sprites/equipment_atlas.png",
     "sprites": {
-      "mage_robe_female": {
-        "x": 0,
-        "y": 0,
-        "w": 816,
-        "h": 77
-      },
-      "mage_robe_male": {
-        "x": 816,
-        "y": 0,
-        "w": 816,
-        "h": 77
-      },
       "hero_armor": {
-        "x": 1632,
+        "x": 0,
         "y": 0,
         "w": 789,
         "h": 77
       },
       "commander_armor": {
-        "x": 2421,
+        "x": 789,
         "y": 0,
         "w": 750,
         "h": 77
       },
       "adamant_platebody_male": {
-        "x": 3171,
+        "x": 1539,
         "y": 0,
         "w": 748,
         "h": 77
       },
       "admin_robes": {
-        "x": 0,
-        "y": 77,
+        "x": 2287,
+        "y": 0,
         "w": 748,
         "h": 77
       },
       "ancient_platebody_female": {
-        "x": 748,
-        "y": 77,
+        "x": 3035,
+        "y": 0,
         "w": 748,
         "h": 77
       },
       "ancient_platebody_male": {
-        "x": 1496,
+        "x": 0,
         "y": 77,
         "w": 748,
         "h": 77
       },
       "archery_armor": {
-        "x": 2244,
+        "x": 748,
         "y": 77,
         "w": 748,
         "h": 77
       },
       "bronze_platebody_female": {
-        "x": 2992,
+        "x": 1496,
         "y": 77,
         "w": 748,
         "h": 77
       },
       "bronze_platebody_male": {
+        "x": 2244,
+        "y": 77,
+        "w": 748,
+        "h": 77
+      },
+      "crusader_armor": {
+        "x": 2992,
+        "y": 77,
+        "w": 748,
+        "h": 77
+      },
+      "iron_platebody_female": {
         "x": 0,
         "y": 154,
         "w": 748,
         "h": 77
       },
-      "crusader_armor": {
+      "iron_platebody_male": {
         "x": 748,
         "y": 154,
         "w": 748,
         "h": 77
       },
-      "iron_platebody_female": {
+      "leather_armor_female": {
         "x": 1496,
         "y": 154,
         "w": 748,
         "h": 77
       },
-      "iron_platebody_male": {
+      "leather_body": {
         "x": 2244,
         "y": 154,
         "w": 748,
         "h": 77
       },
-      "leather_armor_female": {
+      "mage_robe_female": {
         "x": 2992,
         "y": 154,
         "w": 748,
         "h": 77
       },
-      "leather_body": {
+      "mage_robe_male": {
         "x": 0,
         "y": 231,
         "w": 748,

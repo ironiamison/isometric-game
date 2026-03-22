@@ -3672,6 +3672,10 @@ impl GameRoom {
                 player.last_attack_time = current_time;
                 // Stop movement when attacking (player must stand still to attack)
                 player.reject_pending_move();
+                // Stall movement for 8 ticks after ranged attacks (like cast stall for spells)
+                if weapon_type == WeaponType::Ranged {
+                    player.cast_stall_ticks = 8;
+                }
             }
         }
 
@@ -7240,8 +7244,8 @@ impl GameRoom {
                 player
                     .spell_cooldowns
                     .insert(spell_def.id.to_string(), current_time);
-                // Stall movement for 5 ticks when casting damage spells
-                player.cast_stall_ticks = 5;
+                // Stall movement for 10 ticks when casting damage spells
+                player.cast_stall_ticks = 10;
             }
         }
 

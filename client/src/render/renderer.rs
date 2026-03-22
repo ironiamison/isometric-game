@@ -4829,12 +4829,10 @@ impl Renderer {
                 24.0 * zoom
             };
 
+            let combat_level = player.combat_level();
+            let level_text = format!(" (Lvl {})", combat_level);
             let name_width = self.measure_text_sharp(&player.name, font_size).width;
-            let gm_width = if player.is_admin {
-                self.measure_text_sharp(" (GM)", font_size).width - 2.0 * zoom
-            } else {
-                0.0
-            };
+            let level_width = self.measure_text_sharp(&level_text, font_size).width - 2.0 * zoom;
             let is_top_player = state
                 .top_level_player_name
                 .as_deref()
@@ -4852,7 +4850,7 @@ impl Renderer {
             } else {
                 0.0
             };
-            let total_width = trophy_width + name_width + gm_width;
+            let total_width = trophy_width + name_width + level_width;
             let name_x = screen_x - total_width / 2.0;
             let name_y = screen_y - name_y_offset + 2.0 * zoom;
 
@@ -4892,11 +4890,8 @@ impl Renderer {
             }
 
             self.draw_text_sharp(&player.name, name_x + trophy_width, name_y, font_size, WHITE);
-
-            if player.is_admin {
-                let gold_color = Color::from_rgba(255, 215, 0, 255);
-                self.draw_text_sharp(" (GM)", name_x + trophy_width + name_width, name_y, font_size, gold_color);
-            }
+            let level_color = Color::from_rgba(180, 220, 255, 255);
+            self.draw_text_sharp(&level_text, name_x + trophy_width + name_width, name_y, font_size, level_color);
         }
 
         // NPC name tags

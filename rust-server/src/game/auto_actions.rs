@@ -144,6 +144,11 @@ impl GameRoom {
                 if player.is_dead {
                     return;
                 }
+                // Stop movement when starting an attack auto-action so the player
+                // doesn't walk out of range before the first hit lands
+                if action_type == AutoActionType::Attack {
+                    player.reject_pending_move();
+                }
                 player.auto_action = Some(AutoAction {
                     target,
                     action: action_type,
