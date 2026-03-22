@@ -5678,72 +5678,107 @@ impl Renderer {
                 continue;
             }
 
-            // Sprite-based arrow projectile from arrow_angles.png
-            // Sheet: 7 types × 4 angles, each frame 31x27
-            // Types (row): bone(0), rune(1), adamant(2), mithril(3), steel(4), iron(5), bronze(6)
-            // Angles (col): frame 0-3 map to 4 isometric directions
-            if let Some(ref arrow_tex) = self.arrow_projectile_texture {
-                let frame_w = 31.0_f32;
-                let frame_h = 27.0_f32;
+            // Drawn arrow projectile — follows arc tangent angle
+            let arrow_y_offset = -24.0 * state.camera.zoom;
+            let screen_y = screen_y_raw + arrow_y_offset;
 
-                // Map arrow item id to row index
-                let type_idx = match projectile.sprite.as_str() {
-                    "bone_arrow" => 0,
-                    "rune_arrow" => 1,
-                    "adamant_arrow" => 2,
-                    "mithril_arrow" => 3,
-                    "steel_arrow" => 4,
-                    "iron_arrow" => 5,
-                    "bronze_arrow" => 6,
-                    _ => 6, // default to bronze
-                };
+            // Use arc tangent for direction so arrow follows the arc
+            let current_time = macroquad::time::get_time();
+            let (vel_x, vel_y, vel_z) = projectile.current_direction(current_time);
 
-                // Calculate world-space direction to pick angle frame
-                let world_dx = projectile.end_x - projectile.start_x;
-                let world_dy = projectile.end_y - projectile.start_y;
+            // Convert velocity to screen space
+            let sv_x = (vel_x - vel_y) * 32.0; // TILE_WIDTH/2
+            let sv_y = (vel_x + vel_y) * 16.0 - vel_z * 32.0; // TILE_HEIGHT/2, Z offset
+            let len = (sv_x * sv_x + sv_y * sv_y).sqrt().max(0.001);
+            let dir_x = sv_x / len;
+            let dir_y = sv_y / len;
 
-                // Map 8 isometric directions to 4 frames + optional horizontal flip
-                // Frame 0: upper-left (~NW), Frame 1: upper-right (~NE)
-                // Frame 2: lower-right (~SE), Frame 3: lower-left (~SW)
-                let angle = world_dy.atan2(world_dx);
-                let octant = ((angle + std::f32::consts::PI) / (std::f32::consts::PI / 4.0)) as usize % 8;
+            // Perpendicular vector for arrow width
+            let perp_x = -dir_y;
+            let perp_y = dir_x;
 
-                // octant: 0=W, 1=NW, 2=N, 3=NE, 4=E, 5=SE, 6=S, 7=SW
-                // Map to frame index and flip
-                let (frame_idx, flip_x) = match octant {
-                    1 => (0, false), // NW
-                    2 => (1, true),  // N (flip NE frame)
-                    3 => (1, false), // NE
-                    4 => (2, true),  // E (flip SE frame)
-                    5 => (2, false), // SE
-                    6 => (3, true),  // S (flip SW frame)
-                    7 => (3, false), // SW
-                    0 => (0, true),  // W (flip NW frame)
-                    _ => (0, false),
-                };
+            // Arrow dimensions
+            let shaft_length = 18.0;
+            let shaft_width = 2.0;
+            let head_length = 6.0;
+            let head_width = 5.0;
+            let fletch_length = 4.0;
+            let fletch_width = 3.0;
 
-                let src_x = (type_idx * 4 + frame_idx) as f32 * frame_w;
-                let source_rect = Rect::new(src_x, 0.0, frame_w, frame_h);
+            // Colors
+            let shaft_color = Color::new(0.55, 0.35, 0.15, 1.0); // Wood brown
+            let head_color = Color::new(0.45, 0.45, 0.5, 1.0); // Metal gray
+            let fletch_color = Color::new(0.85, 0.85, 0.8, 1.0); // Light feathers
 
-                let zoom = state.camera.zoom;
-                let draw_w = frame_w * zoom;
-                let draw_h = frame_h * zoom;
-                let arrow_y_offset = -24.0 * zoom;
+            // Arrow positions
+            let tip_x = screen_x + dir_x * (shaft_length / 2.0 + head_length);
+            let tip_y = screen_y + dir_y * (shaft_length / 2.0 + head_length);
+            let back_x = screen_x - dir_x * shaft_length / 2.0;
+            let back_y = screen_y - dir_y * shaft_length / 2.0;
 
-                let dest_w = if flip_x { -draw_w } else { draw_w };
+            // Draw shaft (thick line)
+            draw_line(
+                back_x,
+                back_y,
+                screen_x + dir_x * shaft_length / 2.0,
+                screen_y + dir_y * shaft_length / 2.0,
+                shaft_width,
+                shaft_color,
+            );
 
-                draw_texture_ex(
-                    arrow_tex,
-                    screen_x - draw_w / 2.0,
-                    screen_y_raw + arrow_y_offset - draw_h / 2.0,
-                    WHITE,
-                    DrawTextureParams {
-                        source: Some(source_rect),
-                        dest_size: Some(Vec2::new(dest_w, draw_h)),
-                        ..Default::default()
-                    },
-                );
-            }
+            // Draw arrowhead (triangle pointing forward)
+            let head_base_x = screen_x + dir_x * shaft_length / 2.0;
+            let head_base_y = screen_y + dir_y * shaft_length / 2.0;
+            draw_triangle(
+                Vec2::new(tip_x, tip_y),
+                Vec2::new(
+                    head_base_x + perp_x * head_width / 2.0,
+                    head_base_y + perp_y * head_width / 2.0,
+                ),
+                Vec2::new(
+                    head_base_x - perp_x * head_width / 2.0,
+                    head_base_y - perp_y * head_width / 2.0,
+                ),
+                head_color,
+            );
+
+            // Draw fletching (two small triangles at the back)
+            let fletch_base_x = back_x + dir_x * fletch_length;
+            let fletch_base_y = back_y + dir_y * fletch_length;
+
+            // Left fletch
+            draw_triangle(
+                Vec2::new(
+                    back_x + perp_x * shaft_width / 2.0,
+                    back_y + perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    fletch_base_x + perp_x * shaft_width / 2.0,
+                    fletch_base_y + perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    back_x + perp_x * fletch_width,
+                    back_y + perp_y * fletch_width,
+                ),
+                fletch_color,
+            );
+
+            // Right fletch
+            draw_triangle(
+                Vec2::new(
+                    back_x - perp_x * shaft_width / 2.0,
+                    back_y - perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    fletch_base_x - perp_x * shaft_width / 2.0,
+                    fletch_base_y - perp_y * shaft_width / 2.0,
+                ),
+                Vec2::new(
+                    back_x - perp_x * fletch_width,
+                    back_y - perp_y * fletch_width,
+                ),
+                fletch_color,
+            );
         }
     }
 

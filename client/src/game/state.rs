@@ -462,6 +462,22 @@ impl Projectile {
 
         (x, y, z)
     }
+
+    /// Get the instantaneous velocity direction (tangent of the arc trajectory).
+    /// Returns (dx/dt, dy/dt, dz/dt) in world space — use for orienting sprites along the arc.
+    pub fn current_direction(&self, current_time: f64) -> (f32, f32, f32) {
+        let t = self.progress(current_time);
+        let vel_x = self.end_x - self.start_x;
+        let vel_y = self.end_y - self.start_y;
+        let base_vel_z = self.end_z - self.start_z;
+
+        // Derivative of arc: d/dt [4 * h * t * (1-t)] = 4 * h * (1 - 2t)
+        let dist = (vel_x * vel_x + vel_y * vel_y).sqrt();
+        let arc_height = (dist * 0.3).max(1.0);
+        let arc_vel_z = 4.0 * arc_height * (1.0 - 2.0 * t);
+
+        (vel_x, vel_y, base_vel_z + arc_vel_z)
+    }
 }
 
 /// Floating level up text
