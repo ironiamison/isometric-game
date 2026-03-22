@@ -159,7 +159,7 @@ pub struct EquipmentStats {
 
     /// Ammo save chance (0.0 - 1.0) — probability of NOT consuming an arrow on ranged attack
     #[serde(default)]
-    pub ammo_save_chance: f64,
+    pub ammo_save_chance: f32,
 }
 
 // ============================================================================
