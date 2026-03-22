@@ -328,17 +328,15 @@ impl Renderer {
                 max_w = max_w.max(self.measure_text_sharp(&rs_text, small_font_size).width);
             }
             // Measure requirement text
-            let is_weapon = equip.slot_type == "weapon";
-            let req_text = if is_weapon && equip.ranged_level_required > 0 {
-                format!("Requires {} Ranged", equip.ranged_level_required)
-            } else if is_weapon && equip.attack_level_required > 1 {
-                format!("Requires {} Attack", equip.attack_level_required)
-            } else if !is_weapon && equip.defence_level_required > 1 {
-                format!("Requires {} Defence", equip.defence_level_required)
-            } else {
-                String::new()
-            };
-            if !req_text.is_empty() {
+            if equip.ranged_level_required > 0 {
+                let req_text = format!("Requires {} Ranged", equip.ranged_level_required);
+                max_w = max_w.max(self.measure_text_sharp(&req_text, small_font_size).width);
+            } else if equip.attack_level_required > 1 {
+                let req_text = format!("Requires {} Attack", equip.attack_level_required);
+                max_w = max_w.max(self.measure_text_sharp(&req_text, small_font_size).width);
+            }
+            if equip.defence_level_required > 1 {
+                let req_text = format!("Requires {} Defence", equip.defence_level_required);
                 max_w = max_w.max(self.measure_text_sharp(&req_text, small_font_size).width);
             }
             if equip.woodcutting_level_required > 1 {
@@ -409,12 +407,12 @@ impl Renderer {
                     total_h += line_height;
                 }
                 // Level requirement lines (only if > 1)
-                let is_weapon = equip.slot_type == "weapon";
-                if is_weapon && equip.ranged_level_required > 0 {
+                if equip.ranged_level_required > 0 {
                     total_h += line_height;
-                } else if (is_weapon && equip.attack_level_required > 1)
-                    || (!is_weapon && equip.defence_level_required > 1)
-                {
+                } else if equip.attack_level_required > 1 {
+                    total_h += line_height;
+                }
+                if equip.defence_level_required > 1 {
                     total_h += line_height;
                 }
                 if equip.woodcutting_level_required > 1 {

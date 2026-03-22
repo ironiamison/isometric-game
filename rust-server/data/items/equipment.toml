@@ -1190,6 +1190,7 @@ attack_bonus = 2
 strength_bonus = 0
 defence_bonus = 0
 ammo_save_chance = 0.60
+ranged_strength_bonus = 2
 
 [improved_attractor]
 display_name = "Improved Attractor"
@@ -1206,6 +1207,7 @@ attack_bonus = 4
 strength_bonus = 0
 defence_bonus = 0
 ammo_save_chance = 0.72
+ranged_strength_bonus = 4
 
 [royal_protector]
 display_name = "Royal Protector"
