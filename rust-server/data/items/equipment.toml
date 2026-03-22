@@ -1143,6 +1143,38 @@ attack_bonus = 2
 strength_bonus = 0
 defence_bonus = 0
 
+[leather_attractor]
+display_name = "Leather Attractor"
+sprite = "leather_attractor"
+description = "A device that magnetically recovers arrows after firing. Saves arrows 60% of the time."
+category = "equipment"
+max_stack = 1
+base_price = 1000
+sellable = true
+[leather_attractor.equipment]
+slot_type = "back"
+ranged_level_required = 20
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 0
+ammo_save_chance = 0.60
+
+[improved_attractor]
+display_name = "Improved Attractor"
+sprite = "improved_attractor"
+description = "An enhanced attractor with stronger recovery. Saves arrows 72% of the time."
+category = "equipment"
+max_stack = 1
+base_price = 5000
+sellable = true
+[improved_attractor.equipment]
+slot_type = "back"
+ranged_level_required = 50
+attack_bonus = 4
+strength_bonus = 0
+defence_bonus = 0
+ammo_save_chance = 0.72
+
 [royal_protector]
 display_name = "Royal Protector"
 sprite = "royal_protector"
