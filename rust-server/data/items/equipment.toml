@@ -917,7 +917,7 @@ base_price = 900
 sellable = true
 [ancient_necklace.equipment]
 slot_type = "necklace"
-defence_level_required = 40
+defence_level_required = 50
 attack_bonus = 5
 strength_bonus = 0
 defence_bonus = 10
@@ -1016,6 +1016,22 @@ attack_bonus = 0
 strength_bonus = 3
 defence_bonus = 5
 ranged_strength_bonus = 2
+
+[ancient_ring]
+display_name = "Ancient Ring"
+sprite = "ancient_ring"
+description = "A ring of forgotten origin, its runes pulse with ranged power."
+category = "equipment"
+max_stack = 1
+base_price = 800
+sellable = true
+[ancient_ring.equipment]
+slot_type = "ring"
+defence_level_required = 50
+attack_bonus = 3
+strength_bonus = 0
+defence_bonus = 6
+ranged_strength_bonus = 3
 
 # =============================================================================
 # GLOVES (Defence requirement)

@@ -824,7 +824,7 @@ count = 1
 display_name = "Ancient Belt"
 description = "Reforge ancient fragments into a belt of ranged might."
 category = "smithing"
-section = "equipment"
+section = "armor"
 level_required = 70
 station = "workbench"
 craft_time_ms = 10000
@@ -1361,7 +1361,7 @@ display_name = "Ancient Necklace"
 description = "Reforge ancient fragments into a necklace of ranged power."
 category = "smithing"
 section = "jewelry"
-level_required = 70
+level_required = 60
 station = "furnace"
 craft_time_ms = 10000
 xp = 250
@@ -1376,6 +1376,28 @@ count = 1
 
 [[ancient_necklace.results]]
 item_id = "ancient_necklace"
+count = 1
+
+[ancient_ring]
+display_name = "Ancient Ring"
+description = "Reforge ancient fragments into a ring of ranged power."
+category = "smithing"
+section = "jewelry"
+level_required = 55
+station = "furnace"
+craft_time_ms = 10000
+xp = 250
+
+[[ancient_ring.ingredients]]
+item_id = "ancient_fragment"
+count = 4
+
+[[ancient_ring.ingredients]]
+item_id = "uncut_diamond"
+count = 1
+
+[[ancient_ring.results]]
+item_id = "ancient_ring"
 count = 1
 
 # =============================================================================

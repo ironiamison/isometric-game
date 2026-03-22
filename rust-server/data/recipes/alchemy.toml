@@ -52,7 +52,7 @@ count = 1
 
 [antidote]
 display_name = "Antidote"
-description = "Brew an antidote from greenleaf and hedgehog spine."
+description = "Brew an antidote from greenleaf and cactus."
 category = "alchemy"
 section = "utility"
 level_required = 10
@@ -65,7 +65,7 @@ item_id = "greenleaf"
 count = 1
 
 [[antidote.ingredients]]
-item_id = "hedgehog_spine"
+item_id = "cactus"
 count = 1
 
 [[antidote.ingredients]]

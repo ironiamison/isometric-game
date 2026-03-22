@@ -7011,7 +7011,8 @@ impl InputHandler {
                     if state.ui_state.furnace_selected_recipe > 0 {
                         state.ui_state.furnace_selected_recipe -= 1;
                         // Auto-scroll to keep selected in view
-                        let row_h = 72.0_f32;
+                        let s = state.ui_state.ui_scale;
+                        let row_h = 72.0 * s;
                         let item_top = state.ui_state.furnace_selected_recipe as f32 * row_h;
                         if item_top < state.ui_state.furnace_scroll_offset {
                             state.ui_state.furnace_scroll_offset = item_top;
@@ -7022,13 +7023,18 @@ impl InputHandler {
                     if state.ui_state.furnace_selected_recipe < recipe_count.saturating_sub(1) {
                         state.ui_state.furnace_selected_recipe += 1;
                         // Auto-scroll to keep selected in view
-                        let row_h = 72.0_f32;
+                        let s = state.ui_state.ui_scale;
+                        let row_h = 72.0 * s;
                         let item_bottom =
                             (state.ui_state.furnace_selected_recipe + 1) as f32 * row_h;
                         let (_, sh) = crate::util::virtual_screen_size();
-                        let panel_h = (450.0_f32).min(sh - 16.0);
-                        // 8.0 = FRAME*2, 40.0 = HEADER, 28.0 = TABS, 30.0 = FOOTER
-                        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                        let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
+                        let panel_h = (450.0 * s).min(sh - 16.0);
+                        let content_h = if is_fire_pit {
+                            panel_h - 10.0 - 78.0 * s
+                        } else {
+                            panel_h - 10.0 - 106.0 * s
+                        };
                         if item_bottom > state.ui_state.furnace_scroll_offset + content_h {
                             state.ui_state.furnace_scroll_offset = item_bottom - content_h;
                         }
@@ -7066,12 +7072,18 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    let row_h = 72.0_f32;
+                    let s = state.ui_state.ui_scale;
+                    let row_h = 72.0 * s;
                     let total_content = recipe_count as f32 * row_h;
                     let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_h = (450.0_f32).min(sh - 16.0);
-                    // 8.0 = FRAME*2, 40.0 = HEADER, 28.0 = TABS, 30.0 = FOOTER
-                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                    let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
+                    let panel_h = (450.0 * s).min(sh - 16.0);
+                    // Match renderer: content_h = panel_h - 10.0 - (header+tab+footer+gaps)*s
+                    let content_h = if is_fire_pit {
+                        panel_h - 10.0 - 78.0 * s
+                    } else {
+                        panel_h - 10.0 - 106.0 * s
+                    };
                     let max_scroll = (total_content - content_h).max(0.0);
                     state.ui_state.furnace_scroll_offset = (state.ui_state.furnace_scroll_offset
                         - wheel_y * SCROLL_SPEED)
@@ -7080,11 +7092,17 @@ impl InputHandler {
 
                 // Scrollbar drag handling
                 if let Some(track_bounds) = layout.get_bounds(&UiElementId::FurnaceScrollbar) {
-                    let row_h = 72.0_f32;
+                    let s = state.ui_state.ui_scale;
+                    let row_h = 72.0 * s;
                     let total_content = recipe_count as f32 * row_h;
                     let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_h = (450.0_f32).min(sh - 16.0);
-                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0;
+                    let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
+                    let panel_h = (450.0 * s).min(sh - 16.0);
+                    let content_h = if is_fire_pit {
+                        panel_h - 10.0 - 78.0 * s
+                    } else {
+                        panel_h - 10.0 - 106.0 * s
+                    };
                     let max_scroll = (total_content - content_h).max(0.0);
                     let clicked_on = matches!(clicked_element, Some(UiElementId::FurnaceScrollbar));
                     crate::ui::scroll::handle_scrollbar_drag(
@@ -7322,13 +7340,17 @@ impl InputHandler {
                 let (_wheel_x, wheel_y) = mouse_wheel();
                 if wheel_y != 0.0 {
                     const SCROLL_SPEED: f32 = 30.0;
-                    let cell_h = 106.0_f32;
-                    let gap = 6.0_f32;
+                    let s = state.ui_state.ui_scale;
+                    let cell_h = 106.0 * s;
+                    let gap = 6.0 * s;
                     let rows = (recipe_count + columns - 1) / columns;
                     let total_content = rows as f32 * (cell_h + gap);
                     let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_h = (480.0_f32).min(sh - 16.0);
-                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0 - 44.0;
+                    // Match renderer: bottom_bar_h reserved, panel capped
+                    let bottom_bar_h = 53.0 * s + 8.0;
+                    let panel_h = (500.0 * s).min(sh - bottom_bar_h - 8.0);
+                    // content_h = panel_h - frame/header/tabs/footer/gaps - controls_strip
+                    let content_h = panel_h - 10.0 - 142.0 * s;
                     let max_scroll = (total_content - content_h).max(0.0);
                     state.ui_state.anvil_scroll_offset = (state.ui_state.anvil_scroll_offset
                         - wheel_y * SCROLL_SPEED)
@@ -7337,13 +7359,15 @@ impl InputHandler {
 
                 // Scrollbar drag handling
                 if let Some(track_bounds) = layout.get_bounds(&UiElementId::AnvilScrollbar) {
-                    let cell_h = 106.0_f32;
-                    let gap = 6.0_f32;
+                    let s = state.ui_state.ui_scale;
+                    let cell_h = 106.0 * s;
+                    let gap = 6.0 * s;
                     let rows = (recipe_count + columns - 1) / columns;
                     let total_content = rows as f32 * (cell_h + gap);
                     let (_, sh) = crate::util::virtual_screen_size();
-                    let panel_h = (480.0_f32).min(sh - 16.0);
-                    let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0 - 44.0;
+                    let bottom_bar_h = 53.0 * s + 8.0;
+                    let panel_h = (500.0 * s).min(sh - bottom_bar_h - 8.0);
+                    let content_h = panel_h - 10.0 - 142.0 * s;
                     let max_scroll = (total_content - content_h).max(0.0);
                     let clicked_on = matches!(clicked_element, Some(UiElementId::AnvilScrollbar));
                     crate::ui::scroll::handle_scrollbar_drag(
@@ -11103,16 +11127,18 @@ impl InputHandler {
 
     /// Auto-scroll anvil grid to keep selected recipe in view
     fn auto_scroll_anvil_grid(&self, state: &mut crate::game::GameState) {
+        let s = state.ui_state.ui_scale;
         let columns = 4;
-        let cell_h = 106.0_f32;
-        let gap = 6.0_f32;
+        let cell_h = 106.0 * s;
+        let gap = 6.0 * s;
         let row = state.ui_state.anvil_selected_recipe / columns;
         let item_top = row as f32 * (cell_h + gap);
         let item_bottom = item_top + cell_h;
 
         let (_, sh) = crate::util::virtual_screen_size();
-        let panel_h = (480.0_f32).min(sh - 16.0);
-        let content_h = panel_h - 8.0 - 40.0 - 28.0 - 30.0 - 16.0 - 44.0;
+        let bottom_bar_h = 53.0 * s + 8.0;
+        let panel_h = (500.0 * s).min(sh - bottom_bar_h - 8.0);
+        let content_h = panel_h - 10.0 - 142.0 * s;
 
         if item_top < state.ui_state.anvil_scroll_offset {
             state.ui_state.anvil_scroll_offset = item_top;
