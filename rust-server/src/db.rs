@@ -18,7 +18,7 @@ pub struct AccountData {
     pub last_login: Option<String>,
 }
 
-use crate::skills::{LegacyCombatSkills, LegacySkills, Skills};
+use crate::skills::Skills;
 
 /// Character data - belongs to an account
 #[derive(Debug, Clone)]
@@ -1007,27 +1007,9 @@ impl Database {
         Ok(rows
             .into_iter()
             .map(|r| {
-                // Try to load skills from JSON column, with legacy format migration
-                let skills = r
-                    .try_get::<String, _>("skills_json")
-                    .ok()
-                    .and_then(|json| {
-                        // Try combined combat format first (has required `combat` field)
-                        // Must be checked before Skills since Skills accepts any JSON via #[serde(default)]
-                        if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(&json) {
-                            return Some(legacy.to_skills());
-                        }
-                        // Then try the current format (attack + strength + defence separate)
-                        if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
-                            return Some(skills);
-                        }
-                        // Fall back to ancient format (hitpoints + attack + strength + defence only)
-                        if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {
-                            return Some(legacy.to_skills());
-                        }
-                        None
-                    })
-                    .unwrap_or_else(Skills::new);
+                let skills = Skills::from_json(
+                    &r.try_get::<String, _>("skills_json").unwrap_or_default(),
+                );
 
                 CharacterData {
                     id: r.get("id"),
@@ -1237,27 +1219,9 @@ impl Database {
         .await?;
 
         Ok(row.map(|r| {
-            // Try to load skills from JSON column, with legacy format migration
-            let skills = r
-                .try_get::<String, _>("skills_json")
-                .ok()
-                .and_then(|json| {
-                    // Try combined combat format first (has required `combat` field)
-                    // Must be checked before Skills since Skills accepts any JSON via #[serde(default)]
-                    if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(&json) {
-                        return Some(legacy.to_skills());
-                    }
-                    // Then try the current format (attack + strength + defence separate)
-                    if let Ok(skills) = serde_json::from_str::<Skills>(&json) {
-                        return Some(skills);
-                    }
-                    // Fall back to ancient format (hitpoints + attack + strength + defence only)
-                    if let Ok(legacy) = serde_json::from_str::<LegacySkills>(&json) {
-                        return Some(legacy.to_skills());
-                    }
-                    None
-                })
-                .unwrap_or_else(Skills::new);
+            let skills = Skills::from_json(
+                &r.try_get::<String, _>("skills_json").unwrap_or_default(),
+            );
 
             CharacterData {
                 id: r.get("id"),
@@ -2261,7 +2225,7 @@ impl Database {
                 Err(_) => continue,
             };
             let skills_json: String = row.try_get("skills_json").unwrap_or_default();
-            let skills: Skills = serde_json::from_str(&skills_json).unwrap_or_default();
+            let skills = Skills::from_json(&skills_json);
             let total = skills.total_level();
             if first.as_ref().map_or(true, |(_, b)| total > *b) {
                 second = first.take();

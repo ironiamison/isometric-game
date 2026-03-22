@@ -3,8 +3,8 @@ use std::path::Path;
 use tracing::{error, info, warn};
 
 use super::prototype::{
-    AnimationType, DialogueConfig, EntityBehaviors, EntityPrototype, LootEntry, RawEntityPrototype,
-    ResolvedRewards, ResolvedStats, SpeechConfig,
+    AnimationType, DialogueConfig, EntityBehaviors, EntityPrototype, LootEntry, LootTable,
+    RawEntityPrototype, ResolvedRewards, ResolvedStats, SpeechConfig,
 };
 
 /// Registry for all entity prototypes
@@ -246,6 +246,11 @@ impl EntityRegistry {
         let mut loot: Vec<LootEntry> = parent.map(|p| p.loot.clone()).unwrap_or_default();
         loot.extend(raw.loot.clone());
 
+        // Merge loot roll tables (child appends to parent)
+        let mut loot_tables: Vec<LootTable> =
+            parent.map(|p| p.loot_tables.clone()).unwrap_or_default();
+        loot_tables.extend(raw.loot_tables.clone());
+
         let size = raw.size.unwrap_or_else(|| parent.map(|p| p.size).unwrap_or(1));
 
         // Parse animation type
@@ -280,6 +285,7 @@ impl EntityRegistry {
             stats,
             rewards,
             loot,
+            loot_tables,
             behaviors,
             merchant: raw
                 .merchant

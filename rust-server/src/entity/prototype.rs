@@ -73,6 +73,29 @@ fn default_one() -> i32 {
     1
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct LootTableEntry {
+    pub item_id: String,
+    pub weight: i32,
+    #[serde(default = "default_one")]
+    pub quantity_min: i32,
+    #[serde(default = "default_one")]
+    pub quantity_max: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LootTable {
+    pub name: String,
+    #[serde(default = "default_one_f32")]
+    pub chance: f32,
+    #[serde(default)]
+    pub entries: Vec<LootTableEntry>,
+}
+
+fn default_one_f32() -> f32 {
+    1.0
+}
+
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct RawEntityBehaviors {
     #[serde(default)]
@@ -239,6 +262,9 @@ pub struct RawEntityPrototype {
     pub loot: Vec<LootEntry>,
 
     #[serde(default)]
+    pub loot_tables: Vec<LootTable>,
+
+    #[serde(default)]
     pub behaviors: RawEntityBehaviors,
 
     pub merchant: Option<MerchantConfig>,
@@ -399,6 +425,7 @@ pub struct EntityPrototype {
     pub stats: ResolvedStats,
     pub rewards: ResolvedRewards,
     pub loot: Vec<LootEntry>,
+    pub loot_tables: Vec<LootTable>,
 
     pub behaviors: EntityBehaviors,
     pub merchant: Option<MerchantConfig>,

@@ -116,6 +116,19 @@ export interface EntityLoot {
   quantity_max: number
 }
 
+export interface LootTableEntry {
+  item_id: string
+  weight: number
+  quantity_min: number
+  quantity_max: number
+}
+
+export interface LootTable {
+  name: string
+  chance: number
+  entries: LootTableEntry[]
+}
+
 export interface Entity {
   id: string
   display_name: string
@@ -134,6 +147,7 @@ export interface Entity {
   gold_min: number
   gold_max: number
   loot: EntityLoot[]
+  loot_tables: LootTable[]
   quest_ids: string[]
 }
 

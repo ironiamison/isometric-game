@@ -520,6 +520,7 @@ impl GameRoom {
                             .map(|pid| {
                                 let gold = rng.gen_range(prototype.rewards.gold_min..=prototype.rewards.gold_max);
                                 let mut items = Vec::new();
+                                // Flat loot (independent rolls)
                                 for entry in &prototype.loot {
                                     if rng.r#gen::<f32>() < entry.drop_chance {
                                         let quantity = rng.gen_range(entry.quantity_min..=entry.quantity_max);
@@ -529,6 +530,32 @@ impl GameRoom {
                                             .map(|item| item.display_name.clone())
                                             .unwrap_or_else(|| entry.item_id.clone());
                                         items.push((entry.item_id.clone(), quantity, display_name));
+                                    }
+                                }
+                                // Roll tables (weighted, pick one per table)
+                                for table in &prototype.loot_tables {
+                                    if rng.r#gen::<f32>() >= table.chance {
+                                        continue;
+                                    }
+                                    let total_weight: i32 = table.entries.iter().map(|e| e.weight).sum();
+                                    if total_weight <= 0 {
+                                        continue;
+                                    }
+                                    let mut roll = rng.gen_range(0..total_weight);
+                                    for entry in &table.entries {
+                                        roll -= entry.weight;
+                                        if roll < 0 {
+                                            if entry.item_id != "nothing" {
+                                                let quantity = rng.gen_range(entry.quantity_min..=entry.quantity_max);
+                                                let display_name = self
+                                                    .item_registry
+                                                    .get(&entry.item_id)
+                                                    .map(|item| item.display_name.clone())
+                                                    .unwrap_or_else(|| entry.item_id.clone());
+                                                items.push((entry.item_id.clone(), quantity, display_name));
+                                            }
+                                            break;
+                                        }
                                     }
                                 }
                                 let player_name = player_names

@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api'
-import { Skull, ArrowLeft, TrendingUp, Droplets, ScrollText } from 'lucide-react'
+import { Skull, ArrowLeft, TrendingUp, Droplets, ScrollText, Dice5 } from 'lucide-react'
 
 function scaleHp(baseHp: number, level: number) {
   return Math.round(baseHp * (1 + 0.10 * Math.max(0, level - 1)))
@@ -218,6 +218,55 @@ export function MonsterDetail() {
           </div>
         </section>
       )}
+
+      {/* Roll Tables */}
+      {monster.loot_tables.length > 0 && monster.loot_tables.map((table, ti) => {
+        const totalWeight = table.entries.reduce((sum, e) => sum + e.weight, 0)
+        return (
+          <section key={ti} className="pixel-box rounded-xl bg-[var(--panel)] p-4 md:p-5 space-y-3">
+            <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]" style={{ fontFamily: 'var(--font-display)' }}>
+              <Dice5 size={13} className="text-[var(--gold)]" />
+              {formatItemName(table.name)} Roll
+              {table.chance < 1 && (
+                <span className="ml-1 text-[var(--text-soft)]">({formatChance(table.chance)} activation)</span>
+              )}
+            </p>
+            <div className="overflow-x-auto rounded-xl border border-[var(--panel-border)]">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-[var(--panel-soft)]">
+                    <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">Item</th>
+                    <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">Chance</th>
+                    <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {table.entries.filter(e => e.item_id !== 'nothing').map((entry, ei) => {
+                    const pct = totalWeight > 0 ? entry.weight / totalWeight : 0
+                    return (
+                      <tr key={ei} className="border-t border-[var(--panel-border)] hover:bg-[var(--panel-soft)]/70">
+                        <td className="px-4 py-2 text-sm font-medium text-[var(--text)]">
+                          {formatItemName(entry.item_id)}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-sm">
+                          <span className={pct >= 1 ? 'text-[var(--moss-light)]' : 'text-[var(--text)]'}>
+                            {formatChance(pct)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 font-mono text-sm text-[var(--text-soft)]">
+                          {entry.quantity_min === entry.quantity_max
+                            ? entry.quantity_min
+                            : `${entry.quantity_min}–${entry.quantity_max}`}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )
+      })}
 
       {/* Related Quests */}
       {monster.quest_ids.length > 0 && (

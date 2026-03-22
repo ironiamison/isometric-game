@@ -1633,7 +1633,7 @@ async fn load_leaderboard_entries(state: &AppState) -> Vec<LeaderboardEntry> {
             let skills_json: String = row.try_get("skills_json").unwrap_or_default();
             let played_time: i64 = row.try_get("played_time").unwrap_or(0);
             let monster_kills: i32 = row.try_get("monster_kills").unwrap_or(0);
-            let skills: Skills = serde_json::from_str(&skills_json).unwrap_or_default();
+            let skills = Skills::from_json(&skills_json);
             Some(LeaderboardEntry {
                 name,
                 combat_level: skills.combat_level(),
@@ -1790,6 +1790,21 @@ struct StatsEntityLoot {
 }
 
 #[derive(Serialize)]
+struct StatsLootTableEntry {
+    item_id: String,
+    weight: i32,
+    quantity_min: i32,
+    quantity_max: i32,
+}
+
+#[derive(Serialize)]
+struct StatsLootTable {
+    name: String,
+    chance: f32,
+    entries: Vec<StatsLootTableEntry>,
+}
+
+#[derive(Serialize)]
 struct StatsEntity {
     id: String,
     display_name: String,
@@ -1808,6 +1823,7 @@ struct StatsEntity {
     gold_min: i32,
     gold_max: i32,
     loot: Vec<StatsEntityLoot>,
+    loot_tables: Vec<StatsLootTable>,
     quest_ids: Vec<String>,
 }
 
@@ -1884,6 +1900,16 @@ async fn stats_entities(State(state): State<AppState>) -> impl IntoResponse {
                 drop_chance: l.drop_chance,
                 quantity_min: l.quantity_min,
                 quantity_max: l.quantity_max,
+            }).collect(),
+            loot_tables: e.loot_tables.iter().map(|t| StatsLootTable {
+                name: t.name.clone(),
+                chance: t.chance,
+                entries: t.entries.iter().map(|e| StatsLootTableEntry {
+                    item_id: e.item_id.clone(),
+                    weight: e.weight,
+                    quantity_min: e.quantity_min,
+                    quantity_max: e.quantity_max,
+                }).collect(),
             }).collect(),
             quest_ids: quest_map.get(&e.id).cloned().unwrap_or_default(),
         })

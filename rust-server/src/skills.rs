@@ -420,6 +420,29 @@ impl LegacySkills {
     }
 }
 
+impl Skills {
+    /// Parse skills from a JSON string, handling all legacy formats.
+    /// Returns default Skills if the JSON is empty or unparseable.
+    pub fn from_json(json: &str) -> Skills {
+        if json.is_empty() {
+            return Skills::new();
+        }
+        // Try combined combat format first (has required `combat` field)
+        if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(json) {
+            return legacy.to_skills();
+        }
+        // Then try the current format (attack + strength + defence separate)
+        if let Ok(skills) = serde_json::from_str::<Skills>(json) {
+            return skills;
+        }
+        // Fall back to ancient format (hitpoints + attack + strength + defence only)
+        if let Ok(legacy) = serde_json::from_str::<LegacySkills>(json) {
+            return legacy.to_skills();
+        }
+        Skills::new()
+    }
+}
+
 /// Calculate whether an attack hits using attack roll vs defence roll.
 /// Returns true if the attack hits.
 ///
