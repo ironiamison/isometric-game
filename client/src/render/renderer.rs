@@ -1073,7 +1073,10 @@ impl Renderer {
                         "bubbles_warp",
                         "tornado",
                         "rocks_aoe",
-                        "projectile",
+                        "air_blast",
+                        "water_blast",
+                        "earth_blast",
+                        "fire_blast",
                     ] {
                         let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                         if let Ok(tex) = load_texture(&path).await {
@@ -1094,7 +1097,10 @@ impl Renderer {
                     "bubbles_warp",
                     "tornado",
                     "rocks_aoe",
-                    "projectile",
+                    "air_blast",
+                    "water_blast",
+                    "earth_blast",
+                    "fire_blast",
                 ] {
                     let path = asset_path(&format!("assets/sprites/effects/{}.png", name));
                     if let Ok(tex) = load_texture(&path).await {
@@ -1690,10 +1696,10 @@ impl Renderer {
                 ("return_home", "return_home"),
                 ("greater_heal", "greater_heal"),
                 ("tornado", "tornado"),
-                ("air_blast", "blast"),
-                ("water_blast", "blast"),
-                ("earth_blast", "blast"),
-                ("fire_blast", "blast"),
+                ("air_blast", "air_blast"),
+                ("water_blast", "water_blast"),
+                ("earth_blast", "earth_blast"),
+                ("fire_blast", "fire_blast"),
             ];
             let mut icons = HashMap::new();
             for (spell_id, icon_name) in &spell_icon_mappings {
@@ -5615,10 +5621,10 @@ impl Renderer {
 
             // Sprite-based projectile (blast spell)
             if projectile.sprite.ends_with("_blast") {
-                if let Some((texture, atlas_offset)) = self.spell_effect_textures.get("projectile") {
+                if let Some((texture, atlas_offset)) = self.spell_effect_textures.get(&projectile.sprite) {
                     let (tex_w, tex_h) = self
                         .spell_effect_textures
-                        .get_dimensions("projectile")
+                        .get_dimensions(&projectile.sprite)
                         .unwrap_or((texture.width(), texture.height()));
                     let frame_count = 4usize;
                     let frame_w = tex_w / frame_count as f32;

@@ -1067,6 +1067,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 let end_y = target_y.round();
                                 // Look up target Z from terrain height
                                 let end_z = state.chunk_manager.get_height(end_x as i32, end_y as i32) as f32;
+                                let dx = end_x - src_x;
+                                let dy = end_y - src_y;
+                                let dist = (dx * dx + dy * dy).sqrt();
+                                let duration = (dist as f64 * 0.12).clamp(0.25, 1.0); // ~0.12s per tile
 
                                 state.projectiles.push(crate::game::Projectile {
                                     sprite: projectile_type.clone(),
@@ -1077,7 +1081,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     end_y,
                                     end_z,
                                     start_time: current_time,
-                                    duration: 0.15, // Fast arrow travel
+                                    duration,
                                 });
                             }
                         }
@@ -3889,6 +3893,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                     if let Some((src_x, src_y, src_z)) = source_pos {
                         let end_z = state.chunk_manager.get_height(target_x, target_y) as f32;
+                        let dx = target_x as f32 - src_x;
+                        let dy = target_y as f32 - src_y;
+                        let dist = (dx * dx + dy * dy).sqrt();
+                        let duration = (dist * 0.12).clamp(0.25, 1.0) as f64; // ~0.12s per tile
                         state.projectiles.push(crate::game::Projectile {
                             sprite: spell_id.clone(),
                             start_x: src_x,
@@ -3898,7 +3906,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             end_y: target_y as f32,
                             end_z,
                             start_time: macroquad::time::get_time(),
-                            duration: 0.3,
+                            duration,
                         });
                     }
                 } else {

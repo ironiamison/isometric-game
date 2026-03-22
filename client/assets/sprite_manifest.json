@@ -31672,6 +31672,30 @@
         "y": 0,
         "w": 340,
         "h": 65
+      },
+      "air_blast": {
+        "x": 3064,
+        "y": 0,
+        "w": 256,
+        "h": 64
+      },
+      "earth_blast": {
+        "x": 3320,
+        "y": 0,
+        "w": 256,
+        "h": 64
+      },
+      "fire_blast": {
+        "x": 3576,
+        "y": 0,
+        "w": 256,
+        "h": 64
+      },
+      "water_blast": {
+        "x": 3832,
+        "y": 0,
+        "w": 256,
+        "h": 64
       }
     }
   },
@@ -31767,50 +31791,74 @@
   "spells_atlas": {
     "file": "ui/spells_atlas.png",
     "sprites": {
-      "dark_eater": {
+      "air_blast": {
         "x": 0,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "dark_hand": {
+      "dark_eater": {
         "x": 32,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "greater_heal": {
+      "dark_hand": {
         "x": 64,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "heal": {
+      "earth_blast": {
         "x": 96,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "lightning_bolt": {
+      "fire_blast": {
         "x": 128,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "return_home": {
+      "greater_heal": {
         "x": 160,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "rock_fall": {
+      "heal": {
         "x": 192,
         "y": 0,
         "w": 32,
         "h": 32
       },
-      "tornado": {
+      "lightning_bolt": {
         "x": 224,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "return_home": {
+        "x": 256,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "rock_fall": {
+        "x": 288,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "tornado": {
+        "x": 320,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "water_blast": {
+        "x": 352,
         "y": 0,
         "w": 32,
         "h": 32

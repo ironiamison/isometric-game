@@ -1260,7 +1260,7 @@ defence_level_required = 5
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 4
-magic_bonus = -3
+magic_bonus = -6
 
 [bronze_body_female]
 display_name = "Bronze Platemail (F)"
@@ -1276,7 +1276,7 @@ defence_level_required = 5
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 4
-magic_bonus = -3
+magic_bonus = -6
 
 [bronze_boots]
 display_name = "Bronze Boots"
@@ -1292,7 +1292,7 @@ defence_level_required = 5
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 2
-magic_bonus = -1
+magic_bonus = -2
 
 [bronze_gloves]
 display_name = "Bronze Gloves"
@@ -1308,7 +1308,7 @@ defence_level_required = 5
 attack_bonus = 0
 strength_bonus = 1
 defence_bonus = 1
-magic_bonus = -1
+magic_bonus = -2
 
 [bronze_sword]
 display_name = "Bronze Sword"
@@ -1341,7 +1341,7 @@ defence_level_required = 15
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 8
-magic_bonus = -4
+magic_bonus = -8
 
 [iron_body_female]
 display_name = "Iron Platemail (F)"
@@ -1357,7 +1357,7 @@ defence_level_required = 15
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 8
-magic_bonus = -4
+magic_bonus = -8
 
 [iron_boots]
 display_name = "Iron Boots"
@@ -1373,7 +1373,7 @@ defence_level_required = 15
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 4
-magic_bonus = -2
+magic_bonus = -4
 
 [iron_gloves]
 display_name = "Iron Gloves"
@@ -1389,7 +1389,7 @@ defence_level_required = 15
 attack_bonus = 0
 strength_bonus = 2
 defence_bonus = 2
-magic_bonus = -1
+magic_bonus = -2
 
 [iron_sword]
 display_name = "Iron Sword"
@@ -1423,7 +1423,7 @@ defence_level_required = 25
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 12
-magic_bonus = -5
+magic_bonus = -10
 
 [steel_body_female]
 display_name = "Steel Platemail (F)"
@@ -1439,7 +1439,7 @@ defence_level_required = 25
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 12
-magic_bonus = -5
+magic_bonus = -10
 
 [steel_boots]
 display_name = "Steel Boots"
@@ -1455,7 +1455,7 @@ defence_level_required = 25
 attack_bonus = 0
 strength_bonus = 1
 defence_bonus = 7
-magic_bonus = -2
+magic_bonus = -4
 
 [steel_gloves]
 display_name = "Steel Gloves"
@@ -1471,7 +1471,7 @@ defence_level_required = 25
 attack_bonus = 0
 strength_bonus = 3
 defence_bonus = 4
-magic_bonus = -2
+magic_bonus = -4
 
 # --- Mithril Tier (Level 35) ---
 
@@ -1489,7 +1489,7 @@ defence_level_required = 35
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 16
-magic_bonus = -6
+magic_bonus = -12
 
 [mithril_body_female]
 display_name = "Mithril Platemail (F)"
@@ -1505,7 +1505,7 @@ defence_level_required = 35
 attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 16
-magic_bonus = -6
+magic_bonus = -12
 
 [mithril_boots]
 display_name = "Mithril Boots"
@@ -1521,7 +1521,7 @@ defence_level_required = 35
 attack_bonus = 0
 strength_bonus = 1
 defence_bonus = 9
-magic_bonus = -3
+magic_bonus = -6
 
 [mithril_gloves]
 display_name = "Mithril Gloves"
@@ -1537,7 +1537,7 @@ defence_level_required = 35
 attack_bonus = 0
 strength_bonus = 4
 defence_bonus = 5
-magic_bonus = -2
+magic_bonus = -4
 
 # --- Adamant Tier (Level 45) ---
 
@@ -1555,7 +1555,7 @@ defence_level_required = 45
 attack_bonus = 0
 strength_bonus = 1
 defence_bonus = 20
-magic_bonus = -7
+magic_bonus = -14
 
 [adamant_body_female]
 display_name = "Adamant Platemail (F)"
@@ -1571,7 +1571,7 @@ defence_level_required = 45
 attack_bonus = 0
 strength_bonus = 1
 defence_bonus = 20
-magic_bonus = -7
+magic_bonus = -14
 
 [adamant_boots]
 display_name = "Adamant Boots"
@@ -1587,7 +1587,7 @@ defence_level_required = 45
 attack_bonus = 0
 strength_bonus = 1
 defence_bonus = 12
-magic_bonus = -3
+magic_bonus = -6
 
 [adamant_gloves]
 display_name = "Adamant Gloves"
@@ -1603,7 +1603,7 @@ defence_level_required = 45
 attack_bonus = 0
 strength_bonus = 5
 defence_bonus = 7
-magic_bonus = -3
+magic_bonus = -6
 
 # --- Rune Tier (Level 55) ---
 
@@ -1621,7 +1621,7 @@ defence_level_required = 55
 attack_bonus = 0
 strength_bonus = 2
 defence_bonus = 25
-magic_bonus = -8
+magic_bonus = -16
 
 [rune_body_female]
 display_name = "Rune Platemail (F)"
@@ -1637,7 +1637,7 @@ defence_level_required = 55
 attack_bonus = 0
 strength_bonus = 2
 defence_bonus = 25
-magic_bonus = -8
+magic_bonus = -16
 
 [rune_boots]
 display_name = "Rune Boots"
@@ -1653,7 +1653,7 @@ defence_level_required = 55
 attack_bonus = 0
 strength_bonus = 2
 defence_bonus = 15
-magic_bonus = -4
+magic_bonus = -8
 
 [rune_gloves]
 display_name = "Rune Gloves"
@@ -1669,7 +1669,7 @@ defence_level_required = 55
 attack_bonus = 0
 strength_bonus = 6
 defence_bonus = 9
-magic_bonus = -3
+magic_bonus = -6
 
 # --- Ancient Tier (Level 40) ---
 # Note: ancient_boots is defined in the FEET section above (replaced from level 20 to tier 4)

@@ -444,12 +444,22 @@ impl Projectile {
         current_time - self.start_time >= self.duration
     }
 
-    /// Get current world position with Z
+    /// Get current world position with Z.
+    /// Blast projectiles arc upward (parabolic Z offset peaking at t=0.5).
     pub fn current_pos(&self, current_time: f64) -> (f32, f32, f32) {
         let t = self.progress(current_time);
         let x = self.start_x + (self.end_x - self.start_x) * t;
         let y = self.start_y + (self.end_y - self.start_y) * t;
-        let z = self.start_z + (self.end_z - self.start_z) * t;
+        let base_z = self.start_z + (self.end_z - self.start_z) * t;
+
+        // Parabolic arc: peaks at t=0.5, height scales with distance
+        let dx = self.end_x - self.start_x;
+        let dy = self.end_y - self.start_y;
+        let dist = (dx * dx + dy * dy).sqrt();
+        let arc_height = (dist * 0.3).max(1.0); // 30% of distance, minimum 1 tile
+        let arc_offset = 4.0 * arc_height * t * (1.0 - t); // parabola: 0 at t=0, peak at t=0.5, 0 at t=1
+        let z = base_z + arc_offset;
+
         (x, y, z)
     }
 }
