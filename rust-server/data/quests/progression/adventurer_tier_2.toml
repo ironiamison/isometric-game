@@ -66,8 +66,8 @@ description = "Accumulate 1,200 gold"
 exp = 900
 gold = 2200
 items = [
-    { id = "health_potion", count = 2 },
     { id = "weak_mana_potion", count = 2 },
+    { id = "mithril_axe", count = 1 },
 ]
 
 [quest.dialogue]

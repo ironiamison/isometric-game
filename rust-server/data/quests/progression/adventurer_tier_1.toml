@@ -37,7 +37,8 @@ description = "Accumulate 150 gold"
 exp = 600
 gold = 1200
 items = [
-    { id = "weak_health_potion", count = 3 },
+    { id = "iron_axe", count = 1 },
+    { id = "weak_mana_potion", count = 1 },
 ]
 
 [quest.dialogue]

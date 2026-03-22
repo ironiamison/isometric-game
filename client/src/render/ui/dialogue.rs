@@ -176,7 +176,7 @@ const COMBAT_T3_REWARDS: [&str; 2] = ["2x Strong Health Potion", "2x Prayer Poti
 
 const SKILLING_T1_REWARDS: [&str; 2] = ["1x Iron Axe", "1x Weak Mana Potion"];
 const SKILLING_T2_REWARDS: [&str; 2] = ["2x Weak Mana Potion", "1x Mithril Axe"];
-const SKILLING_T3_REWARDS: [&str; 2] = ["1x Backpack", "1x Shades"];
+const SKILLING_T3_REWARDS: [&str; 1] = ["1x Backpack"];
 
 const SKILLING_T1_REQUIREMENTS: [QuestRequirement; 2] = [
     ("green_thumb", "Green Thumb"),
