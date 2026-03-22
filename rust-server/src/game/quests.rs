@@ -241,8 +241,27 @@ impl GameRoom {
         quest_id: &str,
         quest_state: &mut PlayerQuestState,
     ) {
-        quest_state.complete_quest(quest_id);
         if let Some(quest) = self.quest_registry.get(quest_id).await {
+            // Verify the player has all required collect items in their inventory
+            // before completing (items may have been banked after collection)
+            {
+                let players = self.players.read().await;
+                if let Some(player) = players.get(player_id) {
+                    for objective in &quest.objectives {
+                        if objective.objective_type == ObjectiveType::CollectItem
+                            && !player.inventory.has_item(&objective.target, objective.count)
+                        {
+                            tracing::warn!(
+                                "Player {} tried to complete quest {} but missing {} x{} in inventory",
+                                player_id, quest_id, objective.target, objective.count
+                            );
+                            return;
+                        }
+                    }
+                }
+            }
+
+            quest_state.complete_quest(quest_id);
             self.send_to_player(
                 player_id,
                 ServerMessage::QuestCompleted {
