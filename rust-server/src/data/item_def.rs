@@ -156,6 +156,10 @@ pub struct EquipmentStats {
     /// Magic level required to equip (for staves/magic items)
     #[serde(default)]
     pub magic_level_required: i32,
+
+    /// Ammo save chance (0.0 - 1.0) — probability of NOT consuming an arrow on ranged attack
+    #[serde(default)]
+    pub ammo_save_chance: f64,
 }
 
 // ============================================================================
