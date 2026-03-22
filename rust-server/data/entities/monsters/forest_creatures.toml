@@ -663,13 +663,7 @@ gold_min = 8
 gold_max = 18
 
 [[biter.loot]]
-item_id = "spoiled_meat"
-drop_chance = 0.35
-quantity_min = 1
-quantity_max = 2
-
-[[biter.loot]]
-item_id = "big_bones"
+item_id = "bones"
 drop_chance = 0.5
 quantity_min = 1
 quantity_max = 1
