@@ -1050,7 +1050,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Spawn projectile for ranged attacks (blast handled by spellEffect)
                 if let Some(ref projectile_type) = projectile {
-                    if projectile_type != "blast" {
+                    if !projectile_type.ends_with("_blast") {
                         if let Some(ref source_id) = source_id {
                             // Get source position + Z (check players then NPCs)
                             let source_pos = if let Some(player) = state.players.get(source_id) {
@@ -3880,7 +3880,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 }
 
                 // Blast spell: spawn a projectile instead of on-target effect
-                if spell_id == "blast" {
+                if spell_id.ends_with("_blast") {
                     let source_pos = if let Some(player) = state.players.get(&caster_id) {
                         Some((player.x.round(), player.y.round(), player.z))
                     } else {
@@ -3890,7 +3890,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     if let Some((src_x, src_y, src_z)) = source_pos {
                         let end_z = state.chunk_manager.get_height(target_x, target_y) as f32;
                         state.projectiles.push(crate::game::Projectile {
-                            sprite: "blast".to_string(),
+                            sprite: spell_id.clone(),
                             start_x: src_x,
                             start_y: src_y,
                             start_z: src_z,

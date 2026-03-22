@@ -1690,7 +1690,10 @@ impl Renderer {
                 ("return_home", "return_home"),
                 ("greater_heal", "greater_heal"),
                 ("tornado", "tornado"),
-                ("blast", "blast"),
+                ("air_blast", "blast"),
+                ("water_blast", "blast"),
+                ("earth_blast", "blast"),
+                ("fire_blast", "blast"),
             ];
             let mut icons = HashMap::new();
             for (spell_id, icon_name) in &spell_icon_mappings {
@@ -5611,7 +5614,7 @@ impl Renderer {
                 world_to_screen_z(world_x, world_y, world_z, &state.camera);
 
             // Sprite-based projectile (blast spell)
-            if projectile.sprite == "blast" {
+            if projectile.sprite.ends_with("_blast") {
                 if let Some((texture, atlas_offset)) = self.spell_effect_textures.get("projectile") {
                     let (tex_w, tex_h) = self
                         .spell_effect_textures
@@ -5807,7 +5810,7 @@ impl Renderer {
                 "heal" => "self_heal",
                 "teleport" | "return_home" => "bubbles_warp",
                 "tornado" => "tornado",
-                "blast" => continue,
+                s if s.ends_with("_blast") => continue,
                 "rocks_aoe" => continue,
                 _ => continue,
             };
@@ -5893,7 +5896,7 @@ impl Renderer {
         let elapsed = current_time - effect.time;
 
         let sprite_name = match effect.spell_id.as_str() {
-            "blast" => return,
+            s if s.ends_with("_blast") => return,
             "rocks_aoe" => "rocks_aoe",
             other => other,
         };

@@ -36,7 +36,7 @@ pub struct ScrollSpellDef {
 }
 
 /// All spells in display order
-pub const SPELLS: [SpellDef; 6] = [
+pub const SPELLS: [SpellDef; 10] = [
     SpellDef {
         id: "dark_hand",
         name: "Dark Hand",
@@ -46,6 +46,46 @@ pub const SPELLS: [SpellDef; 6] = [
         cooldown_ms: 1500,
         description: "A shadowy hand strikes your target",
         effect_sprite: "dark_hand",
+    },
+    SpellDef {
+        id: "air_blast",
+        name: "Air Blast",
+        spell_type: SpellType::Damage,
+        magic_level_req: 1,
+        mana_cost: 2,
+        cooldown_ms: 1000,
+        description: "A gust of wind strikes your target",
+        effect_sprite: "projectile",
+    },
+    SpellDef {
+        id: "water_blast",
+        name: "Water Blast",
+        spell_type: SpellType::Damage,
+        magic_level_req: 5,
+        mana_cost: 3,
+        cooldown_ms: 1000,
+        description: "A surge of water strikes your target",
+        effect_sprite: "projectile",
+    },
+    SpellDef {
+        id: "earth_blast",
+        name: "Earth Blast",
+        spell_type: SpellType::Damage,
+        magic_level_req: 10,
+        mana_cost: 4,
+        cooldown_ms: 1200,
+        description: "A chunk of earth strikes your target",
+        effect_sprite: "projectile",
+    },
+    SpellDef {
+        id: "fire_blast",
+        name: "Fire Blast",
+        spell_type: SpellType::Damage,
+        magic_level_req: 15,
+        mana_cost: 5,
+        cooldown_ms: 1200,
+        description: "A ball of fire strikes your target",
+        effect_sprite: "projectile",
     },
     SpellDef {
         id: "lightning_bolt",
