@@ -3485,6 +3485,7 @@ impl GameRoom {
             attack_bonus,
             strength_bonus,
             equipped_head,
+            equipped_back,
             combat_style,
         ) = {
             let mut players = self.players.write().await;
@@ -3526,6 +3527,7 @@ impl GameRoom {
                 atk_bonus,
                 str_bonus,
                 player.equipped_head.clone(),
+                player.equipped_back.clone(),
                 player.combat_style,
             )
         };
@@ -3867,19 +3869,39 @@ impl GameRoom {
                         .map(|s| s.item_id.clone())
                 });
                 if let Some(arrow_id) = arrow_id {
-                    player.inventory.remove_item(&arrow_id, 1);
-                    let inv_update = player.inventory.to_update();
-                    let gold = player.inventory.gold;
-                    drop(players);
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::InventoryUpdate {
-                            player_id: player_id.to_string(),
-                            slots: inv_update,
-                            gold,
-                        },
-                    )
-                    .await;
+                    // Check if equipped back item has ammo save chance (attractor)
+                    let saved = if let Some(ref back_id) = equipped_back {
+                        if let Some(back_def) = self.item_registry.get(back_id) {
+                            if let Some(ref equip) = back_def.equipment {
+                                equip.ammo_save_chance > 0.0
+                                    && rand::random::<f32>() < equip.ammo_save_chance
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                    if !saved {
+                        player.inventory.remove_item(&arrow_id, 1);
+                        let inv_update = player.inventory.to_update();
+                        let gold = player.inventory.gold;
+                        drop(players);
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::InventoryUpdate {
+                                player_id: player_id.to_string(),
+                                slots: inv_update,
+                                gold,
+                            },
+                        )
+                        .await;
+                    } else {
+                        drop(players);
+                    }
                     // Look up arrow's ranged_strength bonus
                     self.item_registry.get(&arrow_id).map(|def| def.ranged_strength).unwrap_or(0)
                 } else {
