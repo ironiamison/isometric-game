@@ -1040,6 +1040,12 @@ drop_chance = 0.05
 quantity_min = 1
 quantity_max = 1
 
+[[rock_golem.loot]]
+item_id = "mithril_boots"
+drop_chance = 0.00390625
+quantity_min = 1
+quantity_max = 1
+
 [rock_golem.behaviors]
 hostile = true
 wander_enabled = true
@@ -1090,6 +1096,12 @@ quantity_max = 1
 [[wurm.loot]]
 item_id = "cactus_seed"
 drop_chance = 0.033
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot]]
+item_id = "rune_boots"
+drop_chance = 0.00390625
 quantity_min = 1
 quantity_max = 1
 

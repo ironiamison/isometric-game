@@ -30675,32 +30675,38 @@
         "w": 544,
         "h": 27
       },
-      "rusty_boots": {
+      "rune_boots": {
         "x": 1632,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "scavenger_boots": {
+      "rusty_boots": {
         "x": 2176,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "training_boots": {
+      "scavenger_boots": {
         "x": 2720,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "worn_boots": {
+      "training_boots": {
         "x": 3264,
         "y": 573,
         "w": 544,
         "h": 27
       },
-      "worn_sandals": {
+      "worn_boots": {
         "x": 0,
+        "y": 600,
+        "w": 544,
+        "h": 27
+      },
+      "worn_sandals": {
+        "x": 544,
         "y": 600,
         "w": 544,
         "h": 27
@@ -31351,23 +31357,23 @@
         "w": 1472,
         "h": 56
       },
-      "golden_scarab": {
-        "x": 0,
-        "y": 1536,
-        "w": 1744,
-        "h": 53
-      },
       "golden_scarab_2": {
-        "x": 1744,
+        "x": 0,
         "y": 1536,
         "w": 1702,
         "h": 53
       },
       "mushroom": {
-        "x": 3446,
+        "x": 1702,
         "y": 1536,
         "w": 608,
         "h": 52
+      },
+      "golden_scarab": {
+        "x": 2310,
+        "y": 1536,
+        "w": 1072,
+        "h": 51
       },
       "anvil": {
         "x": 0,

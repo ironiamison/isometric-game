@@ -120069,26 +120069,6 @@
     },
     {
       "entityId": "evil_cactus",
-      "x": 47,
-      "y": 32
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 37,
-      "y": 46
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 49,
-      "y": 41
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 43,
-      "y": 69
-    },
-    {
-      "entityId": "evil_cactus",
       "x": 54,
       "y": 78
     },
@@ -120096,31 +120076,6 @@
       "entityId": "evil_cactus",
       "x": 57,
       "y": 88
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 37,
-      "y": 44
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 36,
-      "y": 55
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 51,
-      "y": 53
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 46,
-      "y": 62
-    },
-    {
-      "entityId": "evil_cactus",
-      "x": 43,
-      "y": 59
     },
     {
       "entityId": "rock",
@@ -120246,6 +120201,41 @@
       "entityId": "wurm",
       "x": 134,
       "y": 54
+    },
+    {
+      "entityId": "golden_scarab",
+      "x": 39,
+      "y": 36
+    },
+    {
+      "entityId": "golden_scarab",
+      "x": 48,
+      "y": 40
+    },
+    {
+      "entityId": "golden_scarab",
+      "x": 33,
+      "y": 47
+    },
+    {
+      "entityId": "golden_scarab",
+      "x": 52,
+      "y": 52
+    },
+    {
+      "entityId": "golden_scarab",
+      "x": 39,
+      "y": 63
+    },
+    {
+      "entityId": "golden_scarab",
+      "x": 44,
+      "y": 73
+    },
+    {
+      "entityId": "golden_scarab",
+      "x": 44,
+      "y": 49
     }
   ],
   "mapObjects": [
@@ -131906,5 +131896,6 @@
       "edge": "right"
     }
   ],
-  "portals": []
+  "portals": [],
+  "gatheringZones": []
 }

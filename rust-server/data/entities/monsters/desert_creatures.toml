@@ -82,6 +82,12 @@ drop_chance = 0.5
 quantity_min = 1
 quantity_max = 1
 
+[[golden_scarab.loot]]
+item_id = "adamant_boots"
+drop_chance = 0.00390625
+quantity_min = 1
+quantity_max = 1
+
 [golden_scarab.behaviors]
 hostile = true
 slayer_only = true
@@ -89,6 +95,7 @@ wander_enabled = true
 wander_radius = 3
 wander_pause_min_ms = 3000
 wander_pause_max_ms = 6000
+no_shadow = true
 
 # =============================================================================
 # Bandit Camel 1 - Friendly desert scenery NPC
