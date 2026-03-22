@@ -9360,10 +9360,9 @@ impl InputHandler {
                 commands.push(InputCommand::CancelAutoAction);
             }
 
-            // Ranged weapons have a longer cooldown to balance range advantage
             let attack_cooldown = {
                 let weapon_range = get_local_weapon_range(state);
-                if weapon_range > 1 { 1.1 } else { 0.8 }
+                if weapon_range > 1 { 0.7 } else { 0.8 }
             };
             if current_time - self.last_attack_time >= attack_cooldown {
                 // Check if we should gather instead of attack
