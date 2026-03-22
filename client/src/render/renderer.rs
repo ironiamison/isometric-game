@@ -372,6 +372,8 @@ pub struct Renderer {
     water_material: Option<Material>,
     /// Material for wave overlay drawn on top of water tiles
     water_overlay_material: Option<Material>,
+    /// Arrow projectile spritesheet (arrow_angles.png: 7 types × 4 angles, 31x27 per frame)
+    arrow_projectile_texture: Option<Texture2D>,
     /// Exit portal arrow textures for interior maps
     exit_arrow_up: Option<Texture2D>,
     exit_arrow_down: Option<Texture2D>,
@@ -1584,6 +1586,18 @@ impl Renderer {
             outline_tex
         });
 
+        // Load arrow projectile spritesheet
+        let arrow_projectile_texture = match load_texture(&asset_path("assets/sprites/arrow_angles.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load arrow_angles spritesheet: {}", e);
+                None
+            }
+        };
+
         // Load exit portal arrow textures
         let exit_arrow_up = match load_texture(&asset_path("assets/ui/up_arrow.png")).await {
             Ok(tex) => {
@@ -1821,6 +1835,7 @@ impl Renderer {
             head_hair_material,
             water_material,
             water_overlay_material,
+            arrow_projectile_texture,
             exit_arrow_up,
             exit_arrow_down,
             exit_arrow_left,
@@ -5663,140 +5678,72 @@ impl Renderer {
                 continue;
             }
 
-            // Offset arrow vertically to match player center (not feet)
-            let arrow_y_offset = -24.0 * state.camera.zoom;
-            let screen_y = screen_y_raw + arrow_y_offset;
+            // Sprite-based arrow projectile from arrow_angles.png
+            // Sheet: 7 types × 4 angles, each frame 31x27
+            // Types (row): bone(0), rune(1), adamant(2), mithril(3), steel(4), iron(5), bronze(6)
+            // Angles (col): frame 0-3 map to 4 isometric directions
+            if let Some(ref arrow_tex) = self.arrow_projectile_texture {
+                let frame_w = 31.0_f32;
+                let frame_h = 27.0_f32;
 
-            // Calculate direction in SCREEN space (accounts for isometric transform + elevation)
-            let (start_screen_x, start_screen_y) = world_to_screen_z(
-                projectile.start_x, projectile.start_y, projectile.start_z, &state.camera,
-            );
-            let (end_screen_x, end_screen_y) = world_to_screen_z(
-                projectile.end_x, projectile.end_y, projectile.end_z, &state.camera,
-            );
-            let dx = end_screen_x - start_screen_x;
-            let dy = end_screen_y - start_screen_y;
-            let angle = dy.atan2(dx);
+                // Map arrow item id to row index
+                let type_idx = match projectile.sprite.as_str() {
+                    "bone_arrow" => 0,
+                    "rune_arrow" => 1,
+                    "adamant_arrow" => 2,
+                    "mithril_arrow" => 3,
+                    "steel_arrow" => 4,
+                    "iron_arrow" => 5,
+                    "bronze_arrow" => 6,
+                    _ => 6, // default to bronze
+                };
 
-            // Snap to isometric angles (2:1 ratio = atan2(1,2) ≈ 26.57°)
-            // 8 isometric directions: 0°, 26.57°, 90°, 153.43°, 180°, -153.43°, -90°, -26.57°
-            let iso_angle = (0.5_f32).atan(); // atan(1/2) ≈ 26.57° ≈ 0.4636 rad
-            let iso_angles: [f32; 8] = [
-                0.0,                               // UpRight (east)
-                iso_angle,                         // Right (26.57°)
-                std::f32::consts::FRAC_PI_2,       // DownRight (90°)
-                std::f32::consts::PI - iso_angle,  // Down (153.43°)
-                std::f32::consts::PI,              // DownLeft (180°)
-                -std::f32::consts::PI + iso_angle, // Left (-153.43°)
-                -std::f32::consts::FRAC_PI_2,      // UpLeft (-90°)
-                -iso_angle,                        // Up (-26.57°)
-            ];
+                // Calculate world-space direction to pick angle frame
+                let world_dx = projectile.end_x - projectile.start_x;
+                let world_dy = projectile.end_y - projectile.start_y;
 
-            // Find nearest isometric angle
-            let mut snapped_angle = iso_angles[0];
-            let mut min_diff = f32::MAX;
-            for &iso_ang in &iso_angles {
-                let mut diff = (angle - iso_ang).abs();
-                // Handle wrap-around at ±180°
-                if diff > std::f32::consts::PI {
-                    diff = 2.0 * std::f32::consts::PI - diff;
-                }
-                if diff < min_diff {
-                    min_diff = diff;
-                    snapped_angle = iso_ang;
-                }
+                // Map 8 isometric directions to 4 frames + optional horizontal flip
+                // Frame 0: upper-left (~NW), Frame 1: upper-right (~NE)
+                // Frame 2: lower-right (~SE), Frame 3: lower-left (~SW)
+                let angle = world_dy.atan2(world_dx);
+                let octant = ((angle + std::f32::consts::PI) / (std::f32::consts::PI / 4.0)) as usize % 8;
+
+                // octant: 0=W, 1=NW, 2=N, 3=NE, 4=E, 5=SE, 6=S, 7=SW
+                // Map to frame index and flip
+                let (frame_idx, flip_x) = match octant {
+                    1 => (0, false), // NW
+                    2 => (1, true),  // N (flip NE frame)
+                    3 => (1, false), // NE
+                    4 => (2, true),  // E (flip SE frame)
+                    5 => (2, false), // SE
+                    6 => (3, true),  // S (flip SW frame)
+                    7 => (3, false), // SW
+                    0 => (0, true),  // W (flip NW frame)
+                    _ => (0, false),
+                };
+
+                let src_x = (type_idx * 4 + frame_idx) as f32 * frame_w;
+                let source_rect = Rect::new(src_x, 0.0, frame_w, frame_h);
+
+                let zoom = state.camera.zoom;
+                let draw_w = frame_w * zoom;
+                let draw_h = frame_h * zoom;
+                let arrow_y_offset = -24.0 * zoom;
+
+                let dest_w = if flip_x { -draw_w } else { draw_w };
+
+                draw_texture_ex(
+                    arrow_tex,
+                    screen_x - draw_w / 2.0,
+                    screen_y_raw + arrow_y_offset - draw_h / 2.0,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(source_rect),
+                        dest_size: Some(Vec2::new(dest_w, draw_h)),
+                        ..Default::default()
+                    },
+                );
             }
-
-            // Direction vector from snapped angle
-            let dir_x = snapped_angle.cos();
-            let dir_y = snapped_angle.sin();
-
-            // Perpendicular vector for arrow width
-            let perp_x = -dir_y;
-            let perp_y = dir_x;
-
-            // Arrow dimensions
-            let shaft_length = 18.0;
-            let shaft_width = 2.0;
-            let head_length = 6.0;
-            let head_width = 5.0;
-            let fletch_length = 4.0;
-            let fletch_width = 3.0;
-
-            // Colors
-            let shaft_color = Color::new(0.55, 0.35, 0.15, 1.0); // Wood brown
-            let head_color = Color::new(0.45, 0.45, 0.5, 1.0); // Metal gray
-            let fletch_color = Color::new(0.85, 0.85, 0.8, 1.0); // Light feathers
-
-            // Arrow positions
-            let tip_x = screen_x + dir_x * (shaft_length / 2.0 + head_length);
-            let tip_y = screen_y + dir_y * (shaft_length / 2.0 + head_length);
-            let back_x = screen_x - dir_x * shaft_length / 2.0;
-            let back_y = screen_y - dir_y * shaft_length / 2.0;
-
-            // Draw shaft (thick line)
-            draw_line(
-                back_x,
-                back_y,
-                screen_x + dir_x * shaft_length / 2.0,
-                screen_y + dir_y * shaft_length / 2.0,
-                shaft_width,
-                shaft_color,
-            );
-
-            // Draw arrowhead (triangle pointing forward)
-            let head_base_x = screen_x + dir_x * shaft_length / 2.0;
-            let head_base_y = screen_y + dir_y * shaft_length / 2.0;
-            draw_triangle(
-                Vec2::new(tip_x, tip_y),
-                Vec2::new(
-                    head_base_x + perp_x * head_width / 2.0,
-                    head_base_y + perp_y * head_width / 2.0,
-                ),
-                Vec2::new(
-                    head_base_x - perp_x * head_width / 2.0,
-                    head_base_y - perp_y * head_width / 2.0,
-                ),
-                head_color,
-            );
-
-            // Draw fletching (two small triangles at the back)
-            let fletch_base_x = back_x + dir_x * fletch_length;
-            let fletch_base_y = back_y + dir_y * fletch_length;
-
-            // Left fletch
-            draw_triangle(
-                Vec2::new(
-                    back_x + perp_x * shaft_width / 2.0,
-                    back_y + perp_y * shaft_width / 2.0,
-                ),
-                Vec2::new(
-                    fletch_base_x + perp_x * shaft_width / 2.0,
-                    fletch_base_y + perp_y * shaft_width / 2.0,
-                ),
-                Vec2::new(
-                    back_x + perp_x * fletch_width,
-                    back_y + perp_y * fletch_width,
-                ),
-                fletch_color,
-            );
-
-            // Right fletch
-            draw_triangle(
-                Vec2::new(
-                    back_x - perp_x * shaft_width / 2.0,
-                    back_y - perp_y * shaft_width / 2.0,
-                ),
-                Vec2::new(
-                    fletch_base_x - perp_x * shaft_width / 2.0,
-                    fletch_base_y - perp_y * shaft_width / 2.0,
-                ),
-                Vec2::new(
-                    back_x - perp_x * fletch_width,
-                    back_y - perp_y * fletch_width,
-                ),
-                fletch_color,
-            );
         }
     }
 

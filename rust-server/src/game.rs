@@ -3900,7 +3900,7 @@ impl GameRoom {
 
         // Now that we have a confirmed target, consume 1 arrow for ranged weapons
         // and add the arrow's ranged_strength bonus to damage
-        let arrow_strength_bonus = if weapon_type == WeaponType::Ranged {
+        let (arrow_strength_bonus, used_arrow_id) = if weapon_type == WeaponType::Ranged {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 let arrow_id = player.inventory.slots.iter().find_map(|slot| {
@@ -3943,7 +3943,8 @@ impl GameRoom {
                         drop(players);
                     }
                     // Look up arrow's ranged_strength bonus
-                    self.item_registry.get(&arrow_id).map(|def| def.ranged_strength).unwrap_or(0)
+                    let bonus = self.item_registry.get(&arrow_id).map(|def| def.ranged_strength).unwrap_or(0);
+                    (bonus, Some(arrow_id))
                 } else {
                     // Arrows ran out between check and consumption (unlikely but safe)
                     return;
@@ -3952,7 +3953,7 @@ impl GameRoom {
                 return;
             }
         } else {
-            0
+            (0, None)
         };
         let strength_bonus = strength_bonus + arrow_strength_bonus + equip_ranged_str_bonus;
 
@@ -4172,12 +4173,8 @@ impl GameRoom {
         let target_x = target_tile_x as f32;
         let target_y = target_tile_y as f32;
 
-        // Determine projectile type for ranged attacks
-        let projectile = if weapon_type == WeaponType::Ranged {
-            Some("arrow".to_string())
-        } else {
-            None
-        };
+        // Determine projectile type for ranged attacks (use actual arrow item id)
+        let projectile = used_arrow_id;
 
         // Broadcast damage event to players in the same zone (instance or overworld)
         let damage_msg = ServerMessage::DamageEvent {
