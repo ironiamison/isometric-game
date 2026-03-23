@@ -108,7 +108,7 @@ monster_id = "wild_boar"
 display_name = "Wild Boars"
 count_min = 30
 count_max = 55
-weight = 10
+weight = 6
 xp_per_kill = 25
 
 [[masters.tasks]]
@@ -166,6 +166,22 @@ count_min = 25
 count_max = 50
 weight = 6
 xp_per_kill = 30
+
+[[masters.tasks]]
+monster_id = "biter"
+display_name = "Biters"
+count_min = 25
+count_max = 50
+weight = 8
+xp_per_kill = 28
+
+[[masters.tasks]]
+monster_id = "cactus"
+display_name = "Cacti"
+count_min = 25
+count_max = 50
+weight = 6
+xp_per_kill = 22
 
 [[masters.tasks]]
 monster_id = "rock_golem"
@@ -237,14 +253,6 @@ weight = 10
 xp_per_kill = 48
 
 [[masters.tasks]]
-monster_id = "reaper"
-display_name = "Reapers"
-count_min = 40
-count_max = 65
-weight = 6
-xp_per_kill = 65
-
-[[masters.tasks]]
 monster_id = "low_orc"
 display_name = "Orcs"
 count_min = 50
@@ -253,12 +261,12 @@ weight = 10
 xp_per_kill = 40
 
 [[masters.tasks]]
-monster_id = "witch"
-display_name = "Witches"
-count_min = 40
-count_max = 65
+monster_id = "evil_cactus"
+display_name = "Evil Cacti"
+count_min = 35
+count_max = 60
 weight = 6
-xp_per_kill = 60
+xp_per_kill = 70
 
 [[masters.tasks]]
 monster_id = "rock_golem"
