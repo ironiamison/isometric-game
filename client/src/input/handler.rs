@@ -1840,6 +1840,33 @@ fn minimap_map_rect(panel_rect: Rect) -> Rect {
     )
 }
 
+const MINIMAP_PREVIEW_WIDTH: f32 = 188.0;
+const MINIMAP_PREVIEW_HEIGHT: f32 = 140.0;
+const MINIMAP_PREVIEW_Y: f32 = 8.0;
+const MINIMAP_PREVIEW_MARGIN: f32 = 12.0;
+const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 0.8;
+
+fn minimap_preview_rect(ui_scale: f32) -> Rect {
+    let (sw, _) = virtual_screen_size();
+    let s = ui_scale;
+    let width = MINIMAP_PREVIEW_WIDTH * s;
+    let height = MINIMAP_PREVIEW_HEIGHT * s;
+    let margin = MINIMAP_PREVIEW_MARGIN * s;
+    let y = MINIMAP_PREVIEW_Y * s;
+    Rect::new((sw - width - margin).floor(), y.floor(), width, height)
+}
+
+fn minimap_preview_bounds(state: &GameState) -> Option<MinimapBounds> {
+    let player = state.get_local_player()?;
+    let half_span = CHUNK_SIZE as f32 * (MINIMAP_VISIBLE_CHUNK_RADIUS + 0.5);
+    Some(MinimapBounds {
+        min_x: player.x - half_span,
+        min_y: player.y - half_span,
+        max_x: player.x + half_span,
+        max_y: player.y + half_span,
+    })
+}
+
 fn minimap_world_bounds(state: &GameState) -> Option<MinimapBounds> {
     let mut bounds = if let Some((width, height)) = state.chunk_manager.get_interior_size() {
         MinimapBounds {
@@ -4572,21 +4599,58 @@ impl InputHandler {
                         }
                     }
                     UiElementId::MinimapToggle => {
-                        audio.play_sfx("enter");
-                        state.ui_state.minimap_panel_open = !state.ui_state.minimap_panel_open;
-                        if state.ui_state.minimap_panel_open {
-                            state.ui_state.inventory_open = false;
-                            state.ui_state.character_panel_open = false;
-                            state.ui_state.social_open = false;
-                            state.ui_state.skills_open = false;
-                            state.ui_state.prayer_book_open = false;
-                            state.ui_state.close_quest_log();
-                            state.ui_state.chat_panel_open = false;
-                            state.ui_state.chat_open = false;
-                            state.ui_state.minimap_panel_zoom = 1.0;
-                            state.ui_state.minimap_panel_center_x = None;
-                            state.ui_state.minimap_panel_center_y = None;
-                            state.ui_state.minimap_panel_dragging = false;
+                        // Click on minimap preview: pathfind to the clicked world position
+                        let preview_rect = minimap_preview_rect(state.ui_state.ui_scale);
+                        if let Some(bounds) = minimap_preview_bounds(state) {
+                            let (world_x, world_y) =
+                                minimap_screen_to_world(bounds, preview_rect, mx, my);
+                            let tile_x = world_x.round() as i32;
+                            let tile_y = world_y.round() as i32;
+
+                            if let Some(player) = state.get_local_player() {
+                                let player_x = player.server_x.round() as i32;
+                                let player_y = player.server_y.round() as i32;
+
+                                // Cancel any current auto-action/path
+                                if state.auto_action_state.is_some() {
+                                    state.auto_action_state = None;
+                                    commands.push(InputCommand::CancelAutoAction);
+                                }
+                                commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                                state.auto_path = None;
+                                self.reset_auto_path_motion_state();
+                                self.suppress_move_until = 0.0;
+
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                let dist =
+                                    (tile_x - player_x).abs().max((tile_y - player_y).abs());
+
+                                if dist <= MAX_PATH_DISTANCE
+                                    && state
+                                        .chunk_manager
+                                        .is_walkable(tile_x as f32, tile_y as f32)
+                                {
+                                    let occupied = build_occupied_set(state, true);
+                                    if let Some(path) = pathfinding::find_path(
+                                        (player_x, player_y),
+                                        (tile_x, tile_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    ) {
+                                        state.auto_path = Some(PathState {
+                                            path,
+                                            current_index: 0,
+                                            destination: (tile_x, tile_y),
+                                            pickup_target: None,
+                                            interact_target: None,
+                                            interact_object_target: None,
+                                            waystone_target: None,
+                                            browse_stall_target: None,
+                                        });
+                                    }
+                                }
+                            }
                         }
                         return commands;
                     }
