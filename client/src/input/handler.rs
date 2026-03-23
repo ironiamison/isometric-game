@@ -9838,16 +9838,10 @@ impl InputHandler {
 
                 if is_attackable {
                     // Attackable NPC - target it and set up auto-action chase
-                    // Send stop to cancel any queued Move from old auto_path
-                    // (which already ran earlier this frame)
-                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                    self.last_dx = 0.0;
-                    self.last_dy = 0.0;
-                    self.move_sent = false;
-                    state.auto_path = None;
-                    self.suppress_move_until = current_time + 0.6;
-                    self.reset_auto_path_motion_state();
                     // Cancel any existing server-side auto-action before starting a new one
+                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                    state.auto_path = None;
+                    self.reset_auto_path_motion_state();
                     if state.auto_action_state.is_some() {
                         commands.push(InputCommand::CancelAutoAction);
                     }
@@ -9860,7 +9854,7 @@ impl InputHandler {
                         action: "attack".to_string(),
                         confirmed: false,
                     });
-                    // Pathfind to within attack range, or send immediately if already in range
+                    // Check range — only stop + suppress keyboard if in range
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(player) = state.players.get(local_id) {
                             if let Some(npc) = state.npcs.get(&npc_id) {
@@ -9916,8 +9910,12 @@ impl InputHandler {
                                         });
                                     }
                                 } else {
-                                    // Already in range - face target and send immediately.
-                                    // Don't gate on NPC settle — server handles range/timing.
+                                    // Already in range — stop movement and suppress keyboard
+                                    // so the attack fires without held keys cancelling it.
+                                    self.last_dx = 0.0;
+                                    self.last_dy = 0.0;
+                                    self.move_sent = false;
+                                    self.suppress_move_until = current_time + 0.6;
                                     let dir = crate::game::Direction::from_velocity(
                                         npc_x as f32 - player_x as f32,
                                         npc_y as f32 - player_y as f32,
