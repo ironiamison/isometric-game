@@ -4600,44 +4600,72 @@ impl InputHandler {
                     }
                     UiElementId::MinimapToggle => {
                         // Click on minimap preview: pathfind to the clicked world position
-                        let preview_rect = minimap_preview_rect(state.ui_state.ui_scale);
-                        if let Some(bounds) = minimap_preview_bounds(state) {
-                            let (world_x, world_y) =
-                                minimap_screen_to_world(bounds, preview_rect, mx, my);
-                            let tile_x = world_x.round() as i32;
-                            let tile_y = world_y.round() as i32;
+                        // Use the inner map rect (excluding title bar) to match renderer
+                        let s = state.ui_state.ui_scale;
+                        let preview_rect = minimap_preview_rect(s);
+                        let map_rect = Rect::new(
+                            preview_rect.x + 6.0 * s,
+                            preview_rect.y + 24.0 * s,
+                            preview_rect.w - 12.0 * s,
+                            preview_rect.h - 30.0 * s,
+                        );
 
+                        // Only pathfind if click is within the actual map area
+                        let in_map = mx >= map_rect.x
+                            && mx <= map_rect.x + map_rect.w
+                            && my >= map_rect.y
+                            && my <= map_rect.y + map_rect.h;
+
+                        if in_map {
                             if let Some(player) = state.get_local_player() {
                                 let player_x = player.server_x.round() as i32;
                                 let player_y = player.server_y.round() as i32;
 
-                                // Cancel any current auto-action/path
-                                if state.auto_action_state.is_some() {
-                                    state.auto_action_state = None;
-                                    commands.push(InputCommand::CancelAutoAction);
-                                }
-                                commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                                state.auto_path = None;
-                                self.reset_auto_path_motion_state();
-                                self.suppress_move_until = 0.0;
+                                // Use server position for bounds so coordinate mapping
+                                // is consistent with pathfinding start point
+                                let half_span =
+                                    CHUNK_SIZE as f32 * (MINIMAP_VISIBLE_CHUNK_RADIUS + 0.5);
+                                let bounds = MinimapBounds {
+                                    min_x: player.server_x - half_span,
+                                    min_y: player.server_y - half_span,
+                                    max_x: player.server_x + half_span,
+                                    max_y: player.server_y + half_span,
+                                };
 
-                                const MAX_PATH_DISTANCE: i32 = 32;
-                                let dist =
-                                    (tile_x - player_x).abs().max((tile_y - player_y).abs());
+                                let (world_x, world_y) =
+                                    minimap_screen_to_world(bounds, map_rect, mx, my);
+                                let tile_x = world_x.round() as i32;
+                                let tile_y = world_y.round() as i32;
 
-                                if dist <= MAX_PATH_DISTANCE
+                                let dist = (tile_x - player_x)
+                                    .abs()
+                                    .max((tile_y - player_y).abs());
+
+                                if dist > 0
                                     && state
                                         .chunk_manager
                                         .is_walkable(tile_x as f32, tile_y as f32)
                                 {
+                                    // Cancel any current auto-action
+                                    if state.auto_action_state.is_some() {
+                                        state.auto_action_state = None;
+                                        commands.push(InputCommand::CancelAutoAction);
+                                    }
+                                    self.suppress_move_until = 0.0;
+
                                     let occupied = build_occupied_set(state, true);
-                                    if let Some(path) = pathfinding::find_path(
-                                        (player_x, player_y),
-                                        (tile_x, tile_y),
-                                        &state.chunk_manager,
-                                        &occupied,
-                                        MAX_PATH_DISTANCE,
-                                    ) {
+                                    let path_limit = dist.min(64);
+
+                                    // Use splice-aware pathfinding to preserve in-progress step
+                                    if let Some(path) =
+                                        find_path_with_committed_step_splice(
+                                            state,
+                                            (player_x, player_y),
+                                            (tile_x, tile_y),
+                                            &occupied,
+                                            path_limit,
+                                        )
+                                    {
                                         state.auto_path = Some(PathState {
                                             path,
                                             current_index: 0,
@@ -4648,6 +4676,7 @@ impl InputHandler {
                                             waystone_target: None,
                                             browse_stall_target: None,
                                         });
+                                        self.reset_auto_path_motion_state();
                                     }
                                 }
                             }
@@ -8529,24 +8558,28 @@ impl InputHandler {
                 }
             }
 
-            return commands;
+            // Don't return — fall through so arrow-key movement still works
         }
 
+        // When minimap panel is open, only allow movement keys (skip chat/world interaction)
+        let minimap_panel_blocks_input = state.ui_state.minimap_panel_open;
         let classic = state.ui_state.classic_controls;
 
-        // Enter key opens chat (not in classic mode - chat is always open)
-        // Don't open chat on System tab (read-only)
-        if !classic
-            && is_key_pressed(KeyCode::Enter)
-            && !matches!(state.ui_state.chat_active_tab, ChatChannel::System)
-        {
-            state.ui_state.chat_open = true;
-            state.ui_state.chat_input.clear();
-            state.ui_state.chat_cursor = 0;
-            state.ui_state.chat_scroll_offset = 0;
-            // Drain any accumulated characters from the queue
-            while get_char_pressed().is_some() {}
-            return commands;
+        if !minimap_panel_blocks_input {
+            // Enter key opens chat (not in classic mode - chat is always open)
+            // Don't open chat on System tab (read-only)
+            if !classic
+                && is_key_pressed(KeyCode::Enter)
+                && !matches!(state.ui_state.chat_active_tab, ChatChannel::System)
+            {
+                state.ui_state.chat_open = true;
+                state.ui_state.chat_input.clear();
+                state.ui_state.chat_cursor = 0;
+                state.ui_state.chat_scroll_offset = 0;
+                // Drain any accumulated characters from the queue
+                while get_char_pressed().is_some() {}
+                return commands;
+            }
         }
 
         // Drain character queue when chat is closed to prevent accumulation
@@ -8863,6 +8896,11 @@ impl InputHandler {
                 commands.push(InputCommand::Dash);
                 state.dash_cooldown_end = current_time + 3.0; // 3 second cooldown
             }
+        }
+
+        // Minimap panel open: movement keys processed above, skip everything else
+        if minimap_panel_blocks_input {
+            return commands;
         }
 
         // Get player position from SERVER state (not visual) to avoid getting ahead of server
@@ -10142,6 +10180,13 @@ impl InputHandler {
                     }
                 } else {
                     // Normal player click - target and set up auto-action chase
+                    // Cancel any existing server-side auto-action before starting a new one
+                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                    state.auto_path = None;
+                    self.reset_auto_path_motion_state();
+                    if state.auto_action_state.is_some() {
+                        commands.push(InputCommand::CancelAutoAction);
+                    }
                     commands.push(InputCommand::Target {
                         entity_id: entity_id.clone(),
                     });
