@@ -40,32 +40,21 @@ impl Direction {
         if dx == 0.0 && dy == 0.0 {
             return Direction::Down;
         }
-
-        let adx = dx.abs();
-        let ady = dy.abs();
-
-        // Diagonal when both axes are significant (within 2:1 ratio)
-        if adx > 0.01 && ady > 0.01 && adx < ady * 2.0 && ady < adx * 2.0 {
-            match (dx > 0.0, dy > 0.0) {
-                (false, true) => Direction::DownLeft,
-                (true, true) => Direction::DownRight,
-                (false, false) => Direction::UpLeft,
-                (true, false) => Direction::UpRight,
-            }
-        } else if ady > adx {
-            // Cardinal vertical
-            if dy < 0.0 {
-                Direction::Up
-            } else {
-                Direction::Down
-            }
+        // Cardinal only — pick the dominant axis, break ties with vertical
+        if dx.abs() > dy.abs() {
+            if dx > 0.0 { Direction::Right } else { Direction::Left }
         } else {
-            // Cardinal horizontal
-            if dx < 0.0 {
-                Direction::Left
-            } else {
-                Direction::Right
-            }
+            if dy > 0.0 { Direction::Down } else { Direction::Up }
+        }
+    }
+
+    /// Snap any diagonal to its nearest cardinal direction.
+    pub fn to_cardinal(self) -> Self {
+        match self {
+            Direction::UpLeft | Direction::Up => Direction::Up,
+            Direction::UpRight | Direction::Right => Direction::Right,
+            Direction::DownRight | Direction::Down => Direction::Down,
+            Direction::DownLeft | Direction::Left => Direction::Left,
         }
     }
 
@@ -183,6 +172,8 @@ pub struct Player {
     pub combat_style: String,
     /// True for the local player (set from state sync calls)
     is_local_player: bool,
+    /// Last server tick this player appeared in a StateSync (for staleness detection)
+    pub last_sync_tick: u64,
 }
 
 impl Player {
@@ -239,6 +230,7 @@ impl Player {
             stall_name: None,
             combat_style: "accurate".to_string(),
             is_local_player: false,
+            last_sync_tick: 0,
         }
     }
 

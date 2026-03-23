@@ -415,6 +415,8 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             let has_pending_local_moves = is_local_player && state.has_pending_move_sequences();
 
             if let Some(player) = state.players.get_mut(&id) {
+                // Track last tick this player appeared in a sync (for staleness detection)
+                player.last_sync_tick = tick;
                 // Read velocity (movement intent) from server
                 let vel_x = extract_i32(player_value, "velX").unwrap_or(0) as f32;
                 let vel_y = extract_i32(player_value, "velY").unwrap_or(0) as f32;
@@ -616,6 +618,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                     if dashing {
                         new_player.is_dashing = true;
                     }
+                    new_player.last_sync_tick = tick;
                     if let Some(hp_val) = hp {
                         new_player.hp = hp_val;
                     }
@@ -656,6 +659,26 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
         state
             .players
             .retain(|id, _| *id == local_id || synced_player_ids.contains(id));
+    }
+
+    // Overworld staleness cleanup: remove players that haven't appeared in any
+    // StateSync for 40+ ticks (2 seconds). This catches ghost players left behind
+    // when a PlayerLeft message is dropped (e.g. channel full during portal transition).
+    // We can't do simple full-sync reconciliation in the overworld because view-distance
+    // culling means absent players may just be far away, not gone.
+    if sync_instance.is_empty() && tick > 40 {
+        let stale_threshold = tick - 40;
+        let local_id = state.local_player_id.clone().unwrap_or_default();
+        state.players.retain(|id, player| {
+            if *id == local_id {
+                return true;
+            }
+            if player.last_sync_tick > 0 && player.last_sync_tick < stale_threshold {
+                log::info!("Removing stale player {} (last seen tick {}, current {})", id, player.last_sync_tick, tick);
+                return false;
+            }
+            true
+        });
     }
 
     // Delta sync: process explicit removal lists
@@ -964,7 +987,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // Update facing direction from server (fixes visual mismatch
                     // during auto-action ranged/spell attacks)
                     if let Some(dir) = direction {
-                        let new_dir = crate::game::Direction::from_u8(dir);
+                        let new_dir = crate::game::Direction::from_u8(dir).to_cardinal();
                         player.direction = new_dir;
                         player.animation.direction = new_dir;
                     }

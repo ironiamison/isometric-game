@@ -51,7 +51,9 @@ impl GameRoom {
             {
                 if player.cast_stall_ticks > 0 {
                     player.cast_stall_ticks -= 1;
-                    player.reject_pending_move();
+                    // Skip movement this tick but keep the queued move intent.
+                    // The client sends moves during the stall which update
+                    // move_dx/move_dy — these execute once the stall expires.
                     continue;
                 }
                 if (player.move_dx == 0 && player.move_dy == 0) || player.pending_move_seq.is_none()

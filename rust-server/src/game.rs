@@ -96,16 +96,14 @@ pub const SPAWN_PRELOAD_RADIUS: i32 = 3;
 
 /// Compute a facing Direction from a delta (dx, dy) vector.
 fn direction_from_delta(dx: i32, dy: i32) -> Direction {
-    match (dx.signum(), dy.signum()) {
-        (0, -1) => Direction::Up,
-        (0, 1) => Direction::Down,
-        (-1, 0) => Direction::Left,
-        (1, 0) => Direction::Right,
-        (-1, -1) => Direction::UpLeft,
-        (1, -1) => Direction::UpRight,
-        (-1, 1) => Direction::DownLeft,
-        (1, 1) => Direction::DownRight,
-        _ => Direction::Down, // fallback
+    if dx == 0 && dy == 0 {
+        return Direction::Down;
+    }
+    // Cardinal only — pick the dominant axis, break ties with vertical
+    if dx.abs() > dy.abs() {
+        if dx > 0 { Direction::Right } else { Direction::Left }
+    } else {
+        if dy > 0 { Direction::Down } else { Direction::Up }
     }
 }
 
@@ -223,21 +221,21 @@ impl Direction {
         if dx == 0.0 && dy == 0.0 {
             return Direction::Down;
         }
+        // Cardinal only — pick the dominant axis, break ties with vertical
+        if dx.abs() > dy.abs() {
+            if dx > 0.0 { Direction::Right } else { Direction::Left }
+        } else {
+            if dy > 0.0 { Direction::Down } else { Direction::Up }
+        }
+    }
 
-        let angle = dy.atan2(dx);
-        let octant =
-            ((angle + std::f32::consts::PI) / (std::f32::consts::PI / 4.0)).round() as i32 % 8;
-
-        match octant {
-            0 => Direction::Left,
-            1 => Direction::UpLeft,
-            2 => Direction::Up,
-            3 => Direction::UpRight,
-            4 => Direction::Right,
-            5 => Direction::DownRight,
-            6 => Direction::Down,
-            7 => Direction::DownLeft,
-            _ => Direction::Down,
+    /// Snap any diagonal to its nearest cardinal direction.
+    pub fn to_cardinal(self) -> Self {
+        match self {
+            Direction::UpLeft | Direction::Up => Direction::Up,
+            Direction::UpRight | Direction::Right => Direction::Right,
+            Direction::DownRight | Direction::Down => Direction::Down,
+            Direction::DownLeft | Direction::Left => Direction::Left,
         }
     }
 
@@ -3452,7 +3450,7 @@ impl GameRoom {
                 if player.sitting_at.is_some() {
                     return;
                 }
-                let face_dir = Direction::from_u8(direction);
+                let face_dir = Direction::from_u8(direction).to_cardinal();
                 player.direction = face_dir;
                 // Ensure player is not moving when just facing
                 player.reject_pending_move();
@@ -3672,10 +3670,6 @@ impl GameRoom {
                 player.last_attack_time = current_time;
                 // Stop movement when attacking (player must stand still to attack)
                 player.reject_pending_move();
-                // Stall movement for 8 ticks after ranged attacks (like cast stall for spells)
-                if weapon_type == WeaponType::Ranged {
-                    player.cast_stall_ticks = 8;
-                }
             }
         }
 
@@ -3868,6 +3862,14 @@ impl GameRoom {
                 return;
             }
         };
+
+        // Stall movement for 8 ticks after ranged attacks that find a target
+        if weapon_type == WeaponType::Ranged {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.cast_stall_ticks = 8;
+            }
+        }
 
         // In slayer-only areas, players can only attack NPCs matching their active slayer task
         if is_npc {

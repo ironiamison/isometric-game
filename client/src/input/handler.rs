@@ -280,10 +280,10 @@ fn mark_chat_channel_as_read(state: &mut GameState, channel: ChatChannel) {
 const AUTO_ACTION_NPC_SETTLE_EPS: f32 = 0.06;
 
 fn queue_face(state: &mut GameState, commands: &mut Vec<InputCommand>, direction: u8) {
-    commands.push(InputCommand::Face { direction });
+    let dir = crate::game::Direction::from_u8(direction).to_cardinal();
+    commands.push(InputCommand::Face { direction: dir as u8 });
     if let Some(local_id) = &state.local_player_id {
         if let Some(player) = state.players.get_mut(local_id) {
-            let dir = crate::game::Direction::from_u8(direction);
             player.direction = dir;
             player.animation.direction = dir;
         }
@@ -1990,9 +1990,9 @@ pub struct InputHandler {
     // Auto-path movement is step-driven: one move per waypoint transition.
     auto_path_sent_waypoint: Option<(i32, i32)>,
     auto_path_sent_dir: Option<(f32, f32)>,
-    // When true, suppress keyboard movement so an attack auto-action can fire.
-    // Cleared when all movement keys are released.
-    suppress_move_for_attack: bool,
+    // Timestamp until which keyboard movement is suppressed so an attack
+    // auto-action can fire. Cleared on key release or expiry (max ~600ms).
+    suppress_move_until: f64,
     // Touch controls for mobile devices
     pub touch_controls: TouchControls,
 }
@@ -2011,7 +2011,7 @@ impl InputHandler {
             move_sent: false,
             auto_path_sent_waypoint: None,
             auto_path_sent_dir: None,
-            suppress_move_for_attack: false,
+            suppress_move_until: 0.0,
             touch_controls: TouchControls::new(),
         }
     }
@@ -8679,33 +8679,24 @@ impl InputHandler {
             is_key_down(KeyCode::Space)
         };
         // Only block movement for manual attacks (key/button held), not for
-        // auto-action attack animations — those are handled by suppress_move_for_attack
+        // auto-action attack animations — those are handled by suppress_move_until
         // and the server-side cast_stall_ticks instead.
         let is_attacking = attack_key_down || self.touch_controls.attack_pressed();
 
         // Check if we have any movement input (keyboard or D-pad)
         let has_movement_input = new_dir != MoveDir::None;
 
-        // Clear the attack-move suppression once the attack has actually fired
-        // (animation started), all movement keys are released, or the auto-action ends.
-        if self.suppress_move_for_attack {
-            let attack_fired = state.get_local_player().map_or(false, |p| {
-                matches!(
-                    p.animation.state,
-                    AnimationState::Attacking
-                        | AnimationState::ShootingBow
-                )
-            });
-            let auto_ended = state.auto_action_state.is_none();
-            if !has_movement_input || attack_fired || auto_ended {
-                self.suppress_move_for_attack = false;
-            }
+        // Clear the attack-move suppression on key release or expiry.
+        let suppress_active = current_time < self.suppress_move_until;
+        if suppress_active && !has_movement_input {
+            self.suppress_move_until = 0.0;
         }
+        let suppress_active = current_time < self.suppress_move_until;
 
         // Movement while sitting is handled server-side (direction-validated auto-stand)
         // Just let the move command go through - server will stand up if direction matches
 
-        if has_movement_input && !is_attacking && !self.suppress_move_for_attack {
+        if has_movement_input && !is_attacking && !suppress_active {
             // Cancel auto-action and follow when player manually moves
             if state.auto_action_state.is_some() {
                 state.auto_action_state = None;
@@ -9112,12 +9103,20 @@ impl InputHandler {
         if state.auto_path.is_none() {
             self.reset_auto_path_motion_state();
         }
+        // Reset motion state when a new path has been set (current_index == 0)
+        // so stale sent-waypoint tracking from a previous path doesn't suppress
+        // the first Move command of the new path.
+        if let Some(ref path_state) = state.auto_path {
+            if path_state.current_index == 0 {
+                self.reset_auto_path_motion_state();
+            }
+        }
 
         // Path following - generate movement commands when auto-pathing
         // Only follow path if not manually moving and not attacking.
         // When movement is suppressed for an attack auto-action, treat as no keyboard
         // input so the auto-path can walk us into range.
-        let no_manual_move = (dx == 0.0 && dy == 0.0) || self.suppress_move_for_attack;
+        let no_manual_move = (dx == 0.0 && dy == 0.0) || suppress_active;
         if no_manual_move && !is_attacking {
             if let (Some((player_x, player_y)), Some(ref mut path_state)) =
                 (player_pos, &mut state.auto_path)
@@ -9209,15 +9208,19 @@ impl InputHandler {
                     if let Some((send_dx, send_dy)) = desired_dir {
                         let waypoint_changed =
                             self.auto_path_sent_waypoint != Some((next_x, next_y));
-                        let dir_changed = self.auto_path_sent_dir != Some((send_dx, send_dy));
+                        let dir_changed =
+                            self.auto_path_sent_dir != Some((send_dx, send_dy));
+                        let time_elapsed =
+                            current_time - self.last_send_time >= self.send_interval;
 
-                        if waypoint_changed || dir_changed {
+                        if waypoint_changed || dir_changed || time_elapsed {
                             commands.push(InputCommand::Move {
                                 dx: send_dx,
                                 dy: send_dy,
                             });
                             self.auto_path_sent_waypoint = Some((next_x, next_y));
                             self.auto_path_sent_dir = Some((send_dx, send_dy));
+                            self.last_send_time = current_time;
                         }
                     }
                 } else {
@@ -9835,7 +9838,12 @@ impl InputHandler {
                         self.last_dy = 0.0;
                         self.move_sent = false;
                     }
-                    self.suppress_move_for_attack = true;
+                    self.suppress_move_until = current_time + 0.6;
+                    self.reset_auto_path_motion_state();
+                    // Cancel any existing server-side auto-action before starting a new one
+                    if state.auto_action_state.is_some() {
+                        commands.push(InputCommand::CancelAutoAction);
+                    }
                     commands.push(InputCommand::Target {
                         entity_id: npc_id.clone(),
                     });
@@ -10452,6 +10460,8 @@ impl InputHandler {
                     state.auto_action_state = None;
                     commands.push(InputCommand::CancelAutoAction);
                 }
+                self.reset_auto_path_motion_state();
+                self.suppress_move_until = 0.0;
 
                 // Use elevation-aware tile picking for click-to-move
                 let tile_x = clicked_tile_x;
