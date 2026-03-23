@@ -4164,9 +4164,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "autoActionStopped" => {
             if let Some(value) = data {
                 let reason = extract_string(value, "reason").unwrap_or_default();
+                // Only clear auto-path if the client didn't already handle the
+                // cancellation. When the client initiates cancel (click-to-move,
+                // new target, etc.), it clears auto_action_state first and may
+                // have already set a new auto_path — don't wipe it.
+                if state.auto_action_state.is_some() {
+                    state.auto_path = None;
+                }
                 state.auto_action_state = None;
-                // Also clear auto-path if we were chasing
-                state.auto_path = None;
                 log::debug!("Auto-action stopped: {}", reason);
             }
         }

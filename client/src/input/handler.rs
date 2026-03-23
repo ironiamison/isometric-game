@@ -9117,6 +9117,12 @@ impl InputHandler {
         // When movement is suppressed for an attack auto-action, treat as no keyboard
         // input so the auto-path can walk us into range.
         let no_manual_move = (dx == 0.0 && dy == 0.0) || suppress_active;
+        if state.auto_path.is_some() && (!no_manual_move || is_attacking) {
+            macroquad::logging::info!(
+                "[AUTOPATH] GATE_BLOCKED no_manual={} is_attacking={} dx={} dy={} suppress={}",
+                no_manual_move, is_attacking, dx, dy, suppress_active
+            );
+        }
         if no_manual_move && !is_attacking {
             if let (Some((player_x, player_y)), Some(ref mut path_state)) =
                 (player_pos, &mut state.auto_path)
@@ -9173,6 +9179,7 @@ impl InputHandler {
             }
 
             if path_blocked {
+                macroquad::logging::info!("[AUTOPATH] PATH_BLOCKED");
                 self.reset_auto_path_motion_state();
                 if !rebuild_current_auto_path(state) {
                     if state.auto_action_state.is_some() || state.follow_target.is_some() {
@@ -9224,6 +9231,7 @@ impl InputHandler {
                         }
                     }
                 } else {
+                    macroquad::logging::info!("[AUTOPATH] INDEX_PAST_END idx={} len={}", path_state.current_index, path_state.path.len());
                     self.reset_auto_path_motion_state();
                 }
             }
@@ -9372,6 +9380,7 @@ impl InputHandler {
                 // Send stop command so we don't keep moving in the last direction
                 // (but not during auto-action — that would interrupt it on the server)
                 if state.auto_action_state.is_none() {
+                    macroquad::logging::info!("[AUTOPATH] PATH_COMPLETE -> STOP");
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                 }
             }
@@ -9829,15 +9838,13 @@ impl InputHandler {
 
                 if is_attackable {
                     // Attackable NPC - target it and set up auto-action chase
-                    // Stop any current movement so the player halts and the attack can fire.
-                    // Suppress keyboard movement until keys are released so held keys
-                    // don't immediately cancel the auto-action.
-                    if self.last_dx != 0.0 || self.last_dy != 0.0 {
-                        commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
-                        self.last_dx = 0.0;
-                        self.last_dy = 0.0;
-                        self.move_sent = false;
-                    }
+                    // Send stop to cancel any queued Move from old auto_path
+                    // (which already ran earlier this frame)
+                    commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                    self.last_dx = 0.0;
+                    self.last_dy = 0.0;
+                    self.move_sent = false;
+                    state.auto_path = None;
                     self.suppress_move_until = current_time + 0.6;
                     self.reset_auto_path_motion_state();
                     // Cancel any existing server-side auto-action before starting a new one
@@ -10460,6 +10467,10 @@ impl InputHandler {
                     state.auto_action_state = None;
                     commands.push(InputCommand::CancelAutoAction);
                 }
+                // Send stop to cancel any queued Move from the old auto_path
+                // (which already ran earlier this frame)
+                commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
+                state.auto_path = None;
                 self.reset_auto_path_motion_state();
                 self.suppress_move_until = 0.0;
 
@@ -10492,6 +10503,10 @@ impl InputHandler {
                             &occupied,
                             MAX_PATH_DISTANCE,
                         ) {
+                            macroquad::logging::info!(
+                                "[CLICK2MOVE] path created len={} from=({},{}) to=({},{})",
+                                path.len(), player_x, player_y, tile_x, tile_y
+                            );
                             state.auto_path = Some(PathState {
                                 path,
                                 current_index: 0,
@@ -10502,8 +10517,21 @@ impl InputHandler {
                                 waystone_target: None,
                                 browse_stall_target: None,
                             });
+                        } else {
+                            macroquad::logging::info!(
+                                "[CLICK2MOVE] pathfind FAILED from=({},{}) to=({},{})",
+                                player_x, player_y, tile_x, tile_y
+                            );
                         }
+                    } else {
+                        macroquad::logging::info!(
+                            "[CLICK2MOVE] BLOCKED dist={} walkable={}",
+                            dist,
+                            state.chunk_manager.is_walkable(tile_x as f32, tile_y as f32)
+                        );
                     }
+                } else {
+                    macroquad::logging::info!("[CLICK2MOVE] no local player");
                 }
 
                 // Also clear target when clicking empty space
