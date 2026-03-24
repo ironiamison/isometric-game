@@ -1,0 +1,95 @@
+# =============================================================================
+# Kha'reth, the Cursed Pharaoh - Stationary Caster Boss
+# =============================================================================
+
+[khareth_pharaoh]
+display_name = "Kha'reth, the Cursed Pharaoh"
+sprite = "khareth_pharaoh"
+animation_type = "humanoid"
+size = 2
+description = "An ancient pharaoh corrupted by dark magic, sealed beneath the pyramid for millennia."
+
+[khareth_pharaoh.stats]
+level = 55
+max_hp = 300
+damage = 8
+attack_range = 10
+aggro_range = 999
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 2000
+respawn_time_ms = 0
+
+[khareth_pharaoh.rewards]
+exp_base = 800
+gold_min = 5000
+gold_max = 20000
+
+[khareth_pharaoh.behaviors]
+hostile = true
+no_shadow = true
+
+# Loot tables TBD — placeholder for now
+[[khareth_pharaoh.loot]]
+item_id = "pharaoh_bones"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 3
+
+# =============================================================================
+# Pharaoh Mummy - Phase 1 Minion
+# =============================================================================
+
+[pharaoh_mummy]
+display_name = "Risen Mummy"
+sprite = "pharaoh_mummy"
+animation_type = "humanoid"
+description = "A mummified servant of Kha'reth, risen to defend its master."
+
+[pharaoh_mummy.stats]
+level = 30
+max_hp = 25
+damage = 4
+attack_range = 1
+aggro_range = 8
+chase_range = 12
+move_cooldown_ms = 400
+attack_cooldown_ms = 1500
+respawn_time_ms = 0
+
+[pharaoh_mummy.rewards]
+exp_base = 30
+gold_min = 0
+gold_max = 0
+
+[pharaoh_mummy.behaviors]
+hostile = true
+
+# =============================================================================
+# Pharaoh Skeleton - Phase 2 Minion (stronger)
+# =============================================================================
+
+[pharaoh_skeleton]
+display_name = "Cursed Skeleton"
+sprite = "pharaoh_skeleton"
+animation_type = "humanoid"
+description = "A skeletal warrior bound by Kha'reth's dark magic."
+
+[pharaoh_skeleton.stats]
+level = 35
+max_hp = 35
+damage = 5
+attack_range = 1
+aggro_range = 8
+chase_range = 12
+move_cooldown_ms = 350
+attack_cooldown_ms = 1400
+respawn_time_ms = 0
+
+[pharaoh_skeleton.rewards]
+exp_base = 40
+gold_min = 0
+gold_max = 0
+
+[pharaoh_skeleton.behaviors]
+hostile = true

@@ -14,6 +14,15 @@ type = "dig"
 # The Awakening - Quest Items
 # =============================================================================
 
+[pharaohs_key]
+display_name = "Pharaoh's Key"
+sprite = "pharaohs_key"
+description = "An ancient key inscribed with hieroglyphs. It hums with dark energy."
+category = "quest"
+max_stack = 1
+base_price = 0
+sellable = false
+
 [resonance_lens]
 display_name = "Resonance Lens"
 sprite = "resonance_lens"

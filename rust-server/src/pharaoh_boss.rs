@@ -275,7 +275,7 @@ impl PharaohBossState {
                     events.push(BossEvent::AoeDamage {
                         instance_id: self.instance_id.clone(),
                         tiles,
-                        damage: 15,
+                        damage: 5,
                         effect: "arena_shrink".to_string(),
                     });
                     self.arena_shrink_layer += 1;

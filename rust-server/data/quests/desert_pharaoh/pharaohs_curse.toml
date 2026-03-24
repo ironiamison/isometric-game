@@ -1,0 +1,64 @@
+[quest]
+id = "pharaohs_curse"
+name = "The Pharaoh's Curse"
+description = "Investigate rumors of an ancient entity sealed beneath the desert pyramid. Speak to the locals, uncover the truth, and confront what lies below."
+giver_npc = "desert_merchant_quest"
+level_required = 50
+repeatable = false
+lua_script = "desert_pharaoh/pharaohs_curse.lua"
+
+[quest.chain]
+# First quest in the desert_pharaoh chain — no previous
+
+[[quest.objectives]]
+id = "talk_merchant"
+type = "talk_to"
+target = "desert_merchant_quest"
+description = "Speak to the Desert Merchant about the pyramid"
+
+[[quest.objectives]]
+id = "talk_elder"
+type = "talk_to"
+target = "nomad_elder"
+description = "Seek the Nomad Elder's knowledge of the legend"
+sequential = true
+
+[[quest.objectives]]
+id = "talk_researcher"
+type = "talk_to"
+target = "tomb_researcher"
+description = "Consult the Tomb Researcher near the pyramid"
+sequential = true
+
+[[quest.objectives]]
+id = "talk_hermit"
+type = "talk_to"
+target = "desert_hermit"
+description = "Find the Desert Hermit and solve the riddle"
+sequential = true
+
+[[quest.objectives]]
+id = "enter_tomb"
+type = "reach_location"
+target = "pharaoh_tomb_entrance"
+count = 1
+description = "Enter the pharaoh's tomb beneath the pyramid"
+sequential = true
+
+[[quest.objectives]]
+id = "defeat_khareth"
+type = "kill_monster"
+target = "khareth_pharaoh"
+count = 1
+description = "Defeat Kha'reth, the Cursed Pharaoh"
+sequential = true
+
+[quest.rewards]
+exp = 1500
+gold = 2000
+
+[quest.dialogue]
+offer = "You're brave to come out here. I've been hearing strange chanting from the pyramid at night... something is stirring beneath the sand."
+accept = "If you're serious about investigating, talk to the Nomad Elder at the oasis. He knows the old stories."
+progress = "Have you spoken to the others? The pyramid holds dark secrets..."
+complete = "You... defeated whatever was down there? The chanting has stopped. The desert feels lighter somehow. Thank you, adventurer."

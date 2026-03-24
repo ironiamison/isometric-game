@@ -40,3 +40,9 @@ radius = 2
 x = 195
 y = 65
 radius = 3
+
+# Pharaoh's Curse - tomb entrance inside pyramid (coordinates TBD)
+[pharaoh_tomb_entrance]
+x = 0
+y = 0
+radius = 2
