@@ -4315,6 +4315,10 @@ impl GameRoom {
                     )
                     .await;
 
+                    // Check pharaoh minion death (player killed a pharaoh minion via combat)
+                    self.check_pharaoh_minion_death(&target_id, inst_id, ct)
+                        .await;
+
                     // Check boss NPC death (player killed the boss)
                     self.check_boss_npc_death(
                         &target_id,
@@ -5475,6 +5479,8 @@ impl GameRoom {
         // Process explosive minion contact explosions
         for (npc_id, instance_id, npc_x, npc_y) in instance_npc_tick.minion_explosions {
             self.check_boss_minion_death(&npc_id, &instance_id, npc_x, npc_y, current_time)
+                .await;
+            self.check_pharaoh_minion_death(&npc_id, &instance_id, current_time)
                 .await;
         }
 
