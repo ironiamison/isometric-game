@@ -13,11 +13,11 @@ lua_script = "progression/adventurer_tier_3.lua"
 previous = "adventurer_tier_2"
 
 [[quest.objectives]]
-id = "kill_pigs"
+id = "kill_piglets"
 type = "kill_monster"
-target = "pig"
+target = "piglet"
 count = 30
-description = "Defeat 30 pigs"
+description = "Defeat 30 piglets"
 
 [[quest.objectives]]
 id = "kill_wild_boars"
