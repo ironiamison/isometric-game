@@ -1148,6 +1148,8 @@ pub struct GameRoom {
     koth_states: RwLock<crate::koth::KothStates>,
     /// Active boss fight sessions: instance_id -> BossState
     boss_states: RwLock<crate::boss::BossStates>,
+    /// Active pharaoh boss fight sessions: instance_id -> PharaohBossState
+    pharaoh_boss_states: RwLock<HashMap<String, crate::pharaoh_boss::PharaohBossState>>,
     /// Database reference for arena stats persistence
     db: Option<Arc<crate::db::Database>>,
     /// Gathering system (fishing)
@@ -1671,6 +1673,7 @@ impl GameRoom {
             )),
             koth_states: RwLock::new(std::collections::HashMap::new()),
             boss_states: RwLock::new(std::collections::HashMap::new()),
+            pharaoh_boss_states: RwLock::new(HashMap::new()),
             db,
             gathering: RwLock::new(gathering),
             woodcutting: RwLock::new(woodcutting),
@@ -6600,6 +6603,7 @@ impl GameRoom {
 
         // Boss fight tick
         self.process_boss_tick(current_time).await;
+        self.process_pharaoh_boss_tick(current_time).await;
 
         // Arena tick: zone detection + state machine
         let arena_start = std::time::Instant::now();
