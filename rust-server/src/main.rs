@@ -4536,6 +4536,34 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
         }
     }
 
+    // Start or join pharaoh boss session if entering pyramid tomb
+    if interior.id == crate::game::boss_tick::PHARAOH_BOSS_MAP_ID {
+        let ct = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        if room.has_pharaoh_boss_session(&instance.id).await {
+            room.add_pharaoh_boss_player(&instance.id, player_id).await;
+        } else {
+            let npcs = instance.npcs.read().await;
+            if let Some(boss_npc) = npcs.values().find(|n| n.prototype_id == "khareth_pharaoh") {
+                room.start_pharaoh_boss_session(
+                    &instance.id,
+                    &boss_npc.id,
+                    boss_npc.hp,
+                    boss_npc.max_hp,
+                    boss_npc.x,
+                    boss_npc.y,
+                    instance.map_width as i32,
+                    instance.map_height as i32,
+                    ct,
+                )
+                .await;
+            }
+        }
+    }
+
     // Send transition message to client
     room.send_to_player(
         player_id,

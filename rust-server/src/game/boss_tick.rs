@@ -6,6 +6,7 @@ use crate::protocol::ServerMessage;
 use rand::Rng;
 
 pub const BOSS_MAP_ID: &str = "desert_boss_cave";
+pub const PHARAOH_BOSS_MAP_ID: &str = "pyramid_tomb";
 
 impl GameRoom {
     /// Process all active boss fight sessions each tick
@@ -830,6 +831,22 @@ impl GameRoom {
             for event in events {
                 self.handle_boss_event(event, current_time).await;
             }
+        }
+    }
+
+    /// Called when a pharaoh minion NPC dies in an instance
+    pub(in crate::game) async fn check_pharaoh_minion_death(
+        &self,
+        npc_id: &str,
+        instance_id: &str,
+        _current_time: u64,
+    ) {
+        if !npc_id.starts_with("pharaoh_minion_") {
+            return;
+        }
+        let mut states = self.pharaoh_boss_states.write().await;
+        if let Some(boss) = states.get_mut(instance_id) {
+            boss.on_minion_died();
         }
     }
 
