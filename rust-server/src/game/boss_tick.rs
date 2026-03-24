@@ -167,15 +167,84 @@ impl GameRoom {
                 delay_ms,
                 effect,
             } => {
-                self.send_to_instance(
-                    &instance_id,
-                    ServerMessage::AoeWarning {
-                        tiles,
-                        delay_ms,
-                        effect,
-                    },
-                )
-                .await;
+                // Pharaoh projectile: find closest player and deal direct damage
+                if let Some(damage_str) = effect.strip_prefix("pharaoh_projectile:") {
+                    let damage: i32 = damage_str.parse().unwrap_or(5);
+                    // Boss position is encoded in tiles[0]
+                    let (boss_x, boss_y) = tiles.first().copied().unwrap_or((0, 0));
+
+                    // Find closest player in the instance
+                    let player_ids = self.get_instance_player_ids(&instance_id).await;
+                    let mut closest: Option<(String, i32, i32, i64)> = None; // (id, x, y, dist_sq)
+
+                    {
+                        let players = self.players.read().await;
+                        for pid in &player_ids {
+                            if let Some(player) = players.get(pid) {
+                                if player.is_dead {
+                                    continue;
+                                }
+                                let dx = (player.x - boss_x) as i64;
+                                let dy = (player.y - boss_y) as i64;
+                                let dist_sq = dx * dx + dy * dy;
+                                if closest.as_ref().map_or(true, |(_, _, _, d)| dist_sq < *d) {
+                                    closest = Some((pid.clone(), player.x, player.y, dist_sq));
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some((target_id, target_x, target_y, _)) = closest {
+                        // Apply damage
+                        let result = {
+                            let mut players = self.players.write().await;
+                            if let Some(player) = players.get_mut(&target_id) {
+                                player.hp = (player.hp - damage).max(0);
+                                let died = player.hp <= 0 && !player.is_dead;
+                                if died {
+                                    player.die(current_time);
+                                }
+                                Some((player.hp, died))
+                            } else {
+                                None
+                            }
+                        };
+
+                        if let Some((target_hp, died)) = result {
+                            if died {
+                                self.broadcast(ServerMessage::PlayerDied {
+                                    id: target_id.clone(),
+                                    killer_id: "pharaoh_boss".to_string(),
+                                }).await;
+                            }
+
+                            // Send DamageEvent with projectile visual
+                            self.send_to_instance(
+                                &instance_id,
+                                ServerMessage::DamageEvent {
+                                    source_id: String::new(),
+                                    target_id: target_id.clone(),
+                                    damage,
+                                    target_hp,
+                                    target_x: target_x as f32,
+                                    target_y: target_y as f32,
+                                    projectile: Some("pharaoh_projectile".to_string()),
+                                },
+                            )
+                            .await;
+                        }
+                    }
+                } else {
+                    self.send_to_instance(
+                        &instance_id,
+                        ServerMessage::AoeWarning {
+                            tiles,
+                            delay_ms,
+                            effect,
+                        },
+                    )
+                    .await;
+                }
             }
             BossEvent::AoeDamage {
                 instance_id,
