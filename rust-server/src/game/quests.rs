@@ -243,12 +243,14 @@ impl GameRoom {
     ) {
         if let Some(quest) = self.quest_registry.get(quest_id).await {
             // Verify the player has all required collect items in their inventory
-            // before completing (items may have been banked after collection)
+            // before completing (items may have been banked after collection).
+            // Skip objectives with consume=false (intermediate items used up before turn-in).
             {
                 let players = self.players.read().await;
                 if let Some(player) = players.get(player_id) {
                     for objective in &quest.objectives {
                         if objective.objective_type == ObjectiveType::CollectItem
+                            && objective.consume
                             && !player.inventory.has_item(&objective.target, objective.count)
                         {
                             tracing::warn!(
@@ -276,7 +278,7 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 for objective in &quest.objectives {
-                    if objective.objective_type == ObjectiveType::CollectItem {
+                    if objective.objective_type == ObjectiveType::CollectItem && objective.consume {
                         player
                             .inventory
                             .remove_item(&objective.target, objective.count);

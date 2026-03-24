@@ -19,6 +19,7 @@ type = "collect_item"
 target = "scrap_leather"
 count = 1
 description = "Obtain an animal hide"
+consume = false
 
 [[quest.objectives]]
 id = "tan_leather"
@@ -26,6 +27,7 @@ type = "collect_item"
 target = "leather"
 count = 1
 description = "Tan the hide into leather at a workbench"
+consume = false
 
 [[quest.objectives]]
 id = "craft_gloves"

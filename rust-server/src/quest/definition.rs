@@ -65,10 +65,18 @@ pub struct RawObjective {
     /// Optional dialogue shown when this objective completes (for talk_to/reach_location)
     #[serde(default)]
     pub dialogue: Option<String>,
+    /// Whether collected items are consumed (removed) on quest turn-in (default: true).
+    /// Set to false for intermediate items that are used up before completion.
+    #[serde(default = "default_consume")]
+    pub consume: bool,
 }
 
 fn default_count() -> i32 {
     1
+}
+
+fn default_consume() -> bool {
+    true
 }
 
 /// Raw reward as it appears in TOML
@@ -155,6 +163,8 @@ pub struct Objective {
     pub sequential: bool,
     /// Optional dialogue shown when this objective completes (for talk_to/reach_location)
     pub dialogue: Option<String>,
+    /// Whether collected items are consumed on quest turn-in
+    pub consume: bool,
 }
 
 impl Objective {
@@ -168,6 +178,7 @@ impl Objective {
             description: raw.description.clone(),
             sequential: raw.sequential,
             dialogue: raw.dialogue.clone(),
+            consume: raw.consume,
         })
     }
 }
