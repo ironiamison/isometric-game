@@ -38,6 +38,7 @@ mod instance;
 mod interior;
 mod koth;
 mod boss;
+mod pharaoh_boss;
 mod interior_registry;
 mod item;
 mod log_buffer;
