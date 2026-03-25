@@ -61,6 +61,12 @@ impl Renderer {
                     }
                 }
                 push_option(&mut options, "Drop");
+                // Mobile: add hotkey assignment options
+                if cfg!(target_os = "android") {
+                    push_option(&mut options, "Hotkey 1");
+                    push_option(&mut options, "Hotkey 2");
+                    push_option(&mut options, "Hotkey 3");
+                }
                 "Item".to_string()
             }
             ContextMenuTarget::Player { id } => {
@@ -205,6 +211,22 @@ impl Renderer {
             ContextMenuTarget::HotkeySlot(_) => {
                 push_option(&mut options, "Clear Slot");
                 "Hotkey Slot".to_string()
+            }
+            ContextMenuTarget::Spell(spell_id) => {
+                let name = crate::game::spell::SPELLS
+                    .iter()
+                    .find(|s| s.id == spell_id)
+                    .map(|s| s.name.to_string())
+                    .or_else(|| {
+                        state.scroll_spell_definitions.iter()
+                            .find(|s| s.id == *spell_id)
+                            .map(|s| s.name.clone())
+                    })
+                    .unwrap_or_else(|| "Spell".to_string());
+                push_option(&mut options, "Hotkey 1");
+                push_option(&mut options, "Hotkey 2");
+                push_option(&mut options, "Hotkey 3");
+                name
             }
             ContextMenuTarget::QuestTracker => {
                 if state.ui_state.quest_tracker_minimized {

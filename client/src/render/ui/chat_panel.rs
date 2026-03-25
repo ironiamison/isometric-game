@@ -6,6 +6,7 @@ use crate::game::{ChatChannel, GameState};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
+use macroquad::window::get_internal_gl;
 
 impl Renderer {
     /// Render the fullscreen chat panel overlay
@@ -29,8 +30,8 @@ impl Renderer {
             macroquad::prelude::Rect::new(0.0, 0.0, sw, sh),
         );
 
-        // Panel dimensions - nearly fullscreen with small margin
-        let margin = 10.0;
+        // Panel dimensions — fullscreen on Android, small margin on desktop
+        let margin = if cfg!(target_os = "android") { 0.0 } else { 10.0 };
         let panel_x = margin;
         let panel_y = margin;
         let panel_w = sw - margin * 2.0;
@@ -234,9 +235,24 @@ impl Renderer {
         let end = total_lines.saturating_sub(scroll_lines_int);
         let start = end.saturating_sub(visible_lines);
 
+        // Scissor clip to message area so text doesn't overflow into tabs/input
+        let physical_w = macroquad::window::screen_width();
+        let physical_h = macroquad::window::screen_height();
+        let scale_x = physical_w / sw;
+        let scale_y = physical_h / sh;
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(Some((
+                ((panel_x + FRAME_THICKNESS) * scale_x) as i32,
+                (messages_y * scale_y) as i32,
+                ((panel_w - FRAME_THICKNESS * 2.0) * scale_x) as i32,
+                (messages_h * scale_y) as i32,
+            )));
+        }
+
         let mut y = messages_y + messages_h - line_height + fractional_offset;
         for i in (start..end).rev() {
-            // Only draw if line is within the message area (with some margin for partial visibility)
             if y >= messages_y - line_height && y <= messages_y + messages_h {
                 let (ref line, color) = all_lines[i];
                 self.draw_text_sharp(line, messages_x, y, font_size, color);
@@ -255,6 +271,13 @@ impl Renderer {
                 14.0,
                 TEXT_DIM,
             );
+        }
+
+        // Disable scissor clipping
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(None);
         }
 
         // Draw scrollbar

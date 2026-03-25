@@ -25,13 +25,16 @@ impl Renderer {
         #[cfg(not(target_os = "android"))]
         let content_height = 306.0 * s;
         #[cfg(target_os = "android")]
-        let content_height = 232.0 * s;
-        let menu_height = (frame_thickness * 2.0 + content_height).min(sh - 40.0);
+        let content_height = 306.0 * s;
 
         // Position at bottom-right, above menu buttons (matching other panels)
         let button_size = MENU_BUTTON_SIZE * s;
         let exp_bar_gap = EXP_BAR_GAP * s;
         let button_area_height = bottom_ui_height(s);
+        // Match quest panel sizing: 314 * s clamped to available space
+        let min_panel_y = 4.0;
+        let max_available_height = sh - button_area_height - 8.0 - min_panel_y;
+        let menu_height = (frame_thickness * 2.0 + content_height).min(max_available_height);
         let menu_x = sw - menu_width - 8.0;
         let menu_y = sh - button_area_height - menu_height - 8.0;
 

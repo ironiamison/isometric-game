@@ -22,10 +22,15 @@ impl Renderer {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
 
-        let panel_width = (500.0 * s).min(sw - 16.0);
-        let panel_height = (450.0 * s).min(sh - 16.0);
-        let panel_x = (sw - panel_width) / 2.0;
-        let panel_y = (sh - panel_height) / 2.0;
+        let (panel_width, panel_height, panel_x, panel_y) = if cfg!(target_os = "android") {
+            (sw, sh, 0.0, 0.0)
+        } else {
+            let pw = (500.0 * s).min(sw - 16.0);
+            let ph = (450.0 * s).min(sh - 16.0);
+            let px = (sw - pw) / 2.0;
+            let py = (sh - ph) / 2.0;
+            (pw, ph, px, py)
+        };
 
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
@@ -34,8 +39,32 @@ impl Renderer {
         self.draw_panel_frame(panel_x, panel_y, panel_width, panel_height);
         self.draw_corner_accents(panel_x, panel_y, panel_width, panel_height);
 
-        let header_h = HEADER_HEIGHT * s;
-        let footer_h = FOOTER_HEIGHT * s;
+        if cfg!(target_os = "android") {
+            let close_size = 22.0;
+            let close_x = panel_x + panel_width - close_size - 6.0;
+            let close_y = panel_y + 6.0;
+            draw_circle(
+                close_x + close_size / 2.0,
+                close_y + close_size / 2.0,
+                close_size / 2.0,
+                Color::new(0.15, 0.1, 0.1, 0.85),
+            );
+            draw_circle_lines(
+                close_x + close_size / 2.0,
+                close_y + close_size / 2.0,
+                close_size / 2.0,
+                1.0,
+                Color::new(0.6, 0.3, 0.3, 0.9),
+            );
+            let cx = close_x + close_size / 2.0;
+            let cy = close_y + close_size / 2.0;
+            draw_line(cx - 4.0, cy - 4.0, cx + 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
+            draw_line(cx + 4.0, cy - 4.0, cx - 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
+            layout.add(UiElementId::FurnaceCloseButton, Rect::new(close_x, close_y, close_size, close_size));
+        }
+
+        let header_h = if cfg!(target_os = "android") { 0.0 } else { HEADER_HEIGHT * s };
+        let footer_h = if cfg!(target_os = "android") { 0.0 } else { FOOTER_HEIGHT * s };
         let tab_h_scaled = TAB_HEIGHT * s;
 
         // ===== HEADER =====
@@ -43,101 +72,105 @@ impl Renderer {
         let header_y = panel_y + FRAME_THICKNESS;
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(header_x, header_y, header_w, header_h, PANEL_BG_MID);
-        draw_line(
-            header_x + 10.0 * s,
-            header_y + header_h,
-            header_x + header_w - 10.0 * s,
-            header_y + header_h,
-            2.0,
-            HEADER_BORDER,
-        );
+        if !cfg!(target_os = "android") {
+            draw_rectangle(header_x, header_y, header_w, header_h, PANEL_BG_MID);
+            draw_line(
+                header_x + 10.0 * s,
+                header_y + header_h,
+                header_x + header_w - 10.0 * s,
+                header_y + header_h,
+                2.0,
+                HEADER_BORDER,
+            );
 
-        // Decorative dots along header border
-        let dot_spacing = 60.0 * s;
-        let num_dots = ((header_w - 40.0 * s) / dot_spacing) as i32;
-        let start_dot_x = header_x + 20.0 * s;
-        for i in 0..num_dots {
-            let dot_x = start_dot_x + i as f32 * dot_spacing;
-            draw_rectangle(
-                dot_x - 1.5,
-                header_y + header_h - 1.5,
-                3.0,
-                3.0,
-                FRAME_ACCENT,
+            // Decorative dots along header border
+            let dot_spacing = 60.0 * s;
+            let num_dots = ((header_w - 40.0 * s) / dot_spacing) as i32;
+            let start_dot_x = header_x + 20.0 * s;
+            for i in 0..num_dots {
+                let dot_x = start_dot_x + i as f32 * dot_spacing;
+                draw_rectangle(
+                    dot_x - 1.5,
+                    header_y + header_h - 1.5,
+                    3.0,
+                    3.0,
+                    FRAME_ACCENT,
+                );
+            }
+
+            // Title
+            let title = if state.ui_state.furnace_station_type == "fire_pit" {
+                "FIRE PIT"
+            } else {
+                "FURNACE"
+            };
+            let title_dims = self.measure_text_sharp(title, 16.0);
+            self.draw_text_sharp(
+                title,
+                header_x + (header_w - title_dims.width) / 2.0,
+                header_y + header_h * 0.65,
+                16.0,
+                TEXT_TITLE,
             );
         }
 
-        // Title
-        let title = if state.ui_state.furnace_station_type == "fire_pit" {
-            "FIRE PIT"
-        } else {
-            "FURNACE"
-        };
-        let title_dims = self.measure_text_sharp(title, 16.0);
-        self.draw_text_sharp(
-            title,
-            header_x + (header_w - title_dims.width) / 2.0,
-            header_y + header_h * 0.65,
-            16.0,
-            TEXT_TITLE,
-        );
-
         // Close button (X)
-        let is_mobile = cfg!(target_os = "android");
-        let close_btn_size = if is_mobile { 32.0 * s } else { 28.0 * s };
-        let close_btn_x = header_x + header_w - close_btn_size - 6.0 * s;
-        let close_btn_y = header_y + (header_h - close_btn_size) / 2.0;
-        let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
-        layout.add(UiElementId::FurnaceCloseButton, close_bounds);
+        if !cfg!(target_os = "android") {
+            let is_mobile = cfg!(target_os = "android");
+            let close_btn_size = if is_mobile { 32.0 * s } else { 28.0 * s };
+            let close_btn_x = header_x + header_w - close_btn_size - 6.0 * s;
+            let close_btn_y = header_y + (header_h - close_btn_size) / 2.0;
+            let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
+            layout.add(UiElementId::FurnaceCloseButton, close_bounds);
 
-        let is_close_hovered = matches!(hovered, Some(UiElementId::FurnaceCloseButton));
-        let (close_bg, close_border) = if is_close_hovered {
-            (
-                Color::new(0.4, 0.15, 0.15, 1.0),
-                Color::new(0.6, 0.2, 0.2, 1.0),
-            )
-        } else {
-            (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
-        };
-        draw_rectangle(
-            close_btn_x,
-            close_btn_y,
-            close_btn_size,
-            close_btn_size,
-            close_border,
-        );
-        draw_rectangle(
-            close_btn_x + 1.0,
-            close_btn_y + 1.0,
-            close_btn_size - 2.0,
-            close_btn_size - 2.0,
-            close_bg,
-        );
-        let cx = close_btn_x + close_btn_size / 2.0;
-        let cy = close_btn_y + close_btn_size / 2.0;
-        let cross = close_btn_size * 0.25;
-        let cross_color = if is_close_hovered {
-            TEXT_TITLE
-        } else {
-            TEXT_DIM
-        };
-        draw_line(
-            cx - cross,
-            cy - cross,
-            cx + cross,
-            cy + cross,
-            2.0,
-            cross_color,
-        );
-        draw_line(
-            cx + cross,
-            cy - cross,
-            cx - cross,
-            cy + cross,
-            2.0,
-            cross_color,
-        );
+            let is_close_hovered = matches!(hovered, Some(UiElementId::FurnaceCloseButton));
+            let (close_bg, close_border) = if is_close_hovered {
+                (
+                    Color::new(0.4, 0.15, 0.15, 1.0),
+                    Color::new(0.6, 0.2, 0.2, 1.0),
+                )
+            } else {
+                (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
+            };
+            draw_rectangle(
+                close_btn_x,
+                close_btn_y,
+                close_btn_size,
+                close_btn_size,
+                close_border,
+            );
+            draw_rectangle(
+                close_btn_x + 1.0,
+                close_btn_y + 1.0,
+                close_btn_size - 2.0,
+                close_btn_size - 2.0,
+                close_bg,
+            );
+            let cx = close_btn_x + close_btn_size / 2.0;
+            let cy = close_btn_y + close_btn_size / 2.0;
+            let cross = close_btn_size * 0.25;
+            let cross_color = if is_close_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_DIM
+            };
+            draw_line(
+                cx - cross,
+                cy - cross,
+                cx + cross,
+                cy + cross,
+                2.0,
+                cross_color,
+            );
+            draw_line(
+                cx + cross,
+                cy - cross,
+                cx - cross,
+                cy + cross,
+                2.0,
+                cross_color,
+            );
+        }
 
         // ===== TABS (only for furnace, not fire pit) =====
         let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
@@ -235,62 +268,78 @@ impl Renderer {
         }
 
         // ===== FOOTER =====
-        let footer_x = panel_x + FRAME_THICKNESS;
-        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
-        let footer_w = panel_width - FRAME_THICKNESS * 2.0;
+        if !cfg!(target_os = "android") {
+            let footer_x = panel_x + FRAME_THICKNESS;
+            let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
+            let footer_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
-        draw_line(
-            footer_x + 10.0 * s,
-            footer_y,
-            footer_x + footer_w - 10.0 * s,
-            footer_y,
-            1.0,
-            HEADER_BORDER,
-        );
-
-        if state.ui_state.crafting_in_progress {
-            self.draw_text_sharp(
-                "[Esc] Cancel",
+            draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
+            draw_line(
                 footer_x + 10.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
+                footer_y,
+                footer_x + footer_w - 10.0 * s,
+                footer_y,
+                1.0,
+                HEADER_BORDER,
             );
-        } else {
-            let action_label = if is_fire_pit {
-                "[Enter] Cook"
+
+            if state.ui_state.crafting_in_progress {
+                self.draw_text_sharp(
+                    "[Esc] Cancel",
+                    footer_x + 10.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
             } else {
-                "[Enter] Smelt"
-            };
-            self.draw_text_sharp(
-                "[Tab] Tab",
-                footer_x + 10.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
-            self.draw_text_sharp(
-                "[W/S] Select",
-                footer_x + 105.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
-            self.draw_text_sharp(
-                "[1/X/A] Qty",
-                footer_x + 220.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
-            self.draw_text_sharp(
-                action_label,
-                footer_x + 335.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
+                let action_label = if is_fire_pit {
+                    "[Enter] Cook"
+                } else {
+                    "[Enter] Smelt"
+                };
+                self.draw_text_sharp(
+                    "[Tab] Tab",
+                    footer_x + 10.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
+                self.draw_text_sharp(
+                    "[W/S] Select",
+                    footer_x + 105.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
+                self.draw_text_sharp(
+                    "[1/X/A] Qty",
+                    footer_x + 220.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
+                self.draw_text_sharp(
+                    action_label,
+                    footer_x + 335.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
+            }
+        }
+
+        // Floating close button (Android only)
+        if cfg!(target_os = "android") {
+            let cs = 22.0;
+            let cx = panel_x + panel_width - cs - 6.0;
+            let cy = panel_y + 6.0;
+            let mid_x = cx + cs / 2.0;
+            let mid_y = cy + cs / 2.0;
+            draw_circle(mid_x, mid_y, cs / 2.0, Color::new(0.15, 0.1, 0.1, 0.85));
+            draw_circle_lines(mid_x, mid_y, cs / 2.0, 1.0, Color::new(0.6, 0.3, 0.3, 0.9));
+            draw_line(mid_x - 4.0, mid_y - 4.0, mid_x + 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
+            draw_line(mid_x + 4.0, mid_y - 4.0, mid_x - 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
+            layout.add(UiElementId::FurnaceCloseButton, Rect::new(cx, cy, cs, cs));
         }
     }
 
@@ -979,5 +1028,6 @@ impl Renderer {
             16.0,
             cancel_text_color,
         );
+
     }
 }

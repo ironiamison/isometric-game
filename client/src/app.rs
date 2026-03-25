@@ -1145,6 +1145,7 @@ pub fn run_game_frame(
             || game_state.ui_state.bank_open
             || game_state.ui_state.chest_open
             || game_state.ui_state.shop_data.is_some()
+            || game_state.ui_state.chat_panel_open
             || in_dialogue
     } else {
         game_state.ui_state.escape_menu_open

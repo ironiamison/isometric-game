@@ -88,10 +88,13 @@ impl Renderer {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
 
-        let panel_width = (650.0 * s).min(sw - 16.0);
-        let panel_height = (450.0 * s).min(sh - 16.0);
-        let panel_x = (sw - panel_width) / 2.0;
-        let panel_y = (sh - panel_height) / 2.0;
+        let (panel_x, panel_y, panel_width, panel_height) = if cfg!(target_os = "android") {
+            (0.0, 0.0, sw, sh)
+        } else {
+            let pw = (650.0 * s).min(sw - 16.0);
+            let ph = (450.0 * s).min(sh - 16.0);
+            ((sw - pw) / 2.0, (sh - ph) / 2.0, pw, ph)
+        };
 
         // Semi-transparent overlay
         draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.588));
@@ -102,7 +105,7 @@ impl Renderer {
 
         // ===== HEADER SECTION =====
         let header_h = HEADER_HEIGHT * s;
-        let footer_h = FOOTER_HEIGHT * s;
+        let footer_h = if cfg!(target_os = "android") { 0.0 } else { FOOTER_HEIGHT * s };
         let header_x = panel_x + FRAME_THICKNESS;
         let header_y = panel_y + FRAME_THICKNESS;
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
@@ -325,6 +328,7 @@ impl Renderer {
         }
 
         // ===== FOOTER SECTION =====
+        if !cfg!(target_os = "android") {
         let footer_x = panel_x + FRAME_THICKNESS;
         let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
         let footer_w = panel_width - FRAME_THICKNESS * 2.0;
@@ -459,6 +463,7 @@ impl Renderer {
                 TEXT_GOLD,
             );
         }
+        } // end !android footer
     }
 
     fn render_recipes_tab(

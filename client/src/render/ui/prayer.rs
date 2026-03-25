@@ -67,7 +67,11 @@ impl Renderer {
 
         // Scaled dimensions
         let panel_width = PRAYER_PANEL_WIDTH * scale;
-        let panel_height = PRAYER_PANEL_HEIGHT * scale;
+        let panel_height = if cfg!(target_os = "android") {
+            (PRAYER_PANEL_HEIGHT - PRAYER_HEADER_HEIGHT) * scale
+        } else {
+            PRAYER_PANEL_HEIGHT * scale
+        };
         let frame_thickness = FRAME_THICKNESS * scale;
         let header_height = PRAYER_HEADER_HEIGHT * scale;
         let tab_height = PRAYER_TAB_HEIGHT * scale;
@@ -87,88 +91,93 @@ impl Renderer {
         self.draw_panel_frame(panel_x, panel_y, panel_width, panel_height);
         self.draw_corner_accents(panel_x, panel_y, panel_width, panel_height);
 
-        // Header
+        // Header (skip on Android for more space)
         let header_x = panel_x + frame_thickness;
         let header_y = panel_y + frame_thickness;
         let header_w = panel_width - frame_thickness * 2.0;
-
-        draw_rectangle(header_x, header_y, header_w, header_height, HEADER_BG);
-        draw_line(
-            header_x + 6.0 * scale,
-            header_y + header_height,
-            header_x + header_w - 6.0 * scale,
-            header_y + header_height,
-            1.0,
-            HEADER_BORDER,
-        );
-
-        // Header text - show active tab name
         let active_tab = state.ui_state.prayer_spell_tab;
-        let header_text = if active_tab == 0 {
-            "Prayer Book"
-        } else {
-            "Spell Book"
-        };
-        let text_dims = self.measure_text_sharp(header_text, 16.0);
-        let text_x = header_x + (header_w - text_dims.width) / 2.0;
-        self.draw_text_sharp(
-            header_text,
-            text_x,
-            header_y + (header_height + 12.0) / 2.0,
-            16.0,
-            TEXT_TITLE,
-        );
 
-        // Help button (?) in header right side
-        let help_btn_size = (header_height - 4.0).min(18.0 * scale);
-        let help_btn_x = header_x + header_w - help_btn_size - 4.0 * scale;
-        let help_btn_y = header_y + (header_height - help_btn_size) / 2.0;
-        let help_id = if active_tab == 0 {
-            UiElementId::PrayerHelpButton
+        let content_start_y = if cfg!(target_os = "android") {
+            header_y
         } else {
-            UiElementId::SpellHelpButton
-        };
-        layout.add(
-            help_id.clone(),
-            Rect::new(help_btn_x, help_btn_y, help_btn_size, help_btn_size),
-        );
+            draw_rectangle(header_x, header_y, header_w, header_height, HEADER_BG);
+            draw_line(
+                header_x + 6.0 * scale,
+                header_y + header_height,
+                header_x + header_w - 6.0 * scale,
+                header_y + header_height,
+                1.0,
+                HEADER_BORDER,
+            );
 
-        let help_hovered = matches!(hovered, Some(id) if *id == help_id);
-        let help_bg = if help_hovered {
-            Color::new(0.25, 0.22, 0.30, 1.0)
-        } else {
-            Color::new(0.15, 0.13, 0.18, 1.0)
+            let header_text = if active_tab == 0 {
+                "Prayer Book"
+            } else {
+                "Spell Book"
+            };
+            let text_dims = self.measure_text_sharp(header_text, 16.0);
+            let text_x = header_x + (header_w - text_dims.width) / 2.0;
+            self.draw_text_sharp(
+                header_text,
+                text_x,
+                header_y + (header_height + 12.0) / 2.0,
+                16.0,
+                TEXT_TITLE,
+            );
+
+            // Help button (?) in header right side
+            let help_btn_size = (header_height - 4.0).min(18.0 * scale);
+            let help_btn_x = header_x + header_w - help_btn_size - 4.0 * scale;
+            let help_btn_y = header_y + (header_height - help_btn_size) / 2.0;
+            let help_id = if active_tab == 0 {
+                UiElementId::PrayerHelpButton
+            } else {
+                UiElementId::SpellHelpButton
+            };
+            layout.add(
+                help_id.clone(),
+                Rect::new(help_btn_x, help_btn_y, help_btn_size, help_btn_size),
+            );
+
+            let help_hovered = matches!(hovered, Some(id) if *id == help_id);
+            let help_bg = if help_hovered {
+                Color::new(0.25, 0.22, 0.30, 1.0)
+            } else {
+                Color::new(0.15, 0.13, 0.18, 1.0)
+            };
+            let help_border = if help_hovered {
+                Color::new(0.6, 0.55, 0.7, 1.0)
+            } else {
+                Color::new(0.35, 0.32, 0.40, 1.0)
+            };
+            draw_rectangle(
+                help_btn_x,
+                help_btn_y,
+                help_btn_size,
+                help_btn_size,
+                help_border,
+            );
+            draw_rectangle(
+                help_btn_x + 1.0,
+                help_btn_y + 1.0,
+                help_btn_size - 2.0,
+                help_btn_size - 2.0,
+                help_bg,
+            );
+            let q_dims = self.measure_text_sharp("?", 14.0);
+            self.draw_text_sharp(
+                "?",
+                help_btn_x + (help_btn_size - q_dims.width) / 2.0,
+                help_btn_y + (help_btn_size + 10.0) / 2.0,
+                14.0,
+                if help_hovered { TEXT_TITLE } else { TEXT_DIM },
+            );
+
+            header_y + header_height
         };
-        let help_border = if help_hovered {
-            Color::new(0.6, 0.55, 0.7, 1.0)
-        } else {
-            Color::new(0.35, 0.32, 0.40, 1.0)
-        };
-        draw_rectangle(
-            help_btn_x,
-            help_btn_y,
-            help_btn_size,
-            help_btn_size,
-            help_border,
-        );
-        draw_rectangle(
-            help_btn_x + 1.0,
-            help_btn_y + 1.0,
-            help_btn_size - 2.0,
-            help_btn_size - 2.0,
-            help_bg,
-        );
-        let q_dims = self.measure_text_sharp("?", 14.0);
-        self.draw_text_sharp(
-            "?",
-            help_btn_x + (help_btn_size - q_dims.width) / 2.0,
-            help_btn_y + (help_btn_size + 10.0) / 2.0,
-            14.0,
-            if help_hovered { TEXT_TITLE } else { TEXT_DIM },
-        );
 
         // Tab bar below header
-        let tab_y = header_y + header_height;
+        let tab_y = content_start_y;
         let tab_w = header_w / 2.0;
         let tab_labels = ["Prayers", "Spells"];
 

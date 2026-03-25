@@ -61,14 +61,17 @@ impl Renderer {
         let bank_grid_w = BANK_COLS as f32 * (slot_size + slot_gap) - slot_gap;
         let inv_grid_w = INV_COLS as f32 * (slot_size + slot_gap) - slot_gap;
         let padding = 12.0 * s;
-        let panel_width =
-            (padding * 2.0 + bank_grid_w + COLUMN_GAP * s + inv_grid_w + FRAME_THICKNESS * 2.0)
-                .min(sw - 16.0);
-        let panel_height = (500.0 * s).min(sh - 16.0);
-        let panel_x = (sw - panel_width) / 2.0;
-        let panel_y = (sh - panel_height) / 2.0;
+        let (panel_x, panel_y, panel_width, panel_height) = if cfg!(target_os = "android") {
+            (0.0, 0.0, sw, sh)
+        } else {
+            let pw =
+                (padding * 2.0 + bank_grid_w + COLUMN_GAP * s + inv_grid_w + FRAME_THICKNESS * 2.0)
+                    .min(sw - 16.0);
+            let ph = (500.0 * s).min(sh - 16.0);
+            ((sw - pw) / 2.0, (sh - ph) / 2.0, pw, ph)
+        };
 
-        let header_h = HEADER_HEIGHT * s;
+        let header_h = if cfg!(target_os = "android") { 0.0 } else { HEADER_HEIGHT * s };
         let gold_bar_h = GOLD_BAR_HEIGHT * s;
 
         // Semi-transparent overlay
@@ -93,15 +96,17 @@ impl Renderer {
             HEADER_BORDER,
         );
 
-        let title = "Bank Vault";
-        let title_dims = self.measure_text_sharp(title, 16.0);
-        self.draw_text_sharp(
-            title,
-            header_x + (header_w - title_dims.width) / 2.0,
-            header_y + header_h * 0.71,
-            16.0,
-            TEXT_TITLE,
-        );
+        if !cfg!(target_os = "android") {
+            let title = "Bank Vault";
+            let title_dims = self.measure_text_sharp(title, 16.0);
+            self.draw_text_sharp(
+                title,
+                header_x + (header_w - title_dims.width) / 2.0,
+                header_y + header_h * 0.71,
+                16.0,
+                TEXT_TITLE,
+            );
+        }
 
         // Help button (?) on the left side of header
         let help_size = 20.0 * s;
@@ -182,20 +187,47 @@ impl Renderer {
         );
 
         // Close button
-        let close_size = 20.0 * s;
-        let close_x = header_x + header_w - close_size - 6.0 * s;
-        let close_y = header_y + (header_h - close_size) / 2.0;
-        let close_rect = Rect::new(close_x, close_y, close_size, close_size);
-        layout.add(UiElementId::BankCloseButton, close_rect);
-        let close_hovered = matches!(hovered, Some(UiElementId::BankCloseButton));
-        let close_color = if close_hovered { TEXT_GOLD } else { TEXT_DIM };
-        self.draw_text_sharp(
-            "X",
-            close_x + (close_size - self.measure_text_sharp("X", 16.0).width) / 2.0,
-            close_y + close_size * 0.71,
-            16.0,
-            close_color,
-        );
+        if !cfg!(target_os = "android") {
+            let close_size = 20.0 * s;
+            let close_x = header_x + header_w - close_size - 6.0 * s;
+            let close_y = header_y + (header_h - close_size) / 2.0;
+            let close_rect = Rect::new(close_x, close_y, close_size, close_size);
+            layout.add(UiElementId::BankCloseButton, close_rect);
+            let close_hovered = matches!(hovered, Some(UiElementId::BankCloseButton));
+            let close_color = if close_hovered { TEXT_GOLD } else { TEXT_DIM };
+            self.draw_text_sharp(
+                "X",
+                close_x + (close_size - self.measure_text_sharp("X", 16.0).width) / 2.0,
+                close_y + close_size * 0.71,
+                16.0,
+                close_color,
+            );
+        }
+
+        // Floating close button for Android
+        if cfg!(target_os = "android") {
+            let close_size = 22.0;
+            let close_x = panel_x + panel_width - close_size - 6.0;
+            let close_y = panel_y + 6.0;
+            draw_circle(
+                close_x + close_size / 2.0,
+                close_y + close_size / 2.0,
+                close_size / 2.0,
+                Color::new(0.15, 0.1, 0.1, 0.85),
+            );
+            draw_circle_lines(
+                close_x + close_size / 2.0,
+                close_y + close_size / 2.0,
+                close_size / 2.0,
+                1.0,
+                Color::new(0.6, 0.3, 0.3, 0.9),
+            );
+            let cx = close_x + close_size / 2.0;
+            let cy = close_y + close_size / 2.0;
+            draw_line(cx - 4.0, cy - 4.0, cx + 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
+            draw_line(cx + 4.0, cy - 4.0, cx - 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
+            layout.add(UiElementId::BankCloseButton, Rect::new(close_x, close_y, close_size, close_size));
+        }
 
         // Content area
         let content_x = panel_x + FRAME_THICKNESS + padding;
@@ -396,6 +428,20 @@ impl Renderer {
                     }
                 }
             }
+        }
+
+        // Floating close button (Android only)
+        if cfg!(target_os = "android") {
+            let cs = 22.0;
+            let cx = panel_x + panel_width - cs - 6.0;
+            let cy = panel_y + 6.0;
+            let mid_x = cx + cs / 2.0;
+            let mid_y = cy + cs / 2.0;
+            draw_circle(mid_x, mid_y, cs / 2.0, Color::new(0.15, 0.1, 0.1, 0.85));
+            draw_circle_lines(mid_x, mid_y, cs / 2.0, 1.0, Color::new(0.6, 0.3, 0.3, 0.9));
+            draw_line(mid_x - 4.0, mid_y - 4.0, mid_x + 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
+            draw_line(mid_x + 4.0, mid_y - 4.0, mid_x - 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
+            layout.add(UiElementId::BankCloseButton, Rect::new(cx, cy, cs, cs));
         }
     }
 
@@ -1321,5 +1367,6 @@ impl Renderer {
             16.0,
             close_text_color,
         );
+
     }
 }

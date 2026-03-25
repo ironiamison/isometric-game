@@ -1096,6 +1096,7 @@ pub enum ContextMenuTarget {
     FarmingPatch { patch_id: String },
     Tile { x: i32, y: i32 },
     HotkeySlot(usize),
+    Spell(String),
     QuestTracker,
 }
 
@@ -1638,7 +1639,7 @@ impl Default for UiState {
             adventurer_selected_tier: 0,
             quest_completed_events: Vec::new(),
             quest_log_open: false,
-            quest_tracker_minimized: false,
+            quest_tracker_minimized: cfg!(target_os = "android"),
             quest_tracker_rect: std::cell::Cell::new(None),
             quest_log_scroll: 0.0,
             quest_catalog: Vec::new(),
@@ -1720,7 +1721,7 @@ impl Default for UiState {
             chest_total_value: 0,
             chest_scroll: 0.0,
             escape_menu_open: false,
-            mobile_menu_expanded: false,
+            mobile_menu_expanded: cfg!(target_os = "android"),
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,
             audio_muted: false,

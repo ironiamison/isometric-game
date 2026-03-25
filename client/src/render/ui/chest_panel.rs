@@ -36,7 +36,7 @@ impl Renderer {
         let padding = 10.0 * s;
 
         // ===== HEADER =====
-        let header_h = HEADER_HEIGHT * s;
+        let header_h = if cfg!(target_os = "android") { 0.0 } else { HEADER_HEIGHT * s };
         let header_y = panel_y + FRAME_THICKNESS;
 
         draw_rectangle(inner_x, header_y, inner_w, header_h, HEADER_BG);
@@ -50,72 +50,75 @@ impl Renderer {
         );
 
         // Title
-        let title = &state.ui_state.chest_name.to_uppercase();
-        let title_dims = self.measure_text_sharp(title, 16.0);
-        self.draw_text_sharp(
-            title,
-            inner_x + (inner_w - title_dims.width) / 2.0,
-            header_y + header_h * 0.71,
-            16.0,
-            TEXT_TITLE,
-        );
+        if !cfg!(target_os = "android") {
+            let title = &state.ui_state.chest_name.to_uppercase();
+            let title_dims = self.measure_text_sharp(title, 16.0);
+            self.draw_text_sharp(
+                title,
+                inner_x + (inner_w - title_dims.width) / 2.0,
+                header_y + header_h * 0.71,
+                16.0,
+                TEXT_TITLE,
+            );
+        }
 
         // Close button (X)
-        let is_mobile = cfg!(target_os = "android");
-        let close_btn_size = if is_mobile { 32.0 * s } else { 28.0 * s };
-        let close_btn_x = inner_x + inner_w - close_btn_size - 6.0 * s;
-        let close_btn_y = header_y + (header_h - close_btn_size) / 2.0;
-        let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
-        layout.add(UiElementId::ChestClose, close_bounds);
+        if !cfg!(target_os = "android") {
+            let close_btn_size = 28.0 * s;
+            let close_btn_x = inner_x + inner_w - close_btn_size - 6.0 * s;
+            let close_btn_y = header_y + (header_h - close_btn_size) / 2.0;
+            let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
+            layout.add(UiElementId::ChestClose, close_bounds);
 
-        let is_close_hovered = matches!(hovered, Some(UiElementId::ChestClose));
-        let (close_bg, close_border) = if is_close_hovered {
-            (
-                Color::new(0.4, 0.15, 0.15, 1.0),
-                Color::new(0.6, 0.2, 0.2, 1.0),
-            )
-        } else {
-            (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
-        };
-        draw_rectangle(
-            close_btn_x,
-            close_btn_y,
-            close_btn_size,
-            close_btn_size,
-            close_border,
-        );
-        draw_rectangle(
-            close_btn_x + 1.0,
-            close_btn_y + 1.0,
-            close_btn_size - 2.0,
-            close_btn_size - 2.0,
-            close_bg,
-        );
+            let is_close_hovered = matches!(hovered, Some(UiElementId::ChestClose));
+            let (close_bg, close_border) = if is_close_hovered {
+                (
+                    Color::new(0.4, 0.15, 0.15, 1.0),
+                    Color::new(0.6, 0.2, 0.2, 1.0),
+                )
+            } else {
+                (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
+            };
+            draw_rectangle(
+                close_btn_x,
+                close_btn_y,
+                close_btn_size,
+                close_btn_size,
+                close_border,
+            );
+            draw_rectangle(
+                close_btn_x + 1.0,
+                close_btn_y + 1.0,
+                close_btn_size - 2.0,
+                close_btn_size - 2.0,
+                close_bg,
+            );
 
-        let cx = close_btn_x + close_btn_size / 2.0;
-        let cy = close_btn_y + close_btn_size / 2.0;
-        let cross = close_btn_size * 0.25;
-        let cross_color = if is_close_hovered {
-            TEXT_TITLE
-        } else {
-            TEXT_DIM
-        };
-        draw_line(
-            cx - cross,
-            cy - cross,
-            cx + cross,
-            cy + cross,
-            2.0,
-            cross_color,
-        );
-        draw_line(
-            cx + cross,
-            cy - cross,
-            cx - cross,
-            cy + cross,
-            2.0,
-            cross_color,
-        );
+            let cx = close_btn_x + close_btn_size / 2.0;
+            let cy = close_btn_y + close_btn_size / 2.0;
+            let cross = close_btn_size * 0.25;
+            let cross_color = if is_close_hovered {
+                TEXT_TITLE
+            } else {
+                TEXT_DIM
+            };
+            draw_line(
+                cx - cross,
+                cy - cross,
+                cx + cross,
+                cy + cross,
+                2.0,
+                cross_color,
+            );
+            draw_line(
+                cx + cross,
+                cy - cross,
+                cx - cross,
+                cy + cross,
+                2.0,
+                cross_color,
+            );
+        }
 
         // ===== FOOTER (total value) =====
         let footer_h = FOOTER_HEIGHT * s;

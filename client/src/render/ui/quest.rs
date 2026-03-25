@@ -902,8 +902,15 @@ impl Renderer {
                 font_size,
                 Color::from_rgba(255, 220, 100, 255),
             );
+            // On Android, use a larger hit area for easier tapping
+            let hit_pad = if cfg!(target_os = "android") { 12.0 } else { 0.0 };
             let text_dims = self.measure_text_sharp(text, font_size);
-            return Some(macroquad::math::Rect::new(text_x, tracker_y, text_width, text_dims.height));
+            return Some(macroquad::math::Rect::new(
+                text_x - hit_pad,
+                tracker_y - hit_pad,
+                text_width + hit_pad * 2.0,
+                text_dims.height + hit_pad * 2.0,
+            ));
         }
 
         let s = state.ui_state.ui_scale;

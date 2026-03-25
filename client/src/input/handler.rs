@@ -234,6 +234,24 @@ pub fn get_map_object_name(gid: u32) -> Option<&'static str> {
 }
 
 /// Save current UI settings to persistent storage
+/// Assign an item or spell to the first available mobile hotkey slot (0-2).
+/// If all slots are full, replaces slot 0 (cycles).
+fn assign_to_mobile_hotkey(state: &mut GameState, binding: crate::game::hotkey::HotkeySlotBinding) {
+    use crate::game::hotkey::HotkeySlotBinding;
+    let preset = state.ui_state.hotkey_bar.active_mut();
+    // Find first empty slot among the 3 mobile slots
+    for i in 0..3 {
+        if matches!(preset.slots[i], HotkeySlotBinding::Empty) {
+            preset.slots[i] = binding;
+            save_current_ui_settings(state);
+            return;
+        }
+    }
+    // All full — replace slot 0
+    preset.slots[0] = binding;
+    save_current_ui_settings(state);
+}
+
 fn save_current_ui_settings(state: &GameState) {
     let settings = UiSettings {
         zoom: state.camera.zoom,
@@ -2022,6 +2040,11 @@ pub struct InputHandler {
     suppress_move_until: f64,
     // Touch controls for mobile devices
     pub touch_controls: TouchControls,
+    // Long-press tracking for right-click on mobile
+    long_press_start: f64,
+    long_press_pos: (f32, f32),
+    long_press_active: bool,
+    long_press_fired: bool,
 }
 
 impl InputHandler {
@@ -2040,6 +2063,10 @@ impl InputHandler {
             auto_path_sent_dir: None,
             suppress_move_until: 0.0,
             touch_controls: TouchControls::new(),
+            long_press_start: 0.0,
+            long_press_pos: (0.0, 0.0),
+            long_press_active: false,
+            long_press_fired: false,
         }
     }
 
@@ -2151,15 +2178,42 @@ impl InputHandler {
     }
 
     fn current_click_target(
-        &self,
+        &mut self,
         layout: &UiLayout,
         mx: f32,
         my: f32,
     ) -> (bool, bool, bool, Option<UiElementId>) {
         let touch_consumed = self.touch_controls.consumed_touch();
         let mouse_clicked = is_mouse_button_pressed(MouseButton::Left) && !touch_consumed;
-        let mouse_right_clicked = is_mouse_button_pressed(MouseButton::Right);
+        let mut mouse_right_clicked = is_mouse_button_pressed(MouseButton::Right);
         let mouse_released = is_mouse_button_released(MouseButton::Left) && !touch_consumed;
+
+        // Long-press detection for right-click on mobile
+        if cfg!(target_os = "android") {
+            let now = macroquad::time::get_time();
+            if mouse_clicked {
+                self.long_press_start = now;
+                self.long_press_pos = (mx, my);
+                self.long_press_active = true;
+                self.long_press_fired = false;
+            }
+            if self.long_press_active && is_mouse_button_down(MouseButton::Left) {
+                let dx = mx - self.long_press_pos.0;
+                let dy = my - self.long_press_pos.1;
+                if dx * dx + dy * dy > 100.0 {
+                    // Moved too far — cancel long press
+                    self.long_press_active = false;
+                } else if !self.long_press_fired && now - self.long_press_start > 0.5 {
+                    // Long press triggered — fire right click
+                    mouse_right_clicked = true;
+                    self.long_press_fired = true;
+                }
+            }
+            if mouse_released || !is_mouse_button_down(MouseButton::Left) {
+                self.long_press_active = false;
+            }
+        }
+
         let clicked_element = if mouse_clicked || mouse_right_clicked || mouse_released {
             layout.hit_test(mx, my).cloned()
         } else {
@@ -3304,6 +3358,7 @@ impl InputHandler {
                         + if is_bones { 1 } else { 0 }
                         + if is_knife { 1 } else { 0 }
                         + if has_deposit { 1 } else { 0 }
+                        + if cfg!(target_os = "android") { 3 } else { 0 } // Hotkey 1-3
                 }
                 ContextMenuTarget::Player { .. } => 4,
                 ContextMenuTarget::Npc { id } => state
@@ -3339,6 +3394,7 @@ impl InputHandler {
                     .unwrap_or(1),
                 ContextMenuTarget::Tile { .. } => 1,
                 ContextMenuTarget::HotkeySlot(_) => 1, // "Clear Slot"
+                ContextMenuTarget::Spell(_) => 3, // "Hotkey 1", "Hotkey 2", "Hotkey 3"
                 ContextMenuTarget::QuestTracker => 1, // "Minimize" or "Expand"
             };
 
@@ -3456,6 +3512,8 @@ impl InputHandler {
                                         None
                                     };
                                     let drop_idx = current_idx;
+                                    current_idx += 1;
+                                    let hotkey_base_idx = if cfg!(target_os = "android") { Some(current_idx) } else { None };
 
                                     if Some(*option_idx) == equip_idx {
                                         commands.push(InputCommand::Equip {
@@ -3494,6 +3552,18 @@ impl InputHandler {
                                                 target_x: None,
                                                 target_y: None,
                                             });
+                                        }
+                                    } else if let Some(base) = hotkey_base_idx {
+                                        if *option_idx >= base && *option_idx < base + 3 {
+                                            let hotkey_slot = *option_idx - base;
+                                            if let Some(Some(slot)) = state.inventory.slots.get(*slot_index) {
+                                                state.ui_state.hotkey_bar.active_mut().slots[hotkey_slot] =
+                                                    crate::game::hotkey::HotkeySlotBinding::Item {
+                                                        item_id: slot.item_id.clone(),
+                                                    };
+                                                save_current_ui_settings(state);
+                                                state.pending_sfx.push("item_put".to_string());
+                                            }
                                         }
                                     }
                                 }
@@ -4423,6 +4493,17 @@ impl InputHandler {
                                         state.ui_state.hotkey_bar.active_mut().slots[*slot_idx] =
                                             crate::game::hotkey::HotkeySlotBinding::Empty;
                                         save_current_ui_settings(state);
+                                    }
+                                }
+                                ContextMenuTarget::Spell(spell_id) => {
+                                    // Options: 0=Hotkey 1, 1=Hotkey 2, 2=Hotkey 3
+                                    if *option_idx < 3 {
+                                        state.ui_state.hotkey_bar.active_mut().slots[*option_idx] =
+                                            crate::game::hotkey::HotkeySlotBinding::Spell {
+                                                spell_id: spell_id.clone(),
+                                            };
+                                        save_current_ui_settings(state);
+                                        state.pending_sfx.push("item_put".to_string());
                                     }
                                 }
                                 ContextMenuTarget::QuestTracker => {
@@ -9720,6 +9801,27 @@ impl InputHandler {
                     }
                     return commands;
                 }
+                UiElementId::SpellSlot(slot_idx) => {
+                    if mouse_right_clicked {
+                        // Right-click on spell opens context menu for hotkey assignment
+                        let spell_id = if *slot_idx < crate::game::spell::SPELLS.len() {
+                            Some(crate::game::spell::SPELLS[*slot_idx].id.to_string())
+                        } else {
+                            let scroll_idx = *slot_idx - crate::game::spell::SPELLS.len();
+                            state.scroll_spell_definitions.get(scroll_idx)
+                                .filter(|s| state.unlocked_spells.contains(&s.id))
+                                .map(|s| s.id.clone())
+                        };
+                        if let Some(id) = spell_id {
+                            state.ui_state.context_menu = Some(ContextMenu {
+                                target: ContextMenuTarget::Spell(id),
+                                x: mx,
+                                y: my,
+                            });
+                        }
+                    }
+                    return commands;
+                }
                 UiElementId::EquipmentSlot(slot_type) => {
                     if mouse_right_clicked {
                         // Right-click on equipment slot opens context menu (if something is equipped)
@@ -10653,12 +10755,19 @@ impl InputHandler {
             }
         }
 
-        // Right-click quest tracker detection
-        if mouse_right_clicked {
-            if let Some(tracker_rect) = state.ui_state.quest_tracker_rect.get() {
-                let (raw_x, raw_y) = mouse_position();
-                let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
-                if tracker_rect.contains(macroquad::math::Vec2::new(mouse_vx, mouse_vy)) {
+        // Quest tracker interaction
+        if let Some(tracker_rect) = state.ui_state.quest_tracker_rect.get() {
+            let (raw_x, raw_y) = mouse_position();
+            let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
+            if tracker_rect.contains(macroquad::math::Vec2::new(mouse_vx, mouse_vy)) {
+                // On Android: tap toggles minimize/expand directly
+                if cfg!(target_os = "android") && mouse_clicked {
+                    state.ui_state.quest_tracker_minimized = !state.ui_state.quest_tracker_minimized;
+                    save_current_ui_settings(state);
+                    return commands;
+                }
+                // Right-click opens context menu (desktop, or long-press on mobile)
+                if mouse_right_clicked {
                     state.ui_state.context_menu = Some(ContextMenu {
                         target: ContextMenuTarget::QuestTracker,
                         x: mouse_vx,
