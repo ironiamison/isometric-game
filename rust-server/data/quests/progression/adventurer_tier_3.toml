@@ -18,6 +18,7 @@ type = "kill_monster"
 target = "piglet"
 count = 30
 description = "Defeat 30 piglets"
+aliases = ["pig"]
 
 [[quest.objectives]]
 id = "kill_wild_boars"

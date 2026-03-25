@@ -997,6 +997,8 @@ mod tests {
                 description: String::new(),
                 sequential: false,
                 dialogue: None,
+                consume: true,
+                aliases: vec![],
             }],
             rewards: Reward::default(),
             dialogue: QuestDialogue::default(),

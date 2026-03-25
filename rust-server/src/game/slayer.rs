@@ -49,8 +49,10 @@ fn slayer_reward_data(reward: &crate::slayer::SlayerRewardDef) -> SlayerRewardDa
     }
 }
 
-fn task_matches_kill(task_monster_id: &str, prototype_id: &str) -> bool {
-    task_monster_id == prototype_id || prototype_id.starts_with(&format!("{}_", task_monster_id))
+fn task_matches_kill(task_monster_id: &str, prototype_id: &str, aliases: &[String]) -> bool {
+    task_monster_id == prototype_id
+        || prototype_id.starts_with(&format!("{}_", task_monster_id))
+        || aliases.iter().any(|a| a == prototype_id)
 }
 
 fn plan_reward_purchase(
@@ -335,7 +337,7 @@ impl GameRoom {
     pub async fn process_slayer_kill(&self, player_id: &str, prototype_id: &str) {
         let mut state = self.get_player_slayer_state(player_id).await;
         let task = match &mut state.current_task {
-            Some(task) if task_matches_kill(&task.monster_id, prototype_id) => task,
+            Some(task) if task_matches_kill(&task.monster_id, prototype_id, &task.aliases) => task,
             _ => return,
         };
 
@@ -557,9 +559,18 @@ mod tests {
 
     #[test]
     fn task_matches_kill_accepts_exact_and_variant_ids() {
-        assert!(task_matches_kill("goblin", "goblin"));
-        assert!(task_matches_kill("goblin", "goblin_champion"));
-        assert!(!task_matches_kill("goblin", "skeleton"));
+        assert!(task_matches_kill("goblin", "goblin", &[]));
+        assert!(task_matches_kill("goblin", "goblin_champion", &[]));
+        assert!(!task_matches_kill("goblin", "skeleton", &[]));
+    }
+
+    #[test]
+    fn task_matches_kill_accepts_aliases() {
+        let aliases = vec!["piglet".to_string()];
+        assert!(task_matches_kill("pig", "pig", &aliases));
+        assert!(task_matches_kill("pig", "piglet", &aliases));
+        assert!(task_matches_kill("pig", "pig_king", &aliases));
+        assert!(!task_matches_kill("pig", "skeleton", &aliases));
     }
 
     #[test]

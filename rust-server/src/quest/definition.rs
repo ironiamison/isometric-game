@@ -69,6 +69,9 @@ pub struct RawObjective {
     /// Set to false for intermediate items that are used up before completion.
     #[serde(default = "default_consume")]
     pub consume: bool,
+    /// Additional entity IDs that count for this objective (e.g. pig also counts for piglet kills)
+    #[serde(default)]
+    pub aliases: Vec<String>,
 }
 
 fn default_count() -> i32 {
@@ -165,6 +168,8 @@ pub struct Objective {
     pub dialogue: Option<String>,
     /// Whether collected items are consumed on quest turn-in
     pub consume: bool,
+    /// Additional entity IDs that count for this objective
+    pub aliases: Vec<String>,
 }
 
 impl Objective {
@@ -179,6 +184,7 @@ impl Objective {
             sequential: raw.sequential,
             dialogue: raw.dialogue.clone(),
             consume: raw.consume,
+            aliases: raw.aliases.clone(),
         })
     }
 }

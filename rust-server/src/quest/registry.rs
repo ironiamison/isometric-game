@@ -379,7 +379,8 @@ impl QuestRegistry {
             if let Some(quest) = quests.get(&quest_id) {
                 for objective in &quest.objectives {
                     if objective.objective_type == ObjectiveType::KillMonster
-                        && objective.target == entity_type
+                        && (objective.target == entity_type
+                            || objective.aliases.iter().any(|a| a == entity_type))
                     {
                         // Check sequential prerequisites
                         if let Some(progress) = player_state.get_quest(&quest_id) {

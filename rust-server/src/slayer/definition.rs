@@ -14,6 +14,9 @@ pub struct SlayerTaskDef {
     pub requires_unlock: bool,
     #[serde(default = "default_xp_per_kill")]
     pub xp_per_kill: i64,
+    /// Additional monster IDs that count for this task (e.g. piglet counts for pig)
+    #[serde(default)]
+    pub aliases: Vec<String>,
 }
 
 fn default_weight() -> i32 {

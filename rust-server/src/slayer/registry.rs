@@ -136,6 +136,7 @@ impl SlayerRegistry {
             xp_per_kill: chosen.xp_per_kill,
             master_id: master_id.to_string(),
             points_on_complete: master.points_per_task,
+            aliases: chosen.aliases.clone(),
         })
     }
 }

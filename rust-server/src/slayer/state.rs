@@ -9,6 +9,8 @@ pub struct SlayerTask {
     pub xp_per_kill: i64,
     pub master_id: String,
     pub points_on_complete: i32,
+    #[serde(default)]
+    pub aliases: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

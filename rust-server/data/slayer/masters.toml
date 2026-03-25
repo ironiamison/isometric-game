@@ -19,6 +19,7 @@ count_min = 15
 count_max = 35
 weight = 10
 xp_per_kill = 10
+aliases = ["piglet"]
 
 [[masters.tasks]]
 monster_id = "slime"
