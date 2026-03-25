@@ -1,0 +1,12 @@
+# PVP Zone Allowlist
+# Only chunks listed here allow player-vs-player combat in the overworld.
+# Chunks are identified by their chunk coordinates (not world tile coordinates).
+# A chunk at (cx, cy) covers world tiles from (cx*32, cy*32) to (cx*32+31, cy*32+31).
+#
+# Example: chunk (2, -6) covers the wilderness cabin area
+#
+# To add a new PVP zone, add a [[zones]] entry with chunk_x and chunk_y.
+
+[[zones]]
+chunk_x = 2
+chunk_y = -6

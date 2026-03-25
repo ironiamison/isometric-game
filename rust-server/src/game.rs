@@ -1196,6 +1196,8 @@ pub struct GameRoom {
     player_trades: RwLock<HashMap<String, String>>,
     /// Pending trade requests: target_id -> (requester_id, tick_when_sent)
     trade_requests: RwLock<HashMap<String, (String, u64)>>,
+    /// Chunk coordinates where PVP is allowed in the overworld (allowlist)
+    pvp_zones: HashSet<(i32, i32)>,
     /// Movement anomaly counters exported through /api/perf.
     movement_anomalies: MovementAnomalyCounters,
     /// Cached name of the all-time highest total level player (gold trophy)
@@ -1645,6 +1647,37 @@ impl GameRoom {
             }
         }
 
+        // Load PVP zone allowlist
+        let pvp_zones: HashSet<(i32, i32)> = match std::fs::read_to_string("data/pvp_zones.toml") {
+            Ok(content) => {
+                #[derive(serde::Deserialize)]
+                struct PvpZoneConfig {
+                    #[serde(default)]
+                    zones: Vec<PvpZoneEntry>,
+                }
+                #[derive(serde::Deserialize)]
+                struct PvpZoneEntry {
+                    chunk_x: i32,
+                    chunk_y: i32,
+                }
+                match toml::from_str::<PvpZoneConfig>(&content) {
+                    Ok(config) => {
+                        let set: HashSet<(i32, i32)> = config.zones.iter().map(|z| (z.chunk_x, z.chunk_y)).collect();
+                        tracing::info!("Loaded {} PVP zone chunks", set.len());
+                        set
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse pvp_zones.toml: {}", e);
+                        HashSet::new()
+                    }
+                }
+            }
+            Err(_) => {
+                tracing::info!("No pvp_zones.toml found, PVP disabled everywhere");
+                HashSet::new()
+            }
+        };
+
         Self {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -1701,12 +1734,19 @@ impl GameRoom {
             trades: RwLock::new(HashMap::new()),
             player_trades: RwLock::new(HashMap::new()),
             trade_requests: RwLock::new(HashMap::new()),
+            pvp_zones,
             movement_anomalies: MovementAnomalyCounters::default(),
             top_level_player_name: RwLock::new(None),
             top_level_value: RwLock::new(0),
             second_level_player_name: RwLock::new(None),
             second_level_value: RwLock::new(0),
         }
+    }
+
+    /// Check if a world position is in a PVP-allowed chunk
+    fn is_pvp_zone(&self, world_x: i32, world_y: i32) -> bool {
+        let chunk = ChunkCoord::from_world(world_x, world_y);
+        self.pvp_zones.contains(&(chunk.x, chunk.y))
     }
 
     /// Load the top two total level players from the database at startup.
@@ -3717,7 +3757,9 @@ impl GameRoom {
                     if player.active && player.hp > 0 {
                         let instances = self.player_instances.read().await;
                         let target_instance = instances.get(forced_id).cloned();
-                        if target_instance == attacker_instance {
+                        // In overworld, PVP is only allowed in designated zones
+                        let pvp_ok = attacker_instance.is_some() || self.is_pvp_zone(attacker_x, attacker_y);
+                        if target_instance == attacker_instance && pvp_ok {
                             target_id = Some(forced_id.to_string());
                             is_npc = false;
                             target_tile_x = player.x;
@@ -3828,6 +3870,10 @@ impl GameRoom {
                             // Only target players in the same context (both overworld, or same instance)
                             let target_instance = instances.get(pid.as_str()).cloned();
                             if target_instance != attacker_instance {
+                                continue;
+                            }
+                            // In overworld, PVP is only allowed in designated zones
+                            if attacker_instance.is_none() && !self.is_pvp_zone(attacker_x, attacker_y) {
                                 continue;
                             }
                             target_id = Some(pid.clone());
@@ -7204,16 +7250,20 @@ impl GameRoom {
             let players = self.players.read().await;
             let instances = self.player_instances.read().await;
             let target_instance = instances.get(target_id.as_str()).cloned();
-            if let Some(target) = players.get(&target_id) {
-                if target.active
-                    && target.hp > 0
-                    && !target.is_dead
-                    && target_instance == caster_instance
-                {
-                    is_npc = false;
-                    target_x = target.x;
-                    target_y = target.y;
-                    target_exists = true;
+            // In overworld, PVP is only allowed in designated zones
+            let pvp_ok = caster_instance.is_some() || self.is_pvp_zone(caster_x, caster_y);
+            if pvp_ok {
+                if let Some(target) = players.get(&target_id) {
+                    if target.active
+                        && target.hp > 0
+                        && !target.is_dead
+                        && target_instance == caster_instance
+                    {
+                        is_npc = false;
+                        target_x = target.x;
+                        target_y = target.y;
+                        target_exists = true;
+                    }
                 }
             }
         }

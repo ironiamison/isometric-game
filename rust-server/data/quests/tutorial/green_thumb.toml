@@ -24,6 +24,7 @@ type = "collect_item"
 target = "harvest_potato"
 count = 3
 description = "Harvest 3 potatoes"
+consume = false
 
 [[quest.objectives]]
 id = "return_to_barley"
