@@ -10137,49 +10137,38 @@ impl Renderer {
             let total_text_w = name_w + level_w;
 
             // Both bars use same width (at least 120, or text width + padding)
-            let bar_width = (total_text_w + padding * 2.0).max(120.0 * s);
+            let mut bar_width = (total_text_w + padding * 2.0).max(120.0 * s);
             let tag_height = 22.0 * s;
-            let bar_height = 18.0 * s;
+            let mut bar_height = 18.0 * s;
 
             if !cfg!(target_os = "android") && self.minimap_preview_enabled(state) {
                 self.render_minimap_preview(state);
             }
 
-            // ===== NAME TAG (top-left) =====
-            let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
-            draw_rectangle(
-                name_tag_x,
-                name_tag_y,
-                bar_width,
-                tag_height,
-                Color::new(0.0, 0.0, 0.0, 0.45),
-            );
+            // Downstream anchors for indicators/chips
+            let bar_x: f32;
+            let prayer_bar_y: f32;
 
-            // Center text in the bar
-            let text_x = name_tag_x + (bar_width - total_text_w) / 2.0;
-            let text_y = (name_tag_y + tag_height * 0.73).floor();
-            self.draw_text_sharp(name, text_x, text_y, font_size, TEXT_TITLE);
-            self.draw_text_sharp(&level_text, text_x + name_w, text_y, font_size, TEXT_DIM);
+            if cfg!(target_os = "android") {
+                // ===== ANDROID: Compact horizontal bars at top-left =====
+                let hud_x = 10.0;
+                let hud_y = 10.0;
+                let compact_h = 18.0;
+                let compact_bar_w = 75.0;
+                let gap = 3.0;
 
-            // Place stat bars directly below the top-left name tag.
-            let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width);
+                // Name tag (compact)
+                let name_tag_w = total_text_w + padding * 2.0;
+                draw_rectangle(hud_x, hud_y, name_tag_w, compact_h, Color::new(0.0, 0.0, 0.0, 0.55));
+                let ntx = hud_x + padding;
+                let nty = (hud_y + compact_h * 0.73).floor();
+                self.draw_text_sharp(name, ntx, nty, font_size, TEXT_TITLE);
+                self.draw_text_sharp(&level_text, ntx + name_w, nty, font_size, TEXT_DIM);
 
-            // ===== HP BAR (below name tag) =====
-            let hp_bar_x = bar_x;
-            let hp_bar_y = stats_y;
-            let hp_ratio = player.hp as f32 / player.max_hp.max(1) as f32;
+                let mut cx = hud_x + name_tag_w + gap;
 
-            draw_rectangle(hp_bar_x, hp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
-            draw_rectangle(
-                hp_bar_x + 1.0,
-                hp_bar_y + 1.0,
-                bar_width - 2.0,
-                bar_height - 2.0,
-                Color::new(0.08, 0.08, 0.10, 1.0),
-            );
-
-            let hp_fill_w = (bar_width - 4.0) * hp_ratio;
-            if hp_fill_w > 0.0 {
+                // HP bar
+                let hp_ratio = player.hp as f32 / player.max_hp.max(1) as f32;
                 let hp_color = if hp_ratio > 0.5 {
                     Color::new(0.2, 0.7, 0.3, 1.0)
                 } else if hp_ratio > 0.25 {
@@ -10187,156 +10176,144 @@ impl Renderer {
                 } else {
                     Color::new(0.8, 0.2, 0.2, 1.0)
                 };
+                draw_rectangle(cx, hud_y, compact_bar_w, compact_h, Color::new(0.08, 0.08, 0.10, 0.85));
+                let hp_fill = (compact_bar_w - 2.0) * hp_ratio;
+                if hp_fill > 0.0 {
+                    draw_rectangle(cx + 1.0, hud_y + 1.0, hp_fill, compact_h - 2.0, hp_color);
+                    draw_rectangle(cx + 1.0, hud_y + 1.0, hp_fill, (compact_h - 2.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.2));
+                }
+                let hp_text = format!("{}/{}", player.hp, player.max_hp);
+                let hp_tw = self.measure_text_sharp(&hp_text, font_size).width;
+                self.draw_text_sharp(&hp_text, (cx + (compact_bar_w - hp_tw) / 2.0).floor(), (hud_y + compact_h * 0.78).floor(), font_size, TEXT_NORMAL);
+                cx += compact_bar_w + gap;
+
+                // MP bar
+                let (mp, max_mp) = (player.mp, player.max_mp);
+                let mp_ratio = if max_mp > 0 { mp as f32 / max_mp as f32 } else { 0.0 };
+                draw_rectangle(cx, hud_y, compact_bar_w, compact_h, Color::new(0.08, 0.08, 0.10, 0.85));
+                let mp_fill = (compact_bar_w - 2.0) * mp_ratio;
+                if mp_fill > 0.0 {
+                    draw_rectangle(cx + 1.0, hud_y + 1.0, mp_fill, compact_h - 2.0, Color::new(0.3, 0.2, 0.8, 1.0));
+                    draw_rectangle(cx + 1.0, hud_y + 1.0, mp_fill, (compact_h - 2.0) / 2.0, Color::new(0.5, 0.4, 0.95, 1.0));
+                }
+                let mp_text = format!("{}/{}", mp, max_mp);
+                let mp_tw = self.measure_text_sharp(&mp_text, font_size).width;
+                self.draw_text_sharp(&mp_text, (cx + (compact_bar_w - mp_tw) / 2.0).floor(), (hud_y + compact_h * 0.78).floor(), font_size, TEXT_NORMAL);
+                cx += compact_bar_w + gap;
+
+                // Prayer bar
+                let prayer_ratio = if state.max_prayer_points > 0 { state.prayer_points as f32 / state.max_prayer_points as f32 } else { 0.0 };
+                draw_rectangle(cx, hud_y, compact_bar_w, compact_h, Color::new(0.08, 0.08, 0.10, 0.85));
+                let pr_fill = (compact_bar_w - 2.0) * prayer_ratio;
+                if pr_fill > 0.0 {
+                    draw_rectangle(cx + 1.0, hud_y + 1.0, pr_fill, compact_h - 2.0, Color::new(0.2, 0.7, 0.85, 1.0));
+                    draw_rectangle(cx + 1.0, hud_y + 1.0, pr_fill, (compact_h - 2.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.2));
+                }
+                let pr_text = format!("{}/{}", state.prayer_points, state.max_prayer_points);
+                let pr_tw = self.measure_text_sharp(&pr_text, font_size).width;
+                self.draw_text_sharp(&pr_text, (cx + (compact_bar_w - pr_tw) / 2.0).floor(), (hud_y + compact_h * 0.78).floor(), font_size, TEXT_NORMAL);
+
+                // Set anchors for downstream indicators/chips
+                bar_x = 10.0;
+                bar_width = 100.0;
+                bar_height = compact_h;
+                prayer_bar_y = hud_y;
+            } else {
+                // ===== DESKTOP: Vertical stacked bars (top-left) =====
+                let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
                 draw_rectangle(
-                    hp_bar_x + 2.0,
-                    hp_bar_y + 2.0,
-                    hp_fill_w,
-                    bar_height - 4.0,
-                    hp_color,
+                    name_tag_x,
+                    name_tag_y,
+                    bar_width,
+                    tag_height,
+                    Color::new(0.0, 0.0, 0.0, 0.45),
                 );
-                draw_rectangle(
-                    hp_bar_x + 2.0,
-                    hp_bar_y + 2.0,
-                    hp_fill_w,
-                    (bar_height - 4.0) / 2.0,
-                    Color::new(1.0, 1.0, 1.0, 0.25),
-                );
+
+                let text_x = name_tag_x + (bar_width - total_text_w) / 2.0;
+                let text_y = (name_tag_y + tag_height * 0.73).floor();
+                self.draw_text_sharp(name, text_x, text_y, font_size, TEXT_TITLE);
+                self.draw_text_sharp(&level_text, text_x + name_w, text_y, font_size, TEXT_DIM);
+
+                let (bx, stats_y) = self.minimap_stats_stack_position(state, bar_width);
+                bar_x = bx;
+
+                // ===== HP BAR =====
+                let hp_bar_x = bar_x;
+                let hp_bar_y = stats_y;
+                let hp_ratio = player.hp as f32 / player.max_hp.max(1) as f32;
+
+                draw_rectangle(hp_bar_x, hp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
+                draw_rectangle(hp_bar_x + 1.0, hp_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+
+                let hp_fill_w = (bar_width - 4.0) * hp_ratio;
+                if hp_fill_w > 0.0 {
+                    let hp_color = if hp_ratio > 0.5 {
+                        Color::new(0.2, 0.7, 0.3, 1.0)
+                    } else if hp_ratio > 0.25 {
+                        Color::new(0.8, 0.6, 0.1, 1.0)
+                    } else {
+                        Color::new(0.8, 0.2, 0.2, 1.0)
+                    };
+                    draw_rectangle(hp_bar_x + 2.0, hp_bar_y + 2.0, hp_fill_w, bar_height - 4.0, hp_color);
+                    draw_rectangle(hp_bar_x + 2.0, hp_bar_y + 2.0, hp_fill_w, (bar_height - 4.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.25));
+                }
+
+                let hp_text = format!("{}/{}", player.hp, player.max_hp);
+                let hp_text_w = self.measure_text_sharp(&hp_text, font_size).width;
+                self.draw_text_sharp(&hp_text, (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(), (hp_bar_y + bar_height * 0.78).floor(), font_size, TEXT_NORMAL);
+
+                // ===== MP BAR =====
+                let mp_bar_x = bar_x;
+                let mp_bar_y = hp_bar_y + bar_height + 4.0 * s;
+                let (mp, max_mp) = state.get_local_player().map(|p| (p.mp, p.max_mp)).unwrap_or((0, 12));
+                let mp_ratio = if max_mp > 0 { mp as f32 / max_mp as f32 } else { 0.0 };
+
+                draw_rectangle(mp_bar_x, mp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
+                draw_rectangle(mp_bar_x + 1.0, mp_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+
+                let mp_fill_w = (bar_width - 4.0) * mp_ratio;
+                if mp_fill_w > 0.0 {
+                    let mp_color = Color::new(0.3, 0.2, 0.8, 1.0);
+                    draw_rectangle(mp_bar_x + 2.0, mp_bar_y + 2.0, mp_fill_w, bar_height - 4.0, mp_color);
+                    draw_rectangle(mp_bar_x + 2.0, mp_bar_y + 2.0, mp_fill_w, (bar_height - 4.0) / 2.0, Color::new(0.5, 0.4, 0.95, 1.0));
+                }
+
+                let mp_text = format!("{}/{}", mp, max_mp);
+                let mp_text_w = self.measure_text_sharp(&mp_text, font_size).width;
+                self.draw_text_sharp(&mp_text, (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(), (mp_bar_y + bar_height * 0.78).floor(), font_size, TEXT_NORMAL);
+
+                // ===== PRAYER BAR =====
+                let prayer_bar_x = bar_x;
+                prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
+                let prayer_ratio = if state.max_prayer_points > 0 { state.prayer_points as f32 / state.max_prayer_points as f32 } else { 0.0 };
+                let prayer_low = prayer_ratio < 0.2 && state.max_prayer_points > 0;
+
+                let border_color = if prayer_low {
+                    let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.3 + 0.7) as f32;
+                    Color::new(0.4 * flash + 0.2, 0.15, 0.15, 1.0)
+                } else {
+                    SLOT_INNER_SHADOW
+                };
+                draw_rectangle(prayer_bar_x, prayer_bar_y, bar_width, bar_height, border_color);
+                draw_rectangle(prayer_bar_x + 1.0, prayer_bar_y + 1.0, bar_width - 2.0, bar_height - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+
+                let prayer_fill_w = (bar_width - 4.0) * prayer_ratio;
+                if prayer_fill_w > 0.0 {
+                    let prayer_color = Color::new(0.2, 0.7, 0.85, 1.0);
+                    draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, bar_height - 4.0, prayer_color);
+                    draw_rectangle(prayer_bar_x + 2.0, prayer_bar_y + 2.0, prayer_fill_w, (bar_height - 4.0) / 2.0, Color::new(1.0, 1.0, 1.0, 0.25));
+                }
+
+                let prayer_text = format!("{}/{}", state.prayer_points, state.max_prayer_points);
+                let prayer_text_w = self.measure_text_sharp(&prayer_text, font_size).width;
+                let prayer_text_color = if prayer_low {
+                    let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.15 + 0.85) as f32;
+                    Color::new(1.0, 0.7 + 0.3 * flash, 0.7 + 0.3 * flash, 1.0)
+                } else {
+                    TEXT_NORMAL
+                };
+                self.draw_text_sharp(&prayer_text, (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(), (prayer_bar_y + bar_height * 0.78).floor(), font_size, prayer_text_color);
             }
-
-            let hp_text = format!("{}/{}", player.hp, player.max_hp);
-            let hp_text_w = self.measure_text_sharp(&hp_text, font_size).width;
-            self.draw_text_sharp(
-                &hp_text,
-                (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(),
-                (hp_bar_y + bar_height * 0.78).floor(),
-                font_size,
-                TEXT_NORMAL,
-            );
-
-            // ===== MP BAR (below HP bar) =====
-            let mp_bar_x = bar_x;
-            let mp_bar_y = hp_bar_y + bar_height + 4.0 * s;
-            let (mp, max_mp) = state
-                .get_local_player()
-                .map(|p| (p.mp, p.max_mp))
-                .unwrap_or((0, 12));
-            let mp_ratio = if max_mp > 0 {
-                mp as f32 / max_mp as f32
-            } else {
-                0.0
-            };
-
-            // Background
-            draw_rectangle(mp_bar_x, mp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
-            draw_rectangle(
-                mp_bar_x + 1.0,
-                mp_bar_y + 1.0,
-                bar_width - 2.0,
-                bar_height - 2.0,
-                Color::new(0.08, 0.08, 0.10, 1.0),
-            );
-
-            // MP fill (blue/purple color)
-            let mp_fill_w = (bar_width - 4.0) * mp_ratio;
-            if mp_fill_w > 0.0 {
-                let mp_color = Color::new(0.3, 0.2, 0.8, 1.0);
-                draw_rectangle(
-                    mp_bar_x + 2.0,
-                    mp_bar_y + 2.0,
-                    mp_fill_w,
-                    bar_height - 4.0,
-                    mp_color,
-                );
-                draw_rectangle(
-                    mp_bar_x + 2.0,
-                    mp_bar_y + 2.0,
-                    mp_fill_w,
-                    (bar_height - 4.0) / 2.0,
-                    Color::new(0.5, 0.4, 0.95, 1.0),
-                );
-            }
-
-            // MP text
-            let mp_text = format!("{}/{}", mp, max_mp);
-            let mp_text_w = self.measure_text_sharp(&mp_text, font_size).width;
-            self.draw_text_sharp(
-                &mp_text,
-                (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(),
-                (mp_bar_y + bar_height * 0.78).floor(),
-                font_size,
-                TEXT_NORMAL,
-            );
-
-            // ===== PRAYER POINTS BAR (below MP bar) =====
-            let prayer_bar_x = bar_x;
-            let prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
-            let prayer_ratio = if state.max_prayer_points > 0 {
-                state.prayer_points as f32 / state.max_prayer_points as f32
-            } else {
-                0.0
-            };
-            let prayer_low = prayer_ratio < 0.2 && state.max_prayer_points > 0;
-
-            // Background with subtle flashing border when low
-            let border_color = if prayer_low {
-                // Subtle flash between normal and slightly red when prayer is low
-                let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.3 + 0.7) as f32;
-                Color::new(0.4 * flash + 0.2, 0.15, 0.15, 1.0)
-            } else {
-                SLOT_INNER_SHADOW
-            };
-            draw_rectangle(
-                prayer_bar_x,
-                prayer_bar_y,
-                bar_width,
-                bar_height,
-                border_color,
-            );
-            draw_rectangle(
-                prayer_bar_x + 1.0,
-                prayer_bar_y + 1.0,
-                bar_width - 2.0,
-                bar_height - 2.0,
-                Color::new(0.08, 0.08, 0.10, 1.0),
-            );
-
-            // Prayer fill (cyan/turquoise color)
-            let prayer_fill_w = (bar_width - 4.0) * prayer_ratio;
-            if prayer_fill_w > 0.0 {
-                let prayer_color = Color::new(0.2, 0.7, 0.85, 1.0);
-                draw_rectangle(
-                    prayer_bar_x + 2.0,
-                    prayer_bar_y + 2.0,
-                    prayer_fill_w,
-                    bar_height - 4.0,
-                    prayer_color,
-                );
-                draw_rectangle(
-                    prayer_bar_x + 2.0,
-                    prayer_bar_y + 2.0,
-                    prayer_fill_w,
-                    (bar_height - 4.0) / 2.0,
-                    Color::new(1.0, 1.0, 1.0, 0.25),
-                );
-            }
-
-            // Prayer text
-            let prayer_text = format!("{}/{}", state.prayer_points, state.max_prayer_points);
-            let prayer_text_w = self.measure_text_sharp(&prayer_text, font_size).width;
-            let prayer_text_color = if prayer_low {
-                // Subtle flash on text when low
-                let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.15 + 0.85) as f32;
-                Color::new(1.0, 0.7 + 0.3 * flash, 0.7 + 0.3 * flash, 1.0)
-            } else {
-                TEXT_NORMAL
-            };
-            self.draw_text_sharp(
-                &prayer_text,
-                (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(),
-                (prayer_bar_y + bar_height * 0.78).floor(),
-                font_size,
-                prayer_text_color,
-            );
 
             // ===== Gathering/Woodcutting status indicator (below prayer bar) =====
             let is_skilling = state.is_gathering || state.is_woodcutting;
@@ -10448,59 +10425,69 @@ impl Renderer {
             self.render_xp_globes(&state.xp_globes, globe_anchor_x, globe_stats_y);
 
             // HUD chips (below gathering/stall/dash indicators): combat style + slayer task side-by-side
+            // Skip on Android to keep mobile HUD clean
             let has_dash_bar = state.dash_cooldown_end > current_time;
-            let chip_row_y = prayer_bar_y
-                + bar_height
-                + 4.0 * s
-                + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
-                + if has_stall_bar { 22.0 * s + 4.0 * s } else { 0.0 }
-                + if has_dash_bar {
-                    22.0 * s + 4.0 * s
-                } else {
-                    0.0
-                };
-            let chip_gap = 4.0 * s;
-            let mut chip_cursor_x = bar_x;
-            let mut chip_row_h: f32 = 0.0;
+            let has_any_chip;
+            let chip_row_h: f32;
 
-            // Slayer task chip (first, if active)
-            let has_slayer_chip = state.ui_state.slayer_current_task.is_some();
-            let slayer_chip_x = chip_cursor_x;
-            let (slayer_w, slayer_h) =
-                self.render_slayer_task_chip(state, slayer_chip_x, chip_row_y);
-            if slayer_w > 0.0 {
-                chip_cursor_x += slayer_w + chip_gap;
-                chip_row_h = chip_row_h.max(slayer_h);
-            }
+            if !cfg!(target_os = "android") {
+                let chip_row_y = prayer_bar_y
+                    + bar_height
+                    + 4.0 * s
+                    + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
+                    + if has_stall_bar { 22.0 * s + 4.0 * s } else { 0.0 }
+                    + if has_dash_bar {
+                        22.0 * s + 4.0 * s
+                    } else {
+                        0.0
+                    };
+                let chip_gap = 4.0 * s;
+                let mut chip_cursor_x = bar_x;
+                let mut crh: f32 = 0.0;
 
-            // Potion buff chips (after slayer task)
-            let mut has_buff_chip = false;
-            for buff in &state.active_potion_buffs {
-                let (buff_w, buff_h) =
-                    self.render_potion_buff_chip(state, buff, chip_cursor_x, chip_row_y);
-                if buff_w > 0.0 {
-                    has_buff_chip = true;
-                    chip_cursor_x += buff_w + chip_gap;
-                    chip_row_h = chip_row_h.max(buff_h);
+                // Slayer task chip (first, if active)
+                let has_slayer_chip = state.ui_state.slayer_current_task.is_some();
+                let slayer_chip_x = chip_cursor_x;
+                let (slayer_w, slayer_h) =
+                    self.render_slayer_task_chip(state, slayer_chip_x, chip_row_y);
+                if slayer_w > 0.0 {
+                    chip_cursor_x += slayer_w + chip_gap;
+                    crh = crh.max(slayer_h);
                 }
-            }
 
-            // Combat style chip (after potion buffs)
-            let (combat_w, combat_h) =
-                self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
-            if combat_w > 0.0 {
-                chip_cursor_x += combat_w + chip_gap;
-                chip_row_h = chip_row_h.max(combat_h);
-            }
+                // Potion buff chips (after slayer task)
+                let mut has_buff_chip = false;
+                for buff in &state.active_potion_buffs {
+                    let (buff_w, buff_h) =
+                        self.render_potion_buff_chip(state, buff, chip_cursor_x, chip_row_y);
+                    if buff_w > 0.0 {
+                        has_buff_chip = true;
+                        chip_cursor_x += buff_w + chip_gap;
+                        crh = crh.max(buff_h);
+                    }
+                }
 
-            let has_any_chip = combat_w > 0.0 || has_slayer_chip || has_buff_chip;
+                // Combat style chip (after potion buffs)
+                let (combat_w, combat_h) =
+                    self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
+                if combat_w > 0.0 {
+                    chip_cursor_x += combat_w + chip_gap;
+                    crh = crh.max(combat_h);
+                }
+
+                has_any_chip = combat_w > 0.0 || has_slayer_chip || has_buff_chip;
+                chip_row_h = crh;
+            } else {
+                has_any_chip = false;
+                chip_row_h = 0.0;
+            }
 
             // XP Drop Feed (below gathering/stall status or MP bar)
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }
                 + if has_stall_bar { 22.0 + 4.0 } else { 0.0 }
                 + if has_dash_bar { 22.0 + 4.0 } else { 0.0 }
                 + if has_any_chip { chip_row_h / s + 4.0 } else { 0.0 };
-            let drop_start_y = mp_bar_y + bar_height + extra_offset + 145.0;
+            let drop_start_y = prayer_bar_y + bar_height + extra_offset + 145.0;
             self.render_xp_drop_feed(&state.xp_drop_feed, 10.0, drop_start_y);
         }
 
@@ -10833,9 +10820,16 @@ impl Renderer {
             }
         }
 
-        // Quick slots and menu buttons - hide on mobile when crafting/shop panel is open
+        // Hide bottom bar on mobile for full-screen skill/bank panels (not menu button panels)
         let hide_bottom_bar = cfg!(target_os = "android")
-            && (state.ui_state.crafting_open || state.ui_state.bank_open);
+            && (state.ui_state.crafting_open
+                || state.ui_state.furnace_open
+                || state.ui_state.anvil_open
+                || state.ui_state.fletching_open
+                || state.ui_state.bank_open
+                || state.ui_state.chest_open
+                || state.ui_state.shop_data.is_some()
+                || state.ui_state.active_dialogue.is_some());
         if !hide_bottom_bar {
             // Quick slots (always visible at bottom, above exp bar)
             self.render_quick_slots(state, hovered, &mut layout);
@@ -10844,44 +10838,7 @@ impl Renderer {
             self.render_menu_buttons(state, hovered, &mut layout);
         }
 
-        // Chat button (top-left, above quest tracker) - mobile only
-        #[cfg(target_os = "android")]
-        {
-            if let Some(tex) = &self.chat_small_icon {
-                let icon_w = tex.width();
-                let icon_h = tex.height();
-                let padding = 6.0;
-                let btn_size = icon_w.max(icon_h) + padding * 2.0;
-                let btn_x = 10.0;
-                let btn_y = 10.0;
-
-                // Circular background
-                let center_x = btn_x + btn_size / 2.0;
-                let center_y = btn_y + btn_size / 2.0;
-                let radius = btn_size / 2.0;
-                draw_circle(center_x, center_y, radius, Color::new(0.1, 0.1, 0.13, 0.85));
-                draw_circle_lines(
-                    center_x,
-                    center_y,
-                    radius,
-                    1.0,
-                    Color::new(0.557, 0.424, 0.267, 1.0),
-                );
-
-                // Icon at original size (no scaling)
-                draw_texture(
-                    tex,
-                    btn_x + (btn_size - icon_w) / 2.0,
-                    btn_y + (btn_size - icon_h) / 2.0,
-                    WHITE,
-                );
-
-                layout.add(
-                    UiElementId::ChatButton,
-                    macroquad::prelude::Rect::new(btn_x, btn_y, btn_size, btn_size),
-                );
-            }
-        }
+        // Chat button — on desktop rendered elsewhere; on Android it's in the collapsible menu bar
 
         // Farming contract tracker (shown in farming area) - left side below stat bars
         if state.farming_contract.is_some() {

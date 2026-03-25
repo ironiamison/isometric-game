@@ -17,6 +17,12 @@ impl Renderer {
         hovered: &Option<UiElementId>,
         layout: &mut UiLayout,
     ) {
+        // On Android, render 3 circular slots above the attack/use buttons instead
+        if cfg!(target_os = "android") {
+            self.render_mobile_quick_slots(state, hovered, layout);
+            return;
+        }
+
         let scale = state.ui_state.ui_scale;
         let slot_size = (QUICK_SLOT_SIZE * scale).max(MIN_SLOT_SIZE);
         let spacing = QUICK_SLOT_SPACING * scale;
@@ -375,6 +381,153 @@ impl Renderer {
                 slot_size,
                 spacing,
             );
+        }
+    }
+
+    /// Render 3 circular quick slots above the attack/use buttons (mobile only)
+    fn render_mobile_quick_slots(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+    ) {
+        // Hide when any panel is open
+        let ui = &state.ui_state;
+        if ui.inventory_open || ui.character_panel_open || ui.skills_open
+            || ui.prayer_book_open || ui.escape_menu_open || ui.quest_log_open
+            || ui.social_open || ui.chat_panel_open || ui.crafting_open
+            || ui.furnace_open || ui.anvil_open || ui.fletching_open
+            || ui.bank_open || ui.chest_open || ui.shop_data.is_some()
+            || state.ui_state.active_dialogue.is_some()
+        {
+            return;
+        }
+
+        let (sw, sh) = virtual_screen_size();
+        let scale = state.ui_state.ui_scale;
+        let active_preset = state.ui_state.hotkey_bar.active();
+        let now = macroquad::time::get_time();
+        let player_mp = state.get_local_player().map(|p| p.mp).unwrap_or(0);
+
+        let radius = 20.0;
+        // Arc around the attack button center (sw-42, sh-120)
+        let attack_cx = sw - 42.0;
+        let attack_cy = sh - 120.0;
+        let arc_dist = 65.0; // distance from attack center to slot center
+        // 3 slots in an arc: left (170°), upper-left (130°), top (90°)
+        let angles: [f32; 3] = [170.0_f32, 130.0, 90.0];
+
+        for i in 0..3 {
+            let angle_rad = angles[i].to_radians();
+            let cx = attack_cx + arc_dist * angle_rad.cos();
+            let cy = attack_cy - arc_dist * angle_rad.sin();
+            let slot_rect = Rect::new(cx - radius, cy - radius, radius * 2.0, radius * 2.0);
+            layout.add(UiElementId::QuickSlot(i), slot_rect);
+
+            let is_hovered = matches!(hovered, Some(UiElementId::QuickSlot(idx)) if *idx == i);
+
+            // Circle background
+            let bg_color = if is_hovered {
+                Color::new(0.25, 0.22, 0.18, 0.85)
+            } else {
+                Color::new(0.1, 0.1, 0.13, 0.75)
+            };
+            draw_circle(cx, cy, radius, bg_color);
+            let border_color = if is_hovered {
+                Color::new(0.557, 0.424, 0.267, 1.0)
+            } else {
+                Color::new(0.35, 0.3, 0.25, 0.8)
+            };
+            draw_circle_lines(cx, cy, radius, 1.5, border_color);
+
+            // Icon area (square inscribed in circle)
+            let icon_size = radius * 1.3;
+            let icon_x = cx - icon_size / 2.0;
+            let icon_y = cy - icon_size / 2.0;
+
+            match &active_preset.slots[i] {
+                HotkeySlotBinding::Empty => {
+                    // Empty slot — just the circle
+                }
+                HotkeySlotBinding::Item { item_id } => {
+                    let inv_slot = state.inventory.find_slot_by_item_id(item_id);
+                    let quantity = inv_slot.and_then(|idx| {
+                        state.inventory.slots.get(idx).and_then(|s| s.as_ref()).map(|s| s.quantity)
+                    });
+                    let has_item = quantity.is_some();
+
+                    if has_item {
+                        self.draw_item_icon(item_id, icon_x, icon_y, icon_size, icon_size, state, false);
+                    } else {
+                        let tint = Color::new(1.0, 1.0, 1.0, 0.3);
+                        self.draw_item_icon_tinted(item_id, icon_x, icon_y, icon_size, icon_size, state, tint);
+                    }
+
+                    // Quantity badge
+                    if let Some(qty) = quantity {
+                        if qty > 1 {
+                            let qty_text = qty.to_string();
+                            self.draw_text_sharp(&qty_text, cx - radius + 4.0, cy + radius - 4.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+                            self.draw_text_sharp(&qty_text, cx - radius + 3.0, cy + radius - 5.0, 16.0, TEXT_NORMAL);
+                        }
+                    }
+                }
+                HotkeySlotBinding::Spell { spell_id } => {
+                    let spell_info: Option<(&str, &str, crate::game::spell::SpellType, i32)> =
+                        SPELLS.iter().find(|s| s.id == spell_id)
+                            .map(|s| (s.id, s.name, s.spell_type, s.mana_cost))
+                            .or_else(|| {
+                                state.scroll_spell_definitions.iter()
+                                    .find(|s| s.id == *spell_id)
+                                    .map(|s| (s.id.as_str(), s.name.as_str(), s.spell_type, s.mana_cost))
+                            });
+
+                    if let Some((id, name, spell_type, mana_cost)) = spell_info {
+                        // Spell icon
+                        if let Some((texture, source_rect)) = self.spell_icons.get(id) {
+                            draw_texture_ex(texture, icon_x, icon_y, WHITE, DrawTextureParams {
+                                source: source_rect,
+                                dest_size: Some(Vec2::new(icon_size, icon_size)),
+                                ..Default::default()
+                            });
+                        } else {
+                            let color = match spell_type {
+                                crate::game::spell::SpellType::Damage => Color::new(0.6, 0.15, 0.15, 0.9),
+                                crate::game::spell::SpellType::Heal => Color::new(0.15, 0.5, 0.15, 0.9),
+                                crate::game::spell::SpellType::Teleport => Color::new(0.2, 0.3, 0.6, 0.9),
+                            };
+                            draw_circle(cx, cy, radius - 4.0, color);
+                            let letter = &name[..1];
+                            let lw = self.measure_text_sharp(letter, 18.0).width;
+                            self.draw_text_sharp(letter, cx - lw / 2.0, cy + 5.0, 18.0, WHITE);
+                        }
+
+                        // Mana cost badge
+                        let mana_text = mana_cost.to_string();
+                        self.draw_text_sharp(&mana_text, cx - radius + 4.0, cy + radius - 4.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
+                        self.draw_text_sharp(&mana_text, cx - radius + 3.0, cy + radius - 5.0, 16.0, Color::new(0.4, 0.6, 1.0, 1.0));
+
+                        // Cooldown overlay
+                        let on_cooldown = state.spell_cooldowns.get(id).map_or(false, |&t| now < t);
+                        let insufficient_mana = player_mp < mana_cost;
+
+                        if on_cooldown {
+                            draw_circle(cx, cy, radius - 1.0, Color::new(0.0, 0.0, 0.0, 0.55));
+                            let remaining = state.spell_cooldowns.get(id).map_or(0.0, |&t| (t - now).max(0.0));
+                            let cd_text = format!("{:.1}", remaining);
+                            let cd_w = self.measure_text_sharp(&cd_text, 16.0).width;
+                            self.draw_text_sharp(&cd_text, cx - cd_w / 2.0, cy + 5.0, 16.0, WHITE);
+                        } else if insufficient_mana {
+                            draw_circle(cx, cy, radius - 1.0, Color::new(0.6, 0.1, 0.1, 0.45));
+                        }
+                    }
+                }
+            }
+
+            // Slot number badge (small, at top)
+            let num_text = (i + 1).to_string();
+            let tw = self.measure_text_sharp(&num_text, 12.0).width;
+            self.draw_text_sharp(&num_text, cx - tw / 2.0, cy - radius + 10.0, 12.0, Color::new(1.0, 1.0, 1.0, 0.5));
         }
     }
 

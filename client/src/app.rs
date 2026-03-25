@@ -1125,17 +1125,35 @@ pub fn run_game_frame(
         || game_state.ui_state.prayer_book_open
         || game_state.ui_state.escape_menu_open
         || game_state.ui_state.crafting_open
+        || game_state.ui_state.furnace_open
+        || game_state.ui_state.anvil_open
+        || game_state.ui_state.fletching_open
+        || game_state.ui_state.bank_open
+        || game_state.ui_state.chest_open
         || game_state.ui_state.shop_data.is_some()
         || game_state.ui_state.quest_log_open
         || game_state.ui_state.social_open
         || game_state.ui_state.chat_panel_open
         || in_dialogue;
-    let hide_direction_controls = game_state.ui_state.escape_menu_open
-        || game_state.ui_state.crafting_open
-        || game_state.ui_state.shop_data.is_some()
-        || game_state.ui_state.quest_log_open
-        || game_state.ui_state.chat_panel_open
-        || in_dialogue;
+    // On Android, only hide d-pad for full-screen crafting interfaces and dialogue
+    // On desktop, also hide for menu panels that overlap the d-pad area
+    let hide_direction_controls = if cfg!(target_os = "android") {
+        game_state.ui_state.crafting_open
+            || game_state.ui_state.furnace_open
+            || game_state.ui_state.anvil_open
+            || game_state.ui_state.fletching_open
+            || game_state.ui_state.bank_open
+            || game_state.ui_state.chest_open
+            || game_state.ui_state.shop_data.is_some()
+            || in_dialogue
+    } else {
+        game_state.ui_state.escape_menu_open
+            || game_state.ui_state.crafting_open
+            || game_state.ui_state.shop_data.is_some()
+            || game_state.ui_state.quest_log_open
+            || game_state.ui_state.chat_panel_open
+            || in_dialogue
+    };
     input_handler.render_touch_controls(
         any_panel_open,
         hide_direction_controls,

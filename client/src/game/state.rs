@@ -1461,6 +1461,8 @@ pub struct UiState {
     pub chest_scroll: f32,
     // Escape menu state
     pub escape_menu_open: bool,
+    // Mobile menu toggle (collapsed/expanded)
+    pub mobile_menu_expanded: bool,
     // Audio settings (synced with AudioManager)
     pub audio_volume: f32,
     pub audio_sfx_volume: f32,
@@ -1718,6 +1720,7 @@ impl Default for UiState {
             chest_total_value: 0,
             chest_scroll: 0.0,
             escape_menu_open: false,
+            mobile_menu_expanded: false,
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,
             audio_muted: false,

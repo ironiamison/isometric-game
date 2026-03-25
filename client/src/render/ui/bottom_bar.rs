@@ -98,23 +98,7 @@ impl Renderer {
     ) {
         let (screen_w, screen_h) = virtual_screen_size();
         let scale = state.ui_state.ui_scale;
-
-        // Scaled dimensions
-        let button_size = MENU_BUTTON_SIZE * scale;
-        let button_spacing = MENU_BUTTON_SPACING * scale;
         let exp_bar_gap = EXP_BAR_GAP * scale;
-
-        // Position at bottom of screen, aligned with quick slots
-        // Floor to integer pixels for crisp pixel art
-        let button_y = (screen_h - exp_bar_gap - button_size).floor();
-
-        // 7 buttons: Inventory, Character, Skills, Prayer, Quest, Social, Settings
-        let num_buttons = 7;
-        let total_width =
-            num_buttons as f32 * button_size + (num_buttons - 1) as f32 * button_spacing;
-
-        // Right-aligned with padding, floor to integer pixels
-        let start_x = (screen_w - total_width - 8.0).floor();
 
         // Buttons with their icon frame indices
         let buttons = [
@@ -159,32 +143,120 @@ impl Renderer {
             ),
         ];
 
-        for (i, (element_id, icon_frame, is_active)) in buttons.iter().enumerate() {
-            // All sizes are integers so x stays on pixel boundaries
-            let x = start_x + i as f32 * (button_size + button_spacing);
-            let y = button_y;
+        if cfg!(target_os = "android") {
+            // ===== ANDROID: Collapsible menu — toggle button at bottom-right, expands left =====
+            let btn_size = 30.0;
+            let btn_spacing = 3.0;
+            let toggle_x = (screen_w - btn_size - 6.0).floor();
+            let toggle_y = (screen_h - exp_bar_gap - btn_size).floor();
 
-            // Register bounds for hit detection
-            let bounds = Rect::new(x, y, button_size, button_size);
-            layout.add(element_id.clone(), bounds);
+            // Draw toggle button (hamburger / X)
+            let expanded = state.ui_state.mobile_menu_expanded;
+            let toggle_bounds = Rect::new(toggle_x, toggle_y, btn_size, btn_size);
+            layout.add(UiElementId::MenuButtonToggle, toggle_bounds);
+            let toggle_hovered = matches!(hovered, Some(UiElementId::MenuButtonToggle));
 
-            // Check if hovered
-            let is_hovered = hovered.as_ref() == Some(element_id);
+            let (toggle_bg, toggle_border) = if expanded || toggle_hovered {
+                (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
+            } else {
+                (SLOT_BG_EMPTY, SLOT_BORDER)
+            };
+            draw_rectangle(toggle_x - 1.0, toggle_y - 1.0, btn_size + 2.0, btn_size + 2.0,
+                Color::new(toggle_border.r, toggle_border.g, toggle_border.b, 0.9));
+            draw_rectangle(toggle_x, toggle_y, btn_size, btn_size,
+                Color::new(toggle_bg.r, toggle_bg.g, toggle_bg.b, 0.85));
 
-            // Draw button with icon
-            self.draw_menu_button_icon_scaled(
-                x,
-                y,
-                button_size,
-                *icon_frame,
-                is_hovered,
-                *is_active,
-                scale,
-            );
+            // Draw hamburger icon (3 lines) or X
+            let line_color = if expanded { TEXT_GOLD } else { TEXT_NORMAL };
+            let cx = toggle_x + btn_size / 2.0;
+            let cy = toggle_y + btn_size / 2.0;
+            if expanded {
+                // X icon
+                draw_line(cx - 5.0, cy - 5.0, cx + 5.0, cy + 5.0, 2.0, line_color);
+                draw_line(cx + 5.0, cy - 5.0, cx - 5.0, cy + 5.0, 2.0, line_color);
+            } else {
+                // Hamburger icon
+                draw_line(cx - 6.0, cy - 4.0, cx + 6.0, cy - 4.0, 2.0, line_color);
+                draw_line(cx - 6.0, cy,       cx + 6.0, cy,       2.0, line_color);
+                draw_line(cx - 6.0, cy + 4.0, cx + 6.0, cy + 4.0, 2.0, line_color);
+            }
 
-            // Draw notification badge on social button if there are pending requests
-            if *element_id == UiElementId::MenuButtonSocial {
-                self.render_social_badge(state, x, y, scale);
+            // Show menu buttons only when expanded, expanding left from toggle
+            if expanded {
+                // Chat button is first (leftmost), then the 7 regular buttons
+                let total_count = buttons.len() + 1; // +1 for chat
+
+                // Chat button (leftmost position)
+                let chat_x = toggle_x - total_count as f32 * (btn_size + btn_spacing);
+                let chat_y = toggle_y;
+                let chat_bounds = Rect::new(chat_x, chat_y, btn_size, btn_size);
+                layout.add(UiElementId::ChatButton, chat_bounds);
+                let chat_hovered = matches!(hovered, Some(UiElementId::ChatButton));
+                let chat_active = state.ui_state.chat_panel_open;
+                // Draw chat button with the chat icon texture
+                let (chat_bg, chat_border) = if chat_active {
+                    (SLOT_HOVER_BG, SLOT_SELECTED_BORDER)
+                } else if chat_hovered {
+                    (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
+                } else {
+                    (SLOT_BG_EMPTY, SLOT_BORDER)
+                };
+                draw_rectangle(chat_x - 1.0, chat_y - 1.0, btn_size + 2.0, btn_size + 2.0,
+                    Color::new(chat_border.r, chat_border.g, chat_border.b, 0.9));
+                draw_rectangle(chat_x, chat_y, btn_size, btn_size,
+                    Color::new(chat_bg.r, chat_bg.g, chat_bg.b, 0.85));
+                if let Some(ref tex) = self.chat_small_icon {
+                    let icon_size = btn_size - 6.0;
+                    let ix = (chat_x + (btn_size - icon_size) / 2.0).floor();
+                    let iy = (chat_y + (btn_size - icon_size) / 2.0).floor();
+                    let tint = if chat_active { TEXT_GOLD } else if chat_hovered { TEXT_TITLE } else { TEXT_NORMAL };
+                    draw_texture_ex(tex, ix, iy, tint, DrawTextureParams {
+                        dest_size: Some(Vec2::new(icon_size, icon_size)),
+                        ..Default::default()
+                    });
+                }
+
+                // Regular menu buttons
+                let num = buttons.len();
+                for (i, (element_id, icon_frame, is_active)) in buttons.iter().enumerate() {
+                    let x = toggle_x - (num - i) as f32 * (btn_size + btn_spacing);
+                    let y = toggle_y;
+
+                    let bounds = Rect::new(x, y, btn_size, btn_size);
+                    layout.add(element_id.clone(), bounds);
+
+                    let is_hovered = hovered.as_ref() == Some(element_id);
+                    self.draw_menu_button_icon_scaled(x, y, btn_size, *icon_frame, is_hovered, *is_active, scale);
+
+                    if *element_id == UiElementId::MenuButtonSocial {
+                        self.render_social_badge(state, x, y, scale);
+                    }
+                }
+            }
+        } else {
+            // ===== DESKTOP: Single row of 7 buttons, right-aligned =====
+            let button_size = MENU_BUTTON_SIZE * scale;
+            let button_spacing = MENU_BUTTON_SPACING * scale;
+            let button_y = (screen_h - exp_bar_gap - button_size).floor();
+
+            let num_buttons = 7;
+            let total_width =
+                num_buttons as f32 * button_size + (num_buttons - 1) as f32 * button_spacing;
+            let start_x = (screen_w - total_width - 8.0).floor();
+
+            for (i, (element_id, icon_frame, is_active)) in buttons.iter().enumerate() {
+                let x = start_x + i as f32 * (button_size + button_spacing);
+                let y = button_y;
+
+                let bounds = Rect::new(x, y, button_size, button_size);
+                layout.add(element_id.clone(), bounds);
+
+                let is_hovered = hovered.as_ref() == Some(element_id);
+                self.draw_menu_button_icon_scaled(x, y, button_size, *icon_frame, is_hovered, *is_active, scale);
+
+                if *element_id == UiElementId::MenuButtonSocial {
+                    self.render_social_badge(state, x, y, scale);
+                }
             }
         }
     }

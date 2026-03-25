@@ -57,7 +57,7 @@ impl Renderer {
         let frame_thickness = FRAME_THICKNESS * s;
         let panel_width = (INV_WIDTH * s).min(sw - 16.0);
         let panel_height_full = 314.0 * s;
-        let button_area_height = MENU_BUTTON_SIZE * s + EXP_BAR_GAP * s;
+        let button_area_height = bottom_ui_height(s);
         let min_panel_y = 4.0;
         let max_available_height = sh - button_area_height - 8.0 - min_panel_y;
         let panel_height = panel_height_full.min(max_available_height);

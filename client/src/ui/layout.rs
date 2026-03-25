@@ -82,6 +82,7 @@ pub enum UiElementId {
     MenuButtonPrayer,
     MenuButtonQuest,
     MenuButtonSettings,
+    MenuButtonToggle,
 
     // Skills Panel
     SkillSlot(usize),

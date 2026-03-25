@@ -107,13 +107,15 @@ pub struct VirtualDPad {
 impl VirtualDPad {
     pub fn new() -> Self {
         let (screen_w, screen_h) = virtual_screen_size();
-        // Position in bottom-left area
-        let center_x = 90.0;
-        let center_y = screen_h - 100.0;
+        // Position in bottom-left area — on Android, use smaller buttons
+        #[cfg(target_os = "android")]
+        let (center_x, center_y, button_size) = (80.0, screen_h - 75.0, 42.0);
+        #[cfg(not(target_os = "android"))]
+        let (center_x, center_y, button_size) = (90.0, screen_h - 100.0, 52.0);
 
         Self {
             center: vec2(center_x, center_y),
-            button_size: 52.0,
+            button_size,
             gap: 2.0,
             current_dir: DPadDirection::None,
             touch_id: None,
@@ -126,7 +128,10 @@ impl VirtualDPad {
     /// Update D-pad position for current screen size
     pub fn update_position(&mut self) {
         let (_, screen_h) = virtual_screen_size();
-        self.center = vec2(90.0, screen_h - 100.0);
+        #[cfg(target_os = "android")]
+        { self.center = vec2(80.0, screen_h - 75.0); }
+        #[cfg(not(target_os = "android"))]
+        { self.center = vec2(90.0, screen_h - 100.0); }
     }
 
     /// Get the button rect for a direction
@@ -755,12 +760,17 @@ impl TouchControls {
     pub fn new() -> Self {
         let (screen_w, screen_h) = virtual_screen_size();
 
-        // Position buttons on the right side of the screen, above menu buttons
-        // Smaller buttons to avoid overlap with bottom UI
-        let attack_x = screen_w - 55.0;
-        let attack_y = screen_h - 130.0;
-        let interact_x = screen_w - 115.0;
-        let interact_y = screen_h - 85.0;
+        // Position buttons on the right side of the screen
+        #[cfg(target_os = "android")]
+        let (attack_x, attack_y, interact_x, interact_y) = (
+            screen_w - 42.0, screen_h - 120.0,
+            screen_w - 100.0, screen_h - 72.0,
+        );
+        #[cfg(not(target_os = "android"))]
+        let (attack_x, attack_y, interact_x, interact_y) = (
+            screen_w - 55.0, screen_h - 130.0,
+            screen_w - 115.0, screen_h - 85.0,
+        );
 
         Self {
             dpad: VirtualDPad::new(),
@@ -817,10 +827,16 @@ impl TouchControls {
 
         // Update positions for current virtual screen size
         let (screen_w, screen_h) = virtual_screen_size();
-        self.attack_button
-            .set_position(screen_w - 55.0, screen_h - 130.0);
-        self.interact_button
-            .set_position(screen_w - 115.0, screen_h - 85.0);
+        #[cfg(target_os = "android")]
+        {
+            self.attack_button.set_position(screen_w - 42.0, screen_h - 120.0);
+            self.interact_button.set_position(screen_w - 100.0, screen_h - 72.0);
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            self.attack_button.set_position(screen_w - 55.0, screen_h - 130.0);
+            self.interact_button.set_position(screen_w - 115.0, screen_h - 85.0);
+        }
         self.dpad.update_position();
 
         // Get all current touches

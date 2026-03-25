@@ -157,7 +157,7 @@ impl Renderer {
 
         // Position panel on right side, above the menu buttons (align with button right edge)
         let inv_x = screen_w - inv_width - 8.0;
-        let button_area_height = button_size + exp_bar_gap;
+        let button_area_height = bottom_ui_height(scale);
 
         // Calculate the minimum Y the panel can reach
         let min_panel_y = 4.0; // Small top margin

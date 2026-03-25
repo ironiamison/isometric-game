@@ -80,7 +80,7 @@ impl Renderer {
 
         // Position panel on right side, above the menu buttons
         let panel_x = screen_w - panel_width - 8.0;
-        let button_area_height = button_size + exp_bar_gap;
+        let button_area_height = bottom_ui_height(scale);
         let panel_y = screen_h - button_area_height - panel_height - 8.0;
 
         // Draw panel frame

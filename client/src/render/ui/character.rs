@@ -86,48 +86,63 @@ impl Renderer {
         let stats_gap = STATS_SECTION_GAP * scale;
         let grid_width = CHARACTER_GRID_WIDTH * scale;
 
-        // Position panel on right side, top-aligned with HP bar, bottom above menu buttons
+        // Position panel on right side, above menu buttons
         let panel_x = screen_w - panel_width - 8.0;
-        let button_area_height = button_size + exp_bar_gap;
-        let panel_top = 45.0; // Align with top of HP bar (below name tag)
+        let button_area_height = bottom_ui_height(scale);
+        let panel_top = if cfg!(target_os = "android") { 2.0 } else { 45.0 };
         let panel_bottom = screen_h - button_area_height - 8.0;
-        let panel_height = (panel_bottom - panel_top).min(panel_height);
+        // On Android, recalculate height without header, shop button, and stats for compact fit
+        let panel_height = if cfg!(target_os = "android") {
+            let h = FRAME_THICKNESS * 2.0
+                + CHARACTER_PANEL_PADDING * 0.5
+                + CHARACTER_GRID_HEIGHT
+                + CHARACTER_PANEL_PADDING * 0.5
+                + COMBAT_STYLE_ROW_HEIGHT
+                + CHARACTER_PANEL_PADDING * 0.5;
+            (h * scale).min(panel_bottom - panel_top)
+        } else {
+            (panel_bottom - panel_top).min(panel_height)
+        };
         let panel_y = panel_bottom - panel_height;
 
         // Draw panel frame
         self.draw_panel_frame(panel_x, panel_y, panel_width, panel_height);
         self.draw_corner_accents(panel_x, panel_y, panel_width, panel_height);
 
-        // Header
+        // Header (skip on Android for more space)
         let header_x = panel_x + frame_thickness;
         let header_y = panel_y + frame_thickness;
         let header_w = panel_width - frame_thickness * 2.0;
 
-        draw_rectangle(header_x, header_y, header_w, header_height, HEADER_BG);
-        draw_line(
-            header_x,
-            header_y + header_height,
-            header_x + header_w,
-            header_y + header_height,
-            1.0,
-            HEADER_BORDER,
-        );
+        let content_y = if cfg!(target_os = "android") {
+            header_y
+        } else {
+            draw_rectangle(header_x, header_y, header_w, header_height, HEADER_BG);
+            draw_line(
+                header_x,
+                header_y + header_height,
+                header_x + header_w,
+                header_y + header_height,
+                1.0,
+                HEADER_BORDER,
+            );
 
-        // Header text (native font size for crisp rendering)
-        let header_text = "Character";
-        let text_dims = self.measure_text_sharp(header_text, 16.0);
-        let text_x = header_x + (header_w - text_dims.width) / 2.0;
-        self.draw_text_sharp(
-            header_text,
-            text_x,
-            (header_y + 17.0 * scale).floor(),
-            16.0,
-            TEXT_TITLE,
-        );
+            let header_text = "Character";
+            let text_dims = self.measure_text_sharp(header_text, 16.0);
+            let text_x = header_x + (header_w - text_dims.width) / 2.0;
+            self.draw_text_sharp(
+                header_text,
+                text_x,
+                (header_y + 17.0 * scale).floor(),
+                16.0,
+                TEXT_TITLE,
+            );
+            header_y + header_height
+        };
 
         // Grid area
         let grid_x = panel_x + frame_thickness + panel_padding;
-        let grid_y = header_y + header_height + panel_padding;
+        let grid_y = content_y + panel_padding;
 
         let slot_step = slot_size + slot_spacing;
 
@@ -203,54 +218,55 @@ impl Renderer {
             }
         }
 
-        // Stats section - to the right of equipment grid
-        let stats_x = grid_x + grid_width + stats_gap;
-        let stats_y = grid_y;
+        // Stats section - to the right of equipment grid (desktop only)
+        if !cfg!(target_os = "android") {
+            let stats_x = grid_x + grid_width + stats_gap;
+            let stats_y = grid_y;
 
-        // Get player stats (native font size for crisp rendering)
-        if let Some(player) = state.get_local_player() {
-            let line_height = 24.0 * scale;
-            // Center stats horizontally in the space right of the equipment grid
-            let available_width = panel_x + panel_width - frame_thickness - stats_x;
-            let label_w = self.measure_text_sharp("DEF", 16.0).width;
-            let gap = 4.0;
-            // Estimate widest value (e.g. "+99")
-            let value_w = self.measure_text_sharp("+99", 16.0).width;
-            let total_stats_w = label_w + gap + value_w;
-            let label_x = stats_x + (available_width - total_stats_w) / 2.0 + 6.0;
-            let value_x = label_x + label_w + gap;
-            let mut text_y = stats_y + 18.0 * scale;
+            if let Some(player) = state.get_local_player() {
+                let line_height = 24.0 * scale;
+                let available_width = panel_x + panel_width - frame_thickness - stats_x;
+                let label_w = self.measure_text_sharp("DEF", 16.0).width;
+                let gap = 4.0;
+                let value_w = self.measure_text_sharp("+99", 16.0).width;
+                let total_stats_w = label_w + gap + value_w;
+                let label_x = stats_x + (available_width - total_stats_w) / 2.0 + 6.0;
+                let value_x = label_x + label_w + gap;
+                let mut text_y = stats_y + 18.0 * scale;
 
-            // Equipment bonuses
-            let atk_bonus = player.attack_bonus(&state.item_registry);
-            let str_bonus = player.strength_bonus(&state.item_registry);
-            let def_bonus = player.defence_bonus(&state.item_registry);
+                let atk_bonus = player.attack_bonus(&state.item_registry);
+                let str_bonus = player.strength_bonus(&state.item_registry);
+                let def_bonus = player.defence_bonus(&state.item_registry);
 
-            // Stats list (font stays at native 16.0 for crisp text)
-            self.draw_text_sharp("ATK", label_x, text_y, 16.0, CATEGORY_EQUIPMENT);
-            let atk_val = format!("+{}", atk_bonus);
-            self.draw_text_sharp(&atk_val, value_x, text_y, 16.0, CATEGORY_EQUIPMENT);
-            text_y += line_height;
+                self.draw_text_sharp("ATK", label_x, text_y, 16.0, CATEGORY_EQUIPMENT);
+                let atk_val = format!("+{}", atk_bonus);
+                self.draw_text_sharp(&atk_val, value_x, text_y, 16.0, CATEGORY_EQUIPMENT);
+                text_y += line_height;
 
-            self.draw_text_sharp("STR", label_x, text_y, 16.0, CATEGORY_CONSUMABLE);
-            let str_val = format!("+{}", str_bonus);
-            self.draw_text_sharp(&str_val, value_x, text_y, 16.0, CATEGORY_CONSUMABLE);
-            text_y += line_height;
+                self.draw_text_sharp("STR", label_x, text_y, 16.0, CATEGORY_CONSUMABLE);
+                let str_val = format!("+{}", str_bonus);
+                self.draw_text_sharp(&str_val, value_x, text_y, 16.0, CATEGORY_CONSUMABLE);
+                text_y += line_height;
 
-            self.draw_text_sharp("DEF", label_x, text_y, 16.0, CATEGORY_MATERIAL);
-            let def_val = format!("+{}", def_bonus);
-            self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
+                self.draw_text_sharp("DEF", label_x, text_y, 16.0, CATEGORY_MATERIAL);
+                let def_val = format!("+{}", def_bonus);
+                self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
+            }
         }
 
         // ===== COMBAT STYLE SELECTOR =====
         let style_row_height = COMBAT_STYLE_ROW_HEIGHT * scale;
         let style_area_width = panel_width - frame_thickness * 2.0 - panel_padding * 2.0;
         let style_x = panel_x + frame_thickness + panel_padding;
+        let shop_offset = if cfg!(target_os = "android") {
+            0.0 // No shop button on mobile
+        } else {
+            SHOP_BUTTON_HEIGHT * scale + panel_padding
+        };
         let style_y = panel_y + panel_height
             - frame_thickness
             - panel_padding
-            - SHOP_BUTTON_HEIGHT * scale
-            - panel_padding
+            - shop_offset
             - style_row_height;
 
         // Label
@@ -314,7 +330,10 @@ impl Renderer {
             );
         }
 
-        // ===== OPEN SHOP BUTTON =====
+        // ===== OPEN SHOP BUTTON (desktop only) =====
+        if cfg!(target_os = "android") {
+            return;
+        }
         let btn_height = 26.0 * scale;
         let btn_width = panel_width - frame_thickness * 2.0 - panel_padding * 2.0;
         let btn_x = panel_x + frame_thickness + panel_padding;

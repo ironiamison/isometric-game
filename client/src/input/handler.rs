@@ -4581,6 +4581,11 @@ impl InputHandler {
                         }
                         return commands;
                     }
+                    UiElementId::MenuButtonToggle => {
+                        audio.play_sfx("enter");
+                        state.ui_state.mobile_menu_expanded = !state.ui_state.mobile_menu_expanded;
+                        return commands;
+                    }
                     UiElementId::ChatButton => {
                         audio.play_sfx("enter");
                         state.ui_state.chat_panel_open = !state.ui_state.chat_panel_open;

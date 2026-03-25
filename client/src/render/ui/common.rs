@@ -129,6 +129,16 @@ pub const MENU_BUTTON_SPACING: f32 = 4.0;
 pub const QUICK_SLOT_SIZE: f32 = 45.0;
 pub const QUICK_SLOT_SPACING: f32 = 4.0;
 
+/// Height of the bottom button area (menu buttons + gap) — used to position panels above it.
+/// On Android the collapsible menu is smaller (30px buttons).
+pub fn bottom_ui_height(scale: f32) -> f32 {
+    if cfg!(target_os = "android") {
+        30.0 + EXP_BAR_GAP * scale
+    } else {
+        MENU_BUTTON_SIZE * scale + EXP_BAR_GAP * scale
+    }
+}
+
 // ============================================================================
 // Shared Types
 // ============================================================================

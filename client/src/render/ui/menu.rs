@@ -31,7 +31,7 @@ impl Renderer {
         // Position at bottom-right, above menu buttons (matching other panels)
         let button_size = MENU_BUTTON_SIZE * s;
         let exp_bar_gap = EXP_BAR_GAP * s;
-        let button_area_height = button_size + exp_bar_gap;
+        let button_area_height = bottom_ui_height(s);
         let menu_x = sw - menu_width - 8.0;
         let menu_y = sh - button_area_height - menu_height - 8.0;
 
