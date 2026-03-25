@@ -112,6 +112,25 @@ impl GameRoom {
                 } else {
                     return;
                 }
+                drop(players);
+
+                // PvP attack auto-actions require a PvP zone (overworld) or instance
+                if action_type == AutoActionType::Attack {
+                    let attacker_instance = self.player_instances.read().await.get(player_id).cloned();
+                    if attacker_instance.is_none() {
+                        let attacker_pos = {
+                            let players = self.players.read().await;
+                            players.get(player_id).map(|p| (p.x, p.y))
+                        };
+                        if let Some((ax, ay)) = attacker_pos {
+                            if !self.is_pvp_zone(ax, ay) {
+                                return;
+                            }
+                        } else {
+                            return;
+                        }
+                    }
+                }
 
                 AutoActionTarget::Player {
                     player_id: target_id.to_string(),

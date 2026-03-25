@@ -57,6 +57,7 @@ impl GameRoom {
                 {
                     player.last_move_vel_x = 0;
                     player.last_move_vel_y = 0;
+                    player.ghost_player_ticks = 0;
                     continue;
                 }
 
@@ -177,8 +178,8 @@ impl GameRoom {
             }
         }
 
-        // (id, target_x, target_y, dx, dy, z, grounded, seq)
-        let pending_moves: Vec<(String, i32, i32, i32, i32, i32, bool, u32)> = {
+        // (id, target_x, target_y, dx, dy, z, grounded, seq, ghost_player_ticks)
+        let pending_moves: Vec<(String, i32, i32, i32, i32, i32, bool, u32, u32)> = {
             let players = self.players.read().await;
             players
                 .values()
@@ -196,6 +197,7 @@ impl GameRoom {
                             player.z,
                             player.grounded,
                             seq,
+                            player.ghost_player_ticks,
                         )
                     })
                 })
@@ -205,11 +207,11 @@ impl GameRoom {
 
         let pending_player_ids: Vec<String> = pending_moves
             .iter()
-            .map(|(id, _, _, _, _, _, _, _)| id.clone())
+            .map(|(id, _, _, _, _, _, _, _, _)| id.clone())
             .collect();
         let pending_move_sequences: HashMap<String, u32> = pending_moves
             .iter()
-            .map(|(id, _, _, _, _, _, _, seq)| (id.clone(), *seq))
+            .map(|(id, _, _, _, _, _, _, seq, _)| (id.clone(), *seq))
             .collect();
 
         let player_instance_map: HashMap<String, String> = {
@@ -258,7 +260,7 @@ impl GameRoom {
         {
             let needed_instances: HashSet<&String> = pending_moves
                 .iter()
-                .filter_map(|(id, _, _, _, _, _, _, _)| player_instance_map.get(id))
+                .filter_map(|(id, _, _, _, _, _, _, _, _)| player_instance_map.get(id))
                 .collect();
 
             for instance_id in needed_instances {
@@ -301,7 +303,8 @@ impl GameRoom {
                               player_z: i32,
                               player_grounded: bool,
                               move_dir: Direction,
-                              record_telemetry: bool|
+                              record_telemetry: bool,
+                              ghosting: bool|
          -> MoveCheck {
             let player_instance = player_instance_map.get(id);
             let is_overworld = player_instance.is_none();
@@ -369,18 +372,20 @@ impl GameRoom {
                 }
             }
 
-            let player_blocked = if is_overworld {
-                overworld_player_positions.contains(&(target_x, target_y))
-            } else {
-                player_instance
-                    .and_then(|instance_id| instance_player_positions.get(instance_id))
-                    .is_some_and(|positions| positions.contains(&(target_x, target_y)))
-            };
-            if player_blocked {
-                if record_telemetry {
-                    tick_telemetry.rejected_player_blocked += 1;
+            if !ghosting {
+                let player_blocked = if is_overworld {
+                    overworld_player_positions.contains(&(target_x, target_y))
+                } else {
+                    player_instance
+                        .and_then(|instance_id| instance_player_positions.get(instance_id))
+                        .is_some_and(|positions| positions.contains(&(target_x, target_y)))
+                };
+                if player_blocked {
+                    if record_telemetry {
+                        tick_telemetry.rejected_player_blocked += 1;
+                    }
+                    return MoveCheck::BlockedPlayer;
                 }
-                return MoveCheck::BlockedPlayer;
             }
 
             let npc_blocked = if is_overworld {
@@ -460,18 +465,29 @@ impl GameRoom {
             MoveCheck::Valid(result_z, result_grounded)
         };
 
+        const GHOST_PLAYER_TICKS_THRESHOLD: u32 = 10; // 0.5s at 20Hz
+
         let mut valid_moves = Vec::new();
         let mut auto_sit_requests = Vec::new();
-        for (id, target_x, target_y, sampled_dx, sampled_dy, player_z, player_grounded, sampled_seq) in pending_moves {
+        let mut ghost_tick_updates: Vec<(String, u32)> = Vec::new();
+        for (id, target_x, target_y, sampled_dx, sampled_dy, player_z, player_grounded, sampled_seq, ghost_ticks) in pending_moves {
             let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
-            match check_move(&id, target_x, target_y, player_z, player_grounded, move_dir, true) {
+            let can_ghost = ghost_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
+            match check_move(&id, target_x, target_y, player_z, player_grounded, move_dir, true, can_ghost) {
                 MoveCheck::Valid(result_z, result_grounded) => {
+                    ghost_tick_updates.push((id.clone(), 0));
                     valid_moves.push((id, target_x, target_y, sampled_dx, sampled_dy, result_z, result_grounded, sampled_seq));
                 }
                 MoveCheck::AutoSit => {
+                    ghost_tick_updates.push((id.clone(), 0));
                     auto_sit_requests.push((id, target_x, target_y, sampled_seq));
                 }
-                _ => {}
+                MoveCheck::BlockedPlayer => {
+                    ghost_tick_updates.push((id, ghost_ticks + 1));
+                }
+                _ => {
+                    ghost_tick_updates.push((id, 0));
+                }
             }
         }
 
@@ -498,6 +514,13 @@ impl GameRoom {
         {
             let mut players = self.players.write().await;
 
+            // Apply ghost player tick counters
+            for (id, new_ghost_ticks) in &ghost_tick_updates {
+                if let Some(player) = players.get_mut(id) {
+                    player.ghost_player_ticks = *new_ghost_ticks;
+                }
+            }
+
             for (id, target_x, target_y, sampled_dx, sampled_dy, result_z, result_grounded, sampled_seq) in valid_moves {
                 if let Some(player) = players.get_mut(&id) {
                     if player.pending_move_seq != Some(sampled_seq) {
@@ -510,6 +533,7 @@ impl GameRoom {
                                     let new_target_y = player.y + new_dy;
                                     let move_dir =
                                         Direction::from_velocity(new_dx as f32, new_dy as f32);
+                                    let re_ghost = player.ghost_player_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
                                     match check_move(
                                         &id,
                                         new_target_x,
@@ -518,6 +542,7 @@ impl GameRoom {
                                         player.grounded,
                                         move_dir,
                                         true,
+                                        re_ghost,
                                     ) {
                                         MoveCheck::Valid(new_z, new_grounded) => {
                                             player.direction = move_dir;

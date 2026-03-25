@@ -421,6 +421,8 @@ pub struct Player {
     pub active_prayers: HashSet<String>,
     /// Current mana points
     pub mp: i32,
+    /// Consecutive ticks this player has been blocked by another player (for ghosting through)
+    pub ghost_player_ticks: u32,
     /// Per-spell cooldown tracking: spell_id -> last_cast_time_ms
     pub spell_cooldowns: HashMap<String, u64>,
     /// Active temporary buffs (from potions etc.), not persisted to DB
@@ -600,6 +602,7 @@ impl Player {
             unlocked_spells: HashSet::new(),
             crafting_state: None,
             active_prayers: HashSet::new(),
+            ghost_player_ticks: 0,
             spell_cooldowns: HashMap::new(),
             active_buffs: Vec::new(),
             bank: item::Bank::new(),
@@ -5794,13 +5797,29 @@ impl GameRoom {
                         }
 
                         // Check same instance context
-                        let same_context = {
+                        let (same_context, attacker_instance) = {
                             let instances = self.player_instances.read().await;
-                            instances.get(pid.as_str()) == instances.get(target_pid.as_str())
+                            let ai = instances.get(pid.as_str()).cloned();
+                            let ti = instances.get(target_pid.as_str()).cloned();
+                            (ai == ti, ai)
                         };
                         if !same_context {
                             self.clear_auto_action(&pid, "interrupted").await;
                             continue;
+                        }
+
+                        // In overworld, stop PvP auto-action if attacker leaves PvP zone
+                        if attacker_instance.is_none() {
+                            let attacker_pos = {
+                                let players = self.players.read().await;
+                                players.get(pid.as_str()).map(|p| (p.x, p.y))
+                            };
+                            if let Some((ax, ay)) = attacker_pos {
+                                if !self.is_pvp_zone(ax, ay) {
+                                    self.clear_auto_action(&pid, "interrupted").await;
+                                    continue;
+                                }
+                            }
                         }
 
                         // Check range and cooldown
