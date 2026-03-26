@@ -8249,6 +8249,9 @@ impl GameRoom {
             player.y = WORLD_SPAWN_Y;
         }
 
+        // Stop gathering (fishing, etc.) on teleport
+        self.handle_stop_gathering(player_id).await;
+
         // Send success result
         self.send_to_player(
             player_id,

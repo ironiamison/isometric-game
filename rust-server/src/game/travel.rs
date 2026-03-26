@@ -221,6 +221,9 @@ impl GameRoom {
                 );
             }
         }
+
+        // Stop gathering (fishing, etc.) on teleport
+        self.handle_stop_gathering(player_id).await;
     }
 
     /// Handle direct waystone teleport (right-click Teleport, no dialogue)
