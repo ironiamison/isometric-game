@@ -236,6 +236,14 @@ impl Renderer {
                 }
                 "Quest Tracker".to_string()
             }
+            ContextMenuTarget::ChatTab => {
+                if state.ui_state.hide_system_in_public {
+                    push_option(&mut options, "Show System Messages");
+                } else {
+                    push_option(&mut options, "Hide System Messages");
+                }
+                "Public Chat".to_string()
+            }
         };
 
         if options.is_empty() {

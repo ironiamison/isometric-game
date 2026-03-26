@@ -19,6 +19,8 @@ pub struct UiSettings {
     pub hotkey_bar: HotkeyBarConfig,
     #[serde(default)]
     pub quest_tracker_minimized: bool,
+    #[serde(default)]
+    pub hide_system_in_public: bool,
 }
 
 impl Default for UiSettings {
@@ -43,6 +45,7 @@ impl Default for UiSettings {
             chat_log_background: true,
             hotkey_bar: HotkeyBarConfig::default(),
             quest_tracker_minimized: false,
+            hide_system_in_public: true,
         }
     }
 }

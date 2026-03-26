@@ -63,6 +63,7 @@ struct ChatLinesCacheKey {
     max_chat_width_x100: i32,
     font_size_x100: i32,
     active_tab: u8,
+    hide_system_in_public: bool,
 }
 
 #[derive(Default)]
@@ -9995,6 +9996,7 @@ impl Renderer {
                     ChatChannel::Global => 1,
                     ChatChannel::System => 2,
                 },
+                hide_system_in_public: state.ui_state.hide_system_in_public,
             };
 
             let rebuild_chat_cache = {
@@ -10007,10 +10009,12 @@ impl Renderer {
                     .ui_state
                     .chat_messages
                     .channel(&state.ui_state.chat_active_tab);
+                let hide_system = state.ui_state.hide_system_in_public
+                    && matches!(state.ui_state.chat_active_tab, ChatChannel::Local);
                 let mut rebuilt_lines: Vec<(String, Color)> = Vec::new();
                 rebuilt_lines.reserve(active_msgs.len() * 2);
 
-                for msg in active_msgs.iter() {
+                for msg in active_msgs.iter().filter(|m| !hide_system || !matches!(m.channel, ChatChannel::System)) {
                     let (color, text) = match msg.channel {
                         ChatChannel::Local => (WHITE, format!("{}: {}", msg.sender_name, msg.text)),
                         ChatChannel::Global => {

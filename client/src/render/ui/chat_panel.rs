@@ -194,11 +194,14 @@ impl Renderer {
         let line_height = 20.0 * s;
         let max_lines = (messages_h / line_height) as usize;
 
+        let hide_system = state.ui_state.hide_system_in_public
+            && matches!(state.ui_state.chat_active_tab, ChatChannel::Local);
         let filtered: Vec<_> = state
             .ui_state
             .chat_messages
             .channel(&state.ui_state.chat_active_tab)
             .iter()
+            .filter(|msg| !hide_system || !matches!(msg.channel, ChatChannel::System))
             .collect();
 
         // Build all wrapped lines with their colors

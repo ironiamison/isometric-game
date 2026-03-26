@@ -1098,6 +1098,7 @@ pub enum ContextMenuTarget {
     HotkeySlot(usize),
     Spell(String),
     QuestTracker,
+    ChatTab,
 }
 
 /// Context menu for right-clicking items
@@ -1513,6 +1514,8 @@ pub struct UiState {
     pub chat_last_seen_local: f64,
     pub chat_last_seen_global: f64,
     pub chat_last_seen_system: f64,
+    // Hide system messages in the Public/Local chat tab
+    pub hide_system_in_public: bool,
     // Tap-to-pathfind (enabled by default on mobile, disabled on desktop)
     pub tap_to_pathfind: bool,
     // Use joystick instead of D-pad for mobile controls
@@ -1760,6 +1763,7 @@ impl Default for UiState {
             chat_last_seen_local: 0.0,
             chat_last_seen_global: 0.0,
             chat_last_seen_system: 0.0,
+            hide_system_in_public: true,
             #[cfg(target_os = "android")]
             tap_to_pathfind: false,
             #[cfg(not(target_os = "android"))]

@@ -264,6 +264,7 @@ fn save_current_ui_settings(state: &GameState) {
         chat_log_background: state.ui_state.chat_log_background,
         hotkey_bar: state.ui_state.hotkey_bar.clone(),
         quest_tracker_minimized: state.ui_state.quest_tracker_minimized,
+        hide_system_in_public: state.ui_state.hide_system_in_public,
     };
     save_ui_settings(&settings);
 }
@@ -2200,10 +2201,10 @@ impl InputHandler {
             if self.long_press_active && is_mouse_button_down(MouseButton::Left) {
                 let dx = mx - self.long_press_pos.0;
                 let dy = my - self.long_press_pos.1;
-                if dx * dx + dy * dy > 100.0 {
-                    // Moved too far — cancel long press
+                if dx * dx + dy * dy > 400.0 {
+                    // Moved too far (>20px) — cancel long press
                     self.long_press_active = false;
-                } else if !self.long_press_fired && now - self.long_press_start > 0.5 {
+                } else if !self.long_press_fired && now - self.long_press_start > 0.4 {
                     // Long press triggered — fire right click
                     mouse_right_clicked = true;
                     self.long_press_fired = true;
@@ -3396,6 +3397,7 @@ impl InputHandler {
                 ContextMenuTarget::HotkeySlot(_) => 1, // "Clear Slot"
                 ContextMenuTarget::Spell(_) => 3, // "Hotkey 1", "Hotkey 2", "Hotkey 3"
                 ContextMenuTarget::QuestTracker => 1, // "Minimize" or "Expand"
+                ContextMenuTarget::ChatTab => 1, // "Hide/Show System Messages"
             };
 
             let menu_width = 140.0; // generous estimate
@@ -4513,6 +4515,13 @@ impl InputHandler {
                                         save_current_ui_settings(state);
                                     }
                                 }
+                                ContextMenuTarget::ChatTab => {
+                                    // Options: 0=Toggle system messages
+                                    if *option_idx == 0 {
+                                        state.ui_state.hide_system_in_public = !state.ui_state.hide_system_in_public;
+                                        save_current_ui_settings(state);
+                                    }
+                                }
                             }
                             return commands;
                         }
@@ -4779,10 +4788,18 @@ impl InputHandler {
                         // Handled by dedicated minimap modal logic below.
                     }
                     UiElementId::ChatTabLocal => {
-                        audio.play_sfx("enter");
-                        state.ui_state.chat_active_tab = ChatChannel::Local;
-                        mark_chat_channel_as_read(state, ChatChannel::Local);
-                        state.ui_state.chat_message_scroll = 0.0;
+                        if mouse_right_clicked {
+                            state.ui_state.context_menu = Some(ContextMenu {
+                                target: ContextMenuTarget::ChatTab,
+                                x: mx,
+                                y: my,
+                            });
+                        } else {
+                            audio.play_sfx("enter");
+                            state.ui_state.chat_active_tab = ChatChannel::Local;
+                            mark_chat_channel_as_read(state, ChatChannel::Local);
+                            state.ui_state.chat_message_scroll = 0.0;
+                        }
                     }
                     UiElementId::ChatTabGlobal => {
                         audio.play_sfx("enter");
