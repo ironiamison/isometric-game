@@ -2559,8 +2559,11 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                                     }
                                                 }
                                                 Message::Close(_) => break,
+                                                Message::Pong(_) => {
+                                                    // Browser auto-pong keeps connection alive even when tab is backgrounded
+                                                    last_app_msg = std::time::Instant::now();
+                                                }
                                                 _ => {
-                                                    // Pong or other control frame — don't reset app timer
                                                     if last_app_msg.elapsed() > Duration::from_secs(45) {
                                                         warn!("Upgraded player {} timed out (no app messages for 45s)", player_id);
                                                         break;
@@ -3413,8 +3416,11 @@ async fn handle_socket(
                         }
                     }
                     Message::Close(_) => break,
+                    Message::Pong(_) => {
+                        // Browser auto-pong keeps connection alive even when tab is backgrounded
+                        last_app_msg = std::time::Instant::now();
+                    }
                     _ => {
-                        // Pong or other control frame — don't reset app timer
                         if last_app_msg.elapsed() > Duration::from_secs(45) {
                             warn!("Player {} timed out (no app messages for 45s)", player_id_clone);
                             break;
