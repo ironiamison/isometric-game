@@ -3538,8 +3538,6 @@ impl Renderer {
         // 1.8. Render gathering marker overlays (fishing spots, etc.)
         self.render_gathering_markers(state);
 
-        // 1.8. Render bonus tile indicators (pulsing glow)
-        self.render_bonus_tiles(state);
 
         // 1.9. Render AOE warning zones and explosion effects (boss fight)
         self.render_aoe_warnings(state);

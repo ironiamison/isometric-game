@@ -4788,18 +4788,10 @@ impl InputHandler {
                         // Handled by dedicated minimap modal logic below.
                     }
                     UiElementId::ChatTabLocal => {
-                        if mouse_right_clicked {
-                            state.ui_state.context_menu = Some(ContextMenu {
-                                target: ContextMenuTarget::ChatTab,
-                                x: mx,
-                                y: my,
-                            });
-                        } else {
-                            audio.play_sfx("enter");
-                            state.ui_state.chat_active_tab = ChatChannel::Local;
-                            mark_chat_channel_as_read(state, ChatChannel::Local);
-                            state.ui_state.chat_message_scroll = 0.0;
-                        }
+                        audio.play_sfx("enter");
+                        state.ui_state.chat_active_tab = ChatChannel::Local;
+                        mark_chat_channel_as_read(state, ChatChannel::Local);
+                        state.ui_state.chat_message_scroll = 0.0;
                     }
                     UiElementId::ChatTabGlobal => {
                         audio.play_sfx("enter");
@@ -9777,6 +9769,20 @@ impl InputHandler {
                             player.animation.set_state(anim_state);
                         }
                     }
+                }
+            }
+        }
+
+        // Handle right-click on chat tab
+        if mouse_right_clicked {
+            if let Some(ref element) = clicked_element {
+                if matches!(element, UiElementId::ChatTabLocal) {
+                    state.ui_state.context_menu = Some(ContextMenu {
+                        target: ContextMenuTarget::ChatTab,
+                        x: mx,
+                        y: my,
+                    });
+                    return commands;
                 }
             }
         }
