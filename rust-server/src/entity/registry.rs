@@ -261,6 +261,14 @@ impl EntityRegistry {
             .or_else(|| parent.map(|p| p.animation_type))
             .unwrap_or_default();
 
+        // Merge tags (child inherits parent tags + adds own)
+        let mut tags: Vec<String> = parent.map(|p| p.tags.clone()).unwrap_or_default();
+        for tag in &raw.tags {
+            if !tags.contains(tag) {
+                tags.push(tag.clone());
+            }
+        }
+
         // Merge behaviors (child overrides if set)
         let behaviors = EntityBehaviors::from(&raw.behaviors);
 
@@ -282,6 +290,7 @@ impl EntityRegistry {
                 .clone()
                 .or_else(|| parent.map(|p| p.description.clone()))
                 .unwrap_or_default(),
+            tags,
             stats,
             rewards,
             loot,

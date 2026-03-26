@@ -59,6 +59,8 @@ pub enum NpcState {
 pub struct PrototypeStats {
     pub display_name: String,
     pub sprite: String,
+    /// Tags for categorizing entities (e.g. "desert", "undead", "beast")
+    pub tags: Vec<String>,
     pub damage: i32,
     pub attack_bonus: i32,
     pub defence_bonus: i32,
@@ -151,6 +153,7 @@ impl Npc {
         let stats = PrototypeStats {
             display_name: prototype.display_name.clone(),
             sprite: prototype.sprite.clone(),
+            tags: prototype.tags.clone(),
             damage: scale_damage(prototype.stats.damage, level),
             attack_bonus: prototype.stats.attack_bonus,
             defence_bonus: prototype.stats.defence_bonus,

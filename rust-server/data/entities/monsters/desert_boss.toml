@@ -11,6 +11,7 @@ sprite = "big_wurm"
 animation_type = "boss_wurm"
 size = 2
 description = "A massive wurm that burrows through the desert sands."
+tags = ["desert"]
 
 [desert_wurm.stats]
 level = 60

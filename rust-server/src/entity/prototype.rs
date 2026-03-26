@@ -252,6 +252,11 @@ pub struct RawEntityPrototype {
     pub animation_type: Option<String>,
     pub description: Option<String>,
 
+    /// Tags for categorizing entities (e.g. "desert", "undead", "beast")
+    /// Used by equipment type bonuses to apply damage multipliers
+    #[serde(default)]
+    pub tags: Vec<String>,
+
     #[serde(default)]
     pub stats: RawEntityStats,
 
@@ -421,6 +426,9 @@ pub struct EntityPrototype {
     pub sprite: String,
     pub animation_type: AnimationType,
     pub description: String,
+
+    /// Tags for categorizing entities (e.g. "desert", "undead", "beast")
+    pub tags: Vec<String>,
 
     pub stats: ResolvedStats,
     pub rewards: ResolvedRewards,

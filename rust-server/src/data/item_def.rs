@@ -81,6 +81,22 @@ pub enum WeaponType {
 }
 
 // ============================================================================
+// Equipment Type Bonuses (damage multipliers against tagged enemies)
+// ============================================================================
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TypeBonus {
+    /// Tag to match against (e.g. "desert", "undead")
+    pub tag: String,
+    /// Percentage strength bonus (e.g. 15 = +15% max hit)
+    #[serde(default)]
+    pub strength_percent: f32,
+    /// Percentage attack bonus (e.g. 10 = +10% accuracy)
+    #[serde(default)]
+    pub attack_percent: f32,
+}
+
+// ============================================================================
 // Equipment Stats
 // ============================================================================
 
@@ -164,6 +180,10 @@ pub struct EquipmentStats {
     /// Ranged strength bonus — added to max hit for ranged attacks
     #[serde(default)]
     pub ranged_strength_bonus: i32,
+
+    /// Damage/accuracy bonuses against enemies with specific tags
+    #[serde(default)]
+    pub type_bonuses: Vec<TypeBonus>,
 }
 
 // ============================================================================

@@ -546,6 +546,10 @@ attack_bonus = 28
 strength_bonus = 24
 defence_bonus = 0
 
+[[wurm_blade.equipment.type_bonuses]]
+tag = "desert"
+strength_percent = 15.0
+
 [steel_sword]
 display_name = "Steel Sword"
 sprite = "steel_sword"

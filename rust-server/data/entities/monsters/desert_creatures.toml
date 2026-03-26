@@ -9,6 +9,7 @@ display_name = "Evil Cactus"
 sprite = "evil_cactus"
 animation_type = "standard"
 description = "A prickly cactus animated by dark desert magic. Its spines are razor-sharp."
+tags = ["desert"]
 
 [evil_cactus.stats]
 level = 22
@@ -57,6 +58,7 @@ display_name = "Golden Scarab"
 sprite = "golden_scarab"
 animation_type = "standard"
 description = "A massive scarab beetle with a gleaming golden carapace. Only assigned as a slayer task by Chaeldar."
+tags = ["desert"]
 
 [golden_scarab.stats]
 level = 24

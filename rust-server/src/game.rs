@@ -3569,6 +3569,7 @@ impl GameRoom {
             equipped_back,
             combat_style,
             equip_ranged_str_bonus,
+            equipped_items,
         ) = {
             let mut players = self.players.write().await;
             let player = match players.get_mut(player_id) {
@@ -3593,6 +3594,9 @@ impl GameRoom {
             let base_str_bonus = player.strength_bonus(&self.item_registry);
             let ranged_str = player.ranged_strength_bonus(&self.item_registry);
 
+            // Collect equipped item IDs for type bonus lookups
+            let equipped: Vec<Option<String>> = player.all_equipped().iter().map(|s| (*s).clone()).collect();
+
             // Apply prayer bonuses to attack and strength
             let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
             let prayer_effects = self.prayer_registry.calculate_effects(&active_ids);
@@ -3613,7 +3617,27 @@ impl GameRoom {
                 player.equipped_back.clone(),
                 player.combat_style,
                 ranged_str,
+                equipped,
             )
+        };
+
+        // Helper: compute type bonus strength % from equipped items against NPC tags
+        let calc_type_bonus_str = |npc_tags: &[String]| -> f32 {
+            let mut total = 0.0f32;
+            for slot in &equipped_items {
+                if let Some(item_id) = slot {
+                    if let Some(def) = self.item_registry.get(item_id) {
+                        if let Some(equip) = &def.equipment {
+                            for tb in &equip.type_bonuses {
+                                if npc_tags.contains(&tb.tag) {
+                                    total += tb.strength_percent;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            total
         };
 
         // Get weapon range and type (needed before cooldown check)
@@ -4071,6 +4095,11 @@ impl GameRoom {
                                 max_hit = ((max_hit as f32) * 1.15).floor() as i32;
                             }
                         }
+                        // Equipment type bonuses (e.g. +15% vs desert enemies)
+                        let type_str_pct = calc_type_bonus_str(&npc.stats.tags);
+                        if type_str_pct > 0.0 {
+                            max_hit = ((max_hit as f32) * (1.0 + type_str_pct / 100.0)).floor() as i32;
+                        }
                         let damage = roll_damage(max_hit).min(npc.hp);
                         let died = npc.take_damage(damage, current_time, Some(player_id));
                         let name = npc.name();
@@ -4139,6 +4168,11 @@ impl GameRoom {
                         {
                             max_hit = ((max_hit as f32) * 1.15).floor() as i32;
                         }
+                    }
+                    // Equipment type bonuses (e.g. +15% vs desert enemies)
+                    let type_str_pct = calc_type_bonus_str(&npc.stats.tags);
+                    if type_str_pct > 0.0 {
+                        max_hit = ((max_hit as f32) * (1.0 + type_str_pct / 100.0)).floor() as i32;
                     }
                     let damage = roll_damage(max_hit).min(npc.hp);
                     let died = npc.take_damage(damage, current_time, Some(player_id));
