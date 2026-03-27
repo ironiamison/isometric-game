@@ -771,9 +771,10 @@ impl Renderer {
             let item_z = state.chunk_manager.get_height(item.x as i32, item.y as i32) as f32;
             let (screen_x, screen_y) = world_to_screen_z(item.x, item.y, item_z, &state.camera);
 
-            // Clickable area - centered on where items actually render (slightly above tile center)
-            let click_width = 44.0 * zoom;
-            let click_height = 28.0 * zoom;
+            // Clickable area - cover the full isometric tile so hovering/clicking
+            // anywhere on the tile triggers the ground item interaction
+            let click_width = 64.0 * zoom;
+            let click_height = 32.0 * zoom;
             let bounds = Rect::new(
                 screen_x - click_width / 2.0,
                 screen_y - click_height,

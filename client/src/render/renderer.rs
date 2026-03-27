@@ -5739,6 +5739,8 @@ impl Renderer {
     }
 
     fn render_click_effects(&self, state: &GameState) {
+        // Temporarily disabled
+        return;
         use crate::game::state::ClickEffectKind;
 
         for effect in &state.click_effects {
