@@ -799,6 +799,9 @@ pub fn run_game_frame(
             InputCommand::SetCombatStyle { style } => ClientMessage::SetCombatStyle {
                 style: style.clone(),
             },
+            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate {
+                enabled: *enabled,
+            },
             InputCommand::KothContinue => ClientMessage::KothContinue,
             InputCommand::KothLeave => ClientMessage::KothLeave,
         };
