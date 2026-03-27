@@ -222,14 +222,6 @@ weight = 10
 xp_per_kill = 45
 
 [[masters.tasks]]
-monster_id = "elf"
-display_name = "Elves"
-count_min = 40
-count_max = 70
-weight = 8
-xp_per_kill = 50
-
-[[masters.tasks]]
 monster_id = "skeleton"
 display_name = "Skeletons"
 count_min = 45
