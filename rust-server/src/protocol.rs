@@ -297,6 +297,10 @@ pub enum ClientMessage {
     #[serde(rename = "cancelAutoAction")]
     CancelAutoAction,
 
+    /// Toggle auto-retaliate on/off
+    #[serde(rename = "setAutoRetaliate")]
+    SetAutoRetaliate { enabled: bool },
+
     // ===== Chest System Messages =====
     /// Open a chest at position
     #[serde(rename = "openChest")]
@@ -467,6 +471,7 @@ impl ClientMessage {
             ClientMessage::SlayerRemoveBlock { .. } => "slayerRemoveBlock",
             ClientMessage::StartAutoAction { .. } => "startAutoAction",
             ClientMessage::CancelAutoAction => "cancelAutoAction",
+            ClientMessage::SetAutoRetaliate { .. } => "setAutoRetaliate",
             ClientMessage::OpenChest { .. } => "OpenChest",
             ClientMessage::ChestTake { .. } => "ChestTake",
             ClientMessage::ChestDeposit { .. } => "ChestDeposit",
@@ -1273,6 +1278,10 @@ pub enum ServerMessage {
     AutoActionStopped {
         reason: String,
     },
+    /// Auto-retaliate setting changed
+    AutoRetaliateChanged {
+        enabled: bool,
+    },
 
     // ===== Scroll Spell System Messages =====
     /// Sent on connect: all scroll spell definitions
@@ -1794,6 +1803,7 @@ impl ServerMessage {
             // Auto-action system messages
             ServerMessage::AutoActionStarted { .. } => "autoActionStarted",
             ServerMessage::AutoActionStopped { .. } => "autoActionStopped",
+            ServerMessage::AutoRetaliateChanged { .. } => "autoRetaliateChanged",
             // Scroll spell system messages
             ServerMessage::ScrollSpellDefinitions { .. } => "scrollSpellDefinitions",
             ServerMessage::UnlockedSpellsSync { .. } => "unlockedSpellsSync",
@@ -5896,6 +5906,14 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
+        ServerMessage::AutoRetaliateChanged { enabled } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("enabled".into()),
+                Value::Boolean(*enabled),
+            ));
+            Value::Map(map)
+        }
         ServerMessage::ScrollSpellDefinitions { spells } => {
             let mut map = Vec::new();
             let spell_values: Vec<Value> = spells
@@ -6814,6 +6832,10 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             })
         }
         "cancelAutoAction" => Ok(ClientMessage::CancelAutoAction),
+        "setAutoRetaliate" => {
+            let enabled = extract_bool(msg_data, "enabled").unwrap_or(true);
+            Ok(ClientMessage::SetAutoRetaliate { enabled })
+        }
         "interactObject" => {
             let x = extract_i32(msg_data, "x").unwrap_or(0);
             let y = extract_i32(msg_data, "y").unwrap_or(0);
@@ -6943,6 +6965,14 @@ fn extract_f64(value: &rmpv::Value, key: &str) -> Option<f64> {
         map.iter()
             .find(|(k, _)| k.as_str() == Some(key))
             .and_then(|(_, v)| v.as_f64())
+    })
+}
+
+fn extract_bool(value: &rmpv::Value, key: &str) -> Option<bool> {
+    value.as_map().and_then(|map| {
+        map.iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .and_then(|(_, v)| v.as_bool())
     })
 }
 

@@ -154,6 +154,10 @@ impl GameRoom {
             })
             .await;
         }
+
+        // Also stop woodcutting and mining sessions
+        let mut woodcutting = self.woodcutting.write().await;
+        woodcutting.stop_woodcutting(player_id);
     }
 
     /// Handle a single chop attempt on a tree.

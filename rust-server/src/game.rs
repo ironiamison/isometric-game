@@ -437,6 +437,11 @@ pub struct Player {
     pub is_dashing: bool,
     /// Active auto-action (OSRS-style click-to-act). Processed each server tick.
     pub auto_action: Option<AutoAction>,
+    /// Whether the player will auto-retaliate when attacked (OSRS-style)
+    pub auto_retaliate: bool,
+    /// Last time the player performed a manual action (ms). Used for 5-minute
+    /// auto-retaliate idle timeout — after 5 min of only retaliating, stop.
+    pub last_activity_time: u64,
     /// Active player stall (None if no stall open)
     pub stall: Option<PlayerStall>,
 }
@@ -533,6 +538,7 @@ pub struct ActiveBuff {
 }
 
 const PLAYER_RESPAWN_TIME_MS: u64 = 5000; // 5 seconds to respawn
+const AUTO_RETALIATE_IDLE_TIMEOUT_MS: u64 = 5 * 60 * 1000; // 5 minutes
 
 impl Player {
     pub fn new(
@@ -610,6 +616,8 @@ impl Player {
             last_dash_tick: 0,
             is_dashing: false,
             auto_action: None,
+            auto_retaliate: true,
+            last_activity_time: 0,
             stall: None,
         }
     }
@@ -2245,6 +2253,12 @@ impl GameRoom {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
             player.active = true;
+            // Initialize activity time so auto-retaliate works from login
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            player.last_activity_time = now;
             return player.name.clone();
         }
         "Unknown".to_string()
@@ -3109,6 +3123,9 @@ impl GameRoom {
         {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
+                // Reset auto-retaliate idle timer on any movement input
+                player.last_activity_time = now_ms;
+
                 let move_seq =
                     seq.unwrap_or_else(|| player.last_received_move_seq.saturating_add(1));
                 let prev_seq = player.last_received_move_seq;
@@ -3556,6 +3573,15 @@ impl GameRoom {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
+
+        // Manual attacks (not from auto-action) reset the auto-retaliate idle timer
+        if forced_target_id.is_none() {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.last_activity_time = current_time;
+            }
+            drop(players);
+        }
 
         // Get attacker info including combat stats
         // When direction_override is provided (auto-action), atomically set and read the
@@ -5671,6 +5697,54 @@ impl GameRoom {
             // a different NPC. The player chose their target and should stay
             // locked on it (matching OSRS behavior). Auto-action is only
             // cancelled by: player death, target death, explicit cancel, or movement.
+
+            // Auto-retaliate: if the player has no auto-action and auto-retaliate
+            // is enabled, automatically fight back against the attacking NPC.
+            // Stops after 5 minutes of inactivity (no manual input).
+            if !died {
+                let should_retaliate = {
+                    let players = self.players.read().await;
+                    if let Some(player) = players.get(&target_id) {
+                        player.auto_retaliate
+                            && player.auto_action.is_none()
+                            && !player.is_dead
+                            && current_time.saturating_sub(player.last_activity_time)
+                                < AUTO_RETALIATE_IDLE_TIMEOUT_MS
+                    } else {
+                        false
+                    }
+                };
+                if should_retaliate {
+                    let mut players = self.players.write().await;
+                    if let Some(player) = players.get_mut(&target_id) {
+                        player.auto_action = Some(AutoAction {
+                            target: AutoActionTarget::Npc {
+                                npc_id: npc_id.clone(),
+                            },
+                            action: AutoActionType::Attack,
+                            started_at: current_time,
+                        });
+                        player.target_id = Some(npc_id.clone());
+                    }
+                    drop(players);
+
+                    self.send_to_player(
+                        &target_id,
+                        ServerMessage::AutoActionStarted {
+                            target_type: "npc".to_string(),
+                            target_id: npc_id.clone(),
+                            action: "attack".to_string(),
+                        },
+                    )
+                    .await;
+
+                    self.broadcast(ServerMessage::TargetChanged {
+                        player_id: target_id.clone(),
+                        target_id: Some(npc_id.clone()),
+                    })
+                    .await;
+                }
+            }
 
             // Handle player death
             if died {

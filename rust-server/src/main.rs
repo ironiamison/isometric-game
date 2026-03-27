@@ -5113,6 +5113,9 @@ async fn handle_client_message(
         ClientMessage::CancelAutoAction => {
             room.handle_cancel_auto_action(player_id).await;
         }
+        ClientMessage::SetAutoRetaliate { enabled } => {
+            room.handle_set_auto_retaliate(player_id, enabled).await;
+        }
         // ===== Chest System Messages =====
         ClientMessage::OpenChest { x, y } => {
             room.handle_open_chest(player_id, x, y).await;

@@ -138,6 +138,9 @@ impl GameRoom {
             entity_type
         );
 
+        // Stop any in-progress gathering/woodcutting action
+        self.handle_stop_gathering(player_id).await;
+
         if let Some(proto) = prototype {
             if let Some(merchant_config) = &proto.merchant {
                 let shop_registry = self.shop_registry.read().await;

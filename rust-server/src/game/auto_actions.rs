@@ -165,6 +165,9 @@ impl GameRoom {
                 }
                 // Stop movement when starting an attack auto-action so the player
                 // doesn't walk out of range before the first hit lands
+                // Manual auto-action start resets auto-retaliate idle timer
+                player.last_activity_time = now_ms();
+
                 if action_type == AutoActionType::Attack {
                     player.reject_pending_move();
                 }
@@ -211,6 +214,27 @@ impl GameRoom {
             self.send_to_player(player_id, auto_action_stopped_message("cancelled"))
                 .await;
         }
+    }
+
+    pub async fn handle_set_auto_retaliate(&self, player_id: &str, enabled: bool) {
+        {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                player.auto_retaliate = enabled;
+            }
+        }
+
+        self.send_to_player(
+            player_id,
+            ServerMessage::AutoRetaliateChanged { enabled },
+        )
+        .await;
+
+        tracing::info!(
+            "Player {} set auto-retaliate to {}",
+            player_id,
+            enabled
+        );
     }
 
     pub(in crate::game) async fn clear_auto_action(&self, player_id: &str, reason: &str) {
