@@ -5729,25 +5729,18 @@ impl GameRoom {
                 let should_retaliate = {
                     let players = self.players.read().await;
                     if let Some(player) = players.get(&target_id) {
-                        // Allow retaliate if no auto-action, OR if current auto-action
-                        // targets a different NPC (not actively fighting the attacker)
-                        let no_conflicting_action = match &player.auto_action {
-                            None => true,
-                            Some(aa) => match &aa.target {
-                                AutoActionTarget::Npc { npc_id: current_npc } => {
-                                    current_npc != &npc_id
-                                }
-                                _ => false,
-                            },
-                        };
+                        // Only retaliate if no existing auto-action — stick with
+                        // current target until it dies or goes out of range
                         player.auto_retaliate
-                            && no_conflicting_action
+                            && player.auto_action.is_none()
                             && !player.is_dead
                             && player.move_dx == 0 && player.move_dy == 0
                             && player.pending_move_seq.is_none()
                             && current_time.saturating_sub(player.last_move_input_ms) >= 500
                             && current_time.saturating_sub(player.last_activity_time)
                                 < AUTO_RETALIATE_IDLE_TIMEOUT_MS
+                            // 500ms delay before selecting a new retaliation target
+                            && current_time.saturating_sub(player.last_attack_time) >= 500
                     } else {
                         false
                     }
