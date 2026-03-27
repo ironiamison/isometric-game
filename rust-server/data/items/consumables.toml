@@ -394,7 +394,7 @@ amount = 7
 
 [cooked_salmon]
 display_name = "Cooked Salmon"
-sprite = "cooked_trout"
+sprite = "cooked_salmon"
 description = "A perfectly cooked salmon fillet. Restores 9 HP."
 category = "consumable"
 max_stack = 10
@@ -420,7 +420,7 @@ amount = 12
 
 [cooked_swordfish]
 display_name = "Cooked Swordfish"
-sprite = "cooked_shark"
+sprite = "cooked_swordfish"
 description = "A hearty swordfish steak. Restores 14 HP."
 category = "consumable"
 max_stack = 10

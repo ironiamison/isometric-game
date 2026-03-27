@@ -445,7 +445,7 @@ base_price = 12
 
 [raw_salmon]
 display_name = "Raw Salmon"
-sprite = "raw_trout"
+sprite = "raw_salmon"
 description = "A pink-fleshed fish that swims upstream. Nutritious when cooked."
 category = "material"
 max_stack = 5
@@ -461,7 +461,7 @@ base_price = 30
 
 [raw_swordfish]
 display_name = "Raw Swordfish"
-sprite = "raw_shark"
+sprite = "raw_swordfish"
 description = "A powerful ocean fish with a sharp bill. Rare and valuable."
 category = "material"
 max_stack = 5
