@@ -6,6 +6,8 @@ use crate::game::{GameState, SocialTab};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
+use macroquad::miniquad::window::screen_size;
+use macroquad::window::get_internal_gl;
 
 /// Social panel dimensions (matches INV_WIDTH for consistency)
 const SOCIAL_PANEL_WIDTH: f32 = 240.0;
@@ -232,6 +234,9 @@ impl Renderer {
         let visible_count = (height / row_height).ceil() as usize + 1;
         let last_visible = (first_visible + visible_count).min(nearby.len());
 
+        // Scissor clip so rows don't overflow into header/tabs
+        self.enable_scissor_clip(x, y, width, height);
+
         let mut row_y = y - (scroll_offset % row_height);
         for i in first_visible..last_visible {
             if row_y + row_height < y {
@@ -299,6 +304,8 @@ impl Renderer {
 
             row_y += row_height;
         }
+
+        self.disable_scissor_clip();
 
         // Draw scrollbar if needed
         if max_scroll > 0.0 {
@@ -369,6 +376,9 @@ impl Renderer {
         let visible_count = (height / row_height).ceil() as usize + 1;
         let last_visible = (first_visible + visible_count).min(total_items);
 
+        // Scissor clip so rows don't overflow into header/tabs
+        self.enable_scissor_clip(x, y, width, height);
+
         let mut row_y = y - (scroll_offset % row_height);
         for i in first_visible..last_visible {
             if row_y + row_height < y {
@@ -432,6 +442,8 @@ impl Renderer {
 
             row_y += row_height;
         }
+
+        self.disable_scissor_clip();
 
         // Draw scrollbar if needed
         if max_scroll > 0.0 {
@@ -618,6 +630,9 @@ impl Renderer {
             let list_start_y = current_y;
             let mut row_y = current_y - (scroll_offset % row_height);
 
+            // Scissor clip so rows don't overflow into header/tabs
+            self.enable_scissor_clip(x, current_y, width, friends_area_height);
+
             for i in first_visible..last_visible {
                 if row_y + row_height < list_start_y {
                     row_y += row_height;
@@ -675,6 +690,8 @@ impl Renderer {
 
                 row_y += row_height;
             }
+
+            self.disable_scissor_clip();
 
             // Draw scrollbar if needed
             if max_scroll > 0.0 {
@@ -848,5 +865,26 @@ impl Renderer {
             let text_y = badge_y + 6.0; // Adjust for baseline
             self.draw_text_sharp(&count_text, text_x, text_y, 16.0, WHITE);
         }
+    }
+
+    fn enable_scissor_clip(&self, x: f32, y: f32, w: f32, h: f32) {
+        let (virtual_w, virtual_h) = virtual_screen_size();
+        let (physical_w, physical_h) = screen_size();
+        let scale_x = physical_w / virtual_w;
+        let scale_y = physical_h / virtual_h;
+        let mut gl = unsafe { get_internal_gl() };
+        gl.flush();
+        gl.quad_gl.scissor(Some((
+            (x * scale_x) as i32,
+            (y * scale_y) as i32,
+            (w * scale_x) as i32,
+            (h * scale_y) as i32,
+        )));
+    }
+
+    fn disable_scissor_clip(&self) {
+        let mut gl = unsafe { get_internal_gl() };
+        gl.flush();
+        gl.quad_gl.scissor(None);
     }
 }
