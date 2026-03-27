@@ -10459,6 +10459,62 @@ impl InputHandler {
                         }
                     }
                 }
+            } else if let Some(ground_item_id) = state
+                .ground_items
+                .values()
+                .find(|item| {
+                    item.x.round() as i32 == clicked_tile_x
+                        && item.y.round() as i32 == clicked_tile_y
+                })
+                .map(|item| item.id.clone())
+            {
+                // Clicked on a tile with a ground item - attempt pickup
+                if let Some(local_id) = &state.local_player_id {
+                    if let Some(player) = state.players.get(local_id) {
+                        if let Some(ground_item) = state.ground_items.get(&ground_item_id) {
+                            let dx = ground_item.x - player.x;
+                            let dy = ground_item.y - player.y;
+                            let dist = (dx * dx + dy * dy).sqrt();
+
+                            const PICKUP_RANGE: f32 = 2.0;
+                            if dist < PICKUP_RANGE {
+                                commands.push(InputCommand::Pickup {
+                                    item_id: ground_item_id,
+                                });
+                            } else {
+                                // Out of range - path to an adjacent tile
+                                let player_x = player.server_x.round() as i32;
+                                let player_y = player.server_y.round() as i32;
+                                let item_x = ground_item.x.round() as i32;
+                                let item_y = ground_item.y.round() as i32;
+
+                                let occupied = build_occupied_set(state, true, true);
+
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) =
+                                    pathfinding::find_path_to_adjacent(
+                                        (player_x, player_y),
+                                        (item_x, item_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    )
+                                {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: Some(ground_item_id),
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
             } else if state
                 .chair_positions
                 .contains(&(clicked_tile_x, clicked_tile_y))
