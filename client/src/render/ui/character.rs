@@ -23,8 +23,6 @@ const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + CHARACTER_GRID_HEIGHT
     + GRID_STYLE_GAP
     + COMBAT_STYLE_ROW_HEIGHT
-    + GRID_STYLE_GAP
-    + AUTO_RETALIATE_BTN_HEIGHT
     + CHARACTER_PANEL_PADDING
     + SHOP_BUTTON_HEIGHT
     + CHARACTER_PANEL_PADDING;
@@ -257,6 +255,69 @@ impl Renderer {
                 self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
             }
 
+            // Auto-retaliate toggle button (in stats column, bottom-aligned with belt row)
+            let ar_h = AUTO_RETALIATE_BTN_HEIGHT * scale;
+            let grid_bottom_local = grid_y + 3.0 * slot_step + slot_size; // bottom of belt row
+            let ar_y = grid_bottom_local - ar_h;
+            // Width and x aligned with the right portion of the style row (Def+Ctrl area)
+            let ar_w = available_width - stats_gap;
+            let ar_x = panel_x + panel_width - frame_thickness - panel_padding - ar_w;
+
+            let ar_bounds = Rect::new(ar_x, ar_y, ar_w, ar_h);
+            layout.add(UiElementId::AutoRetaliateToggle, ar_bounds);
+
+            let ar_enabled = state.auto_retaliate;
+            let ar_hovered = matches!(hovered, Some(UiElementId::AutoRetaliateToggle));
+
+            let ar_bg = if ar_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
+            let ar_border = if ar_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
+
+            draw_rectangle(ar_x, ar_y, ar_w, ar_h, ar_border);
+            draw_rectangle(ar_x + 1.0, ar_y + 1.0, ar_w - 2.0, ar_h - 2.0, ar_bg);
+
+            // Draw icon centered at top
+            if let Some(icon) = &self.auto_retaliate_icon {
+                let icon_size = 24.0 * scale;
+                let icon_x = ar_x + (ar_w - icon_size) / 2.0;
+                let icon_y = ar_y + 4.0 * scale;
+                draw_texture_ex(
+                    icon,
+                    icon_x,
+                    icon_y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(icon_size, icon_size)),
+                        ..Default::default()
+                    },
+                );
+            }
+
+            // Label text below icon
+            let ar_text_color = if ar_enabled {
+                Color::new(0.2, 0.9, 0.2, 1.0)
+            } else {
+                Color::new(0.8, 0.3, 0.3, 1.0)
+            };
+
+            let line1 = "auto";
+            let line2 = "retaliate";
+            let l1w = self.measure_text_sharp(line1, 14.0).width;
+            let l2w = self.measure_text_sharp(line2, 14.0).width;
+            let text_start = ar_y + 4.0 * scale + 24.0 * scale + 2.0 * scale;
+            self.draw_text_sharp(
+                line1,
+                ar_x + (ar_w - l1w) / 2.0,
+                text_start + 10.0 * scale,
+                14.0,
+                ar_text_color,
+            );
+            self.draw_text_sharp(
+                line2,
+                ar_x + (ar_w - l2w) / 2.0,
+                text_start + 22.0 * scale,
+                14.0,
+                ar_text_color,
+            );
         }
 
         // ===== COMBAT STYLE SELECTOR =====
@@ -327,69 +388,6 @@ impl Renderer {
             );
         }
 
-        // ===== AUTO-RETALIATE TOGGLE (desktop only) =====
-        if !cfg!(target_os = "android") {
-            let ar_h = AUTO_RETALIATE_BTN_HEIGHT * scale;
-            let ar_w = style_area_width;
-            let ar_x = style_x;
-            let ar_y = style_y + style_row_height + GRID_STYLE_GAP * scale;
-
-            let ar_bounds = Rect::new(ar_x, ar_y, ar_w, ar_h);
-            layout.add(UiElementId::AutoRetaliateToggle, ar_bounds);
-
-            let ar_enabled = state.auto_retaliate;
-            let ar_hovered = matches!(hovered, Some(UiElementId::AutoRetaliateToggle));
-
-            let ar_bg = if ar_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-            let ar_border = if ar_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
-
-            draw_rectangle(ar_x, ar_y, ar_w, ar_h, ar_border);
-            draw_rectangle(ar_x + 1.0, ar_y + 1.0, ar_w - 2.0, ar_h - 2.0, ar_bg);
-
-            // Draw icon centered at top
-            if let Some(icon) = &self.auto_retaliate_icon {
-                let icon_size = 24.0 * scale;
-                let icon_x = ar_x + (ar_w - icon_size) / 2.0;
-                let icon_y = ar_y + 4.0 * scale;
-                draw_texture_ex(
-                    icon,
-                    icon_x,
-                    icon_y,
-                    WHITE,
-                    DrawTextureParams {
-                        dest_size: Some(Vec2::new(icon_size, icon_size)),
-                        ..Default::default()
-                    },
-                );
-            }
-
-            // Label text below icon
-            let ar_text_color = if ar_enabled {
-                Color::new(0.2, 0.9, 0.2, 1.0)
-            } else {
-                Color::new(0.8, 0.3, 0.3, 1.0)
-            };
-
-            let line1 = "auto";
-            let line2 = "retaliate";
-            let l1w = self.measure_text_sharp(line1, 14.0).width;
-            let l2w = self.measure_text_sharp(line2, 14.0).width;
-            let text_start = ar_y + 4.0 * scale + 24.0 * scale + 2.0 * scale;
-            self.draw_text_sharp(
-                line1,
-                ar_x + (ar_w - l1w) / 2.0,
-                text_start + 10.0 * scale,
-                14.0,
-                ar_text_color,
-            );
-            self.draw_text_sharp(
-                line2,
-                ar_x + (ar_w - l2w) / 2.0,
-                text_start + 22.0 * scale,
-                14.0,
-                ar_text_color,
-            );
-        }
 
         // ===== OPEN SHOP BUTTON (desktop only) =====
         if cfg!(target_os = "android") {

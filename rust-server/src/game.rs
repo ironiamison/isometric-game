@@ -1760,6 +1760,29 @@ impl GameRoom {
         self.pvp_zones.contains(&(chunk.x, chunk.y))
     }
 
+    /// Check if PVP is allowed for a player at their current location.
+    /// In the overworld, checks the PVP zone allowlist.
+    /// In instances, checks the instance's pvp_enabled flag.
+    async fn is_pvp_allowed(&self, player_id: &str, world_x: i32, world_y: i32) -> bool {
+        let instances = self.player_instances.read().await;
+        let instance_id = instances.get(player_id).cloned();
+        drop(instances);
+        match instance_id {
+            Some(inst_id) => {
+                // In an instance — check instance pvp flag
+                if let Some(inst) = self.instance_manager.get_by_instance_id(&inst_id) {
+                    inst.pvp_enabled
+                } else {
+                    false
+                }
+            }
+            None => {
+                // Overworld — check pvp zone allowlist
+                self.is_pvp_zone(world_x, world_y)
+            }
+        }
+    }
+
     /// Load the top two total level players from the database at startup.
     pub async fn init_top_level_player(&self) {
         if let Some(ref db) = self.db {
@@ -3815,8 +3838,9 @@ impl GameRoom {
                     if player.active && player.hp > 0 {
                         let instances = self.player_instances.read().await;
                         let target_instance = instances.get(forced_id).cloned();
-                        // In overworld, PVP is only allowed in designated zones
-                        let pvp_ok = attacker_instance.is_some() || self.is_pvp_zone(attacker_x, attacker_y);
+                        drop(instances);
+                        // PVP must be allowed at attacker's location (overworld zone or instance flag)
+                        let pvp_ok = self.is_pvp_allowed(player_id, attacker_x, attacker_y).await;
                         if target_instance == attacker_instance && pvp_ok {
                             target_id = Some(forced_id.to_string());
                             is_npc = false;
@@ -3930,8 +3954,8 @@ impl GameRoom {
                             if target_instance != attacker_instance {
                                 continue;
                             }
-                            // In overworld, PVP is only allowed in designated zones
-                            if attacker_instance.is_none() && !self.is_pvp_zone(attacker_x, attacker_y) {
+                            // PVP must be allowed at attacker's location
+                            if !self.is_pvp_allowed(player_id, attacker_x, attacker_y).await {
                                 continue;
                             }
                             target_id = Some(pid.clone());
@@ -5708,6 +5732,8 @@ impl GameRoom {
                         player.auto_retaliate
                             && player.auto_action.is_none()
                             && !player.is_dead
+                            && player.move_dx == 0 && player.move_dy == 0
+                            && player.pending_move_seq.is_none()
                             && current_time.saturating_sub(player.last_activity_time)
                                 < AUTO_RETALIATE_IDLE_TIMEOUT_MS
                     } else {
@@ -5921,14 +5947,14 @@ impl GameRoom {
                             continue;
                         }
 
-                        // In overworld, stop PvP auto-action if attacker leaves PvP zone
-                        if attacker_instance.is_none() {
+                        // Stop PvP auto-action if attacker is not in a PvP-allowed area
+                        {
                             let attacker_pos = {
                                 let players = self.players.read().await;
                                 players.get(pid.as_str()).map(|p| (p.x, p.y))
                             };
                             if let Some((ax, ay)) = attacker_pos {
-                                if !self.is_pvp_zone(ax, ay) {
+                                if !self.is_pvp_allowed(&pid, ax, ay).await {
                                     self.clear_auto_action(&pid, "interrupted").await;
                                     continue;
                                 }
@@ -7382,8 +7408,8 @@ impl GameRoom {
             let players = self.players.read().await;
             let instances = self.player_instances.read().await;
             let target_instance = instances.get(target_id.as_str()).cloned();
-            // In overworld, PVP is only allowed in designated zones
-            let pvp_ok = caster_instance.is_some() || self.is_pvp_zone(caster_x, caster_y);
+            // PVP must be allowed at caster's location
+            let pvp_ok = self.is_pvp_allowed(player_id, caster_x, caster_y).await;
             if pvp_ok {
                 if let Some(target) = players.get(&target_id) {
                     if target.active

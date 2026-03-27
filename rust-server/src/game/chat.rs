@@ -911,6 +911,7 @@ impl GameRoom {
                     &interior.id,
                     interior.size.width,
                     interior.size.height,
+                    interior.pvp_enabled,
                 );
 
                 // Spawn NPCs and set collision if new instance

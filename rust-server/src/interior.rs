@@ -124,6 +124,9 @@ pub struct InteriorMapDef {
     /// Optional block types for rightward tile edges (visual)
     #[serde(default, rename = "blockTypesRight")]
     pub block_types_right: Option<Vec<u16>>,
+    /// Whether PVP is enabled in this instance (default: false)
+    #[serde(default, rename = "pvpEnabled")]
+    pub pvp_enabled: bool,
 }
 
 /// Layer data for interior maps

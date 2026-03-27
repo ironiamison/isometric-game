@@ -3736,12 +3736,14 @@ async fn auto_enter_instance(
             &interior.id,
             interior.size.width,
             interior.size.height,
+            interior.pvp_enabled,
         ),
         InstanceType::Private => state.instance_manager.get_or_create_private(
             &interior.id,
             player_id,
             interior.size.width,
             interior.size.height,
+            interior.pvp_enabled,
         ),
     };
 
@@ -4342,12 +4344,14 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
             &interior.id,
             interior.size.width,
             interior.size.height,
+            interior.pvp_enabled,
         ),
         InstanceType::Private => state.instance_manager.get_or_create_private(
             &interior.id,
             player_id,
             interior.size.width,
             interior.size.height,
+            interior.pvp_enabled,
         ),
     };
 

@@ -27,6 +27,8 @@ pub struct Instance {
     pub map_height: u32,
     /// Optional heightmap for elevation lookups
     pub heightmap: RwLock<Option<Vec<u8>>>,
+    /// Whether PVP is enabled in this instance
+    pub pvp_enabled: bool,
 }
 
 impl Instance {
@@ -184,6 +186,7 @@ impl InstanceManager {
         map_id: &str,
         width: u32,
         height: u32,
+        pvp_enabled: bool,
     ) -> (Arc<Instance>, bool) {
         if let Some(instance) = self.public_instances.get(map_id) {
             return (instance.clone(), false);
@@ -202,11 +205,12 @@ impl InstanceManager {
             map_width: width,
             map_height: height,
             heightmap: RwLock::new(None),
+            pvp_enabled,
         });
 
         self.public_instances
             .insert(map_id.to_string(), instance.clone());
-        info!("Created public instance: {}", instance_id);
+        info!("Created public instance: {} (pvp={})", instance_id, pvp_enabled);
         (instance, true)
     }
 
@@ -217,6 +221,7 @@ impl InstanceManager {
         owner_id: &str,
         width: u32,
         height: u32,
+        pvp_enabled: bool,
     ) -> (Arc<Instance>, bool) {
         let key = (owner_id.to_string(), map_id.to_string());
 
@@ -237,12 +242,13 @@ impl InstanceManager {
             map_width: width,
             map_height: height,
             heightmap: RwLock::new(None),
+            pvp_enabled,
         });
 
         self.private_instances.insert(key, instance.clone());
         info!(
-            "Created private instance: {} for owner {}",
-            instance_id, owner_id
+            "Created private instance: {} for owner {} (pvp={})",
+            instance_id, owner_id, pvp_enabled
         );
         (instance, true)
     }
