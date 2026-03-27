@@ -316,6 +316,20 @@ impl Player {
         bonus
     }
 
+    /// Calculate total ranged strength bonus from all equipped items
+    pub fn ranged_strength_bonus(&self, item_registry: &ItemRegistry) -> i32 {
+        let mut bonus = 0;
+        for equipped in self.all_equipped() {
+            if let Some(item_id) = equipped {
+                let def = item_registry.get_or_placeholder(item_id);
+                if let Some(equip) = &def.equipment {
+                    bonus += equip.ranged_strength_bonus;
+                }
+            }
+        }
+        bonus
+    }
+
     pub fn respawn(&mut self, x: f32, y: f32, hp: i32) {
         self.is_dead = false;
         self.death_time = 0.0;

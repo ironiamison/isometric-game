@@ -227,18 +227,23 @@ impl Renderer {
             let available_width = panel_x + panel_width - frame_thickness - stats_x;
 
             if let Some(player) = state.get_local_player() {
-                let line_height = 24.0 * scale;
-                let label_w = self.measure_text_sharp("DEF", 16.0).width;
+                let line_height = 18.0 * scale;
+                let label_w = self.measure_text_sharp("MAG", 16.0).width;
                 let gap = 4.0;
                 let value_w = self.measure_text_sharp("+99", 16.0).width;
                 let total_stats_w = label_w + gap + value_w;
                 let label_x = stats_x + (available_width - total_stats_w) / 2.0 + 6.0;
                 let value_x = label_x + label_w + gap;
-                let mut text_y = stats_y + 18.0 * scale;
+                let mut text_y = stats_y + 14.0 * scale;
 
                 let atk_bonus = player.attack_bonus(&state.item_registry);
                 let str_bonus = player.strength_bonus(&state.item_registry);
                 let def_bonus = player.defence_bonus(&state.item_registry);
+                let mag_bonus = player.magic_bonus(&state.item_registry);
+                let rng_bonus = player.ranged_strength_bonus(&state.item_registry);
+
+                let mag_color = Color::new(0.650, 0.400, 0.850, 1.0);
+                let rng_color = Color::new(0.900, 0.600, 0.250, 1.0);
 
                 self.draw_text_sharp("ATK", label_x, text_y, 16.0, CATEGORY_EQUIPMENT);
                 let atk_val = format!("+{}", atk_bonus);
@@ -253,6 +258,16 @@ impl Renderer {
                 self.draw_text_sharp("DEF", label_x, text_y, 16.0, CATEGORY_MATERIAL);
                 let def_val = format!("+{}", def_bonus);
                 self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
+                text_y += line_height;
+
+                self.draw_text_sharp("MAG", label_x, text_y, 16.0, mag_color);
+                let mag_val = format!("+{}", mag_bonus);
+                self.draw_text_sharp(&mag_val, value_x, text_y, 16.0, mag_color);
+                text_y += line_height;
+
+                self.draw_text_sharp("RNG", label_x, text_y, 16.0, rng_color);
+                let rng_val = format!("+{}", rng_bonus);
+                self.draw_text_sharp(&rng_val, value_x, text_y, 16.0, rng_color);
             }
 
             // Auto-retaliate toggle button (in stats column, bottom-aligned with belt row)
