@@ -222,10 +222,10 @@ impl Renderer {
         if !cfg!(target_os = "android") {
             let stats_x = grid_x + grid_width + stats_gap;
             let stats_y = grid_y;
+            let available_width = panel_x + panel_width - frame_thickness - stats_x;
 
             if let Some(player) = state.get_local_player() {
                 let line_height = 24.0 * scale;
-                let available_width = panel_x + panel_width - frame_thickness - stats_x;
                 let label_w = self.measure_text_sharp("DEF", 16.0).width;
                 let gap = 4.0;
                 let value_w = self.measure_text_sharp("+99", 16.0).width;
@@ -252,6 +252,61 @@ impl Renderer {
                 let def_val = format!("+{}", def_bonus);
                 self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
             }
+
+            // Auto-retaliate toggle button (below stats, aligned with ring row)
+            let ar_size = slot_size;
+            let ar_x = stats_x + (available_width - ar_size) / 2.0;
+            let ar_y = grid_y + 2.0 * slot_step;
+
+            let ar_bounds = Rect::new(ar_x, ar_y, ar_size, ar_size);
+            layout.add(UiElementId::AutoRetaliateToggle, ar_bounds);
+
+            let ar_enabled = state.auto_retaliate;
+            let ar_hovered = matches!(hovered, Some(UiElementId::AutoRetaliateToggle));
+
+            let ar_bg = if ar_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
+            let ar_border = if ar_enabled {
+                Color::new(0.2, 0.9, 0.2, 1.0) // bright green
+            } else if ar_hovered {
+                SLOT_HOVER_BORDER
+            } else {
+                SLOT_BORDER
+            };
+            let border_w = if ar_enabled { 2.0 } else { 1.0 };
+
+            draw_rectangle(ar_x, ar_y, ar_size, ar_size, ar_border);
+            draw_rectangle(
+                ar_x + border_w,
+                ar_y + border_w,
+                ar_size - border_w * 2.0,
+                ar_size - border_w * 2.0,
+                ar_bg,
+            );
+
+            let ar_text_color = if ar_enabled {
+                Color::new(0.2, 0.9, 0.2, 1.0) // green text when on
+            } else {
+                Color::new(0.8, 0.3, 0.3, 1.0) // red text when off
+            };
+
+            let line1 = "auto";
+            let line2 = "retaliate";
+            let l1w = self.measure_text_sharp(line1, 14.0).width;
+            let l2w = self.measure_text_sharp(line2, 14.0).width;
+            self.draw_text_sharp(
+                line1,
+                ar_x + (ar_size - l1w) / 2.0,
+                ar_y + ar_size * 0.38,
+                14.0,
+                ar_text_color,
+            );
+            self.draw_text_sharp(
+                line2,
+                ar_x + (ar_size - l2w) / 2.0,
+                ar_y + ar_size * 0.68,
+                14.0,
+                ar_text_color,
+            );
         }
 
         // ===== COMBAT STYLE SELECTOR =====

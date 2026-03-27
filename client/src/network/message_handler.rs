@@ -4179,6 +4179,14 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "autoRetaliateChanged" => {
+            if let Some(value) = data {
+                let enabled = extract_bool(value, "enabled").unwrap_or(true);
+                state.auto_retaliate = enabled;
+                log::debug!("Auto-retaliate changed: {}", enabled);
+            }
+        }
+
         "error" => {
             if let Some(value) = data {
                 let message = extract_string(value, "message").unwrap_or_default();

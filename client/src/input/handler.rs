@@ -1741,6 +1741,10 @@ pub enum InputCommand {
     SetCombatStyle {
         style: String,
     },
+    // Auto-retaliate toggle
+    SetAutoRetaliate {
+        enabled: bool,
+    },
     // KOTH commands
     KothContinue,
     KothLeave,
@@ -9973,6 +9977,15 @@ impl InputHandler {
                                 }
                             }
                         }
+                    }
+                    return commands;
+                }
+                UiElementId::AutoRetaliateToggle => {
+                    if mouse_clicked {
+                        audio.play_sfx("click");
+                        let new_val = !state.auto_retaliate;
+                        state.auto_retaliate = new_val;
+                        commands.push(InputCommand::SetAutoRetaliate { enabled: new_val });
                     }
                     return commands;
                 }

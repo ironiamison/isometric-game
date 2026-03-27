@@ -308,6 +308,10 @@ pub enum ClientMessage {
     #[serde(rename = "setCombatStyle")]
     SetCombatStyle { style: String },
 
+    /// Toggle auto-retaliate on/off
+    #[serde(rename = "setAutoRetaliate")]
+    SetAutoRetaliate { enabled: bool },
+
     /// KOTH: Continue fighting at checkpoint
     KothContinue,
     /// KOTH: Leave and claim rewards
@@ -783,6 +787,10 @@ impl ClientMessage {
             ClientMessage::SetCombatStyle { style } => {
                 data.insert("style".into(), Value::String(style.clone().into()));
                 "setCombatStyle"
+            }
+            ClientMessage::SetAutoRetaliate { enabled } => {
+                data.insert("enabled".into(), Value::Boolean(*enabled));
+                "setAutoRetaliate"
             }
             ClientMessage::KothContinue => "kothContinue",
             ClientMessage::KothLeave => "kothLeave",

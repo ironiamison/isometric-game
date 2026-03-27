@@ -17,12 +17,12 @@ mod settings;
 mod ui;
 mod util;
 
-use audio::AudioManager;
 
 use game::GameState;
 use input::{InputCommand, InputHandler};
 use network::NetworkClient;
 use render::animation::AnimationState;
+use audio::AudioManager;
 use render::Renderer;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1329,6 +1329,9 @@ fn run_game_frame(
             },
             InputCommand::SetCombatStyle { style } => ClientMessage::SetCombatStyle {
                 style: style.clone(),
+            },
+            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate {
+                enabled: *enabled,
             },
             InputCommand::KothContinue => ClientMessage::KothContinue,
             InputCommand::KothLeave => ClientMessage::KothLeave,
