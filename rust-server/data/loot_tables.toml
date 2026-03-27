@@ -63,12 +63,26 @@ items = [
     { id = "raw_lobster", level = 40, weight = 10, xp_bonus = 15 },
 ]
 
+[fish_advanced.tiers.uncommon]
+base_weight = 30
+level_scaling = 0.2
+items = [
+    { id = "raw_lobster", level = 40, weight = 10, xp_bonus = 25 },
+    { id = "raw_swordfish", level = 60, weight = 6, xp_bonus = 30 },
+]
+
 [fish_advanced.tiers.rare]
-base_weight = 15
+base_weight = 10
 level_scaling = 0.1
 items = [
-    { id = "oyster", level = 60, weight = 5, xp_bonus = 80 },
-    { id = "raw_swordfish", level = 60, weight = 7, xp_bonus = 120 },
+    { id = "raw_swordfish", level = 60, weight = 7, xp_bonus = 50 },
+]
+
+[fish_advanced.tiers.legendary]
+base_weight = 0.35
+level_scaling = 0.0
+items = [
+    { id = "oyster", level = 60, weight = 1, xp_bonus = 35 },
 ]
 
 # =============================================================================
