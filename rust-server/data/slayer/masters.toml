@@ -100,7 +100,7 @@ xp_per_kill = 10
 id = "mazchna"
 display_name = "Mazchna"
 entity_prototype = "slayer_master_mazchna"
-combat_level_required = 35
+combat_level_required = 25
 slayer_level_required = 20
 points_per_task = 5
 
@@ -209,8 +209,8 @@ xp_per_kill = 55
 id = "chaeldar"
 display_name = "Chaeldar"
 entity_prototype = "slayer_master_chaeldar"
-combat_level_required = 40
-slayer_level_required = 60
+combat_level_required = 50
+slayer_level_required = 50
 points_per_task = 10
 
 [[masters.tasks]]

@@ -1,5 +1,7 @@
 use super::touch::TouchControls;
 use crate::audio::AudioManager;
+use crate::game::state::{ClickEffect, ClickEffectKind};
+use crate::render::isometric::screen_to_world;
 use crate::game::{
     pathfinding, quest_status_order, BankDrag, BankQuantityAction, BankQuantityDialog, ChatChannel,
     ContextMenu, ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState,
@@ -613,7 +615,7 @@ fn sync_path_index(path_state: &mut PathState, player_pos: (i32, i32)) {
 }
 
 /// Build set of tiles occupied by entities (other players + NPCs) for pathfinding
-fn build_occupied_set(state: &GameState, include_chairs: bool) -> HashSet<(i32, i32)> {
+fn build_occupied_set(state: &GameState, include_chairs: bool, include_players: bool) -> HashSet<(i32, i32)> {
     let mut occupied = HashSet::new();
 
     // When in interior mode, don't count overworld players as obstacles
@@ -622,7 +624,7 @@ fn build_occupied_set(state: &GameState, include_chairs: bool) -> HashSet<(i32, 
 
     // Add other players (not local player)
     // Skip if in interior - we'll only see players in our instance from server updates
-    if !in_interior {
+    if include_players && !in_interior {
         for (id, player) in &state.players {
             if state.local_player_id.as_ref() == Some(id) {
                 continue;
@@ -964,7 +966,7 @@ fn pathfind_and_attack_player(
                 let ty = target.server_y.round() as i32;
                 let weapon_range = get_local_weapon_range(state);
                 if !in_attack_range(px, py, tx, ty, weapon_range) {
-                    let occupied = build_occupied_set(state, true);
+                    let occupied = build_occupied_set(state, true, true);
                     const MAX_PATH_DISTANCE: i32 = 32;
                     if let Some((dest, path)) = find_path_to_attack_with_optimistic_splice(
                         state,
@@ -1016,7 +1018,7 @@ fn pathfind_and_attack_npc(state: &mut GameState, commands: &mut Vec<InputComman
                 let closest_y = py.clamp(ny, ny + npc.size - 1);
                 let weapon_range = get_local_weapon_range(state);
                 if !in_attack_range(px, py, closest_x, closest_y, weapon_range) {
-                    let mut occupied = build_occupied_set(state, true);
+                    let mut occupied = build_occupied_set(state, true, true);
                     // Remove NPC footprint tiles so pathfinding can route to them
                     for dy in 0..npc.size {
                         for dx in 0..npc.size {
@@ -1101,7 +1103,7 @@ fn pathfind_and_interact_npc(
                         let py = player.server_y.round() as i32;
                         let nx = npc.server_x.round() as i32;
                         let ny = npc.server_y.round() as i32;
-                        let occupied = build_occupied_set(state, false);
+                        let occupied = build_occupied_set(state, false, true);
                         const MAX_PATH_DISTANCE: i32 = 32;
                         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                             (px, py),
@@ -1145,7 +1147,7 @@ fn pathfind_and_resource(
         let cdx = (px - tile_x).abs();
         let cdy = (py - tile_y).abs();
         if (cdx + cdy) != 1 {
-            let occupied = build_occupied_set(state, true);
+            let occupied = build_occupied_set(state, true, true);
             const MAX_PATH_DISTANCE: i32 = 32;
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 (px, py),
@@ -1208,7 +1210,7 @@ fn pathfind_to_tile(
                 .chunk_manager
                 .is_walkable(tile_x as f32, tile_y as f32)
         {
-            let occupied = build_occupied_set(state, true);
+            let occupied = build_occupied_set(state, true, true);
             if let Some(path) = pathfinding::find_path(
                 (px, py),
                 (tile_x, tile_y),
@@ -1256,7 +1258,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     if let Some(aa) = state.auto_action_state.clone() {
         if let Some((txf, tyf)) = auto_action_target_pos(&aa, state) {
             let target = (txf.round() as i32, tyf.round() as i32);
-            let mut occupied = build_occupied_set(state, true);
+            let mut occupied = build_occupied_set(state, true, true);
             match aa.target_type.as_str() {
                 "npc" => {
                     // Remove all footprint tiles for multi-tile NPCs
@@ -1299,7 +1301,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
                 target.server_x.round() as i32,
                 target.server_y.round() as i32,
             );
-            let mut occupied = build_occupied_set(state, true);
+            let mut occupied = build_occupied_set(state, true, true);
             occupied.remove(&target_tile);
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 start,
@@ -1318,7 +1320,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     if let Some(item_id) = template.pickup_target.clone() {
         if let Some(item) = state.ground_items.get(&item_id) {
             let target = (item.x.round() as i32, item.y.round() as i32);
-            let occupied = build_occupied_set(state, true);
+            let occupied = build_occupied_set(state, true, true);
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 start,
                 target,
@@ -1336,7 +1338,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     if let Some(npc_id) = template.interact_target.clone() {
         if let Some(npc) = state.npcs.get(&npc_id) {
             let target = (npc.server_x.round() as i32, npc.server_y.round() as i32);
-            let occupied = build_occupied_set(state, false);
+            let occupied = build_occupied_set(state, false, true);
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 start,
                 target,
@@ -1352,7 +1354,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     }
 
     if let Some(target) = template.interact_object_target {
-        let occupied = build_occupied_set(state, true);
+        let occupied = build_occupied_set(state, true, true);
         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
             start,
             target,
@@ -1367,7 +1369,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     }
 
     if let Some(target) = template.waystone_target {
-        let occupied = build_occupied_set(state, true);
+        let occupied = build_occupied_set(state, true, true);
         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
             start,
             target,
@@ -1387,7 +1389,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
                 target.server_x.round() as i32,
                 target.server_y.round() as i32,
             );
-            let mut occupied = build_occupied_set(state, true);
+            let mut occupied = build_occupied_set(state, true, true);
             occupied.remove(&target_tile);
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 start,
@@ -1404,7 +1406,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     }
 
     if let Some((chair_x, chair_y)) = state.pending_chair_sit {
-        let occupied = build_occupied_set(state, true);
+        let occupied = build_occupied_set(state, true, true);
         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
             start,
             (chair_x, chair_y),
@@ -1420,7 +1422,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
 
     if let Some(patch_id) = state.pending_harvest_patch.clone() {
         if let Some(patch) = state.farming_patches.get(&patch_id) {
-            let occupied = build_occupied_set(state, true);
+            let occupied = build_occupied_set(state, true, true);
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 start,
                 (patch.x, patch.y),
@@ -1439,7 +1441,7 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     if !state.chunk_manager.is_walkable(goal.0 as f32, goal.1 as f32) {
         return false;
     }
-    let occupied = build_occupied_set(state, true);
+    let occupied = build_occupied_set(state, true, true);
     if let Some(path) =
         pathfinding::find_path(start, goal, &state.chunk_manager, &occupied, MAX_PATH_DISTANCE)
     {
@@ -2046,6 +2048,9 @@ pub struct InputHandler {
     long_press_pos: (f32, f32),
     long_press_active: bool,
     long_press_fired: bool,
+    /// Timestamp when we first started being blocked by another player.
+    /// After 500ms, we ghost through them (client-side collision skip).
+    player_blocked_since: Option<f64>,
 }
 
 impl InputHandler {
@@ -2068,6 +2073,7 @@ impl InputHandler {
             long_press_pos: (0.0, 0.0),
             long_press_active: false,
             long_press_fired: false,
+            player_blocked_since: None,
         }
     }
 
@@ -3630,7 +3636,7 @@ impl InputHandler {
                                                     let tx = target.server_x.round() as i32;
                                                     let ty = target.server_y.round() as i32;
                                                     let mut occupied =
-                                                        build_occupied_set(state, true);
+                                                        build_occupied_set(state, true, true);
                                                     occupied.remove(&(tx, ty));
                                                     const MAX_PATH_DISTANCE: i32 = 32;
                                                     if let Some((dest, path)) =
@@ -4177,7 +4183,7 @@ impl InputHandler {
                                                         });
                                                     } else {
                                                         let occupied =
-                                                            build_occupied_set(state, true);
+                                                            build_occupied_set(state, true, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) =
                                                             pathfinding::find_path_to_adjacent(
@@ -4217,7 +4223,7 @@ impl InputHandler {
                                                         );
                                                     } else {
                                                         let occupied =
-                                                            build_occupied_set(state, true);
+                                                            build_occupied_set(state, true, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) =
                                                             pathfinding::find_path_to_adjacent(
@@ -4296,7 +4302,7 @@ impl InputHandler {
                                                         );
                                                     } else {
                                                         let occupied =
-                                                            build_occupied_set(state, true);
+                                                            build_occupied_set(state, true, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some((dest, path)) =
                                                             pathfinding::find_path_to_adjacent(
@@ -4357,7 +4363,7 @@ impl InputHandler {
                                                         let px = player.server_x.round() as i32;
                                                         let py = player.server_y.round() as i32;
                                                         let occupied =
-                                                            build_occupied_set(state, true);
+                                                            build_occupied_set(state, true, true);
                                                         const MAX_PATH_DISTANCE: i32 = 32;
                                                         if let Some(path) =
                                                             find_path_with_optimistic_splice(
@@ -4420,7 +4426,7 @@ impl InputHandler {
                                                             );
                                                         } else {
                                                             let occupied =
-                                                                build_occupied_set(state, true);
+                                                                build_occupied_set(state, true, true);
                                                             const MAX_PATH_DISTANCE: i32 = 32;
                                                             if let Some((dest, path)) =
                                                                 pathfinding::find_path_to_adjacent(
@@ -4748,7 +4754,7 @@ impl InputHandler {
                                     }
                                     self.suppress_move_until = 0.0;
 
-                                    let occupied = build_occupied_set(state, true);
+                                    let occupied = build_occupied_set(state, true, true);
                                     let path_limit = dist.min(64);
 
                                     // Use splice-aware pathfinding to preserve in-progress step
@@ -8781,7 +8787,9 @@ impl InputHandler {
                 // New direction pressed - record time
                 self.dir_press_time = current_time;
                 self.move_sent = false;
+                self.player_blocked_since = None;
             } else if keyboard_dir == MoveDir::None && self.prev_dir != MoveDir::None {
+                self.player_blocked_since = None;
                 // Direction released
                 if self.move_sent {
                     // Was moving, now stopped - send stop command
@@ -8936,18 +8944,61 @@ impl InputHandler {
                         let tile_walkable = state
                             .chunk_manager
                             .is_walkable(target_x as f32, target_y as f32);
-                        let occupied = build_occupied_set(state, false);
-                        let not_occupied = !occupied.contains(&(target_x, target_y));
                         // Match server: block if target terrain is more than 1 block above player
                         let target_height = state.chunk_manager.get_height(target_x, target_y) as i32;
                         let height_ok = (target_height - player_z) <= 1;
-                        tile_walkable && not_occupied && height_ok
+
+                        // Player ghosting: after being blocked by a player for
+                        // 500ms, stop treating players as obstacles so movement
+                        // flows through them like normal walking.
+                        let ghosting = self.player_blocked_since
+                            .is_some_and(|since| current_time - since >= 0.5);
+                        let occupied = build_occupied_set(state, false, !ghosting);
+                        let not_occupied = !occupied.contains(&(target_x, target_y));
+
+                        if tile_walkable && not_occupied && height_ok {
+                            // Check if a player is still at the target — if so,
+                            // keep ghosting active so we don't flicker on/off.
+                            if ghosting {
+                                let in_interior = state.current_interior.is_some();
+                                let player_at_target = !in_interior && state.players.iter().any(|(id, p)| {
+                                    state.local_player_id.as_ref() != Some(id)
+                                        && !p.is_dead
+                                        && p.server_x.round() as i32 == target_x
+                                        && p.server_y.round() as i32 == target_y
+                                });
+                                if !player_at_target {
+                                    self.player_blocked_since = None;
+                                }
+                            } else {
+                                self.player_blocked_since = None;
+                            }
+                            true
+                        } else if tile_walkable && height_ok {
+                            // Blocked by something on the tile — check if it's a player
+                            let in_interior = state.current_interior.is_some();
+                            let is_player = !in_interior && state.players.iter().any(|(id, p)| {
+                                state.local_player_id.as_ref() != Some(id)
+                                    && !p.is_dead
+                                    && p.server_x.round() as i32 == target_x
+                                    && p.server_y.round() as i32 == target_y
+                            });
+                            if is_player {
+                                self.player_blocked_since.get_or_insert(current_time);
+                            } else {
+                                self.player_blocked_since = None;
+                            }
+                            false
+                        } else {
+                            self.player_blocked_since = None;
+                            false
+                        }
                     } else {
+                        self.player_blocked_since = None;
                         false
                     };
 
                     if can_move {
-                        macroquad::logging::info!("[MOVE] SEND ({}, {}) dir={:?}", dx, dy, new_dir);
                         commands.push(InputCommand::Move { dx, dy });
                         self.last_dx = dx;
                         self.last_dy = dy;
@@ -8959,10 +9010,8 @@ impl InputHandler {
                         }
                     } else {
                         // Can't move - face that direction instead
-                        macroquad::logging::info!("[MOVE] BLOCKED dir={:?} sitting={}", new_dir, state.is_sitting);
                         if self.move_sent || self.touch_controls.was_dpad_move_sent() {
                             // Was moving, send stop
-                            macroquad::logging::info!("[MOVE] BLOCKED->STOP (was moving)");
                             commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                             self.move_sent = false;
                             self.touch_controls.set_dpad_move_sent(false);
@@ -9109,7 +9158,7 @@ impl InputHandler {
                             if needs_repath && repath_allowed {
                                 // Exclude chase target from occupied set so the target
                                 // doesn't block our path when it moves onto our route.
-                                let mut occupied = build_occupied_set(state, true);
+                                let mut occupied = build_occupied_set(state, true, true);
                                 if let Some(ref aa) = state.auto_action_state {
                                     match aa.target_type.as_str() {
                                         "npc" => {
@@ -9215,7 +9264,7 @@ impl InputHandler {
                                 // Delay elapsed — clear waiting state and path to target
                                 state.follow_arrived_target_pos = None;
                                 state.follow_target_move_time = 0.0;
-                                let mut occupied = build_occupied_set(state, true);
+                                let mut occupied = build_occupied_set(state, true, true);
                                 if let Some(p) = state.players.get(follow_id) {
                                     occupied.remove(&(
                                         p.server_x.round() as i32,
@@ -9259,7 +9308,7 @@ impl InputHandler {
                             current_time - state.last_chase_repath_time >= REPATH_COOLDOWN;
 
                         if needs_repath && repath_allowed {
-                            let mut occupied = build_occupied_set(state, true);
+                            let mut occupied = build_occupied_set(state, true, true);
                             if let Some(p) = state.players.get(follow_id) {
                                 occupied.remove(&(
                                     p.server_x.round() as i32,
@@ -9337,7 +9386,7 @@ impl InputHandler {
                 if path_state.current_index < path_state.path.len() {
                     let (next_x, next_y) = path_state.path[path_state.current_index];
                     if player_x != next_x || player_y != next_y {
-                        let mut occupied = build_occupied_set(state, true);
+                        let mut occupied = build_occupied_set(state, true, true);
                         // Exclude chase/follow target from blocked check
                         if let Some(ref aa) = state.auto_action_state {
                             match aa.target_type.as_str() {
@@ -9972,7 +10021,7 @@ impl InputHandler {
                                         let item_y = ground_item.y.round() as i32;
 
                                         // Build occupied set (other players + NPCs)
-                                        let occupied = build_occupied_set(state, true);
+                                        let occupied = build_occupied_set(state, true, true);
 
                                         const MAX_PATH_DISTANCE: i32 = 32;
                                         if let Some((dest, path)) =
@@ -10010,6 +10059,7 @@ impl InputHandler {
         if mouse_clicked && clicked_element.is_none() {
             let (raw_x, raw_y) = mouse_position();
             let (mouse_x, mouse_y) = screen_to_virtual_coords(raw_x, raw_y);
+            let (click_world_x, click_world_y) = screen_to_world(mouse_x, mouse_y, &state.camera);
 
             // Get the clicked tile coordinates (elevation-aware)
             let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) =
@@ -10070,6 +10120,12 @@ impl InputHandler {
 
                 if is_attackable {
                     // Attackable NPC - target it and set up auto-action chase
+                    state.click_effects.clear();
+                    state.click_effects.push(ClickEffect::new(
+                        click_world_x,
+                        click_world_y,
+                        ClickEffectKind::Attack,
+                    ));
                     // Cancel any existing server-side auto-action before starting a new one
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                     state.auto_path = None;
@@ -10096,7 +10152,7 @@ impl InputHandler {
                                 let npc_y = npc.server_y.round() as i32;
                                 let weapon_range = get_local_weapon_range(state);
                                 if !in_attack_range(player_x, player_y, npc_x, npc_y, weapon_range) {
-                                    let occupied = build_occupied_set(state, true);
+                                    let occupied = build_occupied_set(state, true, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     let path_result = if weapon_range > 1 {
                                         pathfinding::find_path_within_range(
@@ -10164,6 +10220,12 @@ impl InputHandler {
                     }
                 } else {
                     // Friendly NPC - interact or pathfind-to-interact
+                    state.click_effects.clear();
+                    state.click_effects.push(ClickEffect::new(
+                        click_world_x,
+                        click_world_y,
+                        ClickEffectKind::Interact,
+                    ));
                     const INTERACT_RANGE: f32 = 2.5;
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(player) = state.players.get(local_id) {
@@ -10236,7 +10298,7 @@ impl InputHandler {
                                     let npc_y = npc.server_y.round() as i32;
 
                                     // Build occupied set (other players + NPCs)
-                                    let occupied = build_occupied_set(state, true);
+                                    let occupied = build_occupied_set(state, true, true);
 
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
@@ -10268,6 +10330,12 @@ impl InputHandler {
 
                 if target_has_stall {
                     // Player has a stall - pathfind to them and browse their shop
+                    state.click_effects.clear();
+                    state.click_effects.push(ClickEffect::new(
+                        click_world_x,
+                        click_world_y,
+                        ClickEffectKind::Interact,
+                    ));
                     if let Some(local_id) = &state.local_player_id {
                         if let Some(local_player) = state.players.get(local_id) {
                             if let Some(target_player) = state.players.get(&entity_id) {
@@ -10284,7 +10352,7 @@ impl InputHandler {
                                     });
                                 } else {
                                     // Pathfind to adjacent tile, then browse on arrival
-                                    let occupied = build_occupied_set(state, true);
+                                    let occupied = build_occupied_set(state, true, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                         (player_x, player_y),
@@ -10310,6 +10378,12 @@ impl InputHandler {
                     }
                 } else {
                     // Normal player click - target and set up auto-action chase
+                    state.click_effects.clear();
+                    state.click_effects.push(ClickEffect::new(
+                        click_world_x,
+                        click_world_y,
+                        ClickEffectKind::Attack,
+                    ));
                     // Cancel any existing server-side auto-action before starting a new one
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                     state.auto_path = None;
@@ -10336,7 +10410,7 @@ impl InputHandler {
                                 let target_y = target_player.server_y.round() as i32;
                                 let weapon_range = get_local_weapon_range(state);
                                 if !in_attack_range(player_x, player_y, target_x, target_y, weapon_range) {
-                                    let occupied = build_occupied_set(state, true);
+                                    let occupied = build_occupied_set(state, true, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     let path_result = if weapon_range > 1 {
                                         pathfinding::find_path_within_range(
@@ -10405,7 +10479,7 @@ impl InputHandler {
                                 });
                             } else {
                                 // Out of range - pathfind to adjacent tile, then sit
-                                let occupied = build_occupied_set(state, true);
+                                let occupied = build_occupied_set(state, true, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                     (px, py),
@@ -10440,6 +10514,19 @@ impl InputHandler {
                 let is_tree = crate::game::tree_types::is_tree_gid(obj_gid);
                 let is_rock = crate::game::ore_types::get_ore_info(obj_gid).is_some();
 
+                // Show click effect — attack for resources, interact for other objects
+                let click_kind = if is_tree || is_rock {
+                    ClickEffectKind::Attack
+                } else {
+                    ClickEffectKind::Interact
+                };
+                state.click_effects.clear();
+                state.click_effects.push(ClickEffect::new(
+                    click_world_x,
+                    click_world_y,
+                    click_kind,
+                ));
+
                 if is_tree
                     && !state
                         .depleted_trees
@@ -10471,7 +10558,7 @@ impl InputHandler {
                             let cdy = (player_y - clicked_tile_y).abs();
                             // Cardinal adjacency only (no diagonal)
                             if (cdx + cdy) != 1 {
-                                let occupied = build_occupied_set(state, true);
+                                let occupied = build_occupied_set(state, true, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                     (player_x, player_y),
@@ -10537,7 +10624,7 @@ impl InputHandler {
                             let cdy = (player_y - clicked_tile_y).abs();
                             // Cardinal adjacency only (no diagonal)
                             if (cdx + cdy) != 1 {
-                                let occupied = build_occupied_set(state, true);
+                                let occupied = build_occupied_set(state, true, true);
                                 const MAX_PATH_DISTANCE: i32 = 32;
                                 if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                     (player_x, player_y),
@@ -10591,7 +10678,7 @@ impl InputHandler {
                             });
                         } else {
                             // Pathfind to adjacent tile, then interact
-                            let occupied = build_occupied_set(state, true);
+                            let occupied = build_occupied_set(state, true, true);
                             const MAX_PATH_DISTANCE: i32 = 32;
                             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                 (player_x, player_y),
@@ -10632,7 +10719,7 @@ impl InputHandler {
                                     commands.push(InputCommand::HarvestCrop { patch_id });
                                 } else {
                                     // Out of range - pathfind to adjacent tile
-                                    let occupied = build_occupied_set(state, true);
+                                    let occupied = build_occupied_set(state, true, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                                         (px, py),
@@ -10676,7 +10763,7 @@ impl InputHandler {
                         });
                     } else {
                         // Pathfind to adjacent tile, then interact
-                        let occupied = build_occupied_set(state, true);
+                        let occupied = build_occupied_set(state, true, true);
                         const MAX_PATH_DISTANCE: i32 = 32;
                         if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                             (px, py),
@@ -10730,7 +10817,7 @@ impl InputHandler {
                             .is_walkable(tile_x as f32, tile_y as f32)
                     {
                         // Build occupied set (other players + NPCs)
-                        let occupied = build_occupied_set(state, true);
+                        let occupied = build_occupied_set(state, true, true);
 
                         // Calculate path using A*
                         if let Some(path) = pathfinding::find_path(
@@ -10744,6 +10831,12 @@ impl InputHandler {
                                 "[CLICK2MOVE] path created len={} from=({},{}) to=({},{})",
                                 path.len(), player_x, player_y, tile_x, tile_y
                             );
+                            state.click_effects.clear();
+                            state.click_effects.push(ClickEffect::new(
+                                click_world_x,
+                                click_world_y,
+                                ClickEffectKind::Walk,
+                            ));
                             state.auto_path = Some(PathState {
                                 path,
                                 current_index: 0,

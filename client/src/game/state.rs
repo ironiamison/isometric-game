@@ -585,6 +585,52 @@ impl RockShakeEffect {
     }
 }
 
+/// The kind of click effect to display
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ClickEffectKind {
+    Walk,
+    Attack,
+    Interact,
+}
+
+/// An animated click effect shown at a world tile when the player clicks
+pub struct ClickEffect {
+    pub tile_x: f32,
+    pub tile_y: f32,
+    pub kind: ClickEffectKind,
+    pub elapsed: f32,
+}
+
+impl ClickEffect {
+    /// Total animation duration in seconds (4 frames)
+    pub const DURATION: f32 = 0.4;
+    pub const FRAME_COUNT: u32 = 4;
+    pub const FRAME_SIZE: f32 = 16.0;
+
+    pub fn new(tile_x: f32, tile_y: f32, kind: ClickEffectKind) -> Self {
+        Self {
+            tile_x,
+            tile_y,
+            kind,
+            elapsed: 0.0,
+        }
+    }
+
+    pub fn update(&mut self, delta: f32) {
+        self.elapsed += delta;
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.elapsed >= Self::DURATION
+    }
+
+    /// Returns the current frame index (0..3)
+    pub fn frame(&self) -> u32 {
+        let f = (self.elapsed / Self::DURATION * Self::FRAME_COUNT as f32) as u32;
+        f.min(Self::FRAME_COUNT - 1)
+    }
+}
+
 /// A falling leaf particle
 pub struct LeafParticle {
     pub tile_x: f32,     // World tile X position
@@ -1936,6 +1982,8 @@ pub struct GameState {
     pub rock_shake_effects: Vec<RockShakeEffect>,
     /// Rock debris particles
     pub rock_particles: Vec<RockParticle>,
+    /// Animated click effects (walk/attack/interact indicators)
+    pub click_effects: Vec<ClickEffect>,
     /// Bubble particles for fishing spot indicators
     pub fishing_bubbles: Vec<BubbleParticle>,
     /// Timer for spawning new bubbles at fishing markers
@@ -2146,6 +2194,7 @@ impl GameState {
             falling_trees: Vec::new(),
             rock_shake_effects: Vec::new(),
             rock_particles: Vec::new(),
+            click_effects: Vec::new(),
             fishing_bubbles: Vec::new(),
             bubble_spawn_timer: 0.0,
             crumbling_rocks: Vec::new(),
@@ -2396,6 +2445,12 @@ impl GameState {
             particle.update(delta);
         }
         self.rock_particles.retain(|p| !p.is_finished());
+
+        // Update click effects
+        for effect in &mut self.click_effects {
+            effect.update(delta);
+        }
+        self.click_effects.retain(|e| !e.is_finished());
 
         // Update fishing bubble particles
         for bubble in &mut self.fishing_bubbles {

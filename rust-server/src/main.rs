@@ -4926,6 +4926,9 @@ async fn handle_client_message(
                     .await;
 
                 if success {
+                    // Stop gathering (fishing, etc.) on teleport
+                    room.handle_stop_gathering(player_id).await;
+
                     if let Some(instance_id) = instance_id {
                         // Player was in an instance - do instance cleanup
                         {

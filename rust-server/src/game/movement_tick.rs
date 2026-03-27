@@ -372,21 +372,9 @@ impl GameRoom {
                 }
             }
 
-            if !ghosting {
-                let player_blocked = if is_overworld {
-                    overworld_player_positions.contains(&(target_x, target_y))
-                } else {
-                    player_instance
-                        .and_then(|instance_id| instance_player_positions.get(instance_id))
-                        .is_some_and(|positions| positions.contains(&(target_x, target_y)))
-                };
-                if player_blocked {
-                    if record_telemetry {
-                        tick_telemetry.rejected_player_blocked += 1;
-                    }
-                    return MoveCheck::BlockedPlayer;
-                }
-            }
+            // Player-vs-player collision is handled client-side (500ms ghost
+            // delay). The server allows players to walk through each other so
+            // there are no prediction/correction mismatches.
 
             let npc_blocked = if is_overworld {
                 npc_positions.contains(&(target_x, target_y))
@@ -470,6 +458,7 @@ impl GameRoom {
         let mut valid_moves = Vec::new();
         let mut auto_sit_requests = Vec::new();
         let mut ghost_tick_updates: Vec<(String, u32)> = Vec::new();
+        let mut blocked_by_player: HashSet<String> = HashSet::new();
         for (id, target_x, target_y, sampled_dx, sampled_dy, player_z, player_grounded, sampled_seq, ghost_ticks) in pending_moves {
             let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
             let can_ghost = ghost_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
@@ -483,7 +472,8 @@ impl GameRoom {
                     auto_sit_requests.push((id, target_x, target_y, sampled_seq));
                 }
                 MoveCheck::BlockedPlayer => {
-                    ghost_tick_updates.push((id, ghost_ticks + 1));
+                    ghost_tick_updates.push((id.clone(), ghost_ticks + 1));
+                    blocked_by_player.insert(id);
                 }
                 _ => {
                     ghost_tick_updates.push((id, 0));
@@ -610,6 +600,17 @@ impl GameRoom {
 
             for player_id in &pending_player_ids {
                 if !moved_players.contains(player_id) {
+                    // Don't clear intent for players blocked by another player —
+                    // they need to keep their intent alive so ghost_player_ticks
+                    // can accumulate across ticks until ghosting kicks in.
+                    if blocked_by_player.contains(player_id) {
+                        if let Some(player) = players.get_mut(player_id) {
+                            if let Some(sampled_seq) = pending_move_sequences.get(player_id) {
+                                player.mark_move_seq_processed(*sampled_seq);
+                            }
+                        }
+                        continue;
+                    }
                     if let Some(player) = players.get_mut(player_id) {
                         if let Some(sampled_seq) = pending_move_sequences.get(player_id) {
                             player.mark_move_seq_processed(*sampled_seq);

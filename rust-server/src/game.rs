@@ -3274,6 +3274,11 @@ impl GameRoom {
             }
         }
 
+        // Stop gathering immediately when movement starts (don't wait for arrival)
+        if dx.abs() > 0.1 || dy.abs() > 0.1 {
+            self.handle_stop_gathering(player_id).await;
+        }
+
         // Close chest if player moved
         self.close_player_chest(player_id).await;
     }
@@ -8248,9 +8253,6 @@ impl GameRoom {
             player.x = WORLD_SPAWN_X;
             player.y = WORLD_SPAWN_Y;
         }
-
-        // Stop gathering (fishing, etc.) on teleport
-        self.handle_stop_gathering(player_id).await;
 
         // Send success result
         self.send_to_player(

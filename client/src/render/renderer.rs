@@ -394,12 +394,20 @@ pub struct Renderer {
     /// reset to 1.0 for world rendering. Snaps to nearest multiple of 8 for
     /// pixel-perfect monogram font rendering.
     pub(crate) font_scale: Cell<f32>,
+    /// Deferred XP drop feed position (x, start_y) — set in render_ui, drawn after interactive UI
+    xp_drop_pos: Cell<Option<(f32, f32)>>,
     /// Off-screen render target for compositing the player silhouette at full opacity
     silhouette_rt: RefCell<Option<RenderTarget>>,
     /// Animated object sprites: sprite_id -> frame_count
     animated_objects: HashMap<u32, u32>,
     /// Animated wall sprites: sprite_id -> frame_count
     animated_walls: HashMap<u32, u32>,
+    /// Destination flag icon for minimap pathfinding destination marker
+    destination_flag: Option<Texture2D>,
+    /// Click effect spritesheets (4 frames, 16x16 each)
+    click_walk_texture: Option<Texture2D>,
+    click_attack_texture: Option<Texture2D>,
+    click_interact_texture: Option<Texture2D>,
     /// Map icons sprite sheet (16x16 icons: dead_tree, oak, oak2, willow, maple, yew, quest, portal, enemy, station)
     map_icons: Option<Texture2D>,
     /// Pre-computed pixel-perfect outline textures for map icon hover state (18x18 per icon to accommodate 1px border)
@@ -1525,6 +1533,52 @@ impl Renderer {
             }
         };
 
+        let destination_flag =
+            match load_texture(&asset_path("assets/ui/destination_flag.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load destination_flag icon: {}", e);
+                    None
+                }
+            };
+
+        let click_walk_texture =
+            match load_texture(&asset_path("assets/ui/walk_click.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load walk_click texture: {}", e);
+                    None
+                }
+            };
+        let click_attack_texture =
+            match load_texture(&asset_path("assets/ui/attack_click.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load attack_click texture: {}", e);
+                    None
+                }
+            };
+        let click_interact_texture =
+            match load_texture(&asset_path("assets/ui/interact_click.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load interact_click texture: {}", e);
+                    None
+                }
+            };
+
         let map_icons = match load_texture(&asset_path("assets/ui/map-icons.png")).await {
             Ok(tex) => {
                 tex.set_filter(FilterMode::Nearest);
@@ -1826,6 +1880,10 @@ impl Renderer {
             fishing_skill_icon,
             chat_small_icon,
             coin_small_icon,
+            destination_flag,
+            click_walk_texture,
+            click_attack_texture,
+            click_interact_texture,
             map_icons,
             map_icons_outlines,
             farming_sprites,
@@ -1847,6 +1905,7 @@ impl Renderer {
             text_measure_cache: RefCell::new(HashMap::new()),
             text_wrap_cache: RefCell::new(HashMap::new()),
             font_scale: Cell::new(1.0),
+            xp_drop_pos: Cell::new(None),
             silhouette_rt: RefCell::new(None),
             animated_objects,
             animated_walls,
@@ -3210,6 +3269,35 @@ impl Renderer {
             }
         }
 
+        // Draw destination flag for active auto-path
+        if let Some(ref path_state) = state.auto_path {
+            if let Some(flag_tex) = &self.destination_flag {
+                let dest_x = path_state.destination.0 as f32 + 0.5;
+                let dest_y = path_state.destination.1 as f32 + 0.5;
+                if dest_x >= bounds.min_x
+                    && dest_x <= bounds.max_x
+                    && dest_y >= bounds.min_y
+                    && dest_y <= bounds.max_y
+                {
+                    let (sx, sy) =
+                        self.minimap_world_to_screen(bounds, map_rect, dest_x, dest_y);
+                    let flag_w = flag_tex.width();
+                    let flag_h = flag_tex.height();
+                    // Anchor the flag's bottom-center pole to the destination point
+                    draw_texture_ex(
+                        flag_tex,
+                        sx - flag_w * 0.5,
+                        sy - flag_h,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(macroquad::math::Vec2::new(flag_w, flag_h)),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+        }
+
         // Disable scissor clipping
         {
             let mut gl = unsafe { get_internal_gl() };
@@ -3569,6 +3657,12 @@ impl Renderer {
                 tile_y: i32,
                 tile_z: i32,
             },
+            /// Destination tile dim overlay for auto-path target
+            DestinationTile {
+                tile_x: i32,
+                tile_y: i32,
+                tile_z: i32,
+            },
             /// Drop zone highlight - depth-sorted to render on top of elevated blocks
             DropZone {
                 tile_x: i32,
@@ -3675,6 +3769,11 @@ impl Renderer {
             } else {
                 self.render_interactive_ui(state)
             };
+
+            // 10. Render XP drops above interactive UI overlays
+            if !state.spectator_mode {
+                self.render_deferred_xp_drops(state);
+            }
             timings.ui_ms = (get_time() - t4) * 1000.0;
 
             timings.total_ms = (get_time() - render_start) * 1000.0;
@@ -4188,6 +4287,14 @@ impl Renderer {
             renderables.push((depth, Renderable::TileHover { tile_x, tile_y, tile_z: z }));
         }
 
+        // Add destination tile highlight for active auto-path
+        if let Some(ref path_state) = state.auto_path {
+            let (dest_x, dest_y) = path_state.destination;
+            let z = state.chunk_manager.get_height(dest_x, dest_y) as i32;
+            let depth = calculate_depth_z(dest_x as f32, dest_y as f32, z as f32, 1) - 0.01;
+            renderables.push((depth, Renderable::DestinationTile { tile_x: dest_x, tile_y: dest_y, tile_z: z }));
+        }
+
         // Sort by depth (painter's algorithm)
         // Must use stable sort: items at the same depth (e.g. walls on tiles
         // with equal x+y) must keep a consistent order to avoid flickering.
@@ -4198,6 +4305,9 @@ impl Renderer {
             match renderable {
                 Renderable::TileHover { tile_x, tile_y, tile_z } => {
                     self.render_tile_hover(tile_x, tile_y, tile_z, &state.camera);
+                }
+                Renderable::DestinationTile { tile_x, tile_y, tile_z } => {
+                    self.render_destination_tile(tile_x, tile_y, tile_z, &state.camera);
                 }
                 Renderable::DropZone { tile_x, tile_y, tile_z, is_hovered } => {
                     self.render_drop_zone(tile_x, tile_y, tile_z, &state.camera, is_hovered);
@@ -4538,6 +4648,9 @@ impl Renderer {
 
         timings.entities_ms = (get_time() - t1) * 1000.0;
 
+        // 3.9. Render click effects on the ground
+        self.render_click_effects(state);
+
         // 4. Render overhead layer (always on top)
         let t2 = get_time();
         self.render_tilemap_layer(state, LayerType::Overhead);
@@ -4592,6 +4705,11 @@ impl Renderer {
         } else {
             self.render_interactive_ui(state)
         };
+
+        // 10. Render XP drops above interactive UI overlays (e.g. crafting fade)
+        if !state.spectator_mode {
+            self.render_deferred_xp_drops(state);
+        }
         timings.ui_ms = (get_time() - t4) * 1000.0;
 
         timings.total_ms = (get_time() - render_start) * 1000.0;
@@ -5617,6 +5735,53 @@ impl Renderer {
                 self.draw_text_sharp(line, text_x, text_y, font_size, text_color);
                 text_y += line_height;
             }
+        }
+    }
+
+    fn render_click_effects(&self, state: &GameState) {
+        use crate::game::state::ClickEffectKind;
+
+        for effect in &state.click_effects {
+            let texture = match effect.kind {
+                ClickEffectKind::Walk => &self.click_walk_texture,
+                ClickEffectKind::Attack => &self.click_attack_texture,
+                ClickEffectKind::Interact => &self.click_interact_texture,
+            };
+            let Some(tex) = texture.as_ref() else {
+                continue;
+            };
+
+            let frame = effect.frame();
+            let frame_size = crate::game::state::ClickEffect::FRAME_SIZE;
+            let source_rect = Rect::new(frame as f32 * frame_size, 0.0, frame_size, frame_size);
+
+            // Convert exact world position to screen space
+            let (screen_x, screen_y) =
+                world_to_screen(effect.tile_x, effect.tile_y, &state.camera);
+
+            let zoom = state.camera.zoom;
+            let draw_size = frame_size * zoom;
+
+            // Fade out over the last quarter of the animation
+            let alpha = if effect.elapsed > crate::game::state::ClickEffect::DURATION * 0.75 {
+                let t = (effect.elapsed - crate::game::state::ClickEffect::DURATION * 0.75)
+                    / (crate::game::state::ClickEffect::DURATION * 0.25);
+                1.0 - t
+            } else {
+                1.0
+            };
+
+            draw_texture_ex(
+                tex,
+                screen_x - draw_size * 0.5,
+                screen_y - draw_size * 0.5,
+                Color::new(1.0, 1.0, 1.0, alpha),
+                DrawTextureParams {
+                    source: Some(source_rect),
+                    dest_size: Some(Vec2::new(draw_size, draw_size)),
+                    ..Default::default()
+                },
+            );
         }
     }
 
@@ -6736,6 +6901,28 @@ impl Renderer {
             line_width,
             color,
         );
+    }
+
+    /// Draw a dim overlay on the auto-path destination tile
+    fn render_destination_tile(&self, tile_x: i32, tile_y: i32, tile_z: i32, camera: &Camera) {
+        let (center_x, center_y) =
+            world_to_screen_z(tile_x as f32 + 0.5, tile_y as f32 + 0.5, tile_z as f32, camera);
+        let center_y = center_y - TILE_HEIGHT * camera.zoom / 2.0;
+
+        let half_w = TILE_WIDTH * camera.zoom / 2.0;
+        let half_h = TILE_HEIGHT * camera.zoom / 2.0;
+
+        // Diamond vertices
+        let top = Vec2::new(center_x, center_y - half_h);
+        let right = Vec2::new(center_x + half_w, center_y);
+        let bottom = Vec2::new(center_x, center_y + half_h);
+        let left = Vec2::new(center_x - half_w, center_y);
+
+        let color = Color::new(0.0, 0.0, 0.0, 0.18);
+
+        // Fill the diamond with two triangles
+        draw_triangle(top, right, bottom, color);
+        draw_triangle(top, bottom, left, color);
     }
 
     /// Draw a green drop zone indicator for a tile (when dragging items)
@@ -10484,17 +10671,19 @@ impl Renderer {
                 chip_row_h = 0.0;
             }
 
-            // XP Drop Feed (below gathering/stall status or MP bar)
+            // XP Drop Feed position (below gathering/stall status or MP bar)
+            // Actual rendering is deferred to after interactive UI so drops appear above panel overlays
             let extra_offset = if is_skilling { 22.0 + 4.0 } else { 0.0 }
                 + if has_stall_bar { 22.0 + 4.0 } else { 0.0 }
                 + if has_dash_bar { 22.0 + 4.0 } else { 0.0 }
                 + if has_any_chip { chip_row_h / s + 4.0 } else { 0.0 };
             let drop_start_y = prayer_bar_y + bar_height + extra_offset + 145.0;
-            self.render_xp_drop_feed(&state.xp_drop_feed, 10.0, drop_start_y);
+            self.xp_drop_pos.set(Some((10.0, drop_start_y)));
         }
 
         // Note: Interactive UI (inventory, crafting, dialogue, quick slots) is rendered
-        // by render_interactive_ui() which is called by the main render loop
+        // by render_interactive_ui() which is called by the main render loop.
+        // XP drops are rendered after interactive UI via render_deferred_xp_drops().
 
         // Area banner (location name during transitions)
         if state.area_banner.is_visible() {
@@ -10664,6 +10853,14 @@ impl Renderer {
                     );
                 }
             }
+        }
+    }
+
+    /// Render XP drop feed above interactive UI overlays (called after render_interactive_ui)
+    fn render_deferred_xp_drops(&self, state: &GameState) {
+        if let Some((x, start_y)) = self.xp_drop_pos.get() {
+            self.render_xp_drop_feed(&state.xp_drop_feed, x, start_y);
+            self.xp_drop_pos.set(None);
         }
     }
 
