@@ -5729,11 +5729,23 @@ impl GameRoom {
                 let should_retaliate = {
                     let players = self.players.read().await;
                     if let Some(player) = players.get(&target_id) {
+                        // Allow retaliate if no auto-action, OR if current auto-action
+                        // targets a different NPC (not actively fighting the attacker)
+                        let no_conflicting_action = match &player.auto_action {
+                            None => true,
+                            Some(aa) => match &aa.target {
+                                AutoActionTarget::Npc { npc_id: current_npc } => {
+                                    current_npc != &npc_id
+                                }
+                                _ => false,
+                            },
+                        };
                         player.auto_retaliate
-                            && player.auto_action.is_none()
+                            && no_conflicting_action
                             && !player.is_dead
                             && player.move_dx == 0 && player.move_dy == 0
                             && player.pending_move_seq.is_none()
+                            && current_time.saturating_sub(player.last_move_input_ms) >= 500
                             && current_time.saturating_sub(player.last_activity_time)
                                 < AUTO_RETALIATE_IDLE_TIMEOUT_MS
                     } else {
@@ -5861,8 +5873,8 @@ impl GameRoom {
                             continue;
                         }
 
-                        // Check if in range and cooldown ready
-                        let (in_range, cooldown_ready) = if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos {
+                        // Check if in range, cooldown ready, and standing still
+                        let (in_range, cooldown_ready, is_still) = if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos {
                             let players = self.players.read().await;
                             if let Some(player) = players.get(&pid) {
                                 let closest_x = player.x.clamp(npc_x + npc_off_x, npc_x + npc_off_x + npc_size - 1);
@@ -5889,15 +5901,19 @@ impl GameRoom {
                                 let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
                                 let cooldown_ready =
                                     current_time - player.last_attack_time >= cd;
-                                (in_range, cooldown_ready)
+                                let is_still = player.move_dx == 0
+                                    && player.move_dy == 0
+                                    && player.pending_move_seq.is_none()
+                                    && current_time.saturating_sub(player.last_move_input_ms) >= 500;
+                                (in_range, cooldown_ready, is_still)
                             } else {
-                                (false, false)
+                                (false, false, false)
                             }
                         } else {
-                            (false, false)
+                            (false, false, false)
                         };
 
-                        if in_range && cooldown_ready {
+                        if in_range && cooldown_ready && is_still {
                             // Compute facing direction toward NPC target
                             let face_dir = if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos {
                                 let players = self.players.read().await;
@@ -5961,8 +5977,8 @@ impl GameRoom {
                             }
                         }
 
-                        // Check range and cooldown
-                        let (in_range, cooldown_ready) = {
+                        // Check range, cooldown, and standing still
+                        let (in_range, cooldown_ready, is_still) = {
                             let players = self.players.read().await;
                             if let (Some(attacker), Some(target)) =
                                 (players.get(&pid), players.get(target_pid.as_str()))
@@ -5990,13 +6006,17 @@ impl GameRoom {
                                 let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
                                 let cooldown_ready =
                                     current_time - attacker.last_attack_time >= cd;
-                                (in_range, cooldown_ready)
+                                let is_still = attacker.move_dx == 0
+                                    && attacker.move_dy == 0
+                                    && attacker.pending_move_seq.is_none()
+                                    && current_time.saturating_sub(attacker.last_move_input_ms) >= 500;
+                                (in_range, cooldown_ready, is_still)
                             } else {
-                                (false, false)
+                                (false, false, false)
                             }
                         };
 
-                        if in_range && cooldown_ready {
+                        if in_range && cooldown_ready && is_still {
                             // Compute facing direction toward player target
                             let face_dir = {
                                 let players = self.players.read().await;
