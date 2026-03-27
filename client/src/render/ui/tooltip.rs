@@ -54,7 +54,7 @@ impl Renderer {
                     }
                 }
             }
-            Some(UiElementId::EquipmentSlot(slot_type)) if state.ui_state.inventory_open => {
+            Some(UiElementId::EquipmentSlot(slot_type)) if state.ui_state.inventory_open || state.ui_state.character_panel_open => {
                 let equipped_item =
                     state
                         .get_local_player()
