@@ -1145,6 +1145,8 @@ pub enum ContextMenuTarget {
     Spell(String),
     QuestTracker,
     ChatTab,
+    BankSlot(usize),
+    BankInventorySlot(usize),
 }
 
 /// Context menu for right-clicking items

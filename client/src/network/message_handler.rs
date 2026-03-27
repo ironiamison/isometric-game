@@ -2923,6 +2923,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     .load_interior(width, height, layers, &collision, portals, objects, walls, heightmap, block_types_down, block_types_right);
                 state.current_interior = Some(map_id.clone());
                 state.current_instance = Some(instance_id);
+                state.fishing_bubbles.clear();
 
                 // Reset portal check and ignore the spawn tile until player steps off
                 state.last_portal_check_pos = None;

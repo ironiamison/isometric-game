@@ -3408,6 +3408,18 @@ impl InputHandler {
                 ContextMenuTarget::Spell(_) => 3, // "Hotkey 1", "Hotkey 2", "Hotkey 3"
                 ContextMenuTarget::QuestTracker => 1, // "Minimize" or "Expand"
                 ContextMenuTarget::ChatTab => 1, // "Hide/Show System Messages"
+                ContextMenuTarget::BankSlot(idx) => {
+                    state.ui_state.bank_slots.get(*idx)
+                        .and_then(|s| s.as_ref())
+                        .map(|(_, qty)| if *qty > 1 { 3 } else { 1 })
+                        .unwrap_or(0)
+                }
+                ContextMenuTarget::BankInventorySlot(idx) => {
+                    state.inventory.slots.get(*idx)
+                        .and_then(|s| s.as_ref())
+                        .map(|slot| if slot.quantity > 1 { 3 } else { 1 })
+                        .unwrap_or(0)
+                }
             };
 
             let menu_width = 140.0; // generous estimate
@@ -4530,6 +4542,80 @@ impl InputHandler {
                                     if *option_idx == 0 {
                                         state.ui_state.hide_system_in_public = !state.ui_state.hide_system_in_public;
                                         save_current_ui_settings(state);
+                                    }
+                                }
+                                ContextMenuTarget::BankSlot(idx) => {
+                                    if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx) {
+                                        let item_id = item_id.clone();
+                                        let qty = *qty;
+                                        let has_many = qty > 1;
+                                        match option_idx {
+                                            0 => {
+                                                // Withdraw 1
+                                                commands.push(InputCommand::BankWithdraw {
+                                                    item_id,
+                                                    quantity: 1,
+                                                });
+                                                state.pending_sfx.push("enter".to_string());
+                                            }
+                                            1 if has_many => {
+                                                // Withdraw X
+                                                state.ui_state.bank_quantity_dialog =
+                                                    Some(BankQuantityDialog {
+                                                        input: String::new(),
+                                                        cursor: 0,
+                                                        action: BankQuantityAction::WithdrawItem,
+                                                        item_id: Some(item_id),
+                                                        max_quantity: qty,
+                                                    });
+                                            }
+                                            2 if has_many => {
+                                                // Withdraw All
+                                                commands.push(InputCommand::BankWithdraw {
+                                                    item_id,
+                                                    quantity: qty,
+                                                });
+                                                state.pending_sfx.push("enter".to_string());
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                                ContextMenuTarget::BankInventorySlot(idx) => {
+                                    if let Some(Some(slot)) = state.inventory.slots.get(*idx) {
+                                        let item_id = slot.item_id.clone();
+                                        let qty = slot.quantity;
+                                        let has_many = qty > 1;
+                                        match option_idx {
+                                            0 => {
+                                                // Deposit 1
+                                                commands.push(InputCommand::BankDeposit {
+                                                    item_id,
+                                                    quantity: 1,
+                                                });
+                                                state.pending_sfx.push("enter".to_string());
+                                            }
+                                            1 if has_many => {
+                                                // Deposit X
+                                                state.ui_state.bank_quantity_dialog =
+                                                    Some(BankQuantityDialog {
+                                                        input: String::new(),
+                                                        cursor: 0,
+                                                        action: BankQuantityAction::DepositItem,
+                                                        item_id: Some(item_id),
+                                                        max_quantity: qty,
+                                                    });
+                                            }
+                                            2 if has_many => {
+                                                // Deposit All
+                                                commands.push(InputCommand::BankDeposit {
+                                                    item_id,
+                                                    quantity: qty,
+                                                });
+                                                state.pending_sfx.push("enter".to_string());
+                                            }
+                                            _ => {}
+                                        }
                                     }
                                 }
                             }
@@ -5686,6 +5772,13 @@ impl InputHandler {
                             state.ui_state.bank_quantity_dialog = None;
                             return commands;
                         }
+                        UiElementId::BankQuantityMax => {
+                            let dialog = state.ui_state.bank_quantity_dialog.as_mut().unwrap();
+                            let max_str = dialog.max_quantity.to_string();
+                            dialog.cursor = max_str.len();
+                            dialog.input = max_str;
+                            return commands;
+                        }
                         _ => {}
                     }
                 }
@@ -5989,6 +6082,35 @@ impl InputHandler {
                     .unwrap_or(false)
                 {
                     return commands;
+                }
+            }
+
+            // Right-click context menu for bank slots and inventory slots
+            if mouse_right_clicked {
+                if let Some(ref element) = clicked_element {
+                    match element {
+                        UiElementId::BankSlot(idx) => {
+                            if let Some(Some(_)) = state.ui_state.bank_slots.get(*idx) {
+                                state.ui_state.context_menu = Some(ContextMenu {
+                                    target: ContextMenuTarget::BankSlot(*idx),
+                                    x: mx,
+                                    y: my,
+                                });
+                            }
+                            return commands;
+                        }
+                        UiElementId::BankInventorySlot(idx) => {
+                            if let Some(Some(_)) = state.inventory.slots.get(*idx) {
+                                state.ui_state.context_menu = Some(ContextMenu {
+                                    target: ContextMenuTarget::BankInventorySlot(*idx),
+                                    x: mx,
+                                    y: my,
+                                });
+                            }
+                            return commands;
+                        }
+                        _ => {}
+                    }
                 }
             }
 

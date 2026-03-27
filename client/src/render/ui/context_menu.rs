@@ -244,6 +244,32 @@ impl Renderer {
                 }
                 "Public Chat".to_string()
             }
+            ContextMenuTarget::BankSlot(idx) => {
+                if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx) {
+                    let item_def = state.item_registry.get_or_placeholder(item_id);
+                    push_option(&mut options, "Withdraw 1");
+                    if *qty > 1 {
+                        push_option(&mut options, "Withdraw X");
+                        push_option(&mut options, "Withdraw All");
+                    }
+                    item_def.display_name.clone()
+                } else {
+                    "Empty".to_string()
+                }
+            }
+            ContextMenuTarget::BankInventorySlot(idx) => {
+                if let Some(Some(slot)) = state.inventory.slots.get(*idx) {
+                    let item_def = state.item_registry.get_or_placeholder(&slot.item_id);
+                    push_option(&mut options, "Deposit 1");
+                    if slot.quantity > 1 {
+                        push_option(&mut options, "Deposit X");
+                        push_option(&mut options, "Deposit All");
+                    }
+                    item_def.display_name.clone()
+                } else {
+                    "Empty".to_string()
+                }
+            }
         };
 
         if options.is_empty() {
