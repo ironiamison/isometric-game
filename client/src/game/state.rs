@@ -2057,6 +2057,9 @@ pub struct GameState {
     /// Active auto-action state (OSRS-style click-to-act chase)
     pub auto_action_state: Option<AutoActionState>,
 
+    /// Whether auto-retaliate is enabled (server-authoritative, toggled via character panel)
+    pub auto_retaliate: bool,
+
     /// Timestamp of last chase re-path to throttle re-pathing frequency
     pub last_chase_repath_time: f64,
 
@@ -2228,6 +2231,7 @@ impl GameState {
             hovered_entity_id: None,
             auto_path: None,
             auto_action_state: None,
+            auto_retaliate: true,
             last_chase_repath_time: 0.0,
             follow_target: None,
             follow_arrived_target_pos: None,
@@ -2458,9 +2462,13 @@ impl GameState {
         }
         self.fishing_bubbles.retain(|p| !p.is_finished(now));
 
-        // Spawn new bubbles at fishing markers periodically
+        // Spawn new bubbles at fishing markers periodically (overworld only)
         self.bubble_spawn_timer -= delta as f64;
-        if self.bubble_spawn_timer <= 0.0 {
+        if self.bubble_spawn_timer <= 0.0 && self.current_instance.is_some() {
+            self.bubble_spawn_timer = 0.8;
+            self.fishing_bubbles.clear();
+        }
+        if self.bubble_spawn_timer <= 0.0 && self.current_instance.is_none() {
             self.bubble_spawn_timer = 0.8; // Spawn a batch every 0.8s
             let fishing_markers: Vec<(f32, f32)> = self
                 .gathering_markers
