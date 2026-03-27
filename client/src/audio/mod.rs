@@ -343,9 +343,7 @@ fn settings_path() -> Option<std::path::PathBuf> {
 
 #[cfg(target_os = "android")]
 fn settings_path() -> Option<std::path::PathBuf> {
-    // On Android, we use a simple path in the app's internal storage
-    // The actual path will be relative to where the app runs
-    Some(std::path::PathBuf::from("audio_settings.toml"))
+    crate::settings::android_files_dir().map(|d| d.join("audio_settings.toml"))
 }
 
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]

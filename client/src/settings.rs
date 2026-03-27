@@ -56,8 +56,31 @@ fn ui_settings_path() -> Option<std::path::PathBuf> {
 }
 
 #[cfg(target_os = "android")]
+pub fn android_files_dir() -> Option<std::path::PathBuf> {
+    unsafe {
+        let env = miniquad::native::android::attach_jni_env();
+        let activity = miniquad::native::android::ACTIVITY;
+        if activity.is_null() {
+            return None;
+        }
+        // Call activity.getFilesDir() -> File
+        let files_dir = miniquad::call_object_method!(env, activity, "getFilesDir", "()Ljava/io/File;");
+        if files_dir.is_null() {
+            return None;
+        }
+        // Call file.getAbsolutePath() -> String
+        let path_jstr = miniquad::call_object_method!(env, files_dir, "getAbsolutePath", "()Ljava/lang/String;");
+        if path_jstr.is_null() {
+            return None;
+        }
+        let path_str = miniquad::get_utf_str!(env, path_jstr);
+        Some(std::path::PathBuf::from(path_str))
+    }
+}
+
+#[cfg(target_os = "android")]
 fn ui_settings_path() -> Option<std::path::PathBuf> {
-    Some(std::path::PathBuf::from("ui_settings.toml"))
+    android_files_dir().map(|d| d.join("ui_settings.toml"))
 }
 
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
@@ -140,12 +163,12 @@ fn control_scheme_chosen_path() -> Option<std::path::PathBuf> {
 
 #[cfg(target_os = "android")]
 fn control_scheme_chosen_path() -> Option<std::path::PathBuf> {
-    Some(std::path::PathBuf::from("control_scheme_chosen"))
+    android_files_dir().map(|d| d.join("control_scheme_chosen"))
 }
 
 #[cfg(target_os = "android")]
 fn controls_path() -> Option<std::path::PathBuf> {
-    Some(std::path::PathBuf::from("controls_settings.toml"))
+    android_files_dir().map(|d| d.join("controls_settings.toml"))
 }
 
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
@@ -280,7 +303,7 @@ fn tutorial_completed_path() -> Option<std::path::PathBuf> {
 
 #[cfg(target_os = "android")]
 fn tutorial_completed_path() -> Option<std::path::PathBuf> {
-    Some(std::path::PathBuf::from("tutorial_completed"))
+    android_files_dir().map(|d| d.join("tutorial_completed"))
 }
 
 #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
