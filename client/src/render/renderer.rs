@@ -375,6 +375,8 @@ pub struct Renderer {
     water_overlay_material: Option<Material>,
     /// Arrow projectile spritesheet (arrow_angles.png: 7 types × 4 angles, 31x27 per frame)
     arrow_projectile_texture: Option<Texture2D>,
+    /// Auto-retaliate toggle icon
+    pub(crate) auto_retaliate_icon: Option<Texture2D>,
     /// Exit portal arrow textures for interior maps
     exit_arrow_up: Option<Texture2D>,
     exit_arrow_down: Option<Texture2D>,
@@ -1653,6 +1655,19 @@ impl Renderer {
             }
         };
 
+        // Load auto-retaliate icon
+        let auto_retaliate_icon =
+            match load_texture(&asset_path("assets/ui/auto_retaliate.png")).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    Some(tex)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load auto_retaliate icon: {}", e);
+                    None
+                }
+            };
+
         // Load exit portal arrow textures
         let exit_arrow_up = match load_texture(&asset_path("assets/ui/up_arrow.png")).await {
             Ok(tex) => {
@@ -1895,6 +1910,7 @@ impl Renderer {
             water_material,
             water_overlay_material,
             arrow_projectile_texture,
+            auto_retaliate_icon,
             exit_arrow_up,
             exit_arrow_down,
             exit_arrow_left,

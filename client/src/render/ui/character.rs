@@ -11,19 +11,23 @@ use macroquad::prelude::*;
 const CHARACTER_PANEL_PADDING: f32 = 12.0;
 const CHARACTER_HEADER_HEIGHT: f32 = 24.0;
 const CHARACTER_GRID_WIDTH: f32 = 3.0 * EQUIP_SLOT_SIZE + 2.0 * EQUIP_SLOT_SPACING; // 122
-const CHARACTER_GRID_HEIGHT: f32 = 4.0 * EQUIP_SLOT_SIZE + 3.0 * EQUIP_SLOT_SPACING + 26.0; // 190
+const CHARACTER_GRID_HEIGHT: f32 = 4.0 * EQUIP_SLOT_SIZE + 3.0 * EQUIP_SLOT_SPACING; // 164
 const CHARACTER_PANEL_WIDTH: f32 = 240.0; // Unified width to match inventory and other UI panels
 const SHOP_BUTTON_HEIGHT: f32 = 26.0;
 const COMBAT_STYLE_ROW_HEIGHT: f32 = 26.0;
+const GRID_STYLE_GAP: f32 = 6.0; // Small gap between equipment grid and style row
+const AUTO_RETALIATE_BTN_HEIGHT: f32 = 60.0; // Icon + two lines of text
 const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + CHARACTER_HEADER_HEIGHT
     + CHARACTER_PANEL_PADDING
     + CHARACTER_GRID_HEIGHT
-    + CHARACTER_PANEL_PADDING
+    + GRID_STYLE_GAP
     + COMBAT_STYLE_ROW_HEIGHT
+    + GRID_STYLE_GAP
+    + AUTO_RETALIATE_BTN_HEIGHT
     + CHARACTER_PANEL_PADDING
     + SHOP_BUTTON_HEIGHT
-    + CHARACTER_PANEL_PADDING; // ~338
+    + CHARACTER_PANEL_PADDING;
 const STATS_SECTION_GAP: f32 = 8.0; // Gap between equipment grid and stats
 
 /// Melee combat style labels and short forms
@@ -253,76 +257,14 @@ impl Renderer {
                 self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
             }
 
-            // Auto-retaliate toggle button (below stats, aligned with ring row)
-            let ar_size = slot_size;
-            let ar_x = stats_x + (available_width - ar_size) / 2.0;
-            let ar_y = grid_y + 2.0 * slot_step;
-
-            let ar_bounds = Rect::new(ar_x, ar_y, ar_size, ar_size);
-            layout.add(UiElementId::AutoRetaliateToggle, ar_bounds);
-
-            let ar_enabled = state.auto_retaliate;
-            let ar_hovered = matches!(hovered, Some(UiElementId::AutoRetaliateToggle));
-
-            let ar_bg = if ar_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-            let ar_border = if ar_enabled {
-                Color::new(0.2, 0.9, 0.2, 1.0) // bright green
-            } else if ar_hovered {
-                SLOT_HOVER_BORDER
-            } else {
-                SLOT_BORDER
-            };
-            let border_w = if ar_enabled { 2.0 } else { 1.0 };
-
-            draw_rectangle(ar_x, ar_y, ar_size, ar_size, ar_border);
-            draw_rectangle(
-                ar_x + border_w,
-                ar_y + border_w,
-                ar_size - border_w * 2.0,
-                ar_size - border_w * 2.0,
-                ar_bg,
-            );
-
-            let ar_text_color = if ar_enabled {
-                Color::new(0.2, 0.9, 0.2, 1.0) // green text when on
-            } else {
-                Color::new(0.8, 0.3, 0.3, 1.0) // red text when off
-            };
-
-            let line1 = "auto";
-            let line2 = "retaliate";
-            let l1w = self.measure_text_sharp(line1, 14.0).width;
-            let l2w = self.measure_text_sharp(line2, 14.0).width;
-            self.draw_text_sharp(
-                line1,
-                ar_x + (ar_size - l1w) / 2.0,
-                ar_y + ar_size * 0.38,
-                14.0,
-                ar_text_color,
-            );
-            self.draw_text_sharp(
-                line2,
-                ar_x + (ar_size - l2w) / 2.0,
-                ar_y + ar_size * 0.68,
-                14.0,
-                ar_text_color,
-            );
         }
 
         // ===== COMBAT STYLE SELECTOR =====
         let style_row_height = COMBAT_STYLE_ROW_HEIGHT * scale;
         let style_area_width = panel_width - frame_thickness * 2.0 - panel_padding * 2.0;
         let style_x = panel_x + frame_thickness + panel_padding;
-        let shop_offset = if cfg!(target_os = "android") {
-            0.0 // No shop button on mobile
-        } else {
-            SHOP_BUTTON_HEIGHT * scale + panel_padding
-        };
-        let style_y = panel_y + panel_height
-            - frame_thickness
-            - panel_padding
-            - shop_offset
-            - style_row_height;
+        let grid_bottom = grid_y + 4.0 * slot_step;
+        let style_y = grid_bottom + GRID_STYLE_GAP * scale;
 
         // Label
         let label = "Style:";
@@ -382,6 +324,70 @@ impl Renderer {
                 by + 17.0 * scale,
                 16.0,
                 text_color,
+            );
+        }
+
+        // ===== AUTO-RETALIATE TOGGLE (desktop only) =====
+        if !cfg!(target_os = "android") {
+            let ar_h = AUTO_RETALIATE_BTN_HEIGHT * scale;
+            let ar_w = style_area_width;
+            let ar_x = style_x;
+            let ar_y = style_y + style_row_height + GRID_STYLE_GAP * scale;
+
+            let ar_bounds = Rect::new(ar_x, ar_y, ar_w, ar_h);
+            layout.add(UiElementId::AutoRetaliateToggle, ar_bounds);
+
+            let ar_enabled = state.auto_retaliate;
+            let ar_hovered = matches!(hovered, Some(UiElementId::AutoRetaliateToggle));
+
+            let ar_bg = if ar_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
+            let ar_border = if ar_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
+
+            draw_rectangle(ar_x, ar_y, ar_w, ar_h, ar_border);
+            draw_rectangle(ar_x + 1.0, ar_y + 1.0, ar_w - 2.0, ar_h - 2.0, ar_bg);
+
+            // Draw icon centered at top
+            if let Some(icon) = &self.auto_retaliate_icon {
+                let icon_size = 24.0 * scale;
+                let icon_x = ar_x + (ar_w - icon_size) / 2.0;
+                let icon_y = ar_y + 4.0 * scale;
+                draw_texture_ex(
+                    icon,
+                    icon_x,
+                    icon_y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(icon_size, icon_size)),
+                        ..Default::default()
+                    },
+                );
+            }
+
+            // Label text below icon
+            let ar_text_color = if ar_enabled {
+                Color::new(0.2, 0.9, 0.2, 1.0)
+            } else {
+                Color::new(0.8, 0.3, 0.3, 1.0)
+            };
+
+            let line1 = "auto";
+            let line2 = "retaliate";
+            let l1w = self.measure_text_sharp(line1, 14.0).width;
+            let l2w = self.measure_text_sharp(line2, 14.0).width;
+            let text_start = ar_y + 4.0 * scale + 24.0 * scale + 2.0 * scale;
+            self.draw_text_sharp(
+                line1,
+                ar_x + (ar_w - l1w) / 2.0,
+                text_start + 10.0 * scale,
+                14.0,
+                ar_text_color,
+            );
+            self.draw_text_sharp(
+                line2,
+                ar_x + (ar_w - l2w) / 2.0,
+                text_start + 22.0 * scale,
+                14.0,
+                ar_text_color,
             );
         }
 
