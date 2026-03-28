@@ -2783,7 +2783,61 @@ impl InputHandler {
                 if let Some(UiElementId::SlayerScrollArea) = &state.ui_state.hovered_element {
                     state.ui_state.slayer_reward_scroll =
                         (state.ui_state.slayer_reward_scroll - wheel_y * 30.0).max(0.0);
+                } else if let Some(UiElementId::SlayerBlockScrollArea) =
+                    &state.ui_state.hovered_element
+                {
+                    state.ui_state.slayer_block_scroll_offset =
+                        (state.ui_state.slayer_block_scroll_offset - wheel_y * 30.0).max(0.0);
                 }
+            }
+
+            // Block list scrollbar drag handling
+            if let Some(track_bounds) =
+                layout.get_bounds(&UiElementId::SlayerBlockScrollbar)
+            {
+                let s = state.ui_state.ui_scale;
+                let compact_h = 24.0 * s;
+                let compact_sp = 2.0 * s;
+
+                let available_count = state
+                    .ui_state
+                    .slayer_blockable_monsters
+                    .iter()
+                    .filter(|(id, _)| !state.ui_state.slayer_blocked_monsters.contains(id))
+                    .count();
+
+                let mut total_h = 0.0_f32;
+                if available_count > 0 {
+                    total_h += compact_h + compact_sp;
+                    total_h += available_count as f32 * (compact_h + compact_sp);
+                    total_h += 4.0 * s;
+                }
+                total_h += compact_h + compact_sp;
+                if state.ui_state.slayer_blocked_monsters.is_empty() {
+                    total_h += compact_h + compact_sp;
+                } else {
+                    total_h += state.ui_state.slayer_blocked_monsters.len() as f32
+                        * (compact_h + compact_sp);
+                }
+
+                let max_scroll = (total_h - track_bounds.h).max(0.0);
+                let clicked_on =
+                    matches!(clicked_element, Some(UiElementId::SlayerBlockScrollbar));
+                let (_, raw_my) = mouse_position();
+                let (_, virt_my) = screen_to_virtual_coords(0.0, raw_my);
+                crate::ui::scroll::handle_scrollbar_drag(
+                    &mut state.ui_state.slayer_block_scroll_drag,
+                    &mut state.ui_state.slayer_block_scroll_offset,
+                    max_scroll,
+                    track_bounds,
+                    total_h,
+                    virt_my,
+                    is_mouse_button_down(MouseButton::Left),
+                    mouse_clicked,
+                    clicked_on,
+                );
+            } else if !is_mouse_button_down(MouseButton::Left) {
+                state.ui_state.slayer_block_scroll_drag.dragging = false;
             }
 
             if mouse_clicked {
@@ -2806,6 +2860,7 @@ impl InputHandler {
                         UiElementId::SlayerRewardTab(idx) => {
                             state.ui_state.slayer_reward_tab = *idx;
                             state.ui_state.slayer_reward_scroll = 0.0;
+                            state.ui_state.slayer_block_scroll_offset = 0.0;
                         }
                         UiElementId::SlayerBuyReward(idx) => {
                             if let Some(reward) = state.ui_state.slayer_rewards.get(*idx) {

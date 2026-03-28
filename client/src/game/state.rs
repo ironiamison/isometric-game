@@ -1623,6 +1623,8 @@ pub struct UiState {
     pub slayer_selected_block_monster: Option<usize>,
     pub slayer_reward_tab: usize,
     pub slayer_reward_scroll: f32,
+    pub slayer_block_scroll_offset: f32,
+    pub slayer_block_scroll_drag: crate::ui::scroll::ScrollDragState,
 
     // ===== Trade System =====
     /// Whether trade window is open
@@ -1863,6 +1865,8 @@ impl Default for UiState {
             slayer_selected_block_monster: None,
             slayer_reward_tab: 0,
             slayer_reward_scroll: 0.0,
+            slayer_block_scroll_offset: 0.0,
+            slayer_block_scroll_drag: Default::default(),
             // Trade system
             trade_open: false,
             trade_partner_id: None,

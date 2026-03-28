@@ -256,6 +256,8 @@ pub enum UiElementId {
     SlayerRemoveBlock(usize),
     SlayerBlockMonsterSelect(usize),
     SlayerScrollArea,
+    SlayerBlockScrollArea,
+    SlayerBlockScrollbar,
 
     // Trade Panel
     TradeOfferSlot(usize),

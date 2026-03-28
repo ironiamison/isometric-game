@@ -870,25 +870,20 @@ impl Renderer {
             }
 
             // For Blocks tab, show selectable monster list + currently blocked monsters
+            // The list gets its own scroll area below the reward row
             if active_tab == 3 {
-                // Separator if there are rewards above
-                if !filtered_rewards.is_empty() {
-                    let sep_y =
-                        content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
-                    if sep_y >= content_y && sep_y <= content_y + content_h {
-                        draw_line(
-                            content_x + 10.0 * s,
-                            sep_y + 4.0 * s,
-                            content_x + content_w - 10.0 * s,
-                            sep_y + 4.0 * s,
-                            1.0,
-                            HEADER_BORDER,
-                        );
-                    }
-                    row_idx += 1;
-                }
+                let compact_h = 24.0 * s;
+                let compact_sp = 2.0 * s;
+                let scrollbar_w = 4.0 * s;
 
-                // Filter out already-blocked monsters from the selectable list
+                // List area starts after the reward rows (separator + padding)
+                let list_top = content_y + 4.0 * s
+                    + row_idx as f32 * (row_h + row_sp)
+                    + 4.0 * s;
+                let list_h = (content_y + content_h - list_top).max(0.0);
+                let list_w = content_w;
+
+                // Filter out already-blocked monsters
                 let available: Vec<(usize, &(String, String))> = state
                     .ui_state
                     .slayer_blockable_monsters
@@ -897,148 +892,177 @@ impl Renderer {
                     .filter(|(_, (id, _))| !state.ui_state.slayer_blocked_monsters.contains(id))
                     .collect();
 
+                // Calculate total content height for scroll
+                let mut total_h = 0.0_f32;
+                if !available.is_empty() {
+                    total_h += compact_h + compact_sp; // "Select monster to block:" header
+                    total_h += available.len() as f32 * (compact_h + compact_sp);
+                    total_h += 4.0 * s; // gap
+                }
+                total_h += compact_h + compact_sp; // "Currently Blocked:" header
+                if state.ui_state.slayer_blocked_monsters.is_empty() {
+                    total_h += compact_h + compact_sp; // "No blocked monsters"
+                } else {
+                    total_h += state.ui_state.slayer_blocked_monsters.len() as f32
+                        * (compact_h + compact_sp);
+                }
+
+                let max_scroll = (total_h - list_h).max(0.0);
+                let block_scroll = state.ui_state.slayer_block_scroll_offset.clamp(0.0, max_scroll);
+                let needs_scrollbar = max_scroll > 0.0;
+                let draw_w = if needs_scrollbar {
+                    list_w - scrollbar_w - 4.0 * s
+                } else {
+                    list_w
+                };
+
+                // Register scroll area for mouse wheel
+                layout.add(
+                    UiElementId::SlayerBlockScrollArea,
+                    Rect::new(content_x, list_top, list_w, list_h),
+                );
+
+                // Separator line
+                if !filtered_rewards.is_empty() {
+                    draw_line(
+                        content_x + 10.0 * s,
+                        list_top - 2.0 * s,
+                        content_x + draw_w - 10.0 * s,
+                        list_top - 2.0 * s,
+                        1.0,
+                        HEADER_BORDER,
+                    );
+                }
+
+                // Set up scissor clip for the block list area
+                let list_clip_x = (content_x * scale_x) as i32;
+                let list_clip_y = (list_top * scale_y) as i32;
+                let list_clip_w = (list_w * scale_x) as i32;
+                let list_clip_h = (list_h * scale_y) as i32;
+                unsafe {
+                    miniquad::gl::glScissor(
+                        list_clip_x,
+                        real_sh as i32 - list_clip_y - list_clip_h,
+                        list_clip_w,
+                        list_clip_h,
+                    );
+                }
+
+                let mut cur_y = list_top - block_scroll;
+
                 if !available.is_empty() {
                     // "Select monster to block:" header
-                    let select_header_y =
-                        content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
-                    if select_header_y >= content_y && select_header_y <= content_y + content_h {
+                    if cur_y + compact_h >= list_top && cur_y <= list_top + list_h {
                         self.draw_text_sharp(
                             "Select monster to block:",
                             content_x + 10.0 * s,
-                            select_header_y + 16.0 * s,
+                            cur_y + compact_h * 0.7,
                             16.0,
                             TEXT_TITLE,
                         );
                     }
-                    row_idx += 1;
+                    cur_y += compact_h + compact_sp;
 
-                    // Render selectable monster rows
+                    let mut alt = false;
                     for (orig_idx, (_monster_id, monster_name)) in &available {
-                        let item_y = content_y + 4.0 * s
-                            + row_idx as f32 * (row_h + row_sp)
-                            - scroll_offset;
-
-                        if item_y + row_h >= content_y && item_y <= content_y + content_h {
+                        if cur_y + compact_h >= list_top && cur_y <= list_top + list_h {
                             let is_selected =
                                 state.ui_state.slayer_selected_block_monster == Some(*orig_idx);
 
-                            // Row background - highlight if selected
                             let row_bg = if is_selected {
                                 Color::new(0.15, 0.18, 0.12, 0.9)
-                            } else if row_idx % 2 == 0 {
-                                Color::new(0.08, 0.08, 0.10, 0.6)
-                            } else {
+                            } else if alt {
                                 Color::new(0.06, 0.06, 0.08, 0.6)
+                            } else {
+                                Color::new(0.08, 0.08, 0.10, 0.6)
                             };
                             draw_rectangle(
-                                content_x + 2.0,
-                                item_y,
-                                content_w - 4.0,
-                                row_h,
-                                row_bg,
+                                content_x + 2.0, cur_y, draw_w - 4.0, compact_h, row_bg,
                             );
 
-                            // Selection border if selected
                             if is_selected {
                                 draw_rectangle_lines(
-                                    content_x + 2.0,
-                                    item_y,
-                                    content_w - 4.0,
-                                    row_h,
-                                    1.0,
-                                    FRAME_ACCENT,
+                                    content_x + 2.0, cur_y, draw_w - 4.0, compact_h,
+                                    1.0, FRAME_ACCENT,
                                 );
                             }
 
-                            // Monster name
                             let name_color = if is_selected { TEXT_GOLD } else { TEXT_NORMAL };
                             self.draw_text_sharp(
                                 monster_name,
                                 content_x + 10.0 * s,
-                                item_y + row_h * 0.55,
+                                cur_y + compact_h * 0.7,
                                 16.0,
                                 name_color,
                             );
 
-                            // Make the whole row clickable
-                            let row_bounds = Rect::new(
-                                content_x + 2.0,
-                                item_y,
-                                content_w - 4.0,
-                                row_h,
-                            );
                             layout.add(
                                 UiElementId::SlayerBlockMonsterSelect(*orig_idx),
-                                row_bounds,
+                                Rect::new(content_x + 2.0, cur_y, draw_w - 4.0, compact_h),
                             );
                         }
 
-                        row_idx += 1;
+                        alt = !alt;
+                        cur_y += compact_h + compact_sp;
                     }
 
-                    // Add a gap before blocked section
-                    row_idx += 1;
+                    cur_y += 4.0 * s;
                 }
 
-                // Blocked monsters header
-                let blocked_header_y =
-                    content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
-                if blocked_header_y >= content_y && blocked_header_y <= content_y + content_h {
-                    let blocked_label = "Currently Blocked:";
+                // "Currently Blocked:" header
+                if cur_y + compact_h >= list_top && cur_y <= list_top + list_h {
                     self.draw_text_sharp(
-                        blocked_label,
+                        "Currently Blocked:",
                         content_x + 10.0 * s,
-                        blocked_header_y + 16.0 * s,
+                        cur_y + compact_h * 0.7,
                         16.0,
                         TEXT_TITLE,
                     );
                 }
-                row_idx += 1;
+                cur_y += compact_h + compact_sp;
 
                 if state.ui_state.slayer_blocked_monsters.is_empty() {
-                    let empty_y =
-                        content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
-                    if empty_y >= content_y && empty_y <= content_y + content_h {
+                    if cur_y + compact_h >= list_top && cur_y <= list_top + list_h {
                         self.draw_text_sharp(
                             "No blocked monsters",
                             content_x + 10.0 * s,
-                            empty_y + 16.0 * s,
+                            cur_y + compact_h * 0.7,
                             16.0,
                             TEXT_DIM,
                         );
                     }
                 } else {
+                    let mut alt = false;
                     for (i, monster_name) in
                         state.ui_state.slayer_blocked_monsters.iter().enumerate()
                     {
-                        let item_y =
-                            content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
-
-                        if item_y + row_h >= content_y && item_y <= content_y + content_h {
-                            // Row background
-                            let row_bg = if row_idx % 2 == 0 {
-                                Color::new(0.08, 0.08, 0.10, 0.6)
-                            } else {
+                        if cur_y + compact_h >= list_top && cur_y <= list_top + list_h {
+                            let row_bg = if alt {
                                 Color::new(0.06, 0.06, 0.08, 0.6)
+                            } else {
+                                Color::new(0.08, 0.08, 0.10, 0.6)
                             };
-                            draw_rectangle(content_x + 2.0, item_y, content_w - 4.0, row_h, row_bg);
+                            draw_rectangle(
+                                content_x + 2.0, cur_y, draw_w - 4.0, compact_h, row_bg,
+                            );
 
-                            // Monster name
                             self.draw_text_sharp(
                                 monster_name,
                                 content_x + 10.0 * s,
-                                item_y + row_h * 0.55,
+                                cur_y + compact_h * 0.7,
                                 16.0,
                                 TEXT_NORMAL,
                             );
 
-                            // Remove button (reddish)
-                            let remove_w = 70.0 * s;
-                            let remove_h = 24.0 * s;
-                            let remove_x = content_x + content_w - remove_w - 8.0 * s;
-                            let remove_y = item_y + (row_h - remove_h) / 2.0;
-                            let remove_bounds = Rect::new(remove_x, remove_y, remove_w, remove_h);
-                            layout.add(UiElementId::SlayerRemoveBlock(i), remove_bounds);
+                            // Compact remove button
+                            let remove_w = 56.0 * s;
+                            let remove_h = 18.0 * s;
+                            let remove_x = content_x + draw_w - remove_w - 6.0 * s;
+                            let remove_y = cur_y + (compact_h - remove_h) / 2.0;
+                            layout.add(
+                                UiElementId::SlayerRemoveBlock(i),
+                                Rect::new(remove_x, remove_y, remove_w, remove_h),
+                            );
 
                             let is_remove_hovered = matches!(
                                 hovered,
@@ -1057,12 +1081,12 @@ impl Renderer {
                                 )
                             };
 
-                            draw_rectangle(remove_x, remove_y, remove_w, remove_h, remove_border);
                             draw_rectangle(
-                                remove_x + 1.0,
-                                remove_y + 1.0,
-                                remove_w - 2.0,
-                                remove_h - 2.0,
+                                remove_x, remove_y, remove_w, remove_h, remove_border,
+                            );
+                            draw_rectangle(
+                                remove_x + 1.0, remove_y + 1.0,
+                                remove_w - 2.0, remove_h - 2.0,
                                 remove_bg,
                             );
 
@@ -1072,18 +1096,57 @@ impl Renderer {
                             } else {
                                 TEXT_NORMAL
                             };
-                            let remove_dims = self.measure_text_sharp(remove_text, 16.0);
+                            let remove_dims = self.measure_text_sharp(remove_text, 14.0);
                             self.draw_text_sharp(
                                 remove_text,
                                 remove_x + (remove_w - remove_dims.width) / 2.0,
-                                remove_y + remove_h * 0.71,
-                                16.0,
+                                remove_y + remove_h * 0.72,
+                                14.0,
                                 remove_text_color,
                             );
                         }
 
-                        row_idx += 1;
+                        alt = !alt;
+                        cur_y += compact_h + compact_sp;
                     }
+                }
+
+                // Draw scrollbar if content overflows
+                if needs_scrollbar {
+                    let track_h = list_h - 4.0 * s;
+                    let track_x = content_x + list_w - scrollbar_w - 2.0 * s;
+                    let track_y = list_top + 2.0 * s;
+
+                    // Track background
+                    draw_rectangle(
+                        track_x, track_y, scrollbar_w, track_h,
+                        Color::new(0.1, 0.1, 0.13, 1.0),
+                    );
+
+                    // Thumb
+                    let visible_ratio = (list_h / total_h).min(1.0);
+                    let thumb_h = (track_h * visible_ratio).max(16.0 * s);
+                    let scroll_ratio = if max_scroll > 0.0 {
+                        block_scroll / max_scroll
+                    } else {
+                        0.0
+                    };
+                    let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
+
+                    let is_dragging = state.ui_state.slayer_block_scroll_drag.dragging;
+                    let is_sb_hovered =
+                        matches!(hovered, Some(UiElementId::SlayerBlockScrollbar));
+                    let thumb_color = if is_dragging || is_sb_hovered {
+                        FRAME_ACCENT
+                    } else {
+                        FRAME_MID
+                    };
+                    draw_rectangle(track_x, thumb_y, scrollbar_w, thumb_h, thumb_color);
+
+                    layout.add_scrollbar(
+                        UiElementId::SlayerBlockScrollbar,
+                        Rect::new(track_x, track_y, scrollbar_w, track_h),
+                    );
                 }
             }
         }
