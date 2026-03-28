@@ -677,6 +677,23 @@ impl Database {
         .execute(pool)
         .await?;
 
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS bans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                ip_address TEXT,
+                banned_by TEXT NOT NULL,
+                reason TEXT,
+                banned_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                FOREIGN KEY (account_id) REFERENCES accounts(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -2235,5 +2252,67 @@ impl Database {
             }
         }
         (first, second)
+    }
+
+    // =========================================================================
+    // Bans
+    // =========================================================================
+
+    /// Check if an account has an active ban. Returns (reason, expires_at) if banned.
+    pub async fn check_ban_by_account(&self, account_id: i64) -> Option<(Option<String>, String)> {
+        sqlx::query_as::<_, (Option<String>, String)>(
+            "SELECT reason, expires_at FROM bans WHERE account_id = ? AND expires_at > datetime('now') ORDER BY expires_at DESC LIMIT 1"
+        )
+        .bind(account_id)
+        .fetch_optional(&self.pool)
+        .await
+        .ok()
+        .flatten()
+    }
+
+    /// Check if an IP has an active ban. Returns (reason, expires_at) if banned.
+    pub async fn check_ban_by_ip(&self, ip: &str) -> Option<(Option<String>, String)> {
+        sqlx::query_as::<_, (Option<String>, String)>(
+            "SELECT reason, expires_at FROM bans WHERE ip_address = ? AND expires_at > datetime('now') ORDER BY expires_at DESC LIMIT 1"
+        )
+        .bind(ip)
+        .fetch_optional(&self.pool)
+        .await
+        .ok()
+        .flatten()
+    }
+
+    /// Insert a new ban record.
+    pub async fn insert_ban(
+        &self,
+        account_id: i64,
+        ip_address: Option<&str>,
+        banned_by: &str,
+        reason: Option<&str>,
+        hours: f64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO bans (account_id, ip_address, banned_by, reason, banned_at, expires_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now', '+' || ? || ' hours'))"
+        )
+        .bind(account_id)
+        .bind(ip_address)
+        .bind(banned_by)
+        .bind(reason)
+        .bind(hours)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Look up account_id by character name (for offline bans).
+    pub async fn get_account_id_by_character_name(&self, name: &str) -> Option<i64> {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT account_id FROM characters WHERE name = ? COLLATE NOCASE LIMIT 1"
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await
+        .ok()
+        .flatten()
     }
 }

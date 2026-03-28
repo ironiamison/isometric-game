@@ -537,6 +537,35 @@ async fn login_account(
         .await
     {
         Some(account) => {
+            // Check for active ban on this account
+            if let Some((reason, expires_at)) = state.db.check_ban_by_account(account.id).await {
+                let msg = match reason {
+                    Some(r) => format!("Account banned until {}. Reason: {}", expires_at, r),
+                    None => format!("Account banned until {}.", expires_at),
+                };
+                return Json(AuthResponse {
+                    success: false,
+                    token: None,
+                    username: None,
+                    characters: None,
+                    error: Some(msg),
+                });
+            }
+            // Check for active ban on this IP
+            if let Some((reason, expires_at)) = state.db.check_ban_by_ip(&client_ip).await {
+                let msg = match reason {
+                    Some(r) => format!("Connection banned until {}. Reason: {}", expires_at, r),
+                    None => format!("Connection banned until {}.", expires_at),
+                };
+                return Json(AuthResponse {
+                    success: false,
+                    token: None,
+                    username: None,
+                    characters: None,
+                    error: Some(msg),
+                });
+            }
+
             // Create auth token - note: (account_id, username) order now
             let token = Uuid::new_v4().to_string();
             state
@@ -1151,6 +1180,31 @@ async fn matchmake_join_or_create(
         }
     };
 
+    // Check for active ban on this account
+    if let Some((reason, expires_at)) = state.db.check_ban_by_account(account_id).await {
+        let msg = match reason {
+            Some(r) => format!("Account banned until {}. Reason: {}", expires_at, r),
+            None => format!("Account banned until {}.", expires_at),
+        };
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": msg })),
+        )
+            .into_response();
+    }
+    // Check for active ban on this IP
+    if let Some((reason, expires_at)) = state.db.check_ban_by_ip(&client_ip).await {
+        let msg = match reason {
+            Some(r) => format!("Connection banned until {}. Reason: {}", expires_at, r),
+            None => format!("Connection banned until {}.", expires_at),
+        };
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": msg })),
+        )
+            .into_response();
+    }
+
     // Load the specified character and verify ownership
     let character_id = options.character_id;
     let character_data = match state.db.get_character(character_id).await {
@@ -1371,6 +1425,8 @@ async fn matchmake_join_or_create(
         character_data.equipped_necklace.clone(),
         character_data.equipped_belt.clone(),
         character_data.is_admin,
+        account_id,
+        Some(client_ip.clone()),
         character_data.sitting_at_x,
         character_data.sitting_at_y,
         &character_data.bank_json,

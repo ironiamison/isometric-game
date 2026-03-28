@@ -13,6 +13,8 @@ const ADMIN_COMMANDS: &[&str] = &[
     "/announce",
     "/arena",
     "/boss",
+    "/kick",
+    "/ban",
 ];
 
 fn sanitize_chat_text(text: &str) -> Option<String> {
@@ -292,7 +294,7 @@ impl GameRoom {
             }
             "/help" => {
                 if is_admin {
-                    self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel [skill] <lvl>, /teleport <x> <y>, /tpto <player>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /items, /help").await;
+                    self.send_system_message(player_id, "Commands: /give <item> [qty], /setlevel [skill] <lvl>, /teleport <x> <y>, /tpto <player>, /spawn <npc> [x] [y], /heal [player], /kill <player>, /god, /announce <msg>, /kick <player>, /ban <player> <hours> [reason], /items, /help").await;
                 } else {
                     self.send_system_message(player_id, "Commands: /items, /help")
                         .await;
@@ -1179,6 +1181,157 @@ impl GameRoom {
 
                 self.send_system_message(player_id, "Entering the Desert Wurm arena...")
                     .await;
+            }
+            "/kick" => {
+                if parts.len() < 2 {
+                    self.send_system_message(player_id, "Usage: /kick <player_name>")
+                        .await;
+                    return;
+                }
+                let target_name = parts[1];
+
+                let target_id = {
+                    let players = self.players.read().await;
+                    players
+                        .values()
+                        .find(|p| p.name.eq_ignore_ascii_case(target_name))
+                        .map(|p| p.id.clone())
+                };
+
+                match target_id {
+                    Some(tid) if tid == player_id => {
+                        self.send_system_message(player_id, "You cannot kick yourself.")
+                            .await;
+                    }
+                    Some(tid) => {
+                        let admin_name = {
+                            let players = self.players.read().await;
+                            players.get(player_id).map(|p| p.name.clone()).unwrap_or_default()
+                        };
+                        tracing::info!("Admin {} kicked player {}", admin_name, target_name);
+                        self.send_system_message(&tid, "You have been kicked by an admin.")
+                            .await;
+                        // Drop the player's sender — closes their mpsc channel,
+                        // which causes the send task to exit and triggers normal disconnect cleanup.
+                        self.unregister_player_sender(&tid).await;
+                        self.send_system_message(player_id, &format!("Kicked {}", target_name))
+                            .await;
+                        self.broadcast(ServerMessage::ChatMessage {
+                            sender_id: "system".to_string(),
+                            sender_name: "[System]".to_string(),
+                            text: format!("{} has been kicked.", target_name),
+                            timestamp: chat_timestamp_ms(),
+                            channel: "global".to_string(),
+                        }).await;
+                    }
+                    None => {
+                        self.send_system_message(player_id, "Player not found or not online.")
+                            .await;
+                    }
+                }
+            }
+            "/ban" => {
+                if parts.len() < 3 {
+                    self.send_system_message(player_id, "Usage: /ban <player_name> <hours> [reason]")
+                        .await;
+                    return;
+                }
+                let target_name = parts[1];
+                let hours: f64 = match parts[2].parse() {
+                    Ok(h) if h > 0.0 && h <= 87600.0 => h,
+                    _ => {
+                        self.send_system_message(player_id, "Hours must be between 0 and 87600 (10 years).")
+                            .await;
+                        return;
+                    }
+                };
+                let reason = if parts.len() > 3 {
+                    Some(parts[3..].join(" "))
+                } else {
+                    None
+                };
+
+                let admin_name = {
+                    let players = self.players.read().await;
+                    players.get(player_id).map(|p| p.name.clone()).unwrap_or_default()
+                };
+
+                // Check if player is online — get account_id and IP
+                let online_info = {
+                    let players = self.players.read().await;
+                    players
+                        .values()
+                        .find(|p| p.name.eq_ignore_ascii_case(target_name))
+                        .map(|p| (p.id.clone(), p.account_id, p.ip_address.clone()))
+                };
+
+                let db = match &self.db {
+                    Some(db) => db.clone(),
+                    None => {
+                        self.send_system_message(player_id, "Database not available.")
+                            .await;
+                        return;
+                    }
+                };
+
+                if let Some((tid, account_id, ip)) = online_info {
+                    if tid == player_id {
+                        self.send_system_message(player_id, "You cannot ban yourself.")
+                            .await;
+                        return;
+                    }
+                    // Online player — ban and kick
+                    if let Err(e) = db
+                        .insert_ban(account_id, ip.as_deref(), &admin_name, reason.as_deref(), hours)
+                        .await
+                    {
+                        self.send_system_message(player_id, &format!("Failed to ban: {}", e))
+                            .await;
+                        return;
+                    }
+
+                    let ban_msg = match &reason {
+                        Some(r) => format!("You have been banned for {} hours. Reason: {}", hours, r),
+                        None => format!("You have been banned for {} hours.", hours),
+                    };
+                    self.send_system_message(&tid, &ban_msg).await;
+                    self.unregister_player_sender(&tid).await;
+
+                    tracing::info!("Admin {} banned {} for {} hours (reason: {:?})", admin_name, target_name, hours, reason);
+                    self.send_system_message(player_id, &format!("Banned {} for {} hours", target_name, hours))
+                        .await;
+                    self.broadcast(ServerMessage::ChatMessage {
+                        sender_id: "system".to_string(),
+                        sender_name: "[System]".to_string(),
+                        text: format!("{} has been banned.", target_name),
+                        timestamp: chat_timestamp_ms(),
+                        channel: "global".to_string(),
+                    }).await;
+                } else {
+                    // Offline player — look up from DB
+                    match db.get_account_id_by_character_name(target_name).await {
+                        Some(account_id) => {
+                            if let Err(e) = db
+                                .insert_ban(account_id, None, &admin_name, reason.as_deref(), hours)
+                                .await
+                            {
+                                self.send_system_message(player_id, &format!("Failed to ban: {}", e))
+                                    .await;
+                                return;
+                            }
+                            tracing::info!("Admin {} banned offline player {} for {} hours (reason: {:?})", admin_name, target_name, hours, reason);
+                            self.send_system_message(
+                                player_id,
+                                &format!("Banned {} (offline) for {} hours", target_name, hours),
+                            )
+                            .await;
+                        }
+                        None => {
+                            self.send_system_message(player_id, "Character not found.")
+                                .await;
+                        }
+                    }
+                }
             }
             _ => {
                 self.send_system_message(

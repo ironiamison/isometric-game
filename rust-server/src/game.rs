@@ -405,6 +405,8 @@ pub struct Player {
     // Admin privileges
     pub is_admin: bool,
     pub is_god_mode: bool, // Invincibility for admins
+    pub account_id: i64,
+    pub ip_address: Option<String>,
     // HP regeneration tracking
     pub last_regen_time: u64,
     /// Tile coordinates of chair player is sitting on (None if not sitting)
@@ -602,6 +604,8 @@ impl Player {
             equipped_belt: None,
             is_admin: false,
             is_god_mode: false,
+            account_id: 0,
+            ip_address: None,
             last_regen_time: 0,
             sitting_at: None,
             discovered_recipes: HashSet::new(),
@@ -2126,6 +2130,8 @@ impl GameRoom {
         equipped_necklace: Option<String>,
         equipped_belt: Option<String>,
         is_admin: bool,
+        account_id: i64,
+        ip_address: Option<String>,
         sitting_at_x: Option<i32>,
         sitting_at_y: Option<i32>,
         bank_json: &str,
@@ -2175,6 +2181,8 @@ impl GameRoom {
         player.equipped_necklace = equipped_necklace;
         player.equipped_belt = equipped_belt;
         player.is_admin = is_admin;
+        player.account_id = account_id;
+        player.ip_address = ip_address;
 
         // Restore combat style preferences and set active style based on equipped weapon
         if let Ok(prefs) = serde_json::from_str::<HashMap<String, String>>(combat_style_prefs_json) {
