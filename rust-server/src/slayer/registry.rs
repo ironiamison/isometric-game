@@ -84,6 +84,21 @@ impl SlayerRegistry {
         self.slayer_requirements.get(monster_id).copied()
     }
 
+    /// Returns deduplicated (monster_id, display_name) pairs across all masters.
+    pub fn get_all_blockable_monsters(&self) -> Vec<(String, String)> {
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for master in self.masters.values() {
+            for task in &master.tasks {
+                if seen.insert(task.monster_id.clone()) {
+                    result.push((task.monster_id.clone(), task.display_name.clone()));
+                }
+            }
+        }
+        result.sort_by(|a, b| a.1.cmp(&b.1));
+        result
+    }
+
     pub fn assign_task(
         &self,
         master_id: &str,
