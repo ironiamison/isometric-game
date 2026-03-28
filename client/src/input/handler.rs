@@ -8652,11 +8652,12 @@ impl InputHandler {
         }
 
         // Handle chat input mode (must be before chat_panel_open block so typing works)
-        if state.ui_state.chat_open {
-            if process_chat_keyboard_input(state, &mut commands, audio) {
-                return commands;
-            }
-        }
+        // In modern mode, chat consumes keyboard but allows mouse clicks (attack, auto-path)
+        let chat_consuming_keyboard = if state.ui_state.chat_open {
+            process_chat_keyboard_input(state, &mut commands, audio)
+        } else {
+            false
+        };
 
         // Handle chat panel scrolling and block game-world input
         if state.ui_state.chat_panel_open {
@@ -8810,50 +8811,34 @@ impl InputHandler {
         }
 
         // Drain character queue when chat is closed to prevent accumulation
-        while get_char_pressed().is_some() {}
+        if !chat_consuming_keyboard {
+            while get_char_pressed().is_some() {}
+        }
 
-        // Read which keys are held (in classic mode, only arrow keys - WASD goes to chat)
-        let up = if classic {
-            is_key_down(KeyCode::Up)
+        // When chat is consuming keyboard, suppress all movement keys and hotkeys
+        // but still allow mouse clicks (attack, auto-path, etc.) to fall through
+        let (up, down, left, right) = if chat_consuming_keyboard {
+            (false, false, false, false)
         } else {
-            is_key_down(KeyCode::W) || is_key_down(KeyCode::Up)
-        };
-        let down = if classic {
-            is_key_down(KeyCode::Down)
-        } else {
-            is_key_down(KeyCode::S) || is_key_down(KeyCode::Down)
-        };
-        let left = if classic {
-            is_key_down(KeyCode::Left)
-        } else {
-            is_key_down(KeyCode::A) || is_key_down(KeyCode::Left)
-        };
-        let right = if classic {
-            is_key_down(KeyCode::Right)
-        } else {
-            is_key_down(KeyCode::D) || is_key_down(KeyCode::Right)
+            // Read which keys are held (in classic mode, only arrow keys - WASD goes to chat)
+            (
+                if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) },
+                if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) },
+                if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) },
+                if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) },
+            )
         };
 
         // Check for newly pressed keys this frame (last-key-wins priority)
-        let up_just = if classic {
-            is_key_pressed(KeyCode::Up)
+        let (up_just, down_just, left_just, right_just) = if chat_consuming_keyboard {
+            (false, false, false, false)
         } else {
-            is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up)
-        };
-        let down_just = if classic {
-            is_key_pressed(KeyCode::Down)
-        } else {
-            is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down)
-        };
-        let left_just = if classic {
-            is_key_pressed(KeyCode::Left)
-        } else {
-            is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left)
-        };
-        let right_just = if classic {
-            is_key_pressed(KeyCode::Right)
-        } else {
-            is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right)
+            (
+                if classic { is_key_pressed(KeyCode::Up) } else { is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up) },
+                if classic { is_key_pressed(KeyCode::Down) } else { is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down) },
+                if classic { is_key_pressed(KeyCode::Left) } else { is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left) },
+                if classic { is_key_pressed(KeyCode::Right) } else { is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right) },
+            )
         };
 
         // Get touch D-pad input (for mobile)
@@ -8999,7 +8984,9 @@ impl InputHandler {
 
         // Only send Move commands if held past the threshold
         // Don't move while attacking - check both attack key/touch button and animation state
-        let attack_key_down = if classic {
+        let attack_key_down = if chat_consuming_keyboard {
+            false
+        } else if classic {
             is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl)
         } else {
             is_key_down(KeyCode::Space)
@@ -9160,7 +9147,7 @@ impl InputHandler {
         }
 
         // Dash: left shift while moving
-        if is_key_pressed(KeyCode::LeftShift) {
+        if !chat_consuming_keyboard && is_key_pressed(KeyCode::LeftShift) {
             let is_moving = self.last_dx != 0.0 || self.last_dy != 0.0;
             if is_moving && current_time >= state.dash_cooldown_end {
                 commands.push(InputCommand::Dash);
@@ -9759,7 +9746,7 @@ impl InputHandler {
         }
 
         // Jump (Ctrl key, modern only) - send jump command on press
-        if !classic && (is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl)) && !state.is_sitting {
+        if !chat_consuming_keyboard && !classic && (is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl)) && !state.is_sitting {
             commands.push(InputCommand::Jump);
         }
 
@@ -11223,7 +11210,7 @@ impl InputHandler {
 
         // Toggle inventory (I key) with mutual exclusivity
         // In classic mode, letter/number keys go to chat input, not hotkeys
-        if !classic && is_key_pressed(KeyCode::I) {
+        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::I) {
             audio.play_sfx("enter");
             if state.ui_state.inventory_open {
                 state.ui_state.inventory_open = false;
@@ -11239,7 +11226,7 @@ impl InputHandler {
         }
 
         // Toggle skills panel (T key) with mutual exclusivity
-        if !classic && is_key_pressed(KeyCode::T) {
+        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::T) {
             audio.play_sfx("enter");
             if state.ui_state.skills_open {
                 state.ui_state.skills_open = false;
@@ -11406,7 +11393,7 @@ impl InputHandler {
         }
 
         // Toggle character panel (C key) with mutual exclusivity
-        if !classic && is_key_pressed(KeyCode::C) {
+        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::C) {
             audio.play_sfx("enter");
             if state.ui_state.character_panel_open {
                 state.ui_state.character_panel_open = false;
@@ -11421,7 +11408,7 @@ impl InputHandler {
         }
 
         // Toggle prayer book (P key) with mutual exclusivity
-        if !classic && is_key_pressed(KeyCode::P) {
+        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::P) {
             audio.play_sfx("enter");
             if state.ui_state.prayer_book_open {
                 state.ui_state.prayer_book_open = false;
@@ -11436,7 +11423,7 @@ impl InputHandler {
         }
 
         // Toggle expanded minimap panel (M key) — disabled in instances/interiors
-        if !classic && is_key_pressed(KeyCode::M) && state.current_instance.is_none() {
+        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::M) && state.current_instance.is_none() {
             audio.play_sfx("enter");
             state.ui_state.minimap_panel_open = !state.ui_state.minimap_panel_open;
             if state.ui_state.minimap_panel_open {
@@ -11465,14 +11452,14 @@ impl InputHandler {
             (KeyCode::Key5, 4usize),
         ];
         for (key, slot_idx) in quick_slot_keys {
-            if !classic && is_key_pressed(key) {
+            if !classic && !chat_consuming_keyboard && is_key_pressed(key) {
                 let cmds = activate_hotkey_slot(state, slot_idx);
                 commands.extend(cmds);
             }
         }
 
         // Pickup nearest item (F key or touch interact when no NPC nearby)
-        let pickup_pressed = !classic && is_key_pressed(KeyCode::F);
+        let pickup_pressed = !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::F);
         if pickup_pressed {
             // Get local player position
             if let Some(local_id) = &state.local_player_id {
@@ -11503,7 +11490,7 @@ impl InputHandler {
         // Interact with nearest NPC (E key or touch interact button)
         // Touch interact button also picks up items if no NPC nearby
         let interact_pressed =
-            (!classic && is_key_pressed(KeyCode::E)) || self.touch_controls.interact_pressed();
+            (!classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::E)) || self.touch_controls.interact_pressed();
         if interact_pressed {
             // If sitting, stand up
             if state.is_sitting {
@@ -11648,7 +11635,7 @@ impl InputHandler {
         }
 
         // Toggle quest log (Q key) with mutual exclusivity
-        if !classic && is_key_pressed(KeyCode::Q) {
+        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::Q) {
             audio.play_sfx("enter");
             if state.ui_state.quest_log_open {
                 state.ui_state.close_quest_log();
