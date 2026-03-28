@@ -254,6 +254,7 @@ pub enum UiElementId {
     SlayerRewardTab(usize),
     SlayerBuyReward(usize),
     SlayerRemoveBlock(usize),
+    SlayerBlockMonsterSelect(usize),
     SlayerScrollArea,
 
     // Trade Panel

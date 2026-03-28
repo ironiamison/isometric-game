@@ -869,7 +869,7 @@ impl Renderer {
                 row_idx += 1;
             }
 
-            // For Blocks tab, also show currently blocked monsters with Remove buttons
+            // For Blocks tab, show selectable monster list + currently blocked monsters
             if active_tab == 3 {
                 // Separator if there are rewards above
                 if !filtered_rewards.is_empty() {
@@ -885,6 +885,98 @@ impl Renderer {
                             HEADER_BORDER,
                         );
                     }
+                    row_idx += 1;
+                }
+
+                // Filter out already-blocked monsters from the selectable list
+                let available: Vec<(usize, &(String, String))> = state
+                    .ui_state
+                    .slayer_blockable_monsters
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, (id, _))| !state.ui_state.slayer_blocked_monsters.contains(id))
+                    .collect();
+
+                if !available.is_empty() {
+                    // "Select monster to block:" header
+                    let select_header_y =
+                        content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) - scroll_offset;
+                    if select_header_y >= content_y && select_header_y <= content_y + content_h {
+                        self.draw_text_sharp(
+                            "Select monster to block:",
+                            content_x + 10.0 * s,
+                            select_header_y + 16.0 * s,
+                            16.0,
+                            TEXT_TITLE,
+                        );
+                    }
+                    row_idx += 1;
+
+                    // Render selectable monster rows
+                    for (orig_idx, (_monster_id, monster_name)) in &available {
+                        let item_y = content_y + 4.0 * s
+                            + row_idx as f32 * (row_h + row_sp)
+                            - scroll_offset;
+
+                        if item_y + row_h >= content_y && item_y <= content_y + content_h {
+                            let is_selected =
+                                state.ui_state.slayer_selected_block_monster == Some(*orig_idx);
+
+                            // Row background - highlight if selected
+                            let row_bg = if is_selected {
+                                Color::new(0.15, 0.18, 0.12, 0.9)
+                            } else if row_idx % 2 == 0 {
+                                Color::new(0.08, 0.08, 0.10, 0.6)
+                            } else {
+                                Color::new(0.06, 0.06, 0.08, 0.6)
+                            };
+                            draw_rectangle(
+                                content_x + 2.0,
+                                item_y,
+                                content_w - 4.0,
+                                row_h,
+                                row_bg,
+                            );
+
+                            // Selection border if selected
+                            if is_selected {
+                                draw_rectangle_lines(
+                                    content_x + 2.0,
+                                    item_y,
+                                    content_w - 4.0,
+                                    row_h,
+                                    1.0,
+                                    FRAME_ACCENT,
+                                );
+                            }
+
+                            // Monster name
+                            let name_color = if is_selected { TEXT_GOLD } else { TEXT_NORMAL };
+                            self.draw_text_sharp(
+                                monster_name,
+                                content_x + 10.0 * s,
+                                item_y + row_h * 0.55,
+                                16.0,
+                                name_color,
+                            );
+
+                            // Make the whole row clickable
+                            let row_bounds = Rect::new(
+                                content_x + 2.0,
+                                item_y,
+                                content_w - 4.0,
+                                row_h,
+                            );
+                            layout.add(
+                                UiElementId::SlayerBlockMonsterSelect(*orig_idx),
+                                row_bounds,
+                            );
+                        }
+
+                        row_idx += 1;
+                    }
+
+                    // Add a gap before blocked section
                     row_idx += 1;
                 }
 

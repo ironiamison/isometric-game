@@ -508,6 +508,21 @@ impl GameRoom {
             ),
         )
         .await;
+
+        // Sync block list to client after block purchase
+        if matches!(plan, RewardPurchasePlan::BlockMonster(_)) {
+            self.send_to_player(
+                player_id,
+                ServerMessage::SlayerStateSync {
+                    current_task: slayer_task_data_from_state(&state),
+                    points: state.points,
+                    tasks_completed: state.tasks_completed,
+                    blocked_monsters: state.blocked_monsters.clone(),
+                    unlocked_monsters: state.unlocked_monsters.clone(),
+                },
+            )
+            .await;
+        }
     }
 
     pub async fn handle_slayer_remove_block(&self, player_id: &str, monster_id: &str) {
@@ -530,6 +545,18 @@ impl GameRoom {
                     None,
                     Some(state.points),
                 ),
+            )
+            .await;
+
+            self.send_to_player(
+                player_id,
+                ServerMessage::SlayerStateSync {
+                    current_task: slayer_task_data_from_state(&state),
+                    points: state.points,
+                    tasks_completed: state.tasks_completed,
+                    blocked_monsters: state.blocked_monsters.clone(),
+                    unlocked_monsters: state.unlocked_monsters.clone(),
+                },
             )
             .await;
         }

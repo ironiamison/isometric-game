@@ -2810,9 +2810,23 @@ impl InputHandler {
                         UiElementId::SlayerBuyReward(idx) => {
                             if let Some(reward) = state.ui_state.slayer_rewards.get(*idx) {
                                 if state.ui_state.slayer_points >= reward.cost {
+                                    let target = if reward.category == "block" {
+                                        state
+                                            .ui_state
+                                            .slayer_selected_block_monster
+                                            .and_then(|i| {
+                                                state
+                                                    .ui_state
+                                                    .slayer_blockable_monsters
+                                                    .get(i)
+                                                    .map(|(id, _)| id.clone())
+                                            })
+                                    } else {
+                                        reward.target_id.clone()
+                                    };
                                     commands.push(InputCommand::SlayerBuyReward {
                                         reward_id: reward.id.clone(),
-                                        target_monster_id: reward.target_id.clone(),
+                                        target_monster_id: target,
                                     });
                                 }
                             }
@@ -2825,6 +2839,9 @@ impl InputHandler {
                                     monster_id: monster_name.clone(),
                                 });
                             }
+                        }
+                        UiElementId::SlayerBlockMonsterSelect(idx) => {
+                            state.ui_state.slayer_selected_block_monster = Some(*idx);
                         }
                         _ => {}
                     }

@@ -4138,13 +4138,17 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
         "slayerResult" => {
             if let Some(value) = data {
-                let _success = extract_bool(value, "success").unwrap_or(false);
+                let success = extract_bool(value, "success").unwrap_or(false);
                 let message = extract_string(value, "message");
                 if let Some(task) = extract_slayer_task(value, "task") {
                     state.ui_state.slayer_current_task = Some(task);
                 }
                 if let Some(points) = extract_i32(value, "points") {
                     state.ui_state.slayer_points = points;
+                }
+                // Clear block selection on successful block purchase
+                if success {
+                    state.ui_state.slayer_selected_block_monster = None;
                 }
                 // Show message in chat
                 if let Some(msg) = message {
