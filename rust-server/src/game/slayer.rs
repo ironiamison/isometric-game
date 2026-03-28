@@ -152,6 +152,7 @@ impl GameRoom {
                 rewards,
                 blocked_monsters: state.blocked_monsters.clone(),
                 unlocked_monsters: state.unlocked_monsters.clone(),
+                blockable_monsters: self.slayer_registry.get_all_blockable_monsters(),
             },
         )
         .await;

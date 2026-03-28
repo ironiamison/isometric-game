@@ -1239,6 +1239,7 @@ pub enum ServerMessage {
         rewards: Vec<SlayerRewardData>,
         blocked_monsters: Vec<String>,
         unlocked_monsters: Vec<String>,
+        blockable_monsters: Vec<(String, String)>,
     },
     SlayerTaskProgress {
         monster_id: String,
@@ -5720,6 +5721,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             rewards,
             blocked_monsters,
             unlocked_monsters,
+            blockable_monsters,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -5760,6 +5762,19 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("unlocked_monsters".into()),
                 Value::Array(unlocked),
+            ));
+            let blockable: Vec<Value> = blockable_monsters
+                .iter()
+                .map(|(id, name)| {
+                    Value::Map(vec![
+                        (Value::String("id".into()), Value::String(id.clone().into())),
+                        (Value::String("name".into()), Value::String(name.clone().into())),
+                    ])
+                })
+                .collect();
+            map.push((
+                Value::String("blockable_monsters".into()),
+                Value::Array(blockable),
             ));
             Value::Map(map)
         }
