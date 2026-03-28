@@ -41,6 +41,62 @@ drop_chance = 0.4
 quantity_min = 1
 quantity_max = 1
 
+[[evil_cactus.loot]]
+item_id = "steel_sword"
+drop_chance = 0.015
+quantity_min = 1
+quantity_max = 1
+
+[[evil_cactus.loot_tables]]
+name = "seed_drop"
+chance = 0.08
+
+[[evil_cactus.loot_tables.entries]]
+item_id = "cactus_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[evil_cactus.loot_tables.entries]]
+item_id = "watermelon_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[evil_cactus.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[evil_cactus.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[evil_cactus.loot_tables]]
+name = "herb_drop"
+chance = 0.07
+
+[[evil_cactus.loot_tables.entries]]
+item_id = "ashveil"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[evil_cactus.loot_tables.entries]]
+item_id = "nightthorn"
+weight = 5
+quantity_min = 1
+quantity_max = 1
+
+[[evil_cactus.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
 [evil_cactus.behaviors]
 hostile = true
 
@@ -87,6 +143,62 @@ quantity_max = 1
 [[golden_scarab.loot]]
 item_id = "adamant_boots"
 drop_chance = 0.00390625
+quantity_min = 1
+quantity_max = 1
+
+[[golden_scarab.loot_tables]]
+name = "seed_drop"
+chance = 0.08
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "watermelon_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "nightthorn_seed"
+weight = 5
+quantity_min = 1
+quantity_max = 1
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "cactus_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[golden_scarab.loot_tables]]
+name = "herb_drop"
+chance = 0.07
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "nightthorn"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "ashveil"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[golden_scarab.loot_tables.entries]]
+item_id = "bloodcap"
+weight = 3
 quantity_min = 1
 quantity_max = 1
 

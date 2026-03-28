@@ -18,8 +18,8 @@ use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Scree
 
 use crate::game::tutorial::TutorialManager;
 
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
 // pub const SERVER_URL: &str = "https://aeven.xyz";
 // pub const WS_URL: &str = "wss://aeven.xyz";
@@ -799,11 +799,9 @@ pub fn run_game_frame(
             InputCommand::SetCombatStyle { style } => ClientMessage::SetCombatStyle {
                 style: style.clone(),
             },
-            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate {
-                enabled: *enabled,
-            },
             InputCommand::KothContinue => ClientMessage::KothContinue,
             InputCommand::KothLeave => ClientMessage::KothLeave,
+            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate { enabled: *enabled },
         };
         network.send(&msg);
     }

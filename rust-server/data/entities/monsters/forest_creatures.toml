@@ -34,9 +34,25 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 1
 
-[[slime.loot]]
+[[slime.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[slime.loot_tables.entries]]
 item_id = "onion_seed"
-drop_chance = 0.06
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[slime.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[slime.loot]]
+item_id = "greenleaf"
+drop_chance = 0.04
 quantity_min = 1
 quantity_max = 1
 
@@ -78,6 +94,28 @@ gold_max = 8
 [[snail.loot]]
 item_id = "snail_shell"
 drop_chance = 0.30
+quantity_min = 1
+quantity_max = 1
+
+[[snail.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[snail.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[snail.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[snail.loot]]
+item_id = "greenleaf"
+drop_chance = 0.04
 quantity_min = 1
 quantity_max = 1
 
@@ -128,6 +166,44 @@ drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
 
+[[shell_snail.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[shell_snail.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[shell_snail.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[shell_snail.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 2
+
+[[shell_snail.loot_tables]]
+name = "herb_drop"
+chance = 0.05
+
+[[shell_snail.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[shell_snail.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
 [shell_snail.behaviors]
 hostile = true
 wander_enabled = true
@@ -175,6 +251,40 @@ drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
 
+[[hedgehog.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[hedgehog.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[hedgehog.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[hedgehog.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 3
+quantity_min = 1
+quantity_max = 1
+
+[[hedgehog.loot]]
+item_id = "greenleaf"
+drop_chance = 0.04
+quantity_min = 1
+quantity_max = 1
+
+[[hedgehog.loot]]
+item_id = "bronze_boots"
+drop_chance = 0.015
+quantity_min = 1
+quantity_max = 1
+
 [hedgehog.behaviors]
 hostile = true
 wander_enabled = true
@@ -215,6 +325,28 @@ item_id = "worm_segment"
 drop_chance = 0.20
 quantity_min = 1
 quantity_max = 2
+
+[[worm.loot_tables]]
+name = "seed_drop"
+chance = 0.05
+
+[[worm.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[worm.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[worm.loot]]
+item_id = "greenleaf"
+drop_chance = 0.03
+quantity_min = 1
+quantity_max = 1
 
 [worm.behaviors]
 hostile = false
@@ -263,6 +395,56 @@ drop_chance = 0.03
 quantity_min = 1
 quantity_max = 1
 
+[[springs.loot]]
+item_id = "iron_sword"
+drop_chance = 0.015
+quantity_min = 1
+quantity_max = 1
+
+[[springs.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[springs.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[springs.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[springs.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 2
+
+[[springs.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[springs.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[springs.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[springs.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
 [springs.behaviors]
 hostile = true
 wander_enabled = true
@@ -298,9 +480,31 @@ exp_base = 18
 gold_min = 2
 gold_max = 8
 
-[[mushroom.loot]]
+[[mushroom.loot_tables]]
+name = "seed_drop"
+chance = 0.08
+
+[[mushroom.loot_tables.entries]]
 item_id = "onion_seed"
-drop_chance = 0.08
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[mushroom.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[mushroom.loot_tables.entries]]
+item_id = "greenleaf_seed"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
+[[mushroom.loot]]
+item_id = "greenleaf"
+drop_chance = 0.05
 quantity_min = 1
 quantity_max = 1
 
@@ -445,6 +649,28 @@ drop_chance = 0.50
 quantity_min = 1
 quantity_max = 2
 
+[[sheep.loot_tables]]
+name = "seed_drop"
+chance = 0.05
+
+[[sheep.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[sheep.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[sheep.loot]]
+item_id = "greenleaf"
+drop_chance = 0.03
+quantity_min = 1
+quantity_max = 1
+
 [sheep.behaviors]
 hostile = false
 wander_enabled = true
@@ -492,6 +718,50 @@ drop_chance = 0.15
 quantity_min = 1
 quantity_max = 2
 
+[[swamper.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[swamper.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[swamper.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[swamper.loot_tables.entries]]
+item_id = "greenleaf_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 2
+
+[[swamper.loot_tables]]
+name = "herb_drop"
+chance = 0.07
+
+[[swamper.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[swamper.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[swamper.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
 [swamper.behaviors]
 hostile = true
 wander_enabled = true
@@ -532,6 +802,44 @@ item_id = "hedgehog_spine"
 drop_chance = 0.15
 quantity_min = 1
 quantity_max = 2
+
+[[cactus.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[cactus.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[cactus.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[cactus.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
+[[cactus.loot_tables]]
+name = "herb_drop"
+chance = 0.05
+
+[[cactus.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[cactus.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 5
+quantity_min = 1
+quantity_max = 1
 
 [cactus.behaviors]
 hostile = true
@@ -577,6 +885,40 @@ quantity_max = 2
 [[cow.loot]]
 item_id = "big_bones"
 drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[cow.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[cow.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[cow.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[cow.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 3
+quantity_min = 1
+quantity_max = 1
+
+[[cow.loot]]
+item_id = "greenleaf"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
+
+[[cow.loot]]
+item_id = "bronze_boots"
+drop_chance = 0.01
 quantity_min = 1
 quantity_max = 1
 
@@ -627,6 +969,56 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 1
 
+[[wild_boar.loot]]
+item_id = "iron_boots"
+drop_chance = 0.01
+quantity_min = 1
+quantity_max = 1
+
+[[wild_boar.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[wild_boar.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[wild_boar.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[wild_boar.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 2
+
+[[wild_boar.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[wild_boar.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[wild_boar.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[wild_boar.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
 [wild_boar.behaviors]
 hostile = true
 wander_enabled = true
@@ -665,6 +1057,56 @@ gold_max = 18
 [[biter.loot]]
 item_id = "regular_bones"
 drop_chance = 0.5
+quantity_min = 1
+quantity_max = 1
+
+[[biter.loot]]
+item_id = "iron_boots"
+drop_chance = 0.01
+quantity_min = 1
+quantity_max = 1
+
+[[biter.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[biter.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[biter.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[biter.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[biter.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[biter.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[biter.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[biter.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 4
 quantity_min = 1
 quantity_max = 1
 
@@ -811,6 +1253,28 @@ drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
 
+[[chicken.loot_tables]]
+name = "seed_drop"
+chance = 0.05
+
+[[chicken.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[chicken.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[chicken.loot]]
+item_id = "greenleaf"
+drop_chance = 0.03
+quantity_min = 1
+quantity_max = 1
+
 [chicken.behaviors]
 hostile = false
 wander_enabled = true
@@ -861,6 +1325,34 @@ quantity_max = 1
 [[goat.loot]]
 item_id = "health_potion"
 drop_chance = 0.10
+quantity_min = 1
+quantity_max = 1
+
+[[goat.loot_tables]]
+name = "seed_drop"
+chance = 0.05
+
+[[goat.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[goat.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[goat.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 3
+quantity_min = 1
+quantity_max = 1
+
+[[goat.loot]]
+item_id = "greenleaf"
+drop_chance = 0.04
 quantity_min = 1
 quantity_max = 1
 

@@ -41,12 +41,6 @@ quantity_min = 1
 quantity_max = 1
 
 [[spider.loot]]
-item_id = "strawberry_seed"
-drop_chance = 0.05
-quantity_min = 1
-quantity_max = 1
-
-[[spider.loot]]
 item_id = "recipe_spine_blade"
 drop_chance = 0.05
 quantity_min = 1
@@ -55,6 +49,68 @@ quantity_max = 1
 [[spider.loot]]
 item_id = "regular_bones"
 drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[spider.loot]]
+item_id = "steel_sword"
+drop_chance = 0.015
+quantity_min = 1
+quantity_max = 1
+
+[[spider.loot_tables]]
+name = "seed_drop"
+chance = 0.08
+
+[[spider.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[spider.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[spider.loot_tables.entries]]
+item_id = "watermelon_seed"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
+[[spider.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[spider.loot_tables]]
+name = "herb_drop"
+chance = 0.07
+
+[[spider.loot_tables.entries]]
+item_id = "ashveil"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[spider.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[spider.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[spider.loot_tables.entries]]
+item_id = "nightthorn"
+weight = 3
 quantity_min = 1
 quantity_max = 1
 
@@ -140,9 +196,25 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 1
 
-[[slime_blue.loot]]
+[[slime_blue.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[slime_blue.loot_tables.entries]]
 item_id = "onion_seed"
-drop_chance = 0.06
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[slime_blue.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[slime_blue.loot]]
+item_id = "greenleaf"
+drop_chance = 0.04
 quantity_min = 1
 quantity_max = 1
 
@@ -183,9 +255,25 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 1
 
-[[slime_green.loot]]
+[[slime_green.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[slime_green.loot_tables.entries]]
 item_id = "onion_seed"
-drop_chance = 0.06
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[slime_green.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[slime_green.loot]]
+item_id = "greenleaf"
+drop_chance = 0.04
 quantity_min = 1
 quantity_max = 1
 
@@ -226,9 +314,25 @@ drop_chance = 0.25
 quantity_min = 1
 quantity_max = 1
 
-[[slime_pink.loot]]
+[[slime_pink.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[slime_pink.loot_tables.entries]]
 item_id = "onion_seed"
-drop_chance = 0.06
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[slime_pink.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[slime_pink.loot]]
+item_id = "greenleaf"
+drop_chance = 0.04
 quantity_min = 1
 quantity_max = 1
 
@@ -337,6 +441,62 @@ quantity_max = 2
 [[skeleton.loot]]
 item_id = "parchment"
 drop_chance = 0.08
+quantity_min = 1
+quantity_max = 1
+
+[[skeleton.loot]]
+item_id = "iron_boots"
+drop_chance = 0.015
+quantity_min = 1
+quantity_max = 1
+
+[[skeleton.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[skeleton.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[skeleton.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[skeleton.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 2
+
+[[skeleton.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
+[[skeleton.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[skeleton.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[skeleton.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[skeleton.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 5
 quantity_min = 1
 quantity_max = 1
 
@@ -505,6 +665,68 @@ drop_chance = 1.0
 quantity_min = 1
 quantity_max = 1
 
+[[wolf_spider.loot]]
+item_id = "steel_sword"
+drop_chance = 0.02
+quantity_min = 1
+quantity_max = 1
+
+[[wolf_spider.loot_tables]]
+name = "seed_drop"
+chance = 0.08
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "watermelon_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 3
+
+[[wolf_spider.loot_tables]]
+name = "herb_drop"
+chance = 0.08
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "nightthorn"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "ashveil"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[wolf_spider.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
 [wolf_spider.behaviors]
 hostile = true
 wander_enabled = true
@@ -552,6 +774,62 @@ drop_chance = 0.20
 quantity_min = 1
 quantity_max = 2
 
+[[low_orc.loot]]
+item_id = "iron_sword"
+drop_chance = 0.02
+quantity_min = 1
+quantity_max = 1
+
+[[low_orc.loot_tables]]
+name = "seed_drop"
+chance = 0.07
+
+[[low_orc.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[low_orc.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[low_orc.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[low_orc.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
+[[low_orc.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[low_orc.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[low_orc.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[low_orc.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
 [low_orc.behaviors]
 hostile = true
 wander_enabled = true
@@ -596,6 +874,68 @@ quantity_max = 2
 [[barbarian.loot]]
 item_id = "regular_bones"
 drop_chance = 1.0
+quantity_min = 1
+quantity_max = 1
+
+[[barbarian.loot]]
+item_id = "steel_sword"
+drop_chance = 0.015
+quantity_min = 1
+quantity_max = 1
+
+[[barbarian.loot_tables]]
+name = "seed_drop"
+chance = 0.07
+
+[[barbarian.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[barbarian.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[barbarian.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[barbarian.loot_tables.entries]]
+item_id = "watermelon_seed"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
+[[barbarian.loot_tables]]
+name = "herb_drop"
+chance = 0.07
+
+[[barbarian.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[barbarian.loot_tables.entries]]
+item_id = "ashveil"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[barbarian.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[barbarian.loot_tables.entries]]
+item_id = "nightthorn"
+weight = 3
 quantity_min = 1
 quantity_max = 1
 
@@ -752,6 +1092,62 @@ drop_chance = 0.35
 quantity_min = 1
 quantity_max = 3
 
+[[bone_monster.loot]]
+item_id = "iron_boots"
+drop_chance = 0.015
+quantity_min = 1
+quantity_max = 1
+
+[[bone_monster.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[bone_monster.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[bone_monster.loot_tables.entries]]
+item_id = "cabbage_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[bone_monster.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[bone_monster.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
+[[bone_monster.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[bone_monster.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[bone_monster.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[bone_monster.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
 [bone_monster.behaviors]
 hostile = true
 wander_enabled = true
@@ -839,6 +1235,50 @@ respawn_time_ms = 10000
 exp_base = 32
 gold_min = 2
 gold_max = 6
+
+[[snake.loot]]
+item_id = "iron_sword"
+drop_chance = 0.01
+quantity_min = 1
+quantity_max = 1
+
+[[snake.loot_tables]]
+name = "seed_drop"
+chance = 0.06
+
+[[snake.loot_tables.entries]]
+item_id = "tomato_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[snake.loot_tables.entries]]
+item_id = "onion_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[snake.loot_tables.entries]]
+item_id = "potato_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 3
+
+[[snake.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[snake.loot_tables.entries]]
+item_id = "greenleaf"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[snake.loot_tables.entries]]
+item_id = "tangleroots"
+weight = 6
+quantity_min = 1
+quantity_max = 1
 
 [snake.behaviors]
 hostile = true
@@ -1047,6 +1487,50 @@ drop_chance = 0.00390625
 quantity_min = 1
 quantity_max = 1
 
+[[rock_golem.loot_tables]]
+name = "seed_drop"
+chance = 0.07
+
+[[rock_golem.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[rock_golem.loot_tables.entries]]
+item_id = "watermelon_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[rock_golem.loot_tables.entries]]
+item_id = "strawberry_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[rock_golem.loot_tables]]
+name = "herb_drop"
+chance = 0.06
+
+[[rock_golem.loot_tables.entries]]
+item_id = "ashveil"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[rock_golem.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[rock_golem.loot_tables.entries]]
+item_id = "nightthorn"
+weight = 4
+quantity_min = 1
+quantity_max = 1
+
 [rock_golem.behaviors]
 hostile = true
 wander_enabled = true
@@ -1103,6 +1587,62 @@ quantity_max = 1
 [[wurm.loot]]
 item_id = "rune_boots"
 drop_chance = 0.00390625
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot_tables]]
+name = "seed_drop"
+chance = 0.08
+
+[[wurm.loot_tables.entries]]
+item_id = "nightthorn_seed"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot_tables.entries]]
+item_id = "watermelon_seed"
+weight = 8
+quantity_min = 1
+quantity_max = 2
+
+[[wurm.loot_tables.entries]]
+item_id = "sweetcorn_seed"
+weight = 10
+quantity_min = 1
+quantity_max = 2
+
+[[wurm.loot_tables.entries]]
+item_id = "bloodcap_seed"
+weight = 3
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot_tables]]
+name = "herb_drop"
+chance = 0.08
+
+[[wurm.loot_tables.entries]]
+item_id = "nightthorn"
+weight = 8
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot_tables.entries]]
+item_id = "ashveil"
+weight = 10
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot_tables.entries]]
+item_id = "marshbloom"
+weight = 6
+quantity_min = 1
+quantity_max = 1
+
+[[wurm.loot_tables.entries]]
+item_id = "bloodcap"
+weight = 3
 quantity_min = 1
 quantity_max = 1
 

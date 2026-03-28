@@ -30,8 +30,8 @@ use auth::AuthSession;
 #[cfg(not(target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
-const SERVER_URL: &str = "https://aeven.xyz";
-const WS_URL: &str = "wss://aeven.xyz";
+const SERVER_URL: &str = "http://localhost:2567";
+const WS_URL: &str = "ws://localhost:2567";
 
 // const SERVER_URL: &str = "https://aeven.xyz";
 // const WS_URL: &str = "wss://aeven.xyz";
@@ -39,7 +39,7 @@ const WS_URL: &str = "wss://aeven.xyz";
 // Development mode - enables guest login
 // Set to false for production builds
 const DEV_MODE: bool = false;
-static FULLSCREEN: AtomicBool = AtomicBool::new(cfg!(target_os = "windows"));
+static FULLSCREEN: AtomicBool = AtomicBool::new(false);
 
 fn window_conf() -> Conf {
     let fullscreen = FULLSCREEN.load(Ordering::Relaxed);
@@ -1330,11 +1330,9 @@ fn run_game_frame(
             InputCommand::SetCombatStyle { style } => ClientMessage::SetCombatStyle {
                 style: style.clone(),
             },
-            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate {
-                enabled: *enabled,
-            },
             InputCommand::KothContinue => ClientMessage::KothContinue,
             InputCommand::KothLeave => ClientMessage::KothLeave,
+            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate { enabled: *enabled },
         };
         network.send(&msg);
     }

@@ -35,6 +35,22 @@ category = "unlock"
 target_id = "bone_monster"
 
 [[rewards]]
+id = "unlock_golden_scarab"
+display_name = "Unlock: Golden Scarabs"
+description = "Unlock Golden Scarabs as a slayer task"
+cost = 100
+category = "unlock"
+target_id = "golden_scarab"
+
+[[rewards]]
+id = "unlock_wurm"
+display_name = "Unlock: Wyverns"
+description = "Unlock Wyverns as a slayer task"
+cost = 150
+category = "unlock"
+target_id = "wurm"
+
+[[rewards]]
 id = "slayer_helmet"
 display_name = "Slayer Helmet"
 description = "A helmet that boosts damage by 15% against your slayer task."

@@ -43,6 +43,18 @@ quantity_min = 1
 quantity_max = 2
 
 [[pig.loot]]
+item_id = "greenleaf"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
+
+[[pig.loot]]
+item_id = "bronze_sword"
+drop_chance = 0.01
+quantity_min = 1
+quantity_max = 1
+
+[[pig.loot]]
 item_id = "regular_bones"
 drop_chance = 1.0
 quantity_min = 1
@@ -135,5 +147,11 @@ item_id = "potato_seed"
 drop_chance = 0.10
 quantity_min = 1
 quantity_max = 2
+
+[[piglet.loot]]
+item_id = "greenleaf"
+drop_chance = 0.05
+quantity_min = 1
+quantity_max = 1
 
 # Wild Boar is defined in forest_creatures.toml (sprite = "wild_boar", wanders)
