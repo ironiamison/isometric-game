@@ -1282,7 +1282,7 @@ impl GameRoom {
                     }
                     // Online player — ban and kick
                     if let Err(e) = db
-                        .insert_ban(account_id, ip.as_deref(), &admin_name, reason.as_deref(), hours)
+                        .insert_ban(account_id, None, &admin_name, reason.as_deref(), hours)
                         .await
                     {
                         self.send_system_message(player_id, &format!("Failed to ban: {}", e))

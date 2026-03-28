@@ -551,21 +551,6 @@ async fn login_account(
                     error: Some(msg),
                 });
             }
-            // Check for active ban on this IP
-            if let Some((reason, expires_at)) = state.db.check_ban_by_ip(&client_ip).await {
-                let msg = match reason {
-                    Some(r) => format!("Connection banned until {}. Reason: {}", expires_at, r),
-                    None => format!("Connection banned until {}.", expires_at),
-                };
-                return Json(AuthResponse {
-                    success: false,
-                    token: None,
-                    username: None,
-                    characters: None,
-                    error: Some(msg),
-                });
-            }
-
             // Create auth token - note: (account_id, username) order now
             let token = Uuid::new_v4().to_string();
             state
@@ -1185,18 +1170,6 @@ async fn matchmake_join_or_create(
         let msg = match reason {
             Some(r) => format!("Account banned until {}. Reason: {}", expires_at, r),
             None => format!("Account banned until {}.", expires_at),
-        };
-        return (
-            StatusCode::FORBIDDEN,
-            Json(serde_json::json!({ "error": msg })),
-        )
-            .into_response();
-    }
-    // Check for active ban on this IP
-    if let Some((reason, expires_at)) = state.db.check_ban_by_ip(&client_ip).await {
-        let msg = match reason {
-            Some(r) => format!("Connection banned until {}. Reason: {}", expires_at, r),
-            None => format!("Connection banned until {}.", expires_at),
         };
         return (
             StatusCode::FORBIDDEN,
