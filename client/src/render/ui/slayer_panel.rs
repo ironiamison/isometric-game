@@ -934,6 +934,12 @@ impl Renderer {
                     );
                 }
 
+                // Flush macroquad's draw batch before switching scissor
+                {
+                    let mut gl = unsafe { get_internal_gl() };
+                    gl.flush();
+                }
+
                 // Set up scissor clip for the block list area
                 let list_clip_x = (content_x * scale_x) as i32;
                 let list_clip_y = (list_top * scale_y) as i32;
@@ -1109,6 +1115,16 @@ impl Renderer {
                         alt = !alt;
                         cur_y += compact_h + compact_sp;
                     }
+                }
+
+                // Flush list draws so they respect the inner scissor,
+                // then restore outer scissor for the scrollbar
+                {
+                    let mut gl = unsafe { get_internal_gl() };
+                    gl.flush();
+                }
+                unsafe {
+                    miniquad::gl::glScissor(clip_x, real_sh as i32 - clip_y - clip_h, clip_w, clip_h);
                 }
 
                 // Draw scrollbar if content overflows

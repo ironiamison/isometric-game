@@ -2783,9 +2783,13 @@ impl InputHandler {
                 if let Some(UiElementId::SlayerScrollArea) = &state.ui_state.hovered_element {
                     state.ui_state.slayer_reward_scroll =
                         (state.ui_state.slayer_reward_scroll - wheel_y * 30.0).max(0.0);
-                } else if let Some(UiElementId::SlayerBlockScrollArea) =
-                    &state.ui_state.hovered_element
-                {
+                } else if matches!(
+                    &state.ui_state.hovered_element,
+                    Some(UiElementId::SlayerBlockScrollArea)
+                        | Some(UiElementId::SlayerBlockMonsterSelect(_))
+                        | Some(UiElementId::SlayerRemoveBlock(_))
+                        | Some(UiElementId::SlayerBlockScrollbar)
+                ) {
                     state.ui_state.slayer_block_scroll_offset =
                         (state.ui_state.slayer_block_scroll_offset - wheel_y * 30.0).max(0.0);
                 }
