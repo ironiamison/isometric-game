@@ -1588,6 +1588,7 @@ struct LeaderboardEntry {
     mining_level: i32,
     alchemy_level: i32,
     slayer_level: i32,
+    survivalist_level: i32,
     total_level: i32,
     played_time: i64,
     monster_kills: i32,
@@ -1611,6 +1612,7 @@ struct PlayerProfileRanks {
     mining_level: usize,
     alchemy_level: usize,
     slayer_level: usize,
+    survivalist_level: usize,
     monster_kills: usize,
     played_time: usize,
 }
@@ -1652,6 +1654,7 @@ async fn load_leaderboard_entries(state: &AppState) -> Vec<LeaderboardEntry> {
                 mining_level: skills.mining.level,
                 alchemy_level: skills.alchemy.level,
                 slayer_level: skills.slayer.level,
+                survivalist_level: skills.survivalist.level,
                 total_level: skills.total_level(),
                 played_time,
                 monster_kills,
@@ -1679,6 +1682,9 @@ fn sort_leaderboard_entries(entries: &mut [LeaderboardEntry], sort: &str) {
         "mining_level" => entries.sort_by(|a, b| b.mining_level.cmp(&a.mining_level)),
         "alchemy_level" => entries.sort_by(|a, b| b.alchemy_level.cmp(&a.alchemy_level)),
         "slayer_level" => entries.sort_by(|a, b| b.slayer_level.cmp(&a.slayer_level)),
+        "survivalist_level" => {
+            entries.sort_by(|a, b| b.survivalist_level.cmp(&a.survivalist_level))
+        }
         "monster_kills" => entries.sort_by(|a, b| b.monster_kills.cmp(&a.monster_kills)),
         "played_time" => entries.sort_by(|a, b| b.played_time.cmp(&a.played_time)),
         _ => entries.sort_by(|a, b| b.total_level.cmp(&a.total_level)),
@@ -1743,6 +1749,7 @@ async fn stats_player_profile(
         mining_level: stat_rank(&entries, &player, |entry| entry.mining_level as i64),
         alchemy_level: stat_rank(&entries, &player, |entry| entry.alchemy_level as i64),
         slayer_level: stat_rank(&entries, &player, |entry| entry.slayer_level as i64),
+        survivalist_level: stat_rank(&entries, &player, |entry| entry.survivalist_level as i64),
         monster_kills: stat_rank(&entries, &player, |entry| entry.monster_kills as i64),
         played_time: stat_rank(&entries, &player, |entry| entry.played_time),
     };

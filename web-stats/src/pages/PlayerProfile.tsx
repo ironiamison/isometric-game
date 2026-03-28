@@ -27,6 +27,7 @@ const PROFILE_STATS: ProfileStat[] = [
   { label: 'Prayer', value: (player) => player.prayer_level.toLocaleString(), rank: (ranks) => ranks.prayer_level },
   { label: 'Magic', value: (player) => player.magic_level.toLocaleString(), rank: (ranks) => ranks.magic_level },
   { label: 'Slayer', value: (player) => player.slayer_level.toLocaleString(), rank: (ranks) => ranks.slayer_level },
+  { label: 'Survivalist', value: (player) => player.survivalist_level.toLocaleString(), rank: (ranks) => ranks.survivalist_level },
   { label: 'Monster Kills', value: (player) => player.monster_kills.toLocaleString(), rank: (ranks) => ranks.monster_kills },
   { label: 'Played Time', value: (player) => formatPlayedTime(player.played_time), rank: (ranks) => ranks.played_time },
 ]

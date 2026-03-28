@@ -43,6 +43,7 @@ const METRIC_GROUPS: { title: string; metrics: Metric[] }[] = [
       { label: 'Farming', sort: 'farming_level', field: 'farming_level', hint: 'Farming level' },
       { label: 'Woodcutting', sort: 'woodcutting_level', field: 'woodcutting_level', hint: 'Woodcutting level' },
       { label: 'Mining', sort: 'mining_level', field: 'mining_level', hint: 'Mining level' },
+      { label: 'Survivalist', sort: 'survivalist_level', field: 'survivalist_level', hint: 'Survivalist level' },
     ],
   },
   {

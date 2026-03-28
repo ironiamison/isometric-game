@@ -34,6 +34,7 @@ export interface LeaderboardEntry {
   mining_level: number
   alchemy_level: number
   slayer_level: number
+  survivalist_level: number
   total_level: number
   played_time: number
   monster_kills: number
@@ -55,6 +56,7 @@ export type LeaderboardSort =
   | 'mining_level'
   | 'alchemy_level'
   | 'slayer_level'
+  | 'survivalist_level'
   | 'total_level'
   | 'played_time'
   | 'monster_kills'
@@ -76,6 +78,7 @@ export interface PlayerProfileRanks {
   mining_level: number
   alchemy_level: number
   slayer_level: number
+  survivalist_level: number
   monster_kills: number
   played_time: number
 }
