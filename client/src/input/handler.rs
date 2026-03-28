@@ -8793,7 +8793,7 @@ impl InputHandler {
         let minimap_panel_blocks_input = state.ui_state.minimap_panel_open;
         let classic = state.ui_state.classic_controls;
 
-        if !minimap_panel_blocks_input {
+        if !minimap_panel_blocks_input && !chat_consuming_keyboard {
             // Enter key opens chat (not in classic mode - chat is always open)
             // Don't open chat on System tab (read-only)
             if !classic
