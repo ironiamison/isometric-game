@@ -11435,8 +11435,8 @@ impl InputHandler {
             }
         }
 
-        // Toggle expanded minimap panel (M key)
-        if !classic && is_key_pressed(KeyCode::M) {
+        // Toggle expanded minimap panel (M key) — disabled in instances/interiors
+        if !classic && is_key_pressed(KeyCode::M) && state.current_instance.is_none() {
             audio.play_sfx("enter");
             state.ui_state.minimap_panel_open = !state.ui_state.minimap_panel_open;
             if state.ui_state.minimap_panel_open {
