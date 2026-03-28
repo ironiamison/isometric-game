@@ -148,6 +148,25 @@ fn extract_string_array(value: &rmpv::Value, key: &str) -> Vec<String> {
     result
 }
 
+fn extract_blockable_monsters(
+    value: &rmpv::Value,
+    key: &str,
+) -> Vec<(String, String)> {
+    let mut result = Vec::new();
+    if let Some(arr) = extract_map_field(value, key) {
+        if let rmpv::Value::Array(ref items) = *arr {
+            for item in items {
+                let id = extract_string(item, "id").unwrap_or_default();
+                let name = extract_string(item, "name").unwrap_or_default();
+                if !id.is_empty() {
+                    result.push((id, name));
+                }
+            }
+        }
+    }
+    result
+}
+
 fn handle_welcome(value: &rmpv::Value, state: &mut GameState) {
     if let Some(player_id) = extract_string(value, "player_id") {
         log::info!("Welcome! Player ID: {}", player_id);
@@ -4080,6 +4099,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     extract_string_array(value, "blocked_monsters");
                 state.ui_state.slayer_unlocked_monsters =
                     extract_string_array(value, "unlocked_monsters");
+                state.ui_state.slayer_blockable_monsters = extract_blockable_monsters(value, "blockable_monsters");
+                state.ui_state.slayer_selected_block_monster = None;
                 state.ui_state.slayer_panel_open = true;
                 state.ui_state.slayer_reward_tab = 0;
                 state.ui_state.slayer_reward_scroll = 0.0;

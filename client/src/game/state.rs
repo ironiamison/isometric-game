@@ -1619,6 +1619,8 @@ pub struct UiState {
     pub slayer_rewards: Vec<crate::game::slayer::SlayerRewardClientData>,
     pub slayer_blocked_monsters: Vec<String>,
     pub slayer_unlocked_monsters: Vec<String>,
+    pub slayer_blockable_monsters: Vec<(String, String)>,
+    pub slayer_selected_block_monster: Option<usize>,
     pub slayer_reward_tab: usize,
     pub slayer_reward_scroll: f32,
 
@@ -1857,6 +1859,8 @@ impl Default for UiState {
             slayer_rewards: Vec::new(),
             slayer_blocked_monsters: Vec::new(),
             slayer_unlocked_monsters: Vec::new(),
+            slayer_blockable_monsters: Vec::new(),
+            slayer_selected_block_monster: None,
             slayer_reward_tab: 0,
             slayer_reward_scroll: 0.0,
             // Trade system
