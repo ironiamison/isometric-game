@@ -764,7 +764,7 @@ impl Renderer {
             miniquad::gl::glScissor(clip_x, real_sh as i32 - clip_y - clip_h, clip_w, clip_h);
         }
 
-        if filtered_rewards.is_empty() && active_tab != 2 {
+        if filtered_rewards.is_empty() && active_tab != 2 && active_tab != 3 {
             self.draw_text_sharp(
                 "No rewards available",
                 content_x + 10.0 * s,
