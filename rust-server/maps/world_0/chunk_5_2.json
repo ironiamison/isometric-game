@@ -3086,7 +3086,13 @@
     ]
   },
   "collision": "AAAEAAAABgAAAAIAAIABAABwAAAADgAAnwEAAIAAAABwAAAADAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "crow",
+      "x": 4,
+      "y": 1
+    }
+  ],
   "mapObjects": [],
   "walls": [
     {

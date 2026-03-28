@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "wIBAAAADQAAADEAAABBAAAAgQAAAIEAAAEBEAACAQAAAgEAAAABBAAAAQQAAAEEAAABCAAAA/v8AAAIAAAAEQAAAKAAAAJBAAAAQAQAAIBEAACAAAAAgAAAAYAIAAMAAAAAAAAAAcIAAAFwAAAB8AACABPgAAAL4IAAReQDACSA=",
+  "collision": "wIBAAAADQAAADEAAABBAAAAgQAAAIEAAAEBEAACAQAAAgEAAAABBAAAAQQAAAEEAAABCAAAA/v8AAAIAAAAEQAAAKAAAAJBAAAAQAQAAIBEAACAAAAAgAAAAYAIAAMAAAACAAAAAcIAAAFwAAAB8AACABPgAAAL4IAAReQDgCSA=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3098,6 +3098,16 @@
       "x": 29,
       "y": 0,
       "level": 1
+    },
+    {
+      "entityId": "crow",
+      "x": 18,
+      "y": 9
+    },
+    {
+      "entityId": "crow",
+      "x": 20,
+      "y": 5
     }
   ],
   "mapObjects": [

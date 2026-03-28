@@ -43,12 +43,12 @@ category = "unlock"
 target_id = "golden_scarab"
 
 [[rewards]]
-id = "unlock_wurm"
+id = "unlock_wyvern"
 display_name = "Unlock: Wyverns"
 description = "Unlock Wyverns as a slayer task"
 cost = 150
 category = "unlock"
-target_id = "wurm"
+target_id = "wyvern"
 
 [[rewards]]
 id = "slayer_helmet"

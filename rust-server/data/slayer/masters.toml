@@ -282,8 +282,8 @@ requires_unlock = true
 xp_per_kill = 85
 
 [[masters.tasks]]
-monster_id = "wurm"
-display_name = "Wurms"
+monster_id = "wyvern"
+display_name = "Wyverns"
 count_min = 30
 count_max = 55
 weight = 5

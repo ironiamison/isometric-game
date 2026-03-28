@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ACAAAABYAAAACAAAAIkCAMASAAAgFAABEBoQPnAK8CNQDgggyAUEoI8XBqDBHwIgAAACIAAAMmAAADIgwA8CIIAYBCDBCAgkgQhwoMFKAKCBFgCggBIAoAATkKA+OQSgwKUAoBwnACHkdgAgAHcQYBBEA2CAhwEgIPgBICAABj8=",
+  "collision": "ABAAAABIAAAACAAAAIkCAMASAAAgFAABEBoQPnAK8CNQDgggyAUEoI8XBqDBHwIgAAACIAAAMmAAADIgwA8CIIAYBCDBCAgkwQhwoIFLAKABFwCgARMAoAETkKAeOQSg4KUAoBwnACHkdgAgAHcQYBBEA2CAhwEgIPgBICAABj8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3152,6 +3152,11 @@
       "x": 2,
       "y": 14,
       "level": 1
+    },
+    {
+      "entityId": "crow",
+      "x": 18,
+      "y": 6
     }
   ],
   "mapObjects": [

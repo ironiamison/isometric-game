@@ -120163,42 +120163,42 @@
       "y": 116
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 120,
       "y": 45
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 141,
       "y": 66
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 118,
       "y": 60
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 99,
       "y": 43
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 104,
       "y": 35
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 91,
       "y": 38
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 122,
       "y": 53
     },
     {
-      "entityId": "wurm",
+      "entityId": "wyvern",
       "x": 134,
       "y": 54
     },
@@ -131896,6 +131896,87 @@
       "edge": "right"
     }
   ],
-  "portals": [],
+  "portals": [
+    {
+      "id": "exit_1774728350176_10rf66by0",
+      "x": 96,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1774728350401_zwligbjzk",
+      "x": 97,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1774728350685_1el7xiaw4",
+      "x": 98,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1774728351043_webf273es",
+      "x": 99,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1774728351319_turzfciyq",
+      "x": 100,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1774728351586_m8q7uz0y3",
+      "x": 101,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1774728352083_c5gvcjl11",
+      "x": 102,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    },
+    {
+      "id": "exit_1774728352365_6f7xh51c3",
+      "x": 103,
+      "y": 199,
+      "width": 1,
+      "height": 1,
+      "target_map": "overworld",
+      "target_x": 0,
+      "target_y": 0
+    }
+  ],
   "gatheringZones": []
 }

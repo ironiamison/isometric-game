@@ -3085,12 +3085,27 @@
       0
     ]
   },
-  "collision": "PwwDAAEIAwABEAEAABABAAAQAQAAkAEAABD/HwAQABAAEAAQAJBgGgCQ/x8AkAAAAJAAAB6QAADjnwAAAYAAAAGAAADO/wAASD8AAM8nAAABRgAAAUYAAAWGAAABBAEAAQQBAAGEAQABjAAA/38AAAAAAAAAAAAAAAAAAAAAAAA=",
+  "collision": "IQwDAAEIAwABCAEAAAgBAAAIAQAACAEAAAj/HwAIABAACAAQAIhgGgCI/x8AiAAAAIgAAP6PAAADggAAAYAAAAGAAADO/wAASD8AAM8nAAABRgAAAUYAAAWGAAABBAEAAQQBAAGEAQABjAAA/38AAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [
     {
       "entityId": "port_master_oakshore",
       "x": 4,
       "y": 16
+    },
+    {
+      "entityId": "crow",
+      "x": 14,
+      "y": 6
+    },
+    {
+      "entityId": "crow",
+      "x": 25,
+      "y": 8
+    },
+    {
+      "entityId": "crow",
+      "x": 8,
+      "y": 15
     }
   ],
   "mapObjects": [

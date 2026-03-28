@@ -3098,6 +3098,36 @@
       "x": 3,
       "y": 30,
       "level": 1
+    },
+    {
+      "entityId": "crow",
+      "x": 11,
+      "y": 13
+    },
+    {
+      "entityId": "crow",
+      "x": 14,
+      "y": 4
+    },
+    {
+      "entityId": "crow",
+      "x": 20,
+      "y": 0
+    },
+    {
+      "entityId": "crow",
+      "x": 25,
+      "y": 14
+    },
+    {
+      "entityId": "crow",
+      "x": 21,
+      "y": 5
+    },
+    {
+      "entityId": "crow",
+      "x": 17,
+      "y": 13
     }
   ],
   "mapObjects": [

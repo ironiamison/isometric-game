@@ -3086,7 +3086,18 @@
     ]
   },
   "collision": "AAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/gcAgAF4AGAAgAAQwAEAEMAAAZAIAAMQCAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "crow",
+      "x": 16,
+      "y": 30
+    },
+    {
+      "entityId": "crow",
+      "x": 27,
+      "y": 28
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2015,

@@ -1542,13 +1542,13 @@ wander_pause_max_ms = 6000
 # Wurm - Slayer-only variant
 # =============================================================================
 
-[wurm]
+[wyvern]
 display_name = "Wyvern"
 sprite = "wurm"
 animation_type = "standard"
 description = "A vicious burrowing wyvern. Only assigned as a slayer task by Chaeldar."
 
-[wurm.stats]
+[wyvern.stats]
 level = 22
 max_hp = 100
 damage = 14
@@ -1561,92 +1561,92 @@ move_cooldown_ms = 520
 attack_cooldown_ms = 1900
 respawn_time_ms = 48000
 
-[wurm.rewards]
+[wyvern.rewards]
 exp_base = 115
 gold_min = 25
 gold_max = 55
 
-[[wurm.loot]]
+[[wyvern.loot]]
 item_id = "wyvern_bones"
 drop_chance = 0.6
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot]]
+[[wyvern.loot]]
 item_id = "wurm_blade"
 drop_chance = 0.001
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot]]
+[[wyvern.loot]]
 item_id = "cactus_seed"
 drop_chance = 0.033
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot]]
+[[wyvern.loot]]
 item_id = "rune_boots"
 drop_chance = 0.00390625
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot_tables]]
+[[wyvern.loot_tables]]
 name = "seed_drop"
 chance = 0.08
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "nightthorn_seed"
 weight = 6
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "watermelon_seed"
 weight = 8
 quantity_min = 1
 quantity_max = 2
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "sweetcorn_seed"
 weight = 10
 quantity_min = 1
 quantity_max = 2
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "bloodcap_seed"
 weight = 3
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot_tables]]
+[[wyvern.loot_tables]]
 name = "herb_drop"
 chance = 0.08
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "nightthorn"
 weight = 8
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "ashveil"
 weight = 10
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "marshbloom"
 weight = 6
 quantity_min = 1
 quantity_max = 1
 
-[[wurm.loot_tables.entries]]
+[[wyvern.loot_tables.entries]]
 item_id = "bloodcap"
 weight = 3
 quantity_min = 1
 quantity_max = 1
 
-[wurm.behaviors]
+[wyvern.behaviors]
 hostile = true
 slayer_only = true
 wander_enabled = true

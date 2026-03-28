@@ -3086,7 +3086,33 @@
     ]
   },
   "collision": "QAAAYAAAACAAAAAgAAAAIgAAACAQAgAgAAIAIAACECDAIQAYgAAABAIAAAQCwP8LAEBJCgFAABJAQAASQEAAEghiACJAQAAiCEIAKgBAACJAQAAiAEAAEgLAABIAABASAAAAEgBBABIBQAAKAsD/CwwAAAZwAMABgP8/AAAAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "crow",
+      "x": 0,
+      "y": 18
+    },
+    {
+      "entityId": "crow",
+      "x": 10,
+      "y": 2
+    },
+    {
+      "entityId": "crow",
+      "x": 18,
+      "y": 8
+    },
+    {
+      "entityId": "crow",
+      "x": 19,
+      "y": 19
+    },
+    {
+      "entityId": "crow",
+      "x": 21,
+      "y": 2
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2280,
