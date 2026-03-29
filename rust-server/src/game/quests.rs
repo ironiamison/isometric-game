@@ -501,6 +501,29 @@ impl GameRoom {
                     if script_result.quest_accepted {
                         self.accept_quest_with_snapshot_progress(player_id, &quest_id, quest_state)
                             .await;
+
+                        // Fire NpcInteraction for the NPC we're talking to so the
+                        // giver's talk_to objective auto-completes on acceptance
+                        // (the event fired earlier when the quest wasn't active yet)
+                        let accept_event = QuestEvent::NpcInteraction {
+                            player_id: player_id.to_string(),
+                            npc_id: entity_type.to_string(),
+                        };
+                        let results = self.quest_registry.process_event(&accept_event, quest_state).await;
+                        for result in results {
+                            if let (Some(objective_id), Some(current), Some(target)) =
+                                (&result.objective_id, result.new_progress, result.target)
+                            {
+                                self.send_quest_progress_update(
+                                    player_id,
+                                    &result.quest_id,
+                                    objective_id,
+                                    current,
+                                    target,
+                                )
+                                .await;
+                            }
+                        }
                     }
 
                     if script_result.quest_completed {

@@ -138,13 +138,16 @@ function show_bookshelf_search(ctx)
         text = "Your hand closes around a small metal box buried behind a stack of mouldy encyclopedias."
     })
 
-    ctx:give_item("tinderbox", 1)
-    ctx:show_notification("Found: Tinderbox")
-
     ctx:show_dialogue({
         speaker = "Narrator",
         text = "A tinderbox! This should be able to light those candles."
     })
+
+    -- Grant item AFTER the last dialogue so it only fires once
+    -- (non-dialogue calls execute on every replay, so they must come
+    -- after all show_dialogue calls in the function)
+    ctx:give_item("tinderbox", 1)
+    ctx:show_notification("Found: Tinderbox")
 end
 
 -- ============================================================================
@@ -453,9 +456,15 @@ function show_barnaby_interrogation(ctx)
         })
     end
 
+    -- Grant item AFTER the last dialogue to avoid double-granting during replay
     ctx:give_item("basement_key", 1)
     ctx:show_notification("Received: Basement Key")
 end
+
+-- Note on give_item placement: non-dialogue calls (give_item, show_notification)
+-- execute on EVERY script replay. Dialogues get skipped during replay, but
+-- give_item does not. Always place give_item after the last show_dialogue in a
+-- function to ensure it only fires once (when the script runs to completion).
 
 -- ============================================================================
 -- Oddwick Waiting (mid-quest, after Barnaby)
