@@ -1775,6 +1775,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.dialogue_scroll_offset = 0.0;
                 state.ui_state.dialogue_touch_scroll_id = None;
                 state.ui_state.dialogue_touch_dragged = false;
+                state.ui_state.selected_inventory_slot = None;
                 state.ui_state.active_dialogue = Some(ActiveDialogue {
                     quest_id,
                     npc_id,

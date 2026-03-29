@@ -1575,6 +1575,8 @@ pub struct UiState {
     pub dialogue_touch_start_y: f32,
     pub dialogue_touch_dragged: bool,
     pub dialogue_scroll_drag: crate::ui::scroll::ScrollDragState,
+    // Selected inventory slot (for "use item on entity" flow)
+    pub selected_inventory_slot: Option<usize>,
     // Inventory grid scroll offset (for small screens where not all rows fit)
     pub inventory_scroll_offset: f32,
     // Touch drag scroll tracking for inventory grid
@@ -1827,6 +1829,7 @@ impl Default for UiState {
             dialogue_touch_start_y: 0.0,
             dialogue_touch_dragged: false,
             dialogue_scroll_drag: Default::default(),
+            selected_inventory_slot: None,
             inventory_scroll_offset: 0.0,
             inventory_touch_scroll_id: None,
             inventory_touch_last_y: 0.0,

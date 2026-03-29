@@ -368,6 +368,25 @@ impl Renderer {
                 }
             }
 
+            // Selected item highlight overlay (for "use item on entity" flow)
+            if state.ui_state.selected_inventory_slot == Some(i) && has_item {
+                draw_rectangle(
+                    x + 2.0,
+                    y + 2.0,
+                    slot_size - 4.0,
+                    slot_size - 4.0,
+                    Color::new(1.0, 1.0, 0.0, 0.3),
+                );
+                draw_rectangle_lines(
+                    x + 1.0,
+                    y + 1.0,
+                    slot_size - 2.0,
+                    slot_size - 2.0,
+                    2.0,
+                    Color::new(1.0, 1.0, 0.0, 0.8),
+                );
+            }
+
             // Shift-drop indicator overlay
             let shift_held = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
             if shift_held && state.ui_state.shift_drop_enabled && has_item && is_hovered {
