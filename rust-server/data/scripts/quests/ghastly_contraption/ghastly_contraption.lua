@@ -47,15 +47,20 @@ function route_in_progress(ctx)
         return
     end
 
-    -- If gate not opened yet, player has tinderbox — show candle puzzle
+    -- If gate not opened yet, player has tinderbox — hint to use tinderbox on candles
     if gate.current < gate.target then
         if npc == "haunted_candles" then
-            show_candle_puzzle(ctx)
+            ctx:show_dialogue({
+                speaker = "Narrator",
+                text = "An ornate candle stand. Use a tinderbox to light it."
+            })
         elseif npc == "prof_oddwick" then
             show_oddwick_hint_candles(ctx)
         else
-            -- Bookshelf or other — generic hint
-            show_oddwick_hint_candles(ctx)
+            ctx:show_dialogue({
+                speaker = "Narrator",
+                text = "You need to find a way past the gate."
+            })
         end
         return
     end
@@ -205,90 +210,83 @@ function show_barnaby_post_key(ctx)
 end
 
 -- ============================================================================
--- Step 2: Candle Puzzle
+-- Use Item on Entity — Candle Puzzle
 -- ============================================================================
--- Correct order: Skull -> Tall -> Red -> Small
--- Oddwick's hint: "tall one first, then skull? Or skull second?"
--- (He swaps the first two — skull is actually first, tall is second)
 
-function show_candle_puzzle(ctx)
-    ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "Four candles stand before the gate. Each is different — a skull-shaped candle, a tall taper, a red candle, and a small stubby one. They must be lit in the correct order."
-    })
+local CANDLE_INFO = {
+    candle_1 = { name = "skull candle", flame = "an eerie green" },
+    candle_2 = { name = "tall taper", flame = "a pale blue" },
+    candle_3 = { name = "red candle", flame = "a warm orange" },
+    candle_4 = { name = "small stubby candle", flame = "a sputtering yellow" },
+}
 
-    -- Question 1: Which candle first?
-    local q1 = ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "Which candle do you light first?",
-        choices = {
-            { id = "skull", text = "The skull candle" },
-            { id = "tall", text = "The tall taper" },
-            { id = "red", text = "The red candle" },
-            { id = "small", text = "The small stubby candle" }
-        }
-    })
+local CANDLE_ORDER = { "candle_1", "candle_2", "candle_3", "candle_4" }
 
-    if q1 ~= "skull" then
-        show_candle_failure(ctx)
-        return
+function on_use_item(ctx, item_id, entity_type, npc_id)
+    if item_id ~= "tinderbox" or entity_type ~= "haunted_candles" then
+        return false
     end
 
-    -- Question 2: Which candle second?
-    local q2 = ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "The skull candle flickers to life with an eerie green flame. Which candle next?",
-        choices = {
-            { id = "tall", text = "The tall taper" },
-            { id = "red", text = "The red candle" },
-            { id = "small", text = "The small stubby candle" }
-        }
-    })
-
-    if q2 ~= "tall" then
-        show_candle_failure(ctx)
-        return
+    local gate = ctx:get_objective_progress("open_first_gate")
+    if gate.current >= gate.target then
+        ctx:show_notification("The candles are already lit. The gate is open.")
+        return true
     end
 
-    -- Question 3: Which candle third?
-    local q3 = ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "The tall taper ignites with a pale blue flame. Which candle next?",
-        choices = {
-            { id = "red", text = "The red candle" },
-            { id = "small", text = "The small stubby candle" }
-        }
-    })
-
-    if q3 ~= "red" then
-        show_candle_failure(ctx)
-        return
+    local tinderbox = ctx:get_objective_progress("find_tinderbox")
+    if tinderbox.current < tinderbox.target then
+        ctx:show_notification("You need to find a tinderbox first.")
+        return true
     end
 
-    -- Final candle (auto — only one left)
-    ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "The red candle bursts into a warm orange flame. You light the last candle — the small stubby one sputters to life."
-    })
+    -- Get current lit candles from flag
+    local lit_str = ctx:get_flag("candles_lit")
+    if lit_str == nil then lit_str = "" end
+    local lit = {}
+    if lit_str ~= "" then
+        for id in string.gmatch(lit_str, "([^,]+)") do
+            table.insert(lit, id)
+        end
+    end
 
-    ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "All four candles burn in unison. The gate groans... and slowly creaks open."
-    })
+    -- Check if already lit
+    for _, id in ipairs(lit) do
+        if id == npc_id then
+            local info = CANDLE_INFO[npc_id]
+            if info then
+                ctx:show_notification("The " .. info.name .. " is already lit.")
+            end
+            return true
+        end
+    end
 
-    ctx:show_notification("The first gate has opened!")
-end
+    -- Check if correct next candle
+    local next_index = #lit + 1
+    local expected = CANDLE_ORDER[next_index]
 
-function show_candle_failure(ctx)
-    ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "A cold wind howls through the room. All the candles snuff out at once. Somewhere in the house, a ghost laughs."
-    })
+    if npc_id ~= expected then
+        ctx:set_flag("candles_lit", "")
+        ctx:show_notification("A cold wind howls through the room. All the candles snuff out at once. Somewhere, a ghost laughs.")
+        return true
+    end
 
-    ctx:show_dialogue({
-        speaker = "Narrator",
-        text = "The candles reset. Perhaps a different order..."
-    })
+    -- Correct! Light it
+    table.insert(lit, npc_id)
+    ctx:set_flag("candles_lit", table.concat(lit, ","))
+
+    local info = CANDLE_INFO[npc_id]
+    if info then
+        ctx:show_notification("The " .. info.name .. " flickers to life with " .. info.flame .. " flame.")
+    end
+
+    -- All 4 lit?
+    if #lit == #CANDLE_ORDER then
+        ctx:show_notification("All four candles burn in unison. The gate groans... and slowly creaks open!")
+        ctx:complete_objective("open_first_gate")
+        ctx:set_flag("candles_lit", "")
+    end
+
+    return true
 end
 
 -- ============================================================================

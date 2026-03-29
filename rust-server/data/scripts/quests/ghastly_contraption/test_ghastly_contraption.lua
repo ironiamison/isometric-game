@@ -57,6 +57,7 @@ local function make_ctx(opts)
     local choice_queue = opts.choices or {}
     local interacting_npc = opts.npc or ""
     local choice_idx = 0
+    local flags = opts.flags or {}
 
     local ctx = {}
     ctx._dialogues = {}        -- all dialogues shown
@@ -65,6 +66,7 @@ local function make_ctx(opts)
     ctx._items_given = {}
     ctx._notifications = {}
     ctx._unlocked_quests = {}
+    ctx._completed_objectives = {}
 
     function ctx:get_quest_state()
         return quest_state
@@ -118,6 +120,18 @@ local function make_ctx(opts)
         table.insert(self._unlocked_quests, quest_id)
     end
 
+    function ctx:get_flag(name)
+        return flags[name]
+    end
+
+    function ctx:set_flag(name, value)
+        flags[name] = value
+    end
+
+    function ctx:complete_objective(obj_id)
+        table.insert(self._completed_objectives, obj_id)
+    end
+
     return ctx
 end
 
@@ -163,6 +177,7 @@ print("")
 -- Verify functions exist
 assert(type(on_interact) == "function", "on_interact must exist")
 assert(type(on_objective_progress) == "function", "on_objective_progress must exist")
+assert(type(on_use_item) == "function", "on_use_item must exist")
 print("All expected functions found.")
 print("")
 print("Running tests...")
@@ -225,10 +240,10 @@ test("Bookshelf search: gives tinderbox", function()
 end)
 
 -- =============================================================================
--- Test: Candle Puzzle — Correct Order (skull → tall → red)
+-- Test: Candle Interaction — Shows hint to use tinderbox
 -- =============================================================================
 
-test("Candle puzzle: correct order (skull, tall, red)", function()
+test("Candle interaction: shows hint to use tinderbox", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
         npc = "haunted_candles",
@@ -237,85 +252,113 @@ test("Candle puzzle: correct order (skull, tall, red)", function()
             open_first_gate = { current = 0, target = 1 },
             talk_barnaby = { current = 0, target = 1 },
         },
-        choices = { "skull", "tall", "red" },
     })
     on_interact(ctx)
 
-    assert_true(any_dialogue_contains(ctx, "eerie green flame"), "Skull candle lights green")
-    assert_true(any_dialogue_contains(ctx, "pale blue flame"), "Tall candle lights blue")
-    assert_true(any_dialogue_contains(ctx, "warm orange flame"), "Red candle lights orange")
-    assert_true(any_dialogue_contains(ctx, "gate groans"), "Gate should open")
-
-    local has_gate_notification = false
-    for _, n in ipairs(ctx._notifications) do
-        if string.find(n, "gate", 1, true) then has_gate_notification = true end
-    end
-    assert_true(has_gate_notification, "Should notify about gate opening")
+    assert_true(any_dialogue_contains(ctx, "tinderbox"), "Should hint about tinderbox")
+    assert_true(any_dialogue_contains(ctx, "candle stand"), "Should describe the candle")
 end)
 
 -- =============================================================================
--- Test: Candle Puzzle — Wrong First Candle
+-- Test: on_use_item — Candle Puzzle via use-item-on-entity
 -- =============================================================================
 
-test("Candle puzzle: wrong first candle (tall)", function()
+test("on_use_item: correct candle order lights all 4", function()
+    local flags = {}
     local ctx = make_ctx({
         quest_state = "in_progress",
-        npc = "haunted_candles",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
-            talk_barnaby = { current = 0, target = 1 },
         },
-        choices = { "tall" },
+        flags = flags,
     })
-    on_interact(ctx)
 
-    assert_true(any_dialogue_contains(ctx, "cold wind"), "Should show failure")
-    assert_true(any_dialogue_contains(ctx, "candles reset") or any_dialogue_contains(ctx, "different order"),
-        "Should hint at retrying")
-    assert_true(not any_dialogue_contains(ctx, "gate groans"), "Gate should NOT open")
+    -- Light candle 1
+    local r = on_use_item(ctx, "tinderbox", "haunted_candles", "candle_1")
+    assert_true(r, "Should be handled")
+    assert_true(#ctx._notifications > 0, "Should notify")
+    assert_contains(ctx._notifications[#ctx._notifications], "skull candle", "Should name skull candle")
+    assert_contains(ctx._notifications[#ctx._notifications], "green", "Should mention green flame")
+
+    -- Light candle 2
+    ctx._notifications = {}
+    r = on_use_item(ctx, "tinderbox", "haunted_candles", "candle_2")
+    assert_true(r, "Should be handled")
+    assert_contains(ctx._notifications[#ctx._notifications], "tall taper", "Should name tall taper")
+
+    -- Light candle 3
+    ctx._notifications = {}
+    r = on_use_item(ctx, "tinderbox", "haunted_candles", "candle_3")
+    assert_true(r, "Should be handled")
+    assert_contains(ctx._notifications[#ctx._notifications], "red candle", "Should name red candle")
+
+    -- Light candle 4 (last one — gate opens)
+    ctx._notifications = {}
+    r = on_use_item(ctx, "tinderbox", "haunted_candles", "candle_4")
+    assert_true(r, "Should be handled")
+    assert_true(#ctx._completed_objectives > 0, "Should complete objective")
+    assert_eq(ctx._completed_objectives[1], "open_first_gate", "Should complete open_first_gate")
 end)
 
--- =============================================================================
--- Test: Candle Puzzle — Wrong Second Candle
--- =============================================================================
-
-test("Candle puzzle: wrong second candle (skull then small)", function()
+test("on_use_item: wrong candle order resets", function()
+    local flags = {}
     local ctx = make_ctx({
         quest_state = "in_progress",
-        npc = "haunted_candles",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
-            talk_barnaby = { current = 0, target = 1 },
         },
-        choices = { "skull", "small" },
+        flags = flags,
     })
-    on_interact(ctx)
 
-    assert_true(any_dialogue_contains(ctx, "eerie green flame"), "First candle should light")
-    assert_true(any_dialogue_contains(ctx, "cold wind"), "Should fail on wrong second")
+    -- Light candle 1 (correct)
+    on_use_item(ctx, "tinderbox", "haunted_candles", "candle_1")
+    assert_eq(flags["candles_lit"], "candle_1", "Should have candle_1 lit")
+
+    -- Light candle 3 (WRONG — should be candle_2)
+    ctx._notifications = {}
+    on_use_item(ctx, "tinderbox", "haunted_candles", "candle_3")
+    assert_eq(flags["candles_lit"], "", "Should reset all candles")
+    assert_contains(ctx._notifications[1], "cold wind", "Should show failure")
 end)
 
--- =============================================================================
--- Test: Candle Puzzle — Wrong Third Candle
--- =============================================================================
-
-test("Candle puzzle: wrong third candle (skull, tall, small)", function()
+test("on_use_item: non-tinderbox returns false", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
-        npc = "haunted_candles",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
-            talk_barnaby = { current = 0, target = 1 },
         },
-        choices = { "skull", "tall", "small" },
     })
-    on_interact(ctx)
+    local r = on_use_item(ctx, "bucket", "haunted_candles", "candle_1")
+    assert_true(not r, "Should return false for non-tinderbox")
+end)
 
-    assert_true(any_dialogue_contains(ctx, "pale blue flame"), "Second candle should light")
-    assert_true(any_dialogue_contains(ctx, "cold wind"), "Should fail on wrong third")
+test("on_use_item: non-candle entity returns false", function()
+    local ctx = make_ctx({
+        quest_state = "in_progress",
+        objectives = {
+            find_tinderbox = { current = 1, target = 1 },
+            open_first_gate = { current = 0, target = 1 },
+        },
+    })
+    local r = on_use_item(ctx, "tinderbox", "tree", "tree_1")
+    assert_true(not r, "Should return false for non-candle")
+end)
+
+test("on_use_item: already lit candle shows message", function()
+    local flags = { candles_lit = "candle_1" }
+    local ctx = make_ctx({
+        quest_state = "in_progress",
+        objectives = {
+            find_tinderbox = { current = 1, target = 1 },
+            open_first_gate = { current = 0, target = 1 },
+        },
+        flags = flags,
+    })
+    on_use_item(ctx, "tinderbox", "haunted_candles", "candle_1")
+    assert_contains(ctx._notifications[1], "already lit", "Should say already lit")
 end)
 
 -- =============================================================================
