@@ -5311,8 +5311,12 @@ impl GameRoom {
             // 6. Nothing matched — send a generic message
             self.send_to_player(
                 player_id,
-                ServerMessage::Announcement {
+                ServerMessage::ChatMessage {
+                    sender_id: "system".to_string(),
+                    sender_name: String::new(),
                     text: "Nothing interesting happens.".to_string(),
+                    timestamp: 0,
+                    channel: "system".to_string(),
                 },
             )
             .await;

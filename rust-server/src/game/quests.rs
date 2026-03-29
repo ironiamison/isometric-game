@@ -1041,12 +1041,16 @@ impl GameRoom {
                         }
                     }
 
-                    // Send notifications
+                    // Send notifications as system chat messages
                     for notification in &script_result.notifications {
                         self.send_to_player(
                             player_id,
-                            ServerMessage::Announcement {
+                            ServerMessage::ChatMessage {
+                                sender_id: "system".to_string(),
+                                sender_name: String::new(),
                                 text: notification.clone(),
+                                timestamp: 0,
+                                channel: "system".to_string(),
                             },
                         )
                         .await;
