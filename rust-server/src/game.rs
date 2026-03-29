@@ -5254,7 +5254,15 @@ impl GameRoom {
             (player.x, player.y, item_id)
         };
 
-        let Some(item_id) = item_id else { return };
+        let Some(item_id) = item_id else {
+            tracing::warn!("UseItemOn: empty inventory slot {} for {}", slot_index, player_id);
+            return;
+        };
+
+        tracing::info!(
+            "UseItemOn: player={} item={} target_npc={}",
+            player_id, item_id, target_npc_id
+        );
 
         // 2. Get NPC info (check instance first, then overworld)
         let instance_id = {
@@ -5293,11 +5301,18 @@ impl GameRoom {
         };
 
         let Some((entity_type, _npc_runtime_id, distance)) = npc_info else {
+            tracing::warn!("UseItemOn: NPC {} not found (instance_id={:?})", target_npc_id, instance_id);
             return;
         };
 
+        tracing::info!(
+            "UseItemOn: found NPC entity_type={} distance={:.1}",
+            entity_type, distance
+        );
+
         // 3. Range check (same as NPC interaction: 2.5 tiles)
         if distance > 2.5 {
+            tracing::info!("UseItemOn: out of range ({:.1} > 2.5)", distance);
             return;
         }
 
