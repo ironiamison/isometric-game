@@ -1,0 +1,87 @@
+[quest]
+id = "ghastly_contraption"
+name = "A Ghastly Contraption"
+description = "Help Professor Oddwick clear the ghosts from his haunted house and build a device that recovers projectiles."
+giver_npc = "prof_oddwick"
+level_required = 20
+repeatable = false
+lua_script = "ghastly_contraption/ghastly_contraption.lua"
+
+[quest.chain]
+# Standalone quest — no chain
+
+[[quest.objectives]]
+id = "talk_oddwick"
+type = "talk_to"
+target = "prof_oddwick"
+description = "Talk to Professor Oddwick"
+
+[[quest.objectives]]
+id = "find_tinderbox"
+type = "collect_item"
+target = "tinderbox"
+count = 1
+description = "Search the bookshelves for a tinderbox"
+sequential = true
+
+[[quest.objectives]]
+id = "open_first_gate"
+type = "reach_location"
+target = "haunted_house_gate1"
+count = 1
+description = "Solve the candle puzzle to open the gate"
+sequential = true
+
+[[quest.objectives]]
+id = "talk_barnaby"
+type = "talk_to"
+target = "barnaby_ghost"
+description = "Convince Barnaby you're alive and get the basement key"
+sequential = true
+
+[[quest.objectives]]
+id = "defeat_poltergeist"
+type = "kill_monster"
+target = "haunted_poltergeist"
+count = 1
+description = "Defeat the Enraged Poltergeist in the basement"
+sequential = true
+
+[[quest.objectives]]
+id = "collect_ectoplasm"
+type = "collect_item"
+target = "haunted_ectoplasm"
+count = 1
+description = "Collect the Haunted Ectoplasm"
+sequential = true
+consume = true
+
+[[quest.objectives]]
+id = "collect_coil"
+type = "collect_item"
+target = "spectral_coil_quest"
+count = 1
+description = "Collect the Spectral Coil"
+sequential = true
+consume = true
+
+[[quest.objectives]]
+id = "return_to_oddwick"
+type = "talk_to"
+target = "prof_oddwick"
+description = "Bring the components back to Oddwick"
+sequential = true
+
+[quest.rewards]
+exp = 500
+gold = 100
+
+[[quest.rewards.items]]
+id = "leather_attractor"
+count = 1
+
+[quest.dialogue]
+offer = "Oh! You're alive! Thank goodness. I could really use some help around here..."
+accept = "Wonderful! First things first — we need to get past these gates. There's a candle mechanism..."
+progress = "Still working on it? Don't give up! ...But also don't die. That would be inconvenient."
+complete = "IT WORKS! Take it — the Leather Attractor! 60% projectile recovery rate! ...Give or take."

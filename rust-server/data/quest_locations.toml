@@ -46,3 +46,9 @@ radius = 3
 x = 0
 y = 0
 radius = 2
+
+# A Ghastly Contraption - first gate (candle puzzle completion zone)
+[haunted_house_gate1]
+x = 24
+y = 30
+radius = 3
