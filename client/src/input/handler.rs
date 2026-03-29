@@ -1488,6 +1488,10 @@ pub enum InputCommand {
     UseItem {
         slot_index: u8,
     },
+    UseItemOnEntity {
+        slot_index: u8,
+        npc_id: String,
+    },
     // Quest commands
     Interact {
         npc_id: String,
@@ -3320,6 +3324,13 @@ impl InputHandler {
                                 // First click - record for potential double-click
                                 state.ui_state.double_click_state.last_click_slot = Some(*idx);
                                 state.ui_state.double_click_state.last_click_time = current_time;
+
+                                // Single click on inventory slot: toggle item selection
+                                if state.ui_state.selected_inventory_slot == Some(*idx) {
+                                    state.ui_state.selected_inventory_slot = None;
+                                } else {
+                                    state.ui_state.selected_inventory_slot = Some(*idx);
+                                }
 
                                 // Start drag from inventory
                                 state.ui_state.drag_state = Some(DragState {
@@ -10432,6 +10443,18 @@ impl InputHandler {
                                 let dy = npc.y - player.y;
                                 let dist_to_player = (dx * dx + dy * dy).sqrt();
 
+                                // If an inventory item is selected, use it on this NPC instead of interacting
+                                if let Some(selected_slot) = state.ui_state.selected_inventory_slot {
+                                    if dist_to_player < INTERACT_RANGE {
+                                        commands.push(InputCommand::UseItemOnEntity {
+                                            slot_index: selected_slot as u8,
+                                            npc_id: npc_id.clone(),
+                                        });
+                                        state.ui_state.selected_inventory_slot = None;
+                                    }
+                                    return commands;
+                                }
+
                                 if dist_to_player < INTERACT_RANGE {
                                     // Check if NPC is an altar or station
                                     if npc.is_altar {
@@ -11040,6 +11063,11 @@ impl InputHandler {
                     }
                 }
             } else if state.ui_state.tap_to_pathfind {
+                // If an inventory item is selected, clear it instead of moving
+                if state.ui_state.selected_inventory_slot.is_some() {
+                    state.ui_state.selected_inventory_slot = None;
+                    return commands;
+                }
                 // Clicked on empty space - cancel auto-action and path there
                 if state.auto_action_state.is_some() {
                     state.auto_action_state = None;
@@ -11251,8 +11279,13 @@ impl InputHandler {
             });
         }
 
-        // Escape key - close any open panel first, then clear target, then open escape menu
+        // Escape key - clear item selection first, then close panels, then clear target, then open escape menu
         if is_key_pressed(KeyCode::Escape) {
+            // Clear inventory item selection first
+            if state.ui_state.selected_inventory_slot.is_some() {
+                state.ui_state.selected_inventory_slot = None;
+                return commands;
+            }
             // Close hotkey settings popup first
             if state.ui_state.hotkey_settings_open {
                 audio.play_sfx("enter");
@@ -11268,6 +11301,7 @@ impl InputHandler {
             {
                 audio.play_sfx("enter");
                 state.ui_state.inventory_open = false;
+                state.ui_state.selected_inventory_slot = None;
                 state.ui_state.character_panel_open = false;
                 state.ui_state.social_open = false;
                 state.ui_state.skills_open = false;

@@ -18,11 +18,11 @@ use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Scree
 
 use crate::game::tutorial::TutorialManager;
 
-// pub const SERVER_URL: &str = "http://localhost:2567";
-// pub const WS_URL: &str = "ws://localhost:2567";
+pub const SERVER_URL: &str = "http://localhost:2567";
+pub const WS_URL: &str = "ws://localhost:2567";
 
-pub const SERVER_URL: &str = "https://aeven.xyz";
-pub const WS_URL: &str = "wss://aeven.xyz";
+// pub const SERVER_URL: &str = "https://aeven.xyz";
+// pub const WS_URL: &str = "wss://aeven.xyz";
 
 // Development mode - enables guest login
 // Set to false for production builds
@@ -420,6 +420,12 @@ pub fn run_game_frame(
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem {
                 slot_index: *slot_index as u32,
             },
+            InputCommand::UseItemOnEntity { slot_index, npc_id } => {
+                ClientMessage::UseItemOn {
+                    slot_index: *slot_index as u32,
+                    target_npc_id: npc_id.clone(),
+                }
+            }
             InputCommand::Interact { npc_id } => {
                 // Notify tutorial of NPC interaction
                 if let Some(tutorial) = &mut game_state.tutorial {
