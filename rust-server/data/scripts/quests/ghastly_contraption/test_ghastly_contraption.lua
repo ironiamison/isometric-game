@@ -182,9 +182,9 @@ test("Offer: accept quest", function()
     assert_true(ctx._quest_accepted, "Quest should be accepted")
     assert_true(any_dialogue_contains(ctx, "real person"), "Should greet player")
     assert_true(any_dialogue_contains(ctx, "auction"), "Should mention buying the house")
-    assert_true(any_dialogue_contains(ctx, "candle"), "Should hint about candles")
+    assert_true(any_dialogue_contains(ctx, "candle mechanism"), "Should mention candle mechanism")
     assert_true(any_dialogue_contains(ctx, "tinderbox"), "Should mention tinderbox")
-    assert_true(any_dialogue_contains(ctx, "skull"), "Should give (wrong) hint about order")
+    assert_true(any_dialogue_contains(ctx, "bookshelves"), "Should point to bookshelves")
 end)
 
 -- =============================================================================
@@ -437,8 +437,8 @@ test("Oddwick hint: candle puzzle not solved yet", function()
     on_interact(ctx)
 
     assert_true(any_dialogue_from(ctx, "Professor Oddwick"), "Should be Oddwick talking")
-    assert_true(any_dialogue_contains(ctx, "candle") or any_dialogue_contains(ctx, "skull"),
-        "Should hint about candles")
+    assert_true(any_dialogue_contains(ctx, "tinderbox"), "Should acknowledge tinderbox found")
+    assert_true(any_dialogue_contains(ctx, "skull"), "Should give (wrong) candle order hint")
 end)
 
 test("Barnaby post-key: already gave the key", function()

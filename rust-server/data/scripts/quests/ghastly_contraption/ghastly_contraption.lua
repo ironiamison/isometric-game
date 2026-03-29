@@ -109,15 +109,11 @@ function show_oddwick_offer(ctx)
         ctx:accept_quest()
         ctx:show_dialogue({
             speaker = "Professor Oddwick",
-            text = "Wonderful! First, we need to get through the gate. There's a candle mechanism — the previous owner was eccentric."
+            text = "Wonderful! The deeper rooms are locked behind gates — some kind of old candle mechanism. Very dramatic, very impractical."
         })
         ctx:show_dialogue({
             speaker = "Professor Oddwick",
-            text = "I think the order was... skull candle first, then the tall one, then... red? No wait, I think the tall one was first. Or was skull second? Blast, I can't remember exactly."
-        })
-        ctx:show_dialogue({
-            speaker = "Professor Oddwick",
-            text = "You'll need a tinderbox to light them. I'm sure there's one around here somewhere — try the bookshelves."
+            text = "But first, we'll need a tinderbox to light anything. I'm sure there's one around here somewhere — try searching the bookshelves."
         })
     else
         ctx:show_dialogue({
@@ -158,7 +154,7 @@ end
 function show_oddwick_hint_tinderbox(ctx)
     ctx:show_dialogue({
         speaker = "Professor Oddwick",
-        text = "Still looking for the tinderbox? Try searching the bookshelves — I'm sure I saw one buried in there somewhere."
+        text = "We need a tinderbox before we can do anything with those candles. Have you tried searching the bookshelves? The previous owner kept all sorts of things stuffed between the books."
     })
 end
 
@@ -169,7 +165,15 @@ end
 function show_oddwick_hint_candles(ctx)
     ctx:show_dialogue({
         speaker = "Professor Oddwick",
-        text = "You have the tinderbox? Excellent! Now light those candles in the right order. I think it was skull first... or was it the tall one? Try near the gate!"
+        text = "You found the tinderbox! Excellent! Now — the candles by the gate need to be lit in a specific order."
+    })
+    ctx:show_dialogue({
+        speaker = "Professor Oddwick",
+        text = "I think the order was... skull candle first, then the tall one, then... red? No wait, I think the tall one was first. Or was skull second? Blast, I can't remember exactly."
+    })
+    ctx:show_dialogue({
+        speaker = "Professor Oddwick",
+        text = "Just try different combinations near the gate. You'll figure it out! ...Probably."
     })
 end
 
