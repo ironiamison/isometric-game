@@ -438,7 +438,7 @@ impl GameRoom {
 
             match self
                 .quest_runner
-                .run_on_interact(player_id, &quest_id, quest_state, None)
+                .run_on_interact(player_id, &quest_id, quest_state, None, Some(entity_type))
                 .await
             {
                 Ok(script_result) => {
@@ -506,7 +506,7 @@ impl GameRoom {
 
         let result = self
             .quest_runner
-            .run_on_interact(player_id, quest_id, quest_state, Some(choice_id))
+            .run_on_interact(player_id, quest_id, quest_state, Some(choice_id), None)
             .await;
 
         let npc_id = self

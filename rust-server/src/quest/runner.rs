@@ -181,13 +181,29 @@ impl QuestRunner {
     }
 
     /// Run the on_interact handler for a quest
+    ///
+    /// `interacting_npc` is the entity_type of the NPC the player clicked on.
+    /// Pass `Some(entity_type)` on the initial NPC interaction, and `None` on
+    /// dialogue continues/choices (the runner reads it from a persisted flag).
     pub async fn run_on_interact(
         &self,
         player_id: &str,
         quest_id: &str,
         quest_state: &mut PlayerQuestState,
         player_choice: Option<&str>,
+        interacting_npc: Option<&str>,
     ) -> Result<ScriptResult, String> {
+        // Persist the interacting NPC on initial interaction so dialogue
+        // continues can read it back without knowing the NPC.
+        let npc_flag_key = format!("{}_interacting_npc", quest_id);
+        if let Some(npc_type) = interacting_npc {
+            quest_state.set_flag(&npc_flag_key, npc_type);
+        }
+        let resolved_npc = quest_state
+            .get_flag(&npc_flag_key)
+            .cloned()
+            .unwrap_or_default();
+
         // Load the quest script if not already loaded
         self.load_quest_script(player_id, quest_id).await?;
 
@@ -212,7 +228,7 @@ impl QuestRunner {
         // For now, we use a synchronous approach that works for dialogue trees
 
         let result = self
-            .run_interact_sync(&state.lua, ctx, player_choice)
+            .run_interact_sync(&state.lua, ctx, player_choice, &resolved_npc)
             .map_err(|e| format!("Script error: {}", e))?;
 
         Ok(result)
@@ -224,6 +240,7 @@ impl QuestRunner {
         lua: &Lua,
         ctx: QuestContext,
         player_choice: Option<&str>,
+        interacting_npc: &str,
     ) -> LuaResult<ScriptResult> {
         let mut result = ScriptResult::default();
 
@@ -236,6 +253,7 @@ impl QuestRunner {
         ctx_table.set("_player_id", ctx.player_id.clone())?;
         ctx_table.set("_quest_id", ctx.quest_id.clone())?;
         ctx_table.set("_player_choice", player_choice.unwrap_or(""))?;
+        ctx_table.set("_interacting_npc", interacting_npc)?;
 
         // Track dialogue step to handle __continue__ correctly
         // When __continue__ is received, we need to skip past already-shown dialogues
@@ -265,6 +283,14 @@ impl QuestRunner {
             Ok(state)
         })?;
         ctx_table.set("get_quest_state", get_quest_state)?;
+
+        // Add get_interacting_npc method — returns the entity_type of the NPC
+        // the player is talking to (e.g. "prof_oddwick", "barnaby_ghost")
+        let get_interacting_npc = lua.create_function(|lua, this: Table| {
+            let npc: String = this.get("_interacting_npc").unwrap_or_default();
+            Ok(npc)
+        })?;
+        ctx_table.set("get_interacting_npc", get_interacting_npc)?;
 
         // Add accept_quest method
         let accept_quest = lua.create_function(|lua, this: Table| {

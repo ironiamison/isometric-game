@@ -55,6 +55,7 @@ local function make_ctx(opts)
     local quest_state = opts.quest_state or "not_started"
     local objectives = opts.objectives or {}
     local choice_queue = opts.choices or {}
+    local interacting_npc = opts.npc or ""
     local choice_idx = 0
 
     local ctx = {}
@@ -67,6 +68,10 @@ local function make_ctx(opts)
 
     function ctx:get_quest_state()
         return quest_state
+    end
+
+    function ctx:get_interacting_npc()
+        return interacting_npc
     end
 
     function ctx:get_objective_progress(obj_id)
@@ -204,6 +209,7 @@ end)
 test("Bookshelf search: gives tinderbox", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "haunted_bookshelf",
         objectives = {
             find_tinderbox = { current = 0, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -225,6 +231,7 @@ end)
 test("Candle puzzle: correct order (skull, tall, red)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "haunted_bookshelf",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -253,6 +260,7 @@ end)
 test("Candle puzzle: wrong first candle (tall)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "haunted_bookshelf",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -275,6 +283,7 @@ end)
 test("Candle puzzle: wrong second candle (skull then small)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "haunted_bookshelf",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -295,6 +304,7 @@ end)
 test("Candle puzzle: wrong third candle (skull, tall, small)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "haunted_bookshelf",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -315,6 +325,7 @@ end)
 test("Barnaby: good answers (watch, bread, door) + take key", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "barnaby_ghost",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 1, target = 1 },
@@ -345,6 +356,7 @@ end)
 test("Barnaby: funny answers (do_you, ecto, can_you) + gentle", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "barnaby_ghost",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 1, target = 1 },
@@ -371,6 +383,7 @@ end)
 test("Barnaby: suspicious answers (obviously, none, yes) + take", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "barnaby_ghost",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 1, target = 1 },
@@ -394,9 +407,63 @@ end)
 -- Test: Oddwick Waiting — before poltergeist fight
 -- =============================================================================
 
+test("Oddwick hint: tinderbox not found yet", function()
+    local ctx = make_ctx({
+        quest_state = "in_progress",
+        npc = "prof_oddwick",
+        objectives = {
+            find_tinderbox = { current = 0, target = 1 },
+            open_first_gate = { current = 0, target = 1 },
+            talk_barnaby = { current = 0, target = 1 },
+        },
+    })
+    on_interact(ctx)
+
+    assert_true(any_dialogue_from(ctx, "Professor Oddwick"), "Should be Oddwick talking")
+    assert_true(any_dialogue_contains(ctx, "bookshelves"), "Should hint about bookshelves")
+    assert_eq(#ctx._items_given, 0, "Should NOT give tinderbox")
+end)
+
+test("Oddwick hint: candle puzzle not solved yet", function()
+    local ctx = make_ctx({
+        quest_state = "in_progress",
+        npc = "prof_oddwick",
+        objectives = {
+            find_tinderbox = { current = 1, target = 1 },
+            open_first_gate = { current = 0, target = 1 },
+            talk_barnaby = { current = 0, target = 1 },
+        },
+    })
+    on_interact(ctx)
+
+    assert_true(any_dialogue_from(ctx, "Professor Oddwick"), "Should be Oddwick talking")
+    assert_true(any_dialogue_contains(ctx, "candle") or any_dialogue_contains(ctx, "skull"),
+        "Should hint about candles")
+end)
+
+test("Barnaby post-key: already gave the key", function()
+    local ctx = make_ctx({
+        quest_state = "in_progress",
+        npc = "barnaby_ghost",
+        objectives = {
+            find_tinderbox = { current = 1, target = 1 },
+            open_first_gate = { current = 1, target = 1 },
+            talk_barnaby = { current = 1, target = 1 },
+            defeat_poltergeist = { current = 0, target = 1 },
+            collect_ectoplasm = { current = 0, target = 1 },
+            collect_coil = { current = 0, target = 1 },
+        },
+    })
+    on_interact(ctx)
+
+    assert_true(any_dialogue_from(ctx, "Barnaby"), "Should be Barnaby talking")
+    assert_true(any_dialogue_contains(ctx, "basement"), "Should mention basement")
+end)
+
 test("Oddwick waiting: before poltergeist fight", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
+        npc = "prof_oddwick",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 1, target = 1 },

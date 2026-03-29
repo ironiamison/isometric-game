@@ -32,33 +32,48 @@ end
 -- ============================================================================
 
 function route_in_progress(ctx)
+    local npc = ctx:get_interacting_npc()
     local tinderbox = ctx:get_objective_progress("find_tinderbox")
     local gate = ctx:get_objective_progress("open_first_gate")
     local barnaby = ctx:get_objective_progress("talk_barnaby")
 
-    -- If tinderbox not found yet — could be bookshelf search or Oddwick hint
-    -- The bookshelf search gives the tinderbox; Oddwick just gives a hint
-    -- Since we can't distinguish which NPC, show the search (bookshelf is
-    -- the primary interaction point; Oddwick's hint was in the offer dialogue)
+    -- If tinderbox not found yet, route based on which NPC
     if tinderbox.current < tinderbox.target then
-        show_bookshelf_search(ctx)
+        if npc == "haunted_bookshelf" then
+            show_bookshelf_search(ctx)
+        else
+            show_oddwick_hint_tinderbox(ctx)
+        end
         return
     end
 
     -- If gate not opened yet, player has tinderbox — show candle puzzle
+    -- The candle puzzle triggers when talking to the bookshelf (it's near the candles)
     if gate.current < gate.target then
-        show_candle_puzzle(ctx)
+        if npc == "haunted_bookshelf" then
+            show_candle_puzzle(ctx)
+        else
+            show_oddwick_hint_candles(ctx)
+        end
         return
     end
 
     -- If Barnaby not convinced yet, this is the Barnaby interaction
     if barnaby.current < barnaby.target then
-        show_barnaby_interrogation(ctx)
+        if npc == "barnaby_ghost" then
+            show_barnaby_interrogation(ctx)
+        else
+            show_oddwick_hint_barnaby(ctx)
+        end
         return
     end
 
-    -- Otherwise player is mid-quest talking to Oddwick
-    show_oddwick_waiting(ctx)
+    -- Otherwise player is mid-quest talking to Oddwick (or Barnaby post-key)
+    if npc == "barnaby_ghost" then
+        show_barnaby_post_key(ctx)
+    else
+        show_oddwick_waiting(ctx)
+    end
 end
 
 -- ============================================================================
@@ -144,6 +159,39 @@ function show_oddwick_hint_tinderbox(ctx)
     ctx:show_dialogue({
         speaker = "Professor Oddwick",
         text = "Still looking for the tinderbox? Try searching the bookshelves — I'm sure I saw one buried in there somewhere."
+    })
+end
+
+-- ============================================================================
+-- Oddwick Hints (candle puzzle not yet solved)
+-- ============================================================================
+
+function show_oddwick_hint_candles(ctx)
+    ctx:show_dialogue({
+        speaker = "Professor Oddwick",
+        text = "You have the tinderbox? Excellent! Now light those candles in the right order. I think it was skull first... or was it the tall one? Try near the gate!"
+    })
+end
+
+-- ============================================================================
+-- Oddwick Hints (Barnaby not yet found)
+-- ============================================================================
+
+function show_oddwick_hint_barnaby(ctx)
+    ctx:show_dialogue({
+        speaker = "Professor Oddwick",
+        text = "You got past the gate! Now you need to find a key to the basement. I've heard someone — or someTHING — rattling around deeper in the house. Maybe they know where it is."
+    })
+end
+
+-- ============================================================================
+-- Barnaby post-key (already gave the key)
+-- ============================================================================
+
+function show_barnaby_post_key(ctx)
+    ctx:show_dialogue({
+        speaker = "Barnaby",
+        text = "Still here? Don't forget — the basement is that way. Be careful! I hear angry noises down there. ...Or it's the pipes. Hard to tell."
     })
 end
 
