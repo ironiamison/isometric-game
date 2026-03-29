@@ -1,0 +1,16 @@
+# Item-on-Entity Interactions
+# These are checked when no quest Lua script handles the use-item action.
+#
+# Fields:
+#   item = item ID from inventory
+#   target_entity = entity prototype ID
+#   message = text shown to player
+#   consume_item = whether to remove the item (default: false)
+#   result_item = item to give instead (optional)
+
+# Example (uncomment when needed):
+# [[interactions]]
+# item = "bone"
+# target_entity = "altar"
+# message = "You bury the bones at the altar."
+# consume_item = true
