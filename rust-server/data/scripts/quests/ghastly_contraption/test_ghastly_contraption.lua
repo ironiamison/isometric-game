@@ -231,7 +231,7 @@ end)
 test("Candle puzzle: correct order (skull, tall, red)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
-        npc = "haunted_bookshelf",
+        npc = "haunted_candles",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -260,7 +260,7 @@ end)
 test("Candle puzzle: wrong first candle (tall)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
-        npc = "haunted_bookshelf",
+        npc = "haunted_candles",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -283,7 +283,7 @@ end)
 test("Candle puzzle: wrong second candle (skull then small)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
-        npc = "haunted_bookshelf",
+        npc = "haunted_candles",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },
@@ -304,7 +304,7 @@ end)
 test("Candle puzzle: wrong third candle (skull, tall, small)", function()
     local ctx = make_ctx({
         quest_state = "in_progress",
-        npc = "haunted_bookshelf",
+        npc = "haunted_candles",
         objectives = {
             find_tinderbox = { current = 1, target = 1 },
             open_first_gate = { current = 0, target = 1 },

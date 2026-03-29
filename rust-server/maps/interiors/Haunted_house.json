@@ -6965,6 +6965,38 @@
       "uniqueId": "bookshelf_1",
       "facing": "south",
       "respawn": false
+    },
+    {
+      "entityId": "haunted_candles",
+      "x": 32,
+      "y": 45,
+      "uniqueId": "candle_1",
+      "facing": "south",
+      "respawn": false
+    },
+    {
+      "entityId": "haunted_candles",
+      "x": 32,
+      "y": 36,
+      "uniqueId": "candle_2",
+      "facing": "south",
+      "respawn": false
+    },
+    {
+      "entityId": "haunted_candles",
+      "x": 45,
+      "y": 45,
+      "uniqueId": "candle_3",
+      "facing": "south",
+      "respawn": false
+    },
+    {
+      "entityId": "haunted_candles",
+      "x": 45,
+      "y": 36,
+      "uniqueId": "candle_4",
+      "facing": "south",
+      "respawn": false
     }
   ],
   "mapObjects": [

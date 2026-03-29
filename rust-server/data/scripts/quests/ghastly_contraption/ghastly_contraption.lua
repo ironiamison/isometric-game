@@ -48,11 +48,13 @@ function route_in_progress(ctx)
     end
 
     -- If gate not opened yet, player has tinderbox — show candle puzzle
-    -- The candle puzzle triggers when talking to the bookshelf (it's near the candles)
     if gate.current < gate.target then
-        if npc == "haunted_bookshelf" then
+        if npc == "haunted_candles" then
             show_candle_puzzle(ctx)
+        elseif npc == "prof_oddwick" then
+            show_oddwick_hint_candles(ctx)
         else
+            -- Bookshelf or other — generic hint
             show_oddwick_hint_candles(ctx)
         end
         return
