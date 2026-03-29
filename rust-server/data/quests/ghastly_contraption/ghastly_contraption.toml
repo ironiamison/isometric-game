@@ -26,10 +26,10 @@ sequential = true
 
 [[quest.objectives]]
 id = "open_first_gate"
-type = "reach_location"
-target = "haunted_house_gate1"
+type = "collect_item"
+target = "candle_puzzle_complete"
 count = 1
-description = "Solve the candle puzzle to open the gate"
+description = "Light the candles in the correct order"
 sequential = true
 
 [[quest.objectives]]
