@@ -5265,8 +5265,8 @@ async fn handle_client_message(
             room.handle_koth_leave(player_id, ct).await;
         }
         ClientMessage::UseItemOn { slot_index, target_npc_id } => {
-            tracing::debug!("UseItemOn: player {} slot {} on npc {}", player_id, slot_index, target_npc_id);
-            // TODO: implement in Task 4
+            room.handle_use_item_on(player_id, slot_index, &target_npc_id)
+                .await;
         }
     }
 

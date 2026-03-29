@@ -990,6 +990,83 @@ impl GameRoom {
             }
         }
     }
+    /// Handle using an item on an NPC — check active quest scripts for on_use_item
+    pub(in crate::game) async fn handle_use_item_on_quest(
+        &self,
+        player_id: &str,
+        item_id: &str,
+        entity_type: &str,
+        npc_id: &str,
+    ) -> bool {
+        let mut quest_states = self.player_quest_states.write().await;
+        let quest_state = quest_states
+            .entry(player_id.to_string())
+            .or_insert_with(PlayerQuestState::new);
+
+        let active_quest_ids: Vec<String> = quest_state.active_quests.keys().cloned().collect();
+
+        for quest_id in active_quest_ids {
+            match self
+                .quest_runner
+                .run_on_use_item(player_id, &quest_id, quest_state, item_id, entity_type, npc_id)
+                .await
+            {
+                Ok(Some(script_result)) => {
+                    // Persist flags
+                    for (key, value) in &script_result.flags_to_set {
+                        quest_state.set_flag(key, value);
+                    }
+
+                    // Complete objectives
+                    for objective_id in &script_result.completed_objectives {
+                        if let Some(progress) = quest_state.get_quest_mut(&quest_id) {
+                            if progress.update_objective(objective_id, 1) {
+                                self.send_quest_progress_update(
+                                    player_id,
+                                    &quest_id,
+                                    objective_id,
+                                    progress
+                                        .objectives
+                                        .get(objective_id as &str)
+                                        .map(|o| o.current)
+                                        .unwrap_or(1),
+                                    progress
+                                        .objectives
+                                        .get(objective_id as &str)
+                                        .map(|o| o.target)
+                                        .unwrap_or(1),
+                                )
+                                .await;
+                            }
+                        }
+                    }
+
+                    // Send notifications
+                    for notification in &script_result.notifications {
+                        self.send_to_player(
+                            player_id,
+                            ServerMessage::Announcement {
+                                text: notification.clone(),
+                            },
+                        )
+                        .await;
+                    }
+
+                    // Grant items
+                    self.grant_script_items(player_id, &script_result.granted_items, quest_state)
+                        .await;
+
+                    return true;
+                }
+                Ok(None) => continue,
+                Err(e) => {
+                    tracing::error!("on_use_item error for quest {}: {}", quest_id, e);
+                    continue;
+                }
+            }
+        }
+        false
+    }
 }
 
 #[cfg(test)]

@@ -5232,6 +5232,93 @@ impl GameRoom {
             .await;
     }
 
+    /// Handle using an item on an NPC target
+    pub async fn handle_use_item_on(
+        &self,
+        player_id: &str,
+        slot_index: u8,
+        target_npc_id: &str,
+    ) {
+        // 1. Get player position and item from inventory
+        let (player_x, player_y, item_id) = {
+            let players = self.players.read().await;
+            let Some(player) = players.get(player_id) else {
+                return;
+            };
+            let item_id = player
+                .inventory
+                .slots
+                .get(slot_index as usize)
+                .and_then(|s| s.as_ref())
+                .map(|s| s.item_id.clone());
+            (player.x, player.y, item_id)
+        };
+
+        let Some(item_id) = item_id else { return };
+
+        // 2. Get NPC info (check instance first, then overworld)
+        let instance_id = {
+            let instances = self.player_instances.read().await;
+            instances.get(player_id).cloned()
+        };
+
+        let npc_info = if instance_id.is_some() {
+            if let Some(instance) =
+                self.instance_manager.find_player_instance(player_id).await
+            {
+                let npcs = instance.npcs.read().await;
+                npcs.get(target_npc_id).map(|npc| {
+                    let dx = (npc.x - player_x) as f32;
+                    let dy = (npc.y - player_y) as f32;
+                    (
+                        npc.prototype_id.clone(),
+                        npc.id.clone(),
+                        (dx * dx + dy * dy).sqrt(),
+                    )
+                })
+            } else {
+                None
+            }
+        } else {
+            let npcs = self.npcs.read().await;
+            npcs.get(target_npc_id).map(|npc| {
+                let dx = (npc.x - player_x) as f32;
+                let dy = (npc.y - player_y) as f32;
+                (
+                    npc.prototype_id.clone(),
+                    npc.id.clone(),
+                    (dx * dx + dy * dy).sqrt(),
+                )
+            })
+        };
+
+        let Some((entity_type, _npc_runtime_id, distance)) = npc_info else {
+            return;
+        };
+
+        // 3. Range check (same as NPC interaction: 2.5 tiles)
+        if distance > 2.5 {
+            return;
+        }
+
+        // 4. Try quest Lua handlers
+        let handled = self
+            .handle_use_item_on_quest(player_id, &item_id, &entity_type, target_npc_id)
+            .await;
+
+        if !handled {
+            // 5. TODO: TOML item_interactions fallback
+            // 6. Nothing matched — send a generic message
+            self.send_to_player(
+                player_id,
+                ServerMessage::Announcement {
+                    text: "Nothing interesting happens.".to_string(),
+                },
+            )
+            .await;
+        }
+    }
+
     /// Handle dialogue choice from player
     pub async fn handle_dialogue_choice(&self, player_id: &str, quest_id: &str, choice_id: &str) {
         // Non-quest dialogues (e.g. leaderboard) just close

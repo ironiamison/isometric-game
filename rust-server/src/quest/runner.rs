@@ -85,6 +85,10 @@ pub struct ScriptResult {
     pub granted_items: Vec<(String, i32)>,
     /// New dialogue step to persist (for tracking dialogue progress)
     pub new_dialogue_step: Option<u32>,
+    /// Flags to persist on the player's quest state
+    pub flags_to_set: Vec<(String, String)>,
+    /// Objectives to mark as completed
+    pub completed_objectives: Vec<String>,
 }
 
 impl Default for ScriptResult {
@@ -97,6 +101,8 @@ impl Default for ScriptResult {
             bonus_rewards: None,
             granted_items: Vec::new(),
             new_dialogue_step: None,
+            flags_to_set: Vec::new(),
+            completed_objectives: Vec::new(),
         }
     }
 }
@@ -650,6 +656,251 @@ impl QuestRunner {
         }
 
         Ok(notifications)
+    }
+
+    /// Run the on_use_item callback for a quest script.
+    /// Returns Ok(Some(result)) if the script handled the interaction,
+    /// Ok(None) if the script doesn't have on_use_item or returned false,
+    /// or Err on script errors.
+    pub async fn run_on_use_item(
+        &self,
+        player_id: &str,
+        quest_id: &str,
+        quest_state: &PlayerQuestState,
+        item_id: &str,
+        entity_type: &str,
+        npc_id: &str,
+    ) -> Result<Option<ScriptResult>, String> {
+        // Load the quest script if not already loaded
+        self.load_quest_script(player_id, quest_id).await?;
+
+        let states = self.player_states.read().await;
+        let state = states
+            .get(player_id)
+            .ok_or_else(|| format!("No Lua state for player {}", player_id))?;
+
+        if !state.has_function("on_use_item") {
+            return Ok(None); // Not an error, just no handler
+        }
+
+        let lua = &state.lua;
+        let mut result = ScriptResult::default();
+
+        // Create context table
+        let ctx_table = lua
+            .create_table()
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // Add quest state
+        let quest_state_str = match quest_state.get_quest(quest_id) {
+            Some(progress) => format!("{:?}", progress.status),
+            None => "not_started".to_string(),
+        };
+        ctx_table
+            .set("_quest_state", quest_state_str)
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("_player_id", player_id)
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("_quest_id", quest_id)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // Add result accumulator
+        let result_table = lua
+            .create_table()
+            .map_err(|e| format!("Lua error: {}", e))?;
+        result_table
+            .set(
+                "notifications",
+                lua.create_table()
+                    .map_err(|e| format!("Lua error: {}", e))?,
+            )
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("_result", result_table.clone())
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // get_quest_state
+        let get_quest_state = lua
+            .create_function(|_lua, this: Table| {
+                let state: String = this.get("_quest_state")?;
+                Ok(state)
+            })
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("get_quest_state", get_quest_state)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // get_objective_progress
+        let objectives = quest_state.clone();
+        let qid = quest_id.to_string();
+        let get_objective_progress = lua
+            .create_function(move |lua, (_this, obj_id): (Table, String)| {
+                let progress_table = lua.create_table()?;
+                if let Some(quest_progress) = objectives.get_quest(&qid) {
+                    if let Some(obj) = quest_progress.objectives.get(&obj_id) {
+                        progress_table.set("current", obj.current)?;
+                        progress_table.set("target", obj.target)?;
+                    } else {
+                        progress_table.set("current", 0)?;
+                        progress_table.set("target", 0)?;
+                    }
+                } else {
+                    progress_table.set("current", 0)?;
+                    progress_table.set("target", 0)?;
+                }
+                Ok(progress_table)
+            })
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("get_objective_progress", get_objective_progress)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // get_flag — reads from a snapshot of the quest flags
+        let flags_clone = quest_state.flags.clone();
+        let get_flag = lua
+            .create_function(move |lua, (_this, flag_name): (Table, String)| {
+                match flags_clone.get(&flag_name) {
+                    Some(value) => Ok(Value::String(lua.create_string(value)?)),
+                    None => Ok(Value::Nil),
+                }
+            })
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("get_flag", get_flag)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // set_flag — stores flags in the result table for later persistence
+        let set_flag = lua
+            .create_function(|lua, (this, flag_name, flag_value): (Table, String, String)| {
+                let result: Table = this.get("_result")?;
+                let flags: Table = result
+                    .get::<Table>("_flags")
+                    .unwrap_or_else(|_| lua.create_table().unwrap());
+                flags.set(flag_name, flag_value)?;
+                result.set("_flags", flags)?;
+                Ok(())
+            })
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("set_flag", set_flag)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // complete_objective — stores objective completions in the result table
+        let complete_objective = lua
+            .create_function(|lua, (this, obj_id): (Table, String)| {
+                let result: Table = this.get("_result")?;
+                let completions: Table = result
+                    .get::<Table>("_completed_objectives")
+                    .unwrap_or_else(|_| lua.create_table().unwrap());
+                let len = completions.len().unwrap_or(0);
+                completions.set(len + 1, obj_id)?;
+                result.set("_completed_objectives", completions)?;
+                Ok(())
+            })
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("complete_objective", complete_objective)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // show_notification
+        let show_notification = lua
+            .create_function(|_lua, (this, text): (Table, String)| {
+                let result: Table = this.get("_result")?;
+                let notifs: Table = result.get("notifications")?;
+                let len = notifs.len()? + 1;
+                notifs.set(len, text)?;
+                Ok(())
+            })
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("show_notification", show_notification)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // give_item
+        let give_item = lua
+            .create_function(
+                |lua, (this, item_id, count): (Table, String, Option<i32>)| {
+                    let result: Table = this.get("_result")?;
+                    let items: Table = result
+                        .get::<Table>("_granted_items")
+                        .unwrap_or_else(|_| lua.create_table().unwrap());
+                    let len = items.len().unwrap_or(0);
+                    let entry = lua.create_table()?;
+                    entry.set("item_id", item_id)?;
+                    entry.set("count", count.unwrap_or(1))?;
+                    items.set(len + 1, entry)?;
+                    result.set("_granted_items", items)?;
+                    Ok(())
+                },
+            )
+            .map_err(|e| format!("Lua error: {}", e))?;
+        ctx_table
+            .set("give_item", give_item)
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        // Call on_use_item(ctx, item_id, entity_type, npc_id)
+        let on_use_item: Function = lua
+            .globals()
+            .get("on_use_item")
+            .map_err(|e| format!("Lua error: {}", e))?;
+
+        let call_result = on_use_item
+            .call::<Value>((
+                ctx_table.clone(),
+                item_id.to_string(),
+                entity_type.to_string(),
+                npc_id.to_string(),
+            ))
+            .map_err(|e| format!("Script error: {}", e))?;
+
+        // If the script returned false, it didn't handle this interaction
+        if let Value::Boolean(false) = call_result {
+            return Ok(None);
+        }
+
+        // Extract notifications
+        if let Ok(notifs) = result_table.get::<Table>("notifications") {
+            for pair in notifs.pairs::<i32, String>() {
+                if let Ok((_, text)) = pair {
+                    result.notifications.push(text);
+                }
+            }
+        }
+
+        // Extract flags
+        if let Ok(flags) = result_table.get::<Table>("_flags") {
+            for pair in flags.pairs::<String, String>() {
+                if let Ok((key, value)) = pair {
+                    result.flags_to_set.push((key, value));
+                }
+            }
+        }
+
+        // Extract completed objectives
+        if let Ok(completions) = result_table.get::<Table>("_completed_objectives") {
+            for pair in completions.pairs::<i64, String>() {
+                if let Ok((_, obj_id)) = pair {
+                    result.completed_objectives.push(obj_id);
+                }
+            }
+        }
+
+        // Extract granted items
+        if let Ok(items) = result_table.get::<Table>("_granted_items") {
+            for pair in items.pairs::<i64, Table>() {
+                if let Ok((_, entry)) = pair {
+                    if let (Ok(item_id), Ok(count)) =
+                        (entry.get::<String>("item_id"), entry.get::<i32>("count"))
+                    {
+                        result.granted_items.push((item_id, count));
+                    }
+                }
+            }
+        }
+
+        Ok(Some(result))
     }
 
     /// Clean up Lua state for a disconnected player
