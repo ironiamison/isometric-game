@@ -310,7 +310,12 @@ impl GameRoom {
         tracing::info!("Player {} completed quest {}", player_id, quest_id);
     }
 
-    async fn grant_script_items(&self, player_id: &str, granted_items: &[(String, i32)]) {
+    async fn grant_script_items(
+        &self,
+        player_id: &str,
+        granted_items: &[(String, i32)],
+        quest_state: &mut PlayerQuestState,
+    ) {
         if granted_items.is_empty() {
             return;
         }
@@ -335,10 +340,29 @@ impl GameRoom {
             )
             .await;
 
-            // Fire ItemCollected events so collect_item objectives progress
+            // Fire ItemCollected events so collect_item objectives progress.
+            // Use the already-held quest_state to avoid deadlocking on the lock.
             for (item_id, count) in granted_items {
-                self.process_quest_item_collect(player_id, item_id, *count)
-                    .await;
+                let event = QuestEvent::ItemCollected {
+                    player_id: player_id.to_string(),
+                    item_id: item_id.to_string(),
+                    count: *count,
+                };
+                let results = self.quest_registry.process_event(&event, quest_state).await;
+                for result in results {
+                    if let (Some(objective_id), Some(current), Some(target)) =
+                        (&result.objective_id, result.new_progress, result.target)
+                    {
+                        self.send_quest_progress_update(
+                            player_id,
+                            &result.quest_id,
+                            objective_id,
+                            current,
+                            target,
+                        )
+                        .await;
+                    }
+                }
             }
         }
     }
@@ -484,7 +508,7 @@ impl GameRoom {
                             .await;
                     }
 
-                    self.grant_script_items(player_id, &script_result.granted_items)
+                    self.grant_script_items(player_id, &script_result.granted_items, quest_state)
                         .await;
 
                     for notification in script_result.notifications {
@@ -560,7 +584,7 @@ impl GameRoom {
                         .await;
                 }
 
-                self.grant_script_items(player_id, &script_result.granted_items)
+                self.grant_script_items(player_id, &script_result.granted_items, quest_state)
                     .await;
             }
             Err(error) => {
