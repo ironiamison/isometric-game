@@ -344,7 +344,23 @@ impl GameRoom {
         entity_type: &str,
     ) {
         let prototype = self.entity_registry.get(entity_type);
-        let quests = self.quest_registry.get_quests_for_npc(entity_type).await;
+        // Get quests where this NPC is the giver_npc in the quest TOML
+        let mut quests = self.quest_registry.get_quests_for_npc(entity_type).await;
+        // Also include quests listed in the NPC prototype's available_quests
+        // (for secondary NPCs like Barnaby or searchable objects like bookshelves)
+        if let Some(ref proto) = prototype {
+            if let Some(ref qg) = proto.quest_giver {
+                let existing: std::collections::HashSet<String> =
+                    quests.iter().map(|q| q.id.clone()).collect();
+                for quest_id in &qg.available_quests {
+                    if !existing.contains(quest_id.as_str()) {
+                        if let Some(quest) = self.quest_registry.get(quest_id).await {
+                            quests.push(quest);
+                        }
+                    }
+                }
+            }
+        }
 
         if quests.is_empty() {
             tracing::debug!("NPC {} ({}) has no quests", npc_id, entity_type);
