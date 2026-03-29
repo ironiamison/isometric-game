@@ -334,6 +334,12 @@ impl GameRoom {
                 },
             )
             .await;
+
+            // Fire ItemCollected events so collect_item objectives progress
+            for (item_id, count) in granted_items {
+                self.process_quest_item_collect(player_id, item_id, *count)
+                    .await;
+            }
         }
     }
 
