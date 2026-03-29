@@ -92,3 +92,38 @@ messages = [
 
 [barnaby_ghost.dialogue]
 greeting = "Oh! A visitor! How exciting! ...Wait. Are you alive?"
+
+# --------------------------------------------------------
+
+# Haunted Bookshelf - searchable object for tinderbox
+[haunted_bookshelf]
+display_name = "Dusty Bookshelf"
+sprite = "bookshelf"
+animation_type = "none"
+description = "A bookshelf covered in dust and cobwebs."
+
+[haunted_bookshelf.stats]
+max_hp = 999
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[haunted_bookshelf.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[haunted_bookshelf.behaviors]
+hostile = false
+quest_giver = true
+wander_enabled = false
+
+[haunted_bookshelf.quest_giver]
+available_quests = ["ghastly_contraption"]
+
+[haunted_bookshelf.dialogue]
+greeting = "A dusty bookshelf. Nothing of interest."

@@ -36,9 +36,12 @@ function route_in_progress(ctx)
     local gate = ctx:get_objective_progress("open_first_gate")
     local barnaby = ctx:get_objective_progress("talk_barnaby")
 
-    -- If tinderbox not found yet, player is talking to Oddwick for hints
+    -- If tinderbox not found yet — could be bookshelf search or Oddwick hint
+    -- The bookshelf search gives the tinderbox; Oddwick just gives a hint
+    -- Since we can't distinguish which NPC, show the search (bookshelf is
+    -- the primary interaction point; Oddwick's hint was in the offer dialogue)
     if tinderbox.current < tinderbox.target then
-        show_oddwick_hint_tinderbox(ctx)
+        show_bookshelf_search(ctx)
         return
     end
 
@@ -107,6 +110,30 @@ function show_oddwick_offer(ctx)
             text = "Fair enough. Can't blame you. But if you change your mind, I'll be here. Not like I can leave — the ghost took my carriage wheels too."
         })
     end
+end
+
+-- ============================================================================
+-- Bookshelf Search (tinderbox discovery)
+-- ============================================================================
+
+function show_bookshelf_search(ctx)
+    ctx:show_dialogue({
+        speaker = "Narrator",
+        text = "You rummage through the dusty bookshelf. Old tomes, cobwebs, a suspicious amount of cat hair..."
+    })
+
+    ctx:show_dialogue({
+        speaker = "Narrator",
+        text = "Your hand closes around a small metal box buried behind a stack of mouldy encyclopedias."
+    })
+
+    ctx:give_item("tinderbox", 1)
+    ctx:show_notification("Found: Tinderbox")
+
+    ctx:show_dialogue({
+        speaker = "Narrator",
+        text = "A tinderbox! This should be able to light those candles."
+    })
 end
 
 -- ============================================================================

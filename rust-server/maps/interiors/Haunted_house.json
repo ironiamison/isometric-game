@@ -6957,6 +6957,14 @@
       "uniqueId": "poltergeist_1",
       "facing": "south",
       "respawn": false
+    },
+    {
+      "entityId": "haunted_bookshelf",
+      "x": 20,
+      "y": 40,
+      "uniqueId": "bookshelf_1",
+      "facing": "south",
+      "respawn": false
     }
   ],
   "mapObjects": [
