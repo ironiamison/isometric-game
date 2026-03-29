@@ -42,6 +42,9 @@ pub enum ClientMessage {
     #[serde(rename = "useItem")]
     UseItem { slot_index: u32 },
 
+    #[serde(rename = "useItemOn")]
+    UseItemOn { slot_index: u32, target_npc_id: String },
+
     #[serde(rename = "requestChunk")]
     RequestChunk { chunk_x: i32, chunk_y: i32 },
 
@@ -376,6 +379,20 @@ impl ClientMessage {
                     Value::Integer((*slot_index as i64).into()),
                 );
                 "useItem"
+            }
+            ClientMessage::UseItemOn {
+                slot_index,
+                target_npc_id,
+            } => {
+                data.insert(
+                    "slot_index".into(),
+                    Value::Integer((*slot_index as i64).into()),
+                );
+                data.insert(
+                    "target_npc_id".into(),
+                    Value::String(target_npc_id.clone().into()),
+                );
+                "useItemOn"
             }
             ClientMessage::RequestChunk { chunk_x, chunk_y } => {
                 data.insert("chunkX".into(), Value::Integer((*chunk_x as i64).into()));

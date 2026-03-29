@@ -46,6 +46,8 @@ pub enum ClientMessage {
     #[serde(rename = "useItem")]
     UseItem { slot_index: u8 },
 
+    UseItemOn { slot_index: u8, target_npc_id: String },
+
     #[serde(rename = "auth")]
     Auth { username: String, password: String },
 
@@ -417,6 +419,7 @@ impl ClientMessage {
             ClientMessage::Target { .. } => "Target",
             ClientMessage::Pickup { .. } => "Pickup",
             ClientMessage::UseItem { .. } => "UseItem",
+            ClientMessage::UseItemOn { .. } => "UseItemOn",
             ClientMessage::Auth { .. } => "Auth",
             ClientMessage::Register { .. } => "Register",
             ClientMessage::RequestChunk { .. } => "RequestChunk",
@@ -6567,6 +6570,21 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
             Ok(ClientMessage::UseItem { slot_index })
+        }
+        "useItemOn" => {
+            let slot_index = msg_data
+                .as_map()
+                .and_then(|map| {
+                    map.iter()
+                        .find(|(k, _)| k.as_str() == Some("slot_index"))
+                })
+                .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
+                .unwrap_or(0);
+            let target_npc_id = extract_string(msg_data, "target_npc_id").unwrap_or_default();
+            Ok(ClientMessage::UseItemOn {
+                slot_index,
+                target_npc_id,
+            })
         }
         "auth" => {
             let username = extract_string(msg_data, "username").unwrap_or_default();

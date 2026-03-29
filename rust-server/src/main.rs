@@ -5264,6 +5264,10 @@ async fn handle_client_message(
                 .as_millis() as u64;
             room.handle_koth_leave(player_id, ct).await;
         }
+        ClientMessage::UseItemOn { slot_index, target_npc_id } => {
+            tracing::debug!("UseItemOn: player {} slot {} on npc {}", player_id, slot_index, target_npc_id);
+            // TODO: implement in Task 4
+        }
     }
 
     let handler_duration = handler_start.elapsed();
