@@ -379,20 +379,25 @@ impl QuestRunner {
             let step: u32 = this.get("_dialogue_step").unwrap_or(0);
             this.set("_dialogue_counter", counter + 1)?;
 
+            // "Replaying" means we have input (continue or choice) and need to skip
+            // past already-shown dialogues to reach the target step.
+            let has_real_choice = !current_choice.is_empty() && current_choice != "__continue__";
+            let is_replaying = is_continue || has_real_choice;
+
             // If there are choices, we need a real choice (not __continue__)
             let choices: Option<Table> = options.get("choices").ok();
             if let Some(ref choice_table) = choices {
                 // Check if there are actual choices
                 let has_choices = choice_table.len().unwrap_or(0) > 0;
                 if has_choices {
-                    // If we're processing __continue__ and this dialogue is before the step we're at,
+                    // If replaying and this dialogue is before the step we're at,
                     // skip it (return nil so the script continues past it)
-                    if is_continue && counter < step {
+                    if is_replaying && counter < step {
                         return Ok(Value::Nil);
                     }
 
                     // Check if we have a real player choice (not __continue__)
-                    if !current_choice.is_empty() && current_choice != "__continue__" {
+                    if has_real_choice {
                         // Clear the choice so it's not reused in recursive calls
                         this.set("_player_choice", "")?;
                         // Update dialogue step to current counter so we're past this dialogue
@@ -407,9 +412,9 @@ impl QuestRunner {
             }
 
             // No choices dialogue
-            // If we're processing __continue__ and this dialogue is before the one
-            // we were waiting on, skip it silently (already shown)
-            if is_continue && counter < step {
+            // If replaying and this dialogue is before the one we were waiting on,
+            // skip it silently (already shown)
+            if is_replaying && counter < step {
                 return Ok(Value::Nil);
             }
 
@@ -419,6 +424,13 @@ impl QuestRunner {
                 // Clear the continue flag so subsequent dialogues work normally
                 this.set("_is_continue", false)?;
                 // Increment step for next dialogue
+                result.set("_new_dialogue_step", counter + 1)?;
+                return Ok(Value::Nil);
+            }
+
+            // If we have a real choice and this is a non-choice dialogue at the target step,
+            // skip past it (the choice targets a later dialogue with choices)
+            if has_real_choice && counter == step {
                 result.set("_new_dialogue_step", counter + 1)?;
                 return Ok(Value::Nil);
             }
