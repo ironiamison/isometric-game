@@ -44,3 +44,43 @@ category = "material"
 max_stack = 1
 base_price = 50
 sellable = true
+
+# =============================================================================
+# A Ghastly Contraption - Quest Items
+# =============================================================================
+
+[tinderbox]
+display_name = "Tinderbox"
+sprite = "tinderbox"
+description = "A small box for striking a flame. Smells faintly of sulphur."
+category = "quest"
+max_stack = 1
+base_price = 0
+sellable = false
+
+[basement_key]
+display_name = "Basement Key"
+sprite = "basement_key"
+description = "A tarnished iron key. Barnaby insists it's a lucky charm."
+category = "quest"
+max_stack = 1
+base_price = 0
+sellable = false
+
+[haunted_ectoplasm]
+display_name = "Haunted Ectoplasm"
+sprite = "haunted_ectoplasm"
+description = "A glowing, gelatinous substance pulsing with spectral energy."
+category = "quest"
+max_stack = 1
+base_price = 0
+sellable = false
+
+[spectral_coil_quest]
+display_name = "Spectral Coil"
+sprite = "spectral_coil"
+description = "A coiled wire that hums with ghostly resonance."
+category = "quest"
+max_stack = 1
+base_price = 0
+sellable = false
