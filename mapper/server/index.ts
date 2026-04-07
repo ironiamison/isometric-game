@@ -142,16 +142,9 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // --- Auth ---
-const USERS: Record<string, { password: string; worlds: string[] }> = {
-  [process.env.MAPPER_USER || 'null']: {
-    password: process.env.MAPPER_PASS || 'NANULL!',
-    worlds: process.env.MAPPER_USER === 'null' || !process.env.MAPPER_USER
-      ? ['world_0', 'world_1']
-      : ['world_0'],
-  },
-  duck: { password: 'NADUCK!', worlds: ['world_0'] },
-  drei: { password: 'drei123', worlds: ['world_0', 'world_1'] },
-};
+const USERS: Record<string, { password: string; worlds: string[] }> = JSON.parse(
+  process.env.MAPPER_USERS || await fs.readFile(path.join(mapperRoot, 'users.json'), 'utf-8')
+);
 const AUTH_SECRET = crypto.randomBytes(32).toString('hex');
 
 function makeToken(username: string): string {
