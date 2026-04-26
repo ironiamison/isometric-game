@@ -448,6 +448,39 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Resource contracts - one active cross-skill contract per player
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS resource_contracts (
+                player_id TEXT PRIMARY KEY,
+                contract_kind TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                target_item_id TEXT NOT NULL,
+                target_name TEXT NOT NULL,
+                amount_required INTEGER NOT NULL,
+                amount_completed INTEGER NOT NULL DEFAULT 0,
+                giver_npc_id TEXT NOT NULL,
+                giver_name TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS resource_contract_stats (
+                player_id TEXT PRIMARY KEY,
+                contracts_completed INTEGER NOT NULL DEFAULT 0,
+                total_gold_earned INTEGER NOT NULL DEFAULT 0,
+                total_xp_earned INTEGER NOT NULL DEFAULT 0
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         // Friendships table - for friend system
         sqlx::query(
             r#"
@@ -1851,6 +1884,175 @@ impl Database {
             .collect();
 
         Ok(contracts)
+    }
+
+    // =========================================================================
+    // Resource Contract Persistence
+    // =========================================================================
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn save_resource_contract(
+        &self,
+        player_id: &str,
+        contract_kind: &str,
+        difficulty: &str,
+        target_item_id: &str,
+        target_name: &str,
+        amount_required: i32,
+        amount_completed: i32,
+        giver_npc_id: &str,
+        giver_name: &str,
+        created_at: u64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO resource_contracts (
+                player_id,
+                contract_kind,
+                difficulty,
+                target_item_id,
+                target_name,
+                amount_required,
+                amount_completed,
+                giver_npc_id,
+                giver_name,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(player_id)
+        .bind(contract_kind)
+        .bind(difficulty)
+        .bind(target_item_id)
+        .bind(target_name)
+        .bind(amount_required)
+        .bind(amount_completed)
+        .bind(giver_npc_id)
+        .bind(giver_name)
+        .bind(created_at as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_resource_contract_progress(
+        &self,
+        player_id: &str,
+        amount_completed: i32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE resource_contracts SET amount_completed = ? WHERE player_id = ?")
+            .bind(amount_completed)
+            .bind(player_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete_resource_contract(&self, player_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM resource_contracts WHERE player_id = ?")
+            .bind(player_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn load_resource_contracts(
+        &self,
+    ) -> Result<
+        Vec<(String, String, String, String, String, i32, i32, String, String, u64)>,
+        sqlx::Error,
+    > {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                player_id,
+                contract_kind,
+                difficulty,
+                target_item_id,
+                target_name,
+                amount_required,
+                amount_completed,
+                giver_npc_id,
+                giver_name,
+                created_at
+            FROM resource_contracts
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .iter()
+            .map(|row| {
+                (
+                    row.get("player_id"),
+                    row.get("contract_kind"),
+                    row.get("difficulty"),
+                    row.get("target_item_id"),
+                    row.get("target_name"),
+                    row.get("amount_required"),
+                    row.get("amount_completed"),
+                    row.get("giver_npc_id"),
+                    row.get("giver_name"),
+                    row.get::<i64, _>("created_at") as u64,
+                )
+            })
+            .collect())
+    }
+
+    pub async fn get_resource_contract_stats(
+        &self,
+        player_id: &str,
+    ) -> Result<(i32, i32, i64), sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT contracts_completed, total_gold_earned, total_xp_earned
+            FROM resource_contract_stats
+            WHERE player_id = ?
+            "#,
+        )
+        .bind(player_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(match row {
+            Some(row) => (
+                row.get("contracts_completed"),
+                row.get("total_gold_earned"),
+                row.get("total_xp_earned"),
+            ),
+            None => (0, 0, 0),
+        })
+    }
+
+    pub async fn add_resource_contract_completion(
+        &self,
+        player_id: &str,
+        gold_earned: i32,
+        xp_earned: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO resource_contract_stats (
+                player_id,
+                contracts_completed,
+                total_gold_earned,
+                total_xp_earned
+            )
+            VALUES (?, 1, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                contracts_completed = contracts_completed + 1,
+                total_gold_earned = total_gold_earned + excluded.total_gold_earned,
+                total_xp_earned = total_xp_earned + excluded.total_xp_earned
+            "#,
+        )
+        .bind(player_id)
+        .bind(gold_earned)
+        .bind(xp_earned)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     // =========================================================================

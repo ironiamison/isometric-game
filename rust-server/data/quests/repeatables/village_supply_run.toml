@@ -1,0 +1,51 @@
+# Village Supply Run - mixed-skill repeatable quest
+
+[quest]
+id = "village_supply_run"
+name = "Village Supply Run"
+description = "The Wise Man is rebuilding the village's emergency stores. Bring him practical supplies gathered from the nearby wilderness."
+giver_npc = "wise_man"
+level_required = 1
+repeatable = true
+lua_script = "repeatables/village_supply_run.lua"
+
+[[quest.objectives]]
+id = "collect_oak_logs"
+type = "collect_item"
+target = "oak_log"
+count = 8
+description = "Bring 8 oak logs"
+
+[[quest.objectives]]
+id = "collect_copper_ore"
+type = "collect_item"
+target = "copper_ore"
+count = 6
+description = "Bring 6 copper ore"
+
+[[quest.objectives]]
+id = "collect_cooked_shrimp"
+type = "collect_item"
+target = "cooked_shrimp"
+count = 4
+description = "Bring 4 cooked shrimp"
+
+[[quest.objectives]]
+id = "return_to_wise_man"
+type = "talk_to"
+target = "wise_man"
+description = "Return to the Wise Man"
+sequential = true
+
+[quest.rewards]
+exp = 350
+gold = 220
+items = [
+    { id = "weak_health_potion", count = 1 },
+]
+
+[quest.dialogue]
+offer = "The village only survives because people keep practical stores ready. Bring me oak logs, copper ore, and a few cooked shrimp and I'll see that your effort is rewarded."
+accept = "Good. I need 8 oak logs, 6 copper ore, and 4 cooked shrimp. Keep the work tight and bring everything back in one run."
+progress = "Stay disciplined. The stores are only useful once the full bundle is delivered."
+complete = "Solid work. Supplies like these keep villages alive when panic starts. Take your pay and come back when you're ready for another run."

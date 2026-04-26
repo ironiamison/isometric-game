@@ -1079,13 +1079,66 @@ pub struct FarmingPatch {
     pub owner_id: String,
 }
 
-/// Active farming contract info received from server
+/// Active resource contract info received from server
 #[derive(Debug, Clone)]
-pub struct FarmingContractInfo {
+pub struct ResourceContractInfo {
+    pub contract_kind: String,
     pub difficulty: String,
-    pub crop_name: String,
+    pub task_text: String,
+    pub progress_label: String,
     pub amount_required: i32,
-    pub amount_harvested: i32,
+    pub amount_completed: i32,
+    pub giver_name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdventureBoardDifficultyInfo {
+    pub difficulty_id: String,
+    pub difficulty_name: String,
+    pub level_required: i32,
+    pub unlocked: bool,
+    pub reward_xp: i64,
+    pub reward_gold: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdventureBoardOfferInfo {
+    pub kind_id: String,
+    pub kind_name: String,
+    pub description: String,
+    pub skill_level: i32,
+    pub difficulties: Vec<AdventureBoardDifficultyInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdventureBoardActiveContractInfo {
+    pub kind_id: String,
+    pub kind_name: String,
+    pub difficulty_name: String,
+    pub task_text: String,
+    pub progress_label: String,
+    pub amount_required: i32,
+    pub amount_completed: i32,
+    pub giver_name: String,
+    pub reward_xp: i64,
+    pub reward_gold: i32,
+    pub bonus_item_text: String,
+    pub can_claim: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdventureBoardStatsInfo {
+    pub contracts_completed: i32,
+    pub total_gold_earned: i32,
+    pub total_xp_earned: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdventureBoardPanelState {
+    pub npc_id: String,
+    pub offers: Vec<AdventureBoardOfferInfo>,
+    pub active_contract: Option<AdventureBoardActiveContractInfo>,
+    pub stats: AdventureBoardStatsInfo,
 }
 
 /// A gathering marker tile in the world (fishing spot, mining node, etc.)
@@ -1408,6 +1461,8 @@ pub struct UiState {
     pub inventory_open: bool,
     // Quest UI state
     pub active_dialogue: Option<ActiveDialogue>,
+    pub adventure_board: Option<AdventureBoardPanelState>,
+    pub adventure_board_selected_offer: usize,
     pub active_quests: Vec<ActiveQuest>,
     pub completed_quest_ids: HashSet<String>,
     pub adventurer_selected_tab: usize,
@@ -1690,6 +1745,8 @@ impl Default for UiState {
             chat_revision: 0,
             inventory_open: false,
             active_dialogue: None,
+            adventure_board: None,
+            adventure_board_selected_offer: 0,
             active_quests: Vec::new(),
             completed_quest_ids: HashSet::new(),
             adventurer_selected_tab: 0,
@@ -1945,8 +2002,8 @@ pub struct GameState {
     pub farming_patch_positions: HashMap<(i32, i32), String>,
     /// Which farming plots the player has unlocked
     pub unlocked_farming_plots: Vec<u32>,
-    /// Active farming contract (if any)
-    pub farming_contract: Option<FarmingContractInfo>,
+    /// Active resource contract (if any)
+    pub resource_contract: Option<ResourceContractInfo>,
     /// Ground tile overrides from server (farming plot tiles: locked=65, unlocked=62)
     pub ground_tile_overrides: HashMap<(i32, i32), u32>,
     /// Gathering marker positions received from server
@@ -2185,7 +2242,7 @@ impl GameState {
             farming_patches: HashMap::new(),
             farming_patch_positions: HashMap::new(),
             unlocked_farming_plots: vec![1],
-            farming_contract: None,
+            resource_contract: None,
             ground_tile_overrides: HashMap::new(),
             gathering_markers: Vec::new(),
             is_gathering: false,

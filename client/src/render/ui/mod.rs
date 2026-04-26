@@ -1,6 +1,7 @@
 //! UI rendering components split from the main renderer
 
 pub mod alchemy_station;
+pub mod adventure_board;
 pub mod altar_panel;
 pub mod anvil;
 pub mod area_banner;

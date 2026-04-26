@@ -10,6 +10,10 @@ pub enum UiElementId {
     DialogueScrollbar,
     AdventurerTab(usize),
     AdventurerTier(usize),
+    AdventureBoardOffer(usize),
+    AdventureBoardDifficulty(usize),
+    AdventureBoardClaim,
+    AdventureBoardAbandon,
 
     // Crafting
     CraftingCategoryTab(usize),

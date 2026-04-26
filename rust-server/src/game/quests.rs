@@ -116,6 +116,31 @@ fn select_target_quest(
     target_quest.or(completed_quest)
 }
 
+fn sort_quests_for_npc(
+    quests: &mut Vec<Arc<Quest>>,
+    prototype: Option<&crate::entity::prototype::EntityPrototype>,
+) {
+    let ordered_ids = prototype
+        .and_then(|proto| proto.quest_giver.as_ref())
+        .map(|qg| qg.available_quests.clone())
+        .unwrap_or_default();
+
+    let order_map: std::collections::HashMap<&str, usize> = ordered_ids
+        .iter()
+        .enumerate()
+        .map(|(idx, quest_id)| (quest_id.as_str(), idx))
+        .collect();
+
+    quests.sort_by(|a, b| {
+        let a_idx = order_map.get(a.id.as_str()).copied().unwrap_or(usize::MAX);
+        let b_idx = order_map.get(b.id.as_str()).copied().unwrap_or(usize::MAX);
+
+        a_idx
+            .cmp(&b_idx)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+}
+
 impl GameRoom {
     async fn send_quest_progress_update(
         &self,
@@ -391,6 +416,7 @@ impl GameRoom {
                 }
             }
         }
+        sort_quests_for_npc(&mut quests, prototype);
 
         if quests.is_empty() {
             tracing::debug!("NPC {} ({}) has no quests", npc_id, entity_type);

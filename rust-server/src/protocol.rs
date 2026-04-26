@@ -1231,6 +1231,22 @@ pub enum ServerMessage {
         amount_required: i32,
         amount_harvested: i32,
     },
+    ResourceContractUpdate {
+        active: bool,
+        contract_kind: String,
+        difficulty: String,
+        task_text: String,
+        progress_label: String,
+        amount_required: i32,
+        amount_completed: i32,
+        giver_name: String,
+    },
+    AdventureBoardState {
+        npc_id: String,
+        offers: Vec<AdventureBoardOfferData>,
+        active_contract: Option<AdventureBoardActiveContractData>,
+        stats: AdventureBoardStatsData,
+    },
 
     // ===== Slayer System Messages =====
     SlayerPanelOpen {
@@ -1679,6 +1695,48 @@ pub struct ShopStockItemData {
     pub price: i32,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AdventureBoardDifficultyData {
+    pub difficulty_id: String,
+    pub difficulty_name: String,
+    pub level_required: i32,
+    pub unlocked: bool,
+    pub reward_xp: i64,
+    pub reward_gold: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdventureBoardOfferData {
+    pub kind_id: String,
+    pub kind_name: String,
+    pub description: String,
+    pub skill_level: i32,
+    pub difficulties: Vec<AdventureBoardDifficultyData>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdventureBoardActiveContractData {
+    pub kind_id: String,
+    pub kind_name: String,
+    pub difficulty_name: String,
+    pub task_text: String,
+    pub progress_label: String,
+    pub amount_required: i32,
+    pub amount_completed: i32,
+    pub giver_name: String,
+    pub reward_xp: i64,
+    pub reward_gold: i32,
+    pub bonus_item_text: String,
+    pub can_claim: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdventureBoardStatsData {
+    pub contracts_completed: i32,
+    pub total_gold_earned: i32,
+    pub total_xp_earned: i64,
+}
+
 impl ServerMessage {
     pub fn msg_type(&self) -> &'static str {
         match self {
@@ -1798,6 +1856,8 @@ impl ServerMessage {
             ServerMessage::BankUpdate { .. } => "bankUpdate",
             ServerMessage::BankResult { .. } => "bankResult",
             ServerMessage::FarmingContractUpdate { .. } => "farmingContractUpdate",
+            ServerMessage::ResourceContractUpdate { .. } => "resourceContractUpdate",
+            ServerMessage::AdventureBoardState { .. } => "adventureBoardState",
             // Slayer system messages
             ServerMessage::SlayerPanelOpen { .. } => "slayerPanelOpen",
             ServerMessage::SlayerTaskProgress { .. } => "slayerTaskProgress",
@@ -5612,6 +5672,203 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::String("amount_harvested".into()),
                 Value::Integer((*amount_harvested as i64).into()),
             ));
+            Value::Map(map)
+        }
+        ServerMessage::ResourceContractUpdate {
+            active,
+            contract_kind,
+            difficulty,
+            task_text,
+            progress_label,
+            amount_required,
+            amount_completed,
+            giver_name,
+        } => {
+            let mut map = Vec::new();
+            map.push((Value::String("active".into()), Value::Boolean(*active)));
+            map.push((
+                Value::String("contract_kind".into()),
+                Value::String(contract_kind.clone().into()),
+            ));
+            map.push((
+                Value::String("difficulty".into()),
+                Value::String(difficulty.clone().into()),
+            ));
+            map.push((
+                Value::String("task_text".into()),
+                Value::String(task_text.clone().into()),
+            ));
+            map.push((
+                Value::String("progress_label".into()),
+                Value::String(progress_label.clone().into()),
+            ));
+            map.push((
+                Value::String("amount_required".into()),
+                Value::Integer((*amount_required as i64).into()),
+            ));
+            map.push((
+                Value::String("amount_completed".into()),
+                Value::Integer((*amount_completed as i64).into()),
+            ));
+            map.push((
+                Value::String("giver_name".into()),
+                Value::String(giver_name.clone().into()),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::AdventureBoardState {
+            npc_id,
+            offers,
+            active_contract,
+            stats,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("npc_id".into()),
+                Value::String(npc_id.clone().into()),
+            ));
+            map.push((
+                Value::String("offers".into()),
+                Value::Array(
+                    offers
+                        .iter()
+                        .map(|offer| {
+                            let mut offer_map = Vec::new();
+                            offer_map.push((
+                                Value::String("kind_id".into()),
+                                Value::String(offer.kind_id.clone().into()),
+                            ));
+                            offer_map.push((
+                                Value::String("kind_name".into()),
+                                Value::String(offer.kind_name.clone().into()),
+                            ));
+                            offer_map.push((
+                                Value::String("description".into()),
+                                Value::String(offer.description.clone().into()),
+                            ));
+                            offer_map.push((
+                                Value::String("skill_level".into()),
+                                Value::Integer((offer.skill_level as i64).into()),
+                            ));
+                            offer_map.push((
+                                Value::String("difficulties".into()),
+                                Value::Array(
+                                    offer
+                                        .difficulties
+                                        .iter()
+                                        .map(|difficulty| {
+                                            let mut diff_map = Vec::new();
+                                            diff_map.push((
+                                                Value::String("difficulty_id".into()),
+                                                Value::String(
+                                                    difficulty.difficulty_id.clone().into(),
+                                                ),
+                                            ));
+                                            diff_map.push((
+                                                Value::String("difficulty_name".into()),
+                                                Value::String(
+                                                    difficulty.difficulty_name.clone().into(),
+                                                ),
+                                            ));
+                                            diff_map.push((
+                                                Value::String("level_required".into()),
+                                                Value::Integer(
+                                                    (difficulty.level_required as i64).into(),
+                                                ),
+                                            ));
+                                            diff_map.push((
+                                                Value::String("unlocked".into()),
+                                                Value::Boolean(difficulty.unlocked),
+                                            ));
+                                            diff_map.push((
+                                                Value::String("reward_xp".into()),
+                                                Value::Integer(difficulty.reward_xp.into()),
+                                            ));
+                                            diff_map.push((
+                                                Value::String("reward_gold".into()),
+                                                Value::Integer(
+                                                    (difficulty.reward_gold as i64).into(),
+                                                ),
+                                            ));
+                                            Value::Map(diff_map)
+                                        })
+                                        .collect(),
+                                ),
+                            ));
+                            Value::Map(offer_map)
+                        })
+                        .collect(),
+                ),
+            ));
+            let active_value = if let Some(contract) = active_contract {
+                let mut contract_map = Vec::new();
+                contract_map.push((
+                    Value::String("kind_id".into()),
+                    Value::String(contract.kind_id.clone().into()),
+                ));
+                contract_map.push((
+                    Value::String("kind_name".into()),
+                    Value::String(contract.kind_name.clone().into()),
+                ));
+                contract_map.push((
+                    Value::String("difficulty_name".into()),
+                    Value::String(contract.difficulty_name.clone().into()),
+                ));
+                contract_map.push((
+                    Value::String("task_text".into()),
+                    Value::String(contract.task_text.clone().into()),
+                ));
+                contract_map.push((
+                    Value::String("progress_label".into()),
+                    Value::String(contract.progress_label.clone().into()),
+                ));
+                contract_map.push((
+                    Value::String("amount_required".into()),
+                    Value::Integer((contract.amount_required as i64).into()),
+                ));
+                contract_map.push((
+                    Value::String("amount_completed".into()),
+                    Value::Integer((contract.amount_completed as i64).into()),
+                ));
+                contract_map.push((
+                    Value::String("giver_name".into()),
+                    Value::String(contract.giver_name.clone().into()),
+                ));
+                contract_map.push((
+                    Value::String("reward_xp".into()),
+                    Value::Integer(contract.reward_xp.into()),
+                ));
+                contract_map.push((
+                    Value::String("reward_gold".into()),
+                    Value::Integer((contract.reward_gold as i64).into()),
+                ));
+                contract_map.push((
+                    Value::String("bonus_item_text".into()),
+                    Value::String(contract.bonus_item_text.clone().into()),
+                ));
+                contract_map.push((
+                    Value::String("can_claim".into()),
+                    Value::Boolean(contract.can_claim),
+                ));
+                Value::Map(contract_map)
+            } else {
+                Value::Nil
+            };
+            map.push((Value::String("active_contract".into()), active_value));
+            let mut stats_map = Vec::new();
+            stats_map.push((
+                Value::String("contracts_completed".into()),
+                Value::Integer((stats.contracts_completed as i64).into()),
+            ));
+            stats_map.push((
+                Value::String("total_gold_earned".into()),
+                Value::Integer((stats.total_gold_earned as i64).into()),
+            ));
+            stats_map.push((
+                Value::String("total_xp_earned".into()),
+                Value::Integer(stats.total_xp_earned.into()),
+            ));
+            map.push((Value::String("stats".into()), Value::Map(stats_map)));
             Value::Map(map)
         }
         ServerMessage::BankOpen {

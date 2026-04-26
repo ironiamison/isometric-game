@@ -110,6 +110,7 @@ mod tests {
             sprite: "test".to_string(),
             animation_type: AnimationType::Blob,
             description: "Test".to_string(),
+            tags: Vec::new(),
             stats: ResolvedStats {
                 level: 1,
                 max_hp: 10,
@@ -126,6 +127,7 @@ mod tests {
             },
             rewards: ResolvedRewards::default(),
             loot: Vec::new(),
+            loot_tables: Vec::new(),
             behaviors: EntityBehaviors {
                 friendly: true,
                 ..EntityBehaviors::default()
@@ -139,6 +141,8 @@ mod tests {
                 interval_max_ms: 10,
                 messages: vec!["Hello".to_string()],
             }),
+            port: None,
+            size: 1,
         };
 
         Npc::from_prototype("npc_1", "test_npc", &prototype, 10, 10, 1, None)

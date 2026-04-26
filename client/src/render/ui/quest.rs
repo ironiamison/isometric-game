@@ -1032,15 +1032,15 @@ impl Renderer {
         Some(macroquad::math::Rect::new(min_x, tracker_y, right_edge - min_x, y - tracker_y))
     }
 
-    /// Render farming contract tracker (left-aligned, below stat bars)
-    pub(crate) fn render_farming_contract_tracker(
+    /// Render resource contract tracker (left-aligned, below stat bars)
+    pub(crate) fn render_resource_contract_tracker(
         &self,
         state: &GameState,
         x: f32,
         y_start: f32,
         max_width: f32,
     ) {
-        let contract = match &state.farming_contract {
+        let contract = match &state.resource_contract {
             Some(c) => c,
             None => return,
         };
@@ -1053,23 +1053,26 @@ impl Renderer {
         self.draw_text_sharp("CONTRACT", x, y, 16.0, Color::from_rgba(180, 220, 130, 255));
         y += line_height;
 
-        // Contract info: "Easy: Harvest potatoes"
-        let title = format!("{}: Harvest {}", contract.difficulty, contract.crop_name);
+        let title = format!("{} {}", contract.difficulty, contract.contract_kind);
         for line in self.wrap_text(&title, max_width, 16.0).iter().take(2) {
             self.draw_text_sharp(line, x, y, 16.0, WHITE);
             y += line_height;
         }
 
-        // Progress: "[x] 3/5 harvested" or "[x] 5/5 harvested" (complete)
-        let complete = contract.amount_harvested >= contract.amount_required;
+        for line in self.wrap_text(&contract.task_text, max_width, 16.0).iter().take(2) {
+            self.draw_text_sharp(line, x, y, 16.0, WHITE);
+            y += line_height;
+        }
+
+        let complete = contract.amount_completed >= contract.amount_required;
         let (check, status_color) = if complete {
             ("[x]", Color::from_rgba(100, 255, 100, 255))
         } else {
             ("[ ]", Color::from_rgba(200, 200, 200, 255))
         };
         let progress_text = format!(
-            "{} {}/{} harvested",
-            check, contract.amount_harvested, contract.amount_required
+            "{} {}/{} {}",
+            check, contract.amount_completed, contract.amount_required, contract.progress_label
         );
         for line in self
             .wrap_text(&progress_text, max_width, 16.0)
@@ -1081,8 +1084,8 @@ impl Renderer {
         }
 
         if complete {
-            let return_text = "[ ] Return to Master Farmer";
-            for line in self.wrap_text(return_text, max_width, 16.0).iter().take(2) {
+            let return_text = format!("[ ] Return to {}", contract.giver_name);
+            for line in self.wrap_text(&return_text, max_width, 16.0).iter().take(2) {
                 self.draw_text_sharp(line, x, y, 16.0, Color::from_rgba(200, 200, 200, 255));
                 y += objective_line_height;
             }

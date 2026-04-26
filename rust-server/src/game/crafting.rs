@@ -401,6 +401,11 @@ impl GameRoom {
             items_gained
         );
 
+        for result in &items_gained {
+            self.record_resource_contract_progress(player_id, &result.item_id, result.count)
+                .await;
+        }
+
         self.send_to_player(
             player_id,
             ServerMessage::CraftResult {
@@ -583,6 +588,8 @@ impl GameRoom {
 
             for (item_id_gained, count) in &items_gained {
                 self.process_quest_item_collect(player_id, item_id_gained, *count as i32)
+                    .await;
+                self.record_resource_contract_progress(player_id, item_id_gained, *count as i32)
                     .await;
             }
 
@@ -769,6 +776,12 @@ impl GameRoom {
             for (item_id_gained, count) in &completion.items_gained {
                 self.process_quest_item_collect(&completion.pid, item_id_gained, *count as i32)
                     .await;
+                self.record_resource_contract_progress(
+                    &completion.pid,
+                    item_id_gained,
+                    *count as i32,
+                )
+                .await;
             }
 
             self.send_to_player(&completion.pid, completion.inventory_update)

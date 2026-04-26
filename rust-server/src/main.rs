@@ -48,6 +48,7 @@ mod perf_metrics;
 mod prayer;
 mod protocol;
 mod quest;
+mod resource_contracts;
 mod scroll_spell;
 mod shop;
 mod skills;
@@ -2303,9 +2304,9 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 let _ = recv_tx.send(bytes).await;
                             }
 
-                            // Farming contract
+                            // Resource contract
                             let contract_msg =
-                                recv_room.get_farming_contract_message(&player_id).await;
+                                recv_room.get_resource_contract_message(&player_id).await;
                             if let Ok(bytes) = protocol::encode_server_message(&contract_msg) {
                                 let _ = recv_tx.send(bytes).await;
                             }
@@ -3149,8 +3150,8 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
-    // Send farming contract state
-    let contract_msg = room.get_farming_contract_message(&player_id).await;
+    // Send resource contract state
+    let contract_msg = room.get_resource_contract_message(&player_id).await;
     if let Ok(bytes) = protocol::encode_server_message(&contract_msg) {
         let _ = sender.send(Message::Binary(bytes)).await;
     }

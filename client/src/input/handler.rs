@@ -3,9 +3,9 @@ use crate::audio::AudioManager;
 use crate::game::state::{ClickEffect, ClickEffectKind};
 use crate::render::isometric::screen_to_world;
 use crate::game::{
-    pathfinding, quest_status_order, BankDrag, BankQuantityAction, BankQuantityDialog, ChatChannel,
-    ContextMenu, ContextMenuTarget, DragSource, DragState, GameState, GoldDropDialog, PathState,
-    QuestCatalogEntry, StallPriceDialog, CHUNK_SIZE,
+    pathfinding, quest_status_order, ActiveDialogue, BankDrag, BankQuantityAction,
+    BankQuantityDialog, ChatChannel, ContextMenu, ContextMenuTarget, DragSource, DragState,
+    GameState, GoldDropDialog, PathState, QuestCatalogEntry, StallPriceDialog, CHUNK_SIZE,
 };
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
@@ -407,6 +407,11 @@ fn activate_hotkey_slot(state: &mut GameState, slot_idx: usize) -> Vec<InputComm
 
 fn is_adventurer_guide_dialogue(speaker: &str) -> bool {
     speaker.eq_ignore_ascii_case("Adventurer Guide")
+}
+
+fn is_adventure_board_dialogue(dialogue: &ActiveDialogue) -> bool {
+    dialogue.quest_id.starts_with("adventure_board:")
+        || dialogue.speaker.eq_ignore_ascii_case("Adventure Board")
 }
 
 fn adventurer_guide_tier_id(tab_idx: usize, tier_idx: usize) -> Option<&'static str> {
@@ -5568,6 +5573,94 @@ impl InputHandler {
 
         // Handle dialogue mode - intercept input when dialogue is open
         if let Some(dialogue) = &state.ui_state.active_dialogue {
+            if is_adventure_board_dialogue(dialogue) {
+                if mouse_clicked {
+                    if let Some(ref element) = clicked_element {
+                        match element {
+                            UiElementId::AdventureBoardOffer(idx) => {
+                                if let Some(board) = state.ui_state.adventure_board.as_ref() {
+                                    if *idx < board.offers.len() {
+                                        state.ui_state.adventure_board_selected_offer = *idx;
+                                    }
+                                }
+                                return commands;
+                            }
+                            UiElementId::AdventureBoardDifficulty(idx) => {
+                                if let Some(board) = state.ui_state.adventure_board.as_ref() {
+                                    let offer_idx = state
+                                        .ui_state
+                                        .adventure_board_selected_offer
+                                        .min(board.offers.len().saturating_sub(1));
+                                    if let Some(offer) = board.offers.get(offer_idx) {
+                                        if let Some(difficulty) = offer.difficulties.get(*idx) {
+                                            if difficulty.unlocked && board.active_contract.is_none() {
+                                                commands.push(InputCommand::DialogueChoice {
+                                                    quest_id: dialogue.quest_id.clone(),
+                                                    choice_id: format!(
+                                                        "board_accept:{}:{}",
+                                                        offer.kind_id, difficulty.difficulty_id
+                                                    ),
+                                                });
+                                                return commands;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            UiElementId::AdventureBoardClaim => {
+                                if state
+                                    .ui_state
+                                    .adventure_board
+                                    .as_ref()
+                                    .and_then(|board| board.active_contract.as_ref())
+                                    .is_some_and(|contract| contract.can_claim)
+                                {
+                                    commands.push(InputCommand::DialogueChoice {
+                                        quest_id: dialogue.quest_id.clone(),
+                                        choice_id: "board_claim".to_string(),
+                                    });
+                                    return commands;
+                                }
+                            }
+                            UiElementId::AdventureBoardAbandon => {
+                                if state
+                                    .ui_state
+                                    .adventure_board
+                                    .as_ref()
+                                    .and_then(|board| board.active_contract.as_ref())
+                                    .is_some()
+                                {
+                                    commands.push(InputCommand::DialogueChoice {
+                                        quest_id: dialogue.quest_id.clone(),
+                                        choice_id: "board_abandon".to_string(),
+                                    });
+                                    return commands;
+                                }
+                            }
+                            UiElementId::DialogueClose => {
+                                commands.push(InputCommand::CloseDialogue);
+                                state.ui_state.active_dialogue = None;
+                                state.ui_state.adventure_board = None;
+                                state.ui_state.adventure_board_selected_offer = 0;
+                                state.pending_sfx.push("enter".to_string());
+                                return commands;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                if is_key_pressed(KeyCode::Escape) {
+                    commands.push(InputCommand::CloseDialogue);
+                    state.ui_state.active_dialogue = None;
+                    state.ui_state.adventure_board = None;
+                    state.ui_state.adventure_board_selected_offer = 0;
+                    return commands;
+                }
+
+                return commands;
+            }
+
             let is_guide_dialogue = is_adventurer_guide_dialogue(&dialogue.speaker);
             let dialogue_has_choices = !dialogue.choices.is_empty();
             let guide_actions_locked = is_guide_dialogue && adventurer_guide_actions_locked(state);
@@ -5718,6 +5811,7 @@ impl InputHandler {
                             {
                                 commands.push(InputCommand::CloseDialogue);
                                 state.ui_state.active_dialogue = None;
+                                state.ui_state.adventure_board = None;
                                 state.pending_sfx.push("enter".to_string());
                                 return commands;
                             }
@@ -5736,6 +5830,7 @@ impl InputHandler {
                 {
                     commands.push(InputCommand::CloseDialogue);
                     state.ui_state.active_dialogue = None;
+                    state.ui_state.adventure_board = None;
                     return commands;
                 }
 
@@ -5772,6 +5867,7 @@ impl InputHandler {
                 {
                     commands.push(InputCommand::CloseDialogue);
                     state.ui_state.active_dialogue = None;
+                    state.ui_state.adventure_board = None;
                     return commands;
                 }
 

@@ -29,7 +29,7 @@ hostile = false
 quest_giver = true
 
 [elder_villager.quest_giver]
-available_quests = ["what_happened_here", "spreading_rot"]
+available_quests = ["what_happened_here", "rot_watch", "spreading_rot"]
 
 [elder_villager.speech]
 radius = 5
@@ -401,10 +401,14 @@ gold_max = 0
 
 [wise_man.behaviors]
 hostile = false
+quest_giver = true
 wander_enabled = true
 wander_radius = 2
 wander_pause_min_ms = 5000
 wander_pause_max_ms = 12000
+
+[wise_man.quest_giver]
+available_quests = ["village_supply_run"]
 
 [wise_man.speech]
 radius = 5
@@ -418,6 +422,8 @@ messages = [
 
 [wise_man.dialogue]
 greeting = "Greetings. I am but a humble keeper of old tales and counsel."
+quest_available = "If you want practical work, I can assign a proper supply run."
+quest_complete = "Good. Practical work done properly is never wasted."
 
 # ============================================================================
 # Banker - Gold storage / future services
@@ -1058,7 +1064,7 @@ wander_pause_min_ms = 5000
 wander_pause_max_ms = 10000
 
 [camp_cook.quest_giver]
-available_quests = ["survivalist_warm_meal", "survivalist_tools_of_trade", "survivalist_leather_craft"]
+available_quests = ["survivalist_warm_meal", "survivalist_tools_of_trade", "survivalist_leather_craft", "campfire_supper"]
 
 [camp_cook.speech]
 radius = 5

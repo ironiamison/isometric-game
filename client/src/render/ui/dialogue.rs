@@ -276,6 +276,11 @@ fn is_adventurer_guide_dialogue(dialogue: &ActiveDialogue) -> bool {
     dialogue.speaker.eq_ignore_ascii_case("Adventurer Guide")
 }
 
+fn is_adventure_board_dialogue(dialogue: &ActiveDialogue) -> bool {
+    dialogue.quest_id.starts_with("adventure_board:")
+        || dialogue.speaker.eq_ignore_ascii_case("Adventure Board")
+}
+
 fn is_adventurer_guide_tier_id(quest_id: &str) -> bool {
     matches!(
         quest_id,
@@ -376,7 +381,7 @@ fn skilling_missing_tier_requirements(state: &GameState, tier_id: &str) -> Vec<&
 }
 
 impl Renderer {
-    fn truncate_text_to_width(&self, text: &str, max_width: f32, font_size: f32) -> String {
+    pub(crate) fn truncate_text_to_width(&self, text: &str, max_width: f32, font_size: f32) -> String {
         if self.measure_text_sharp(text, font_size).width <= max_width {
             return text.to_string();
         }
@@ -414,6 +419,10 @@ impl Renderer {
         scroll_offset: f32,
         scrollbar_dragging: bool,
     ) {
+        if is_adventure_board_dialogue(dialogue) {
+            self.render_adventure_board_dialogue(state, dialogue, hovered, layout);
+            return;
+        }
         if is_adventurer_guide_dialogue(dialogue) {
             self.render_adventurer_guide_dialogue(state, dialogue, hovered, layout);
             return;

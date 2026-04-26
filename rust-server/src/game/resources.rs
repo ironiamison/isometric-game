@@ -353,6 +353,8 @@ impl GameRoom {
 
                         self.process_quest_item_collect(player_id, &result.log_item_id, 1)
                             .await;
+                        self.record_resource_contract_progress(player_id, &result.log_item_id, 1)
+                            .await;
 
                         if leveled_up {
                             self.broadcast_skill_level_up(player_id, "woodcutting", new_level).await;
@@ -639,6 +641,8 @@ impl GameRoom {
 
                         self.process_quest_item_collect(player_id, &result.ore_item_id, 1)
                             .await;
+                        self.record_resource_contract_progress(player_id, &result.ore_item_id, 1)
+                            .await;
 
                         if leveled_up {
                             self.broadcast_skill_level_up(player_id, "mining", new_level).await;
@@ -786,6 +790,8 @@ impl GameRoom {
 
         for tick in gather_ticks {
             self.process_quest_item_collect(&tick.pid, &tick.item_id, 1)
+                .await;
+            self.record_resource_contract_progress(&tick.pid, &tick.item_id, 1)
                 .await;
 
             self.send_to_player(

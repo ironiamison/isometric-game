@@ -11057,26 +11057,18 @@ impl Renderer {
 
         // Chat button — on desktop rendered elsewhere; on Android it's in the collapsible menu bar
 
-        // Farming contract tracker (shown in farming area) - left side below stat bars
-        if state.farming_contract.is_some() {
-            if let Some(player) = state.get_local_player() {
-                let px = player.x;
-                let py = player.y;
-                if px >= 0.0 && px <= 29.0 && py >= -42.0 && py <= -16.0 {
-                    let s = self.font_scale.get();
-                    let bar_width_contract = 120.0f32;
-                    let (bar_x, stats_y) =
-                        self.minimap_stats_stack_position(state, bar_width_contract);
-                    // Below 3 stat bars (HP + MP + Prayer, each 18*s + 4*s gap) + extra gap
-                    let slayer_offset = if state.ui_state.slayer_current_task.is_some() {
-                        46.0 * s
-                    } else {
-                        0.0
-                    };
-                    let contract_y = stats_y + 3.0 * (18.0 + 4.0) * s + 14.0 * s + slayer_offset;
-                    self.render_farming_contract_tracker(state, bar_x, contract_y, 240.0);
-                }
-            }
+        // Resource contract tracker - left side below stat bars
+        if state.resource_contract.is_some() {
+            let s = self.font_scale.get();
+            let bar_width_contract = 120.0f32;
+            let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width_contract);
+            let slayer_offset = if state.ui_state.slayer_current_task.is_some() {
+                46.0 * s
+            } else {
+                0.0
+            };
+            let contract_y = stats_y + 3.0 * (18.0 + 4.0) * s + 14.0 * s + slayer_offset;
+            self.render_resource_contract_tracker(state, bar_x, contract_y, 240.0);
         }
 
         // Slayer chip hover tooltip (rendered here so it draws on top of contract tracker)

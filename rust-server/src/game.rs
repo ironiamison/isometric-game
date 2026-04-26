@@ -36,6 +36,7 @@ mod npc_tick;
 mod post_movement;
 mod prayer;
 mod quests;
+mod resource_contracts;
 mod resources;
 mod respawns;
 mod shop;
@@ -1179,6 +1180,8 @@ pub struct GameRoom {
     chairs: RwLock<HashMap<(i32, i32), ChairState>>,
     /// Farming system (allotment patches, crop growth)
     farming: RwLock<crate::farming::FarmingSystem>,
+    /// Shared cross-skill resource contracts (farming, mining, woodcutting)
+    resource_contracts: RwLock<crate::resource_contracts::ResourceContractManager>,
     /// Cached portal tile positions (immutable after init, no lock needed)
     portal_tiles: std::collections::HashSet<(i32, i32)>,
     /// Quest locations for reach_location objectives (location_id -> QuestLocation)
@@ -1429,6 +1432,7 @@ impl GameRoom {
                 crate::farming::FarmingSystem::new()
             }
         };
+        let mut resource_contracts = crate::resource_contracts::ResourceContractManager::new();
 
         // Restore planted patches from database
         if let Some(ref db) = db {
@@ -1466,11 +1470,49 @@ impl GameRoom {
             }
         }
 
-        // Load farming contracts from database
+        // Load shared resource contracts from database, then migrate any legacy farming contracts.
         if let Some(ref db) = db {
-            match db.load_farming_contracts().await {
+            match db.load_resource_contracts().await {
                 Ok(contracts) => {
                     let count = contracts.len();
+                    for (
+                        player_id,
+                        contract_kind,
+                        difficulty,
+                        target_item_id,
+                        target_name,
+                        amount_required,
+                        amount_completed,
+                        giver_npc_id,
+                        giver_name,
+                        created_at,
+                    ) in &contracts
+                    {
+                        resource_contracts.restore_contract(
+                            player_id,
+                            contract_kind,
+                            difficulty,
+                            target_item_id,
+                            target_name,
+                            *amount_required,
+                            *amount_completed,
+                            giver_npc_id,
+                            giver_name,
+                            *created_at,
+                        );
+                    }
+                    if count > 0 {
+                        tracing::info!("Restored {} resource contracts from database", count);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load resource contracts from database: {}", e);
+                }
+            }
+
+            match db.load_farming_contracts().await {
+                Ok(contracts) => {
+                    let mut migrated = 0usize;
                     for (
                         player_id,
                         difficulty,
@@ -1478,23 +1520,94 @@ impl GameRoom {
                         amount_required,
                         amount_harvested,
                         created_at,
-                    ) in &contracts
+                    ) in contracts
                     {
-                        farming.restore_contract(
-                            player_id,
+                        if resource_contracts.has_contract(&player_id) {
+                            if let Err(e) = db.delete_farming_contract(&player_id).await {
+                                tracing::warn!(
+                                    "Failed to delete legacy farming contract for {}: {}",
+                                    player_id,
+                                    e
+                                );
+                            }
+                            continue;
+                        }
+
+                        let Some(difficulty) =
+                            crate::resource_contracts::ContractDifficulty::from_str(&difficulty)
+                        else {
+                            continue;
+                        };
+
+                        let target_item_id = farming
+                            .crops
+                            .get(&crop_id)
+                            .map(|crop| crop.produce_item.clone())
+                            .unwrap_or(crop_id);
+                        let target_name = item_registry
+                            .get(&target_item_id)
+                            .map(|item| item.display_name.clone())
+                            .unwrap_or_else(|| target_item_id.clone());
+
+                        let contract = crate::resource_contracts::ResourceContract {
+                            player_id: player_id.clone(),
+                            kind: crate::resource_contracts::ResourceContractKind::Farming,
                             difficulty,
-                            crop_id,
-                            *amount_required,
-                            *amount_harvested,
-                            *created_at,
-                        );
+                            target_item_id: target_item_id.clone(),
+                            target_name: target_name.clone(),
+                            amount_required,
+                            amount_completed: amount_harvested,
+                            created_at,
+                            giver_npc_id: "master_farmer".to_string(),
+                            giver_name: "Master Farmer".to_string(),
+                        };
+
+                        resource_contracts.insert_contract(contract.clone());
+                        migrated += 1;
+
+                        if let Err(e) = db
+                            .save_resource_contract(
+                                &player_id,
+                                contract.kind.as_str(),
+                                contract.difficulty.as_str(),
+                                &target_item_id,
+                                &target_name,
+                                amount_required,
+                                amount_harvested,
+                                "master_farmer",
+                                "Master Farmer",
+                                created_at,
+                            )
+                            .await
+                        {
+                            tracing::warn!(
+                                "Failed to migrate legacy farming contract for {}: {}",
+                                player_id,
+                                e
+                            );
+                        }
+
+                        if let Err(e) = db.delete_farming_contract(&player_id).await {
+                            tracing::warn!(
+                                "Failed to delete legacy farming contract for {}: {}",
+                                player_id,
+                                e
+                            );
+                        }
                     }
-                    if count > 0 {
-                        tracing::info!("Restored {} farming contracts from database", count);
+
+                    if migrated > 0 {
+                        tracing::info!(
+                            "Migrated {} legacy farming contracts into resource contracts",
+                            migrated
+                        );
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to load farming contracts from database: {}", e);
+                    tracing::warn!(
+                        "Failed to load legacy farming contracts from database: {}",
+                        e
+                    );
                 }
             }
         }
@@ -1729,6 +1842,7 @@ impl GameRoom {
             chair_gids,
             chairs: RwLock::new(chairs),
             farming: RwLock::new(farming),
+            resource_contracts: RwLock::new(resource_contracts),
             portal_tiles,
             quest_locations,
             slayer_registry,
@@ -5123,6 +5237,11 @@ impl GameRoom {
             return;
         }
 
+        if entity_type == "adventure_board" {
+            self.show_adventure_board_dialogue(player_id, &npc_id).await;
+            return;
+        }
+
         let is_altar = self
             .entity_registry
             .get(&entity_type)
@@ -5217,6 +5336,18 @@ impl GameRoom {
 
         if is_port_master {
             self.show_port_master_dialogue(player_id, &npc_id, &entity_type)
+                .await;
+            return;
+        }
+
+        if self
+            .resource_contract_kind_for_entity(&entity_type)
+            .is_some()
+            && self
+                .resource_contract_npc_unlocked(player_id, &entity_type)
+                .await
+        {
+            self.show_resource_contract_master_dialogue(player_id, &npc_id, &entity_type)
                 .await;
             return;
         }
@@ -5353,26 +5484,125 @@ impl GameRoom {
             return;
         }
 
+        if let Some(npc_id) = quest_id.strip_prefix("adventure_board:") {
+            if let Some(rest) = choice_id.strip_prefix("board_accept:") {
+                if let Some((kind_str, diff_str)) = rest.split_once(':') {
+                    self.handle_accept_adventure_board_contract(player_id, npc_id, kind_str, diff_str)
+                        .await;
+                    self.show_adventure_board_dialogue(player_id, npc_id).await;
+                }
+            } else if choice_id == "board_claim" {
+                self.handle_claim_resource_contract(player_id).await;
+                self.show_adventure_board_dialogue(player_id, npc_id).await;
+            } else if choice_id == "board_abandon" {
+                self.handle_abandon_resource_contract(player_id).await;
+                self.show_adventure_board_dialogue(player_id, npc_id).await;
+            } else {
+                match choice_id {
+                    "board_farming" => {
+                        self.show_adventure_board_contract_dialogue(
+                            player_id,
+                            npc_id,
+                            crate::resource_contracts::ResourceContractKind::Farming,
+                        )
+                        .await;
+                    }
+                    "board_mining" => {
+                        self.show_adventure_board_contract_dialogue(
+                            player_id,
+                            npc_id,
+                            crate::resource_contracts::ResourceContractKind::Mining,
+                        )
+                        .await;
+                    }
+                    "board_woodcutting" => {
+                        self.show_adventure_board_contract_dialogue(
+                            player_id,
+                            npc_id,
+                            crate::resource_contracts::ResourceContractKind::Woodcutting,
+                        )
+                        .await;
+                    }
+                    "board_fishing" => {
+                        self.show_adventure_board_contract_dialogue(
+                            player_id,
+                            npc_id,
+                            crate::resource_contracts::ResourceContractKind::Fishing,
+                        )
+                        .await;
+                    }
+                    "board_smithing" => {
+                        self.show_adventure_board_contract_dialogue(
+                            player_id,
+                            npc_id,
+                            crate::resource_contracts::ResourceContractKind::Smithing,
+                        )
+                        .await;
+                    }
+                    _ => {
+                        self.show_adventure_board_dialogue(player_id, npc_id).await;
+                    }
+                }
+            }
+            return;
+        }
+
+        if let Some(rest) = quest_id.strip_prefix("adventure_board_contract:") {
+            if let Some((npc_id, kind_str)) = rest.split_once(':') {
+                if crate::resource_contracts::ResourceContractKind::from_str(kind_str).is_some() {
+                    if let Some(diff_str) = choice_id.strip_prefix("accept_") {
+                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                            .await;
+                        self.handle_accept_adventure_board_contract(
+                            player_id,
+                            npc_id,
+                            kind_str,
+                            diff_str,
+                        )
+                        .await;
+                    } else if choice_id == "claim_contract" {
+                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                            .await;
+                        self.handle_claim_resource_contract(player_id).await;
+                    } else if choice_id == "abandon_contract" {
+                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                            .await;
+                        self.handle_abandon_resource_contract(player_id).await;
+                    } else if choice_id == "nevermind" {
+                        self.show_adventure_board_dialogue(player_id, npc_id).await;
+                    } else {
+                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                            .await;
+                    }
+                } else {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                }
+                return;
+            }
+        }
+
         // Handle plot seller dialogue choices (format: "plot_seller:{npc_id}")
         if let Some(npc_id) = quest_id.strip_prefix("plot_seller:") {
             if choice_id == "buy_plots" {
                 // Show the plot purchase screen
                 self.show_plot_purchase_dialogue(player_id, npc_id).await;
             } else if choice_id == "contracts" {
-                // Show the farming contracts screen
-                self.show_contract_dialogue(player_id, npc_id).await;
+                self.show_resource_contract_dialogue(player_id, npc_id, "master_farmer")
+                    .await;
             } else if let Some(diff_str) = choice_id.strip_prefix("accept_") {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
-                self.handle_accept_contract(player_id, diff_str).await;
+                self.handle_accept_resource_contract(player_id, npc_id, "master_farmer", diff_str)
+                    .await;
             } else if choice_id == "claim_contract" {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
-                self.handle_claim_contract(player_id).await;
+                self.handle_claim_resource_contract(player_id).await;
             } else if choice_id == "abandon_contract" {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
-                self.handle_abandon_contract(player_id).await;
+                self.handle_abandon_resource_contract(player_id).await;
             } else if let Some(plot_str) = choice_id.strip_prefix("unlock_") {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
@@ -5388,6 +5618,41 @@ impl GameRoom {
                     .await;
             }
             return;
+        }
+
+        if let Some(rest) = quest_id.strip_prefix("resource_contract_master:") {
+            if let Some((npc_id, entity_type)) = rest.split_once(':') {
+                if choice_id == "contracts" {
+                    self.show_resource_contract_dialogue(player_id, npc_id, entity_type)
+                        .await;
+                } else if choice_id == "open_shop" {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                    let _ = self
+                        .try_open_merchant_shop(player_id, npc_id, entity_type)
+                        .await;
+                } else if let Some(diff_str) = choice_id.strip_prefix("accept_") {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                    self.handle_accept_resource_contract(player_id, npc_id, entity_type, diff_str)
+                        .await;
+                } else if choice_id == "claim_contract" {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                    self.handle_claim_resource_contract(player_id).await;
+                } else if choice_id == "abandon_contract" {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                    self.handle_abandon_resource_contract(player_id).await;
+                } else if choice_id == "nevermind" {
+                    self.show_resource_contract_master_dialogue(player_id, npc_id, entity_type)
+                        .await;
+                } else {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                }
+                return;
+            }
         }
 
         // Handle banker dialogue choices (format: "banker:{npc_id}")

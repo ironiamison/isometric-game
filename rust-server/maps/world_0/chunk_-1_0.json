@@ -3148,6 +3148,12 @@
       "level": 1
     },
     {
+      "entityId": "adventure_board",
+      "x": 5,
+      "y": 15,
+      "level": 1
+    },
+    {
       "entityId": "old_thomas",
       "x": 2,
       "y": 14,

@@ -1,0 +1,48 @@
+# Campfire Supper - repeatable cooking loop
+
+[quest]
+id = "campfire_supper"
+name = "Campfire Supper"
+description = "The Camp Cook needs another round of fresh food for the camp. Catch shrimp, cook them, and bring the finished meal back."
+giver_npc = "camp_cook"
+level_required = 1
+repeatable = true
+lua_script = "repeatables/campfire_supper.lua"
+
+[quest.chain]
+previous = "survivalist_leather_craft"
+
+[[quest.objectives]]
+id = "catch_shrimp"
+type = "collect_item"
+target = "raw_shrimp"
+count = 6
+description = "Catch 6 raw shrimp"
+consume = false
+
+[[quest.objectives]]
+id = "cook_shrimp"
+type = "collect_item"
+target = "cooked_shrimp"
+count = 6
+description = "Cook 6 shrimp"
+
+[[quest.objectives]]
+id = "return_to_cook"
+type = "talk_to"
+target = "camp_cook"
+description = "Return to the Camp Cook"
+sequential = true
+
+[quest.rewards]
+exp = 275
+gold = 180
+items = [
+    { id = "baked_potato", count = 2 },
+]
+
+[quest.dialogue]
+offer = "You've got the basics down. Now prove you can keep a camp fed without me holding your hand. Catch a fresh batch of shrimp, cook them properly, and bring the meal back."
+accept = "I want 6 raw shrimp caught and 6 cooked shrimp delivered. Fish them yourself, cook them at the fire pit, then report back."
+progress = "A survivalist finishes the whole loop: catch it, cook it, deliver it."
+complete = "That's a proper field supper. Efficient, clean, and edible. Take your pay and keep those campfire habits sharp."

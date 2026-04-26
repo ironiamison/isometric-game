@@ -5,13 +5,15 @@ use super::protocol::{
 use crate::game::npc::{Npc, NpcState};
 use crate::render::animation::{NpcAnimationLayout, NpcAnimationState};
 use crate::game::{
-    ActiveDialogue, ActivePotionBuff, ActiveQuest, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
+    ActiveDialogue, ActivePotionBuff, ActiveQuest, AdventureBoardActiveContractInfo,
+    AdventureBoardDifficultyInfo, AdventureBoardOfferInfo, AdventureBoardPanelState,
+    AdventureBoardStatsInfo, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
     FriendInfo, GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot,
-    ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal,
-    QuestCatalogEntry, QuestCompletedEvent, QuestObjective, RecipeDefinition, RecipeIngredient,
-    RecipeResult, ShopData, ShopStockItem, SkillType, SkillXpEvent, SpellEffect, TransitionState,
-    Wall, WallEdge,
+    ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player,
+    Portal, QuestCatalogEntry, QuestCompletedEvent, QuestObjective, RecipeDefinition,
+    RecipeIngredient, RecipeResult, ShopData, ShopStockItem, SkillType, SkillXpEvent,
+    SpellEffect, TransitionState, Wall, WallEdge,
 };
 use crate::render::OVERWORLD_NAME;
 
@@ -73,6 +75,11 @@ fn reset_adventurer_guide_dialogue(state: &mut GameState) -> bool {
     state.ui_state.dialogue_touch_scroll_id = None;
     state.ui_state.dialogue_touch_dragged = false;
     true
+}
+
+fn clear_adventure_board_dialogue(state: &mut GameState) {
+    state.ui_state.adventure_board = None;
+    state.ui_state.adventure_board_selected_offer = 0;
 }
 
 /// Extract a nested map value from an rmpv map by key.
@@ -1776,6 +1783,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 state.ui_state.dialogue_touch_scroll_id = None;
                 state.ui_state.dialogue_touch_dragged = false;
                 state.ui_state.selected_inventory_slot = None;
+                if !quest_id.starts_with("adventure_board:") {
+                    clear_adventure_board_dialogue(state);
+                }
                 state.ui_state.active_dialogue = Some(ActiveDialogue {
                     quest_id,
                     npc_id,
@@ -1806,6 +1816,147 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         }
                     }
                 }
+
+                if !already_open {
+                    state.pending_sfx.push("ui_open".to_string());
+                }
+            }
+        }
+
+        "adventureBoardState" => {
+            if let Some(value) = data {
+                let npc_id = extract_string(value, "npc_id").unwrap_or_default();
+                let previous_kind = state
+                    .ui_state
+                    .adventure_board
+                    .as_ref()
+                    .and_then(|board| {
+                        board.offers
+                            .get(state.ui_state.adventure_board_selected_offer)
+                            .map(|offer| offer.kind_id.clone())
+                    });
+                let already_open = state
+                    .ui_state
+                    .active_dialogue
+                    .as_ref()
+                    .map(|d| d.quest_id == format!("adventure_board:{}", npc_id))
+                    .unwrap_or(false);
+
+                let mut offers = Vec::new();
+                if let Some(offers_arr) = extract_array(value, "offers") {
+                    for offer_value in offers_arr {
+                        let mut difficulties = Vec::new();
+                        if let Some(diff_arr) = extract_array(offer_value, "difficulties") {
+                            for diff_value in diff_arr {
+                                difficulties.push(AdventureBoardDifficultyInfo {
+                                    difficulty_id: extract_string(diff_value, "difficulty_id")
+                                        .unwrap_or_default(),
+                                    difficulty_name: extract_string(diff_value, "difficulty_name")
+                                        .unwrap_or_default(),
+                                    level_required: extract_i32(diff_value, "level_required")
+                                        .unwrap_or(0),
+                                    unlocked: extract_bool(diff_value, "unlocked").unwrap_or(false),
+                                    reward_xp: extract_i64(diff_value, "reward_xp").unwrap_or(0),
+                                    reward_gold: extract_i32(diff_value, "reward_gold")
+                                        .unwrap_or(0),
+                                });
+                            }
+                        }
+
+                        offers.push(AdventureBoardOfferInfo {
+                            kind_id: extract_string(offer_value, "kind_id").unwrap_or_default(),
+                            kind_name: extract_string(offer_value, "kind_name").unwrap_or_default(),
+                            description: extract_string(offer_value, "description")
+                                .unwrap_or_default(),
+                            skill_level: extract_i32(offer_value, "skill_level").unwrap_or(0),
+                            difficulties,
+                        });
+                    }
+                }
+
+                let active_contract = extract_map_field(value, "active_contract")
+                    .filter(|contract| !contract.is_nil())
+                    .map(|contract| AdventureBoardActiveContractInfo {
+                        kind_id: extract_string(contract, "kind_id").unwrap_or_default(),
+                        kind_name: extract_string(contract, "kind_name").unwrap_or_default(),
+                        difficulty_name: extract_string(contract, "difficulty_name")
+                            .unwrap_or_default(),
+                        task_text: extract_string(contract, "task_text").unwrap_or_default(),
+                        progress_label: extract_string(contract, "progress_label")
+                            .unwrap_or_default(),
+                        amount_required: extract_i32(contract, "amount_required").unwrap_or(0),
+                        amount_completed: extract_i32(contract, "amount_completed").unwrap_or(0),
+                        giver_name: extract_string(contract, "giver_name").unwrap_or_default(),
+                        reward_xp: extract_i64(contract, "reward_xp").unwrap_or(0),
+                        reward_gold: extract_i32(contract, "reward_gold").unwrap_or(0),
+                        bonus_item_text: extract_string(contract, "bonus_item_text")
+                            .unwrap_or_default(),
+                        can_claim: extract_bool(contract, "can_claim").unwrap_or(false),
+                    });
+
+                let stats = extract_map_field(value, "stats")
+                    .map(|stats| AdventureBoardStatsInfo {
+                        contracts_completed: extract_i32(stats, "contracts_completed")
+                            .unwrap_or(0),
+                        total_gold_earned: extract_i32(stats, "total_gold_earned").unwrap_or(0),
+                        total_xp_earned: extract_i64(stats, "total_xp_earned").unwrap_or(0),
+                    })
+                    .unwrap_or(AdventureBoardStatsInfo {
+                        contracts_completed: 0,
+                        total_gold_earned: 0,
+                        total_xp_earned: 0,
+                    });
+
+                state.ui_state.adventure_board = Some(AdventureBoardPanelState {
+                    npc_id: npc_id.clone(),
+                    offers,
+                    active_contract,
+                    stats,
+                });
+
+                if let Some(target_kind) = previous_kind {
+                    if let Some(board) = state.ui_state.adventure_board.as_ref() {
+                        if let Some(idx) =
+                            board.offers.iter().position(|offer| offer.kind_id == target_kind)
+                        {
+                            state.ui_state.adventure_board_selected_offer = idx;
+                        }
+                    }
+                } else if let Some(board) = state.ui_state.adventure_board.as_ref() {
+                    if let Some(active_kind) =
+                        board.active_contract.as_ref().map(|contract| contract.kind_id.as_str())
+                    {
+                        if let Some(idx) =
+                            board.offers.iter().position(|offer| offer.kind_id == active_kind)
+                        {
+                            state.ui_state.adventure_board_selected_offer = idx;
+                        }
+                    }
+                }
+
+                if let Some(board) = state.ui_state.adventure_board.as_ref() {
+                    if board.offers.is_empty() {
+                        state.ui_state.adventure_board_selected_offer = 0;
+                    } else {
+                        state.ui_state.adventure_board_selected_offer = state
+                            .ui_state
+                            .adventure_board_selected_offer
+                            .min(board.offers.len().saturating_sub(1));
+                    }
+                }
+
+                state.ui_state.active_dialogue = Some(ActiveDialogue {
+                    quest_id: format!("adventure_board:{}", npc_id),
+                    npc_id,
+                    speaker: "Adventure Board".to_string(),
+                    text: String::new(),
+                    choices: Vec::new(),
+                    show_time: macroquad::time::get_time(),
+                });
+                state.ui_state.dialogue_scroll_offset = 0.0;
+                state.ui_state.dialogue_touch_scroll_id = None;
+                state.ui_state.dialogue_touch_dragged = false;
+                state.ui_state.selected_inventory_slot = None;
 
                 if !already_open {
                     state.pending_sfx.push("ui_open".to_string());
@@ -1992,6 +2143,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 // Keep Adventurer Guide UI open and reset it after completion.
                 if !reset_adventurer_guide_dialogue(state) {
+                    clear_adventure_board_dialogue(state);
                     state.ui_state.active_dialogue = None;
                 }
             }
@@ -2008,6 +2160,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
             // Keep Adventurer Guide panel open and reset to its initial state.
             if !reset_adventurer_guide_dialogue(state) {
+                clear_adventure_board_dialogue(state);
                 state.ui_state.active_dialogue = None;
             }
         }
@@ -3657,18 +3810,21 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
-        "farmingContractUpdate" => {
+        "resourceContractUpdate" => {
             if let Some(value) = data {
                 let active = extract_bool(value, "active").unwrap_or(false);
                 if active {
-                    state.farming_contract = Some(crate::game::FarmingContractInfo {
+                    state.resource_contract = Some(crate::game::ResourceContractInfo {
+                        contract_kind: extract_string(value, "contract_kind").unwrap_or_default(),
                         difficulty: extract_string(value, "difficulty").unwrap_or_default(),
-                        crop_name: extract_string(value, "crop_name").unwrap_or_default(),
+                        task_text: extract_string(value, "task_text").unwrap_or_default(),
+                        progress_label: extract_string(value, "progress_label").unwrap_or_default(),
                         amount_required: extract_i32(value, "amount_required").unwrap_or(0),
-                        amount_harvested: extract_i32(value, "amount_harvested").unwrap_or(0),
+                        amount_completed: extract_i32(value, "amount_completed").unwrap_or(0),
+                        giver_name: extract_string(value, "giver_name").unwrap_or_default(),
                     });
                 } else {
-                    state.farming_contract = None;
+                    state.resource_contract = None;
                 }
             }
         }

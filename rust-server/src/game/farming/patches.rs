@@ -199,48 +199,12 @@ impl GameRoom {
                 self.process_quest_item_collect(player_id, &harvest.produce_item, harvest.amount)
                     .await;
 
-                let contract_progress = {
-                    let mut farming = self.farming.write().await;
-                    let crop_id = farming
-                        .crops
-                        .iter()
-                        .find(|(_, crop)| crop.produce_item == harvest.produce_item)
-                        .map(|(crop_id, _)| crop_id.clone());
-
-                    crop_id.and_then(|crop_id| {
-                        farming.record_contract_harvest(player_id, &crop_id, harvest.amount)
-                    })
-                };
-
-                if let Some((harvested, required, complete)) = contract_progress {
-                    if complete {
-                        self.send_system_message(
-                            player_id,
-                            &format!(
-                                "Contract complete! ({}/{}) Return to the Master Farmer to claim your rewards.",
-                                harvested, required
-                            ),
-                        )
-                        .await;
-                    } else {
-                        self.send_system_message(
-                            player_id,
-                            &format!("Contract progress: {}/{} harvested.", harvested, required),
-                        )
-                        .await;
-                    }
-
-                    if let Some(ref db) = self.db {
-                        if let Err(e) = db
-                            .update_farming_contract_progress(player_id, harvested)
-                            .await
-                        {
-                            tracing::warn!("Failed to update contract progress: {}", e);
-                        }
-                    }
-
-                    self.send_farming_contract_update(player_id).await;
-                }
+                self.record_resource_contract_progress(
+                    player_id,
+                    &harvest.produce_item,
+                    harvest.amount,
+                )
+                .await;
             }
             Err(message) => {
                 self.send_to_player(player_id, ServerMessage::Error { code: 400, message })
