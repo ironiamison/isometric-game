@@ -330,6 +330,17 @@ impl GameRoom {
                     },
                 )
                 .await;
+
+                // Record collection log entries for quest reward items
+                for item_reward in &quest.rewards.items {
+                    self.record_collection_entry(
+                        player_id,
+                        &item_reward.item_id,
+                        "quest_rewards",
+                        quest_id,
+                    )
+                    .await;
+                }
             }
         }
         tracing::info!("Player {} completed quest {}", player_id, quest_id);
