@@ -1484,6 +1484,31 @@ async fn matchmake_join_or_create(
         }
     }
 
+    // Load collection log from database
+    match state.db.load_collection_log(character_id).await {
+        Ok(entries) => {
+            let count = entries.len();
+            let log_set: std::collections::HashSet<(String, String)> = entries
+                .iter()
+                .map(|(item_id, source, _, _)| (item_id.clone(), source.clone()))
+                .collect();
+            room.set_player_collection_log(&player_id, log_set).await;
+            if count > 0 {
+                info!(
+                    "Loaded {} collection log entries for {}",
+                    count, character_data.name
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load collection log for character {}: {}",
+                character_id,
+                e
+            );
+        }
+    }
+
     // Load slayer state from database
     let slayer_state = state
         .db
@@ -2335,6 +2360,29 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             {
                                 if let Ok(bytes) = protocol::encode_server_message(&prayer_state) {
                                     let _ = recv_tx.send(bytes).await;
+                                }
+                            }
+
+                            // Collection log definitions
+                            let clog_defs_msg = crate::protocol::ServerMessage::CollectionLogDefinitions {
+                                entries: recv_state.collection_log_defs.all_entries(),
+                            };
+                            if let Ok(bytes) = protocol::encode_server_message(&clog_defs_msg) {
+                                let _ = recv_tx.send(bytes).await;
+                            }
+
+                            // Collection log sync (player's obtained entries)
+                            match recv_state.db.load_collection_log(character_id).await {
+                                Ok(entries) => {
+                                    let clog_sync = crate::protocol::ServerMessage::CollectionLogSync {
+                                        entries,
+                                    };
+                                    if let Ok(bytes) = protocol::encode_server_message(&clog_sync) {
+                                        let _ = recv_tx.send(bytes).await;
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to load collection log for sync: {}", e);
                                 }
                             }
 
