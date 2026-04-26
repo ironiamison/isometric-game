@@ -447,6 +447,8 @@ pub struct Player {
     pub last_activity_time: u64,
     /// Active player stall (None if no stall open)
     pub stall: Option<PlayerStall>,
+    /// Collection log: set of (item_id, source) pairs this player has obtained
+    pub collection_log: HashSet<(String, String)>,
 }
 
 // ============================================================================
@@ -624,6 +626,7 @@ impl Player {
             auto_retaliate: true,
             last_activity_time: 0,
             stall: None,
+            collection_log: HashSet::new(),
         }
     }
 
@@ -2880,6 +2883,81 @@ impl GameRoom {
             player.discovered_recipes.insert(recipe_id.to_string())
         } else {
             false
+        }
+    }
+
+    /// Record a collection log entry for a player. Returns true if this was a new entry.
+    pub async fn record_collection_entry(
+        &self,
+        player_id: &str,
+        item_id: &str,
+        source: &str,
+        source_detail: &str,
+    ) -> bool {
+        let key = (item_id.to_string(), source.to_string());
+
+        // Check + insert in-memory
+        let (is_new, account_id) = {
+            let mut players = self.players.write().await;
+            if let Some(player) = players.get_mut(player_id) {
+                let is_new = player.collection_log.insert(key);
+                (is_new, Some(player.account_id))
+            } else {
+                (false, None)
+            }
+        };
+
+        if !is_new {
+            return false;
+        }
+
+        // Persist to DB
+        let obtained_at = chrono::Utc::now().to_rfc3339();
+        if let Some(ref db) = self.db {
+            if let Some(account_id) = account_id {
+                if let Err(e) = db
+                    .save_collection_entry(account_id, item_id, source, source_detail, &obtained_at)
+                    .await
+                {
+                    tracing::warn!("Failed to save collection entry for {}: {}", player_id, e);
+                }
+            }
+        }
+
+        // Send real-time notification to client
+        self.send_to_player(
+            player_id,
+            crate::protocol::ServerMessage::CollectionLogEntry {
+                item_id: item_id.to_string(),
+                source: source.to_string(),
+                source_detail: source_detail.to_string(),
+                obtained_at,
+            },
+        )
+        .await;
+
+        true
+    }
+
+    pub async fn get_player_collection_log(
+        &self,
+        player_id: &str,
+    ) -> HashSet<(String, String)> {
+        let players = self.players.read().await;
+        players
+            .get(player_id)
+            .map(|p| p.collection_log.clone())
+            .unwrap_or_default()
+    }
+
+    pub async fn set_player_collection_log(
+        &self,
+        player_id: &str,
+        log: HashSet<(String, String)>,
+    ) {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.collection_log = log;
         }
     }
 
