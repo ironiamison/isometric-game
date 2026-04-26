@@ -8400,6 +8400,17 @@ impl GameRoom {
                     vec![]
                 };
 
+                // Record collection log entries for monster drops
+                for item in &drops {
+                    self.record_collection_entry(
+                        player_id,
+                        &item.item_id,
+                        "monster_drops",
+                        &prototype_id,
+                    )
+                    .await;
+                }
+
                 for item in drops {
                     let mut items = self.ground_items.write().await;
 
