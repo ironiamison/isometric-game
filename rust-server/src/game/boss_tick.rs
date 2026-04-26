@@ -694,6 +694,17 @@ impl GameRoom {
                             }
                         }
 
+                        // Record collection log entries for boss rewards
+                        for (item_id, _, _) in items {
+                            self.record_collection_entry(
+                                pid,
+                                item_id,
+                                "boss_rewards",
+                                boss_prototype_id,
+                            )
+                            .await;
+                        }
+
                         let mut display_parts: Vec<String> = items
                             .iter()
                             .map(|(_, qty, name)| format!("{}x {}", qty, name))
