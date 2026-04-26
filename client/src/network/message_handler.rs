@@ -2149,6 +2149,65 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
+        "collectionLogDefinitions" => {
+            if let Some(value) = data {
+                if let Some(entries_val) = extract_map_field(value, "entries") {
+                    if let rmpv::Value::Array(arr) = entries_val {
+                        let mut defs = Vec::new();
+                        for entry in arr {
+                            if let rmpv::Value::Array(fields) = entry {
+                                if fields.len() >= 3 {
+                                    let item_id = fields[0].as_str().unwrap_or("").to_string();
+                                    let source = fields[1].as_str().unwrap_or("").to_string();
+                                    let source_detail = fields[2].as_str().unwrap_or("").to_string();
+                                    defs.push((item_id, source, source_detail));
+                                }
+                            }
+                        }
+                        log::info!("Received {} collection log definitions", defs.len());
+                        state.ui_state.collection_log_definitions = defs;
+                    }
+                }
+            }
+        }
+        "collectionLogSync" => {
+            if let Some(value) = data {
+                if let Some(entries_val) = extract_map_field(value, "entries") {
+                    if let rmpv::Value::Array(arr) = entries_val {
+                        let mut log = std::collections::HashMap::new();
+                        for entry in arr {
+                            if let rmpv::Value::Array(fields) = entry {
+                                if fields.len() >= 4 {
+                                    let item_id = fields[0].as_str().unwrap_or("").to_string();
+                                    let source = fields[1].as_str().unwrap_or("").to_string();
+                                    let obtained_at = fields[3].as_str().unwrap_or("").to_string();
+                                    log.insert((item_id, source), obtained_at);
+                                }
+                            }
+                        }
+                        log::info!("Synced {} collection log entries", log.len());
+                        state.ui_state.collection_log = log;
+                    }
+                }
+            }
+        }
+        "collectionLogEntry" => {
+            if let Some(value) = data {
+                let item_id = extract_string(value, "item_id").unwrap_or_default();
+                let source = extract_string(value, "source").unwrap_or_default();
+                let obtained_at = extract_string(value, "obtained_at").unwrap_or_default();
+
+                log::info!("New collection log entry: {} from {}", item_id, source);
+                state.ui_state.collection_log.insert(
+                    (item_id.clone(), source),
+                    obtained_at,
+                );
+
+                state.push_system_chat(format!("New collection log entry: {}!", item_id));
+                state.pending_sfx.push("enter".to_string());
+            }
+        }
+
         "dialogueClosed" => {
             // If we're in a port travel fade, transition to fade-in
             if matches!(

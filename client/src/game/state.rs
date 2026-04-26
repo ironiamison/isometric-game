@@ -1474,6 +1474,16 @@ pub struct UiState {
     pub quest_log_scroll: f32,
     pub quest_catalog: Vec<QuestCatalogEntry>,
     pub selected_quest_id: Option<String>,
+    // Collection log UI state
+    pub collection_tab_active: bool,
+    /// Static definitions: Vec of (item_id, source, source_detail)
+    pub collection_log_definitions: Vec<(String, String, String)>,
+    /// Player's obtained items: HashMap of (item_id, source) -> obtained_at
+    pub collection_log: std::collections::HashMap<(String, String), String>,
+    pub collection_category: Option<String>,
+    pub collection_subcategory: Option<String>,
+    pub collection_scroll: f32,
+    pub collection_scroll_drag: crate::ui::scroll::ScrollDragState,
     // Crafting UI state
     pub crafting_open: bool,
     pub crafting_selected_category: usize,
@@ -1758,6 +1768,13 @@ impl Default for UiState {
             quest_log_scroll: 0.0,
             quest_catalog: Vec::new(),
             selected_quest_id: None,
+            collection_tab_active: false,
+            collection_log_definitions: Vec::new(),
+            collection_log: std::collections::HashMap::new(),
+            collection_category: None,
+            collection_subcategory: None,
+            collection_scroll: 0.0,
+            collection_scroll_drag: Default::default(),
             crafting_open: false,
             crafting_selected_category: 0,
             crafting_selected_recipe: 0,
@@ -1959,6 +1976,10 @@ impl UiState {
         self.quest_log_open = false;
         self.quest_log_scroll = 0.0;
         self.selected_quest_id = None;
+        self.collection_tab_active = false;
+        self.collection_category = None;
+        self.collection_subcategory = None;
+        self.collection_scroll = 0.0;
     }
 }
 
