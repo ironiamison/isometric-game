@@ -15,6 +15,8 @@ struct TimedCraftCompletion {
     next_duration_ms: Option<u64>,
     batch_completed: u32,
     batch_total: u32,
+    burned: bool,
+    category: RecipeCategory,
 }
 
 fn recipe_level_check_passed(player: &Player, recipe: &RecipeDefinition) -> bool {
@@ -36,6 +38,17 @@ fn recipe_skill_name(category: RecipeCategory) -> &'static str {
             "Survivalist"
         }
         _ => "Combat",
+    }
+}
+
+fn collection_log_skill(category: RecipeCategory) -> &'static str {
+    match category {
+        RecipeCategory::Smithing => "smithing",
+        RecipeCategory::Alchemy => "alchemy",
+        RecipeCategory::Cooking => "cooking",
+        RecipeCategory::Fletching => "fletching",
+        RecipeCategory::Leatherworking => "leatherworking",
+        _ => "crafting",
     }
 }
 
@@ -257,7 +270,7 @@ impl GameRoom {
             }
         };
 
-        let (items_gained, inv_msg, xp_results) = {
+        let (items_gained, inv_msg, xp_results, burned) = {
             let mut players = self.players.write().await;
             let player = match players.get_mut(player_id) {
                 Some(player) if player.active && !player.is_dead => player,
@@ -391,6 +404,7 @@ impl GameRoom {
                 items_gained,
                 inventory_update_message(player_id, player),
                 xp_results,
+                burned,
             )
         };
 
@@ -404,6 +418,14 @@ impl GameRoom {
         for result in &items_gained {
             self.record_resource_contract_progress(player_id, &result.item_id, result.count)
                 .await;
+        }
+
+        if !burned {
+            let skill = collection_log_skill(recipe.category);
+            for result in &items_gained {
+                self.record_collection_entry(player_id, &result.item_id, "skilling", skill)
+                    .await;
+            }
         }
 
         self.send_to_player(
@@ -593,6 +615,14 @@ impl GameRoom {
                     .await;
             }
 
+            if !burned {
+                let skill = collection_log_skill(recipe.category);
+                for (item_id_gained, _count) in &items_gained {
+                    self.record_collection_entry(player_id, item_id_gained, "skilling", skill)
+                        .await;
+                }
+            }
+
             self.send_to_player(player_id, inv_msg).await;
             self.send_crafting_xp_updates(player_id, xp_results).await;
             return;
@@ -749,6 +779,8 @@ impl GameRoom {
                     next_duration_ms,
                     batch_completed: completed_count,
                     batch_total,
+                    burned,
+                    category: recipe.category,
                 });
             }
 
@@ -782,6 +814,14 @@ impl GameRoom {
                     *count as i32,
                 )
                 .await;
+            }
+
+            if !completion.burned {
+                let skill = collection_log_skill(completion.category);
+                for (item_id_gained, _count) in &completion.items_gained {
+                    self.record_collection_entry(&completion.pid, item_id_gained, "skilling", skill)
+                        .await;
+                }
             }
 
             self.send_to_player(&completion.pid, completion.inventory_update)
