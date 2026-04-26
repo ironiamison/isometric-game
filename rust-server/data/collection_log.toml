@@ -1,0 +1,13 @@
+# Collection Log Definitions
+# Defines all obtainable items per source for the collection log.
+# Will be fully populated in a later task.
+
+[monster_drops]
+pig = ["regular_bones"]
+
+[boss_rewards]
+
+[skilling]
+fishing = ["raw_shrimp"]
+
+[quest_rewards]
