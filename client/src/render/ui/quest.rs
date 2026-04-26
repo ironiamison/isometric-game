@@ -91,16 +91,49 @@ impl Renderer {
             HEADER_BORDER,
         );
 
-        // Title centered in header
-        let title = "Quests";
-        let title_width = self.measure_text_sharp(title, 16.0).width;
+        // Tab bar (two tabs)
+        let tab_w = header_w / 2.0;
+        let quests_active = !state.ui_state.collection_tab_active;
+        let clog_active = state.ui_state.collection_tab_active;
+
+        // Quests tab
+        let qt_hovered = matches!(hovered, Some(UiElementId::QuestsTab));
+        let qt_bg = if quests_active { HEADER_BG } else if qt_hovered { Color::new(0.17, 0.15, 0.19, 1.0) } else { Color::new(0.10, 0.09, 0.12, 1.0) };
+        draw_rectangle(header_x, header_y, tab_w, header_h, qt_bg);
+        let qt_text = "Quests";
+        let qt_w = self.measure_text_sharp(qt_text, 16.0).width;
         self.draw_text_sharp(
-            title,
-            (header_x + (header_w - title_width) / 2.0).floor(),
+            qt_text,
+            (header_x + (tab_w - qt_w) / 2.0).floor(),
             (header_y + 17.0 * s).floor(),
             16.0,
-            TEXT_TITLE,
+            if quests_active { TEXT_TITLE } else { TEXT_DIM },
         );
+        layout.add(UiElementId::QuestsTab, Rect::new(header_x, header_y, tab_w, header_h));
+
+        // Collection tab
+        let ct_hovered = matches!(hovered, Some(UiElementId::CollectionLogTab));
+        let ct_bg = if clog_active { HEADER_BG } else if ct_hovered { Color::new(0.17, 0.15, 0.19, 1.0) } else { Color::new(0.10, 0.09, 0.12, 1.0) };
+        draw_rectangle(header_x + tab_w, header_y, tab_w, header_h, ct_bg);
+        let ct_text = "Collection";
+        let ct_w = self.measure_text_sharp(ct_text, 16.0).width;
+        self.draw_text_sharp(
+            ct_text,
+            (header_x + tab_w + (tab_w - ct_w) / 2.0).floor(),
+            (header_y + 17.0 * s).floor(),
+            16.0,
+            if clog_active { TEXT_TITLE } else { TEXT_DIM },
+        );
+        layout.add(UiElementId::CollectionLogTab, Rect::new(header_x + tab_w, header_y, tab_w, header_h));
+
+        // Tab separator line
+        draw_line(header_x + tab_w, header_y + 4.0, header_x + tab_w, header_y + header_h - 4.0, 1.0, HEADER_BORDER);
+
+        // Branch on active tab
+        if state.ui_state.collection_tab_active {
+            self.render_collection_log_content(state, hovered, layout, panel_x, panel_y, panel_width, panel_height, header_h, footer_h, line_height, entry_padding);
+            return;
+        }
 
         // ===== DETAIL VIEW =====
         if state.ui_state.selected_quest_id.is_some() {
@@ -1090,6 +1123,214 @@ impl Renderer {
                 y += objective_line_height;
             }
         }
+    }
+
+    fn render_collection_log_content(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+        panel_x: f32,
+        panel_y: f32,
+        panel_width: f32,
+        panel_height: f32,
+        header_h: f32,
+        footer_h: f32,
+        line_height: f32,
+        entry_padding: f32,
+    ) {
+        let s = state.ui_state.ui_scale;
+        let frame_thickness = FRAME_THICKNESS * s;
+
+        // Content area (same as quest list)
+        let content_x = panel_x + frame_thickness + 8.0 * s;
+        let content_y = panel_y + frame_thickness + header_h + 8.0 * s;
+        let content_w = panel_width - frame_thickness * 2.0 - 16.0 * s;
+        let content_h = panel_height - frame_thickness * 2.0 - header_h - footer_h - 16.0 * s;
+
+        // Content background (inset effect - same as quest list)
+        draw_rectangle(content_x, content_y, content_w, content_h, SLOT_BORDER);
+        draw_rectangle(content_x + 1.0, content_y + 1.0, content_w - 2.0, content_h - 2.0, SLOT_BG_EMPTY);
+        draw_line(content_x + 2.0, content_y + 2.0, content_x + content_w - 2.0, content_y + 2.0, 2.0, SLOT_INNER_SHADOW);
+        draw_line(content_x + 2.0, content_y + 2.0, content_x + 2.0, content_y + content_h - 2.0, 2.0, SLOT_INNER_SHADOW);
+
+        // Register scroll area
+        layout.add(UiElementId::CollectionLogScrollArea, Rect::new(content_x, content_y, content_w, content_h));
+
+        let defs = &state.ui_state.collection_log_definitions;
+        let obtained = &state.ui_state.collection_log;
+        let text_x = content_x + 12.0 * s;
+        let _wrap_w = content_w - 20.0 * s;
+
+        // Build display data based on current drill-down level
+        if let Some(ref subcat) = state.ui_state.collection_subcategory {
+            // LEVEL 3: Item list within a subcategory
+            let category = state.ui_state.collection_category.as_deref().unwrap_or("");
+
+            // Draw back button
+            self.draw_collection_back_button(state, hovered, layout, content_x, content_y, s);
+            let items_y = content_y + line_height + 4.0 * s;
+            let _items_h = content_h - line_height - 4.0 * s;
+
+            // Get items for this subcategory
+            let mut items: Vec<&str> = defs.iter()
+                .filter(|(_, src, detail)| src == category && detail == subcat)
+                .map(|(item_id, _, _)| item_id.as_str())
+                .collect();
+            items.sort();
+
+            let total = items.len();
+            let got = items.iter().filter(|id| obtained.contains_key(&(id.to_string(), category.to_string()))).count();
+
+            // Subcategory title
+            let title = format!("{} ({}/{})", subcat.replace('_', " "), got, total);
+            self.draw_text_sharp(&title, text_x, items_y + 14.0 * s, 16.0, TEXT_TITLE);
+
+            let mut y = items_y + line_height + entry_padding + 4.0 * s;
+            for item_id in &items {
+                if y + line_height > content_y + content_h { break; }
+                let is_obtained = obtained.contains_key(&(item_id.to_string(), category.to_string()));
+                let display_name = if is_obtained {
+                    item_id.replace('_', " ")
+                } else {
+                    "???".to_string()
+                };
+                let color = if is_obtained { Color::new(0.0, 0.8, 0.0, 1.0) } else { TEXT_DIM };
+                self.draw_text_sharp(&display_name, text_x, y + 12.0 * s, 16.0, color);
+                y += line_height + 2.0 * s;
+            }
+        } else if let Some(ref category) = state.ui_state.collection_category {
+            // LEVEL 2: Subcategories within a category
+            self.draw_collection_back_button(state, hovered, layout, content_x, content_y, s);
+            let list_y = content_y + line_height + 4.0 * s;
+
+            // Group definitions by source_detail for this category
+            let mut subcats: std::collections::HashMap<&str, (usize, usize)> = std::collections::HashMap::new();
+            for (item_id, src, detail) in defs.iter() {
+                if src == category {
+                    let entry = subcats.entry(detail.as_str()).or_insert((0, 0));
+                    entry.0 += 1; // total
+                    if obtained.contains_key(&(item_id.clone(), src.clone())) {
+                        entry.1 += 1; // obtained
+                    }
+                }
+            }
+
+            let mut sorted_subcats: Vec<(&str, usize, usize)> = subcats.into_iter()
+                .map(|(name, (total, got))| (name, total, got))
+                .collect();
+            sorted_subcats.sort_by(|a, b| a.0.cmp(b.0));
+
+            let mut y = list_y;
+            for (display_idx, (name, total, got)) in sorted_subcats.iter().enumerate() {
+                let entry_h = entry_padding + line_height + entry_padding;
+                if y + entry_h > content_y + content_h { break; }
+
+                let bounds = Rect::new(content_x + 4.0 * s, y, content_w - 8.0 * s, entry_h);
+                layout.add(UiElementId::CollectionLogSubcategory(display_idx), bounds);
+
+                let is_hovered = matches!(hovered, Some(UiElementId::CollectionLogSubcategory(idx)) if *idx == display_idx);
+                if is_hovered {
+                    draw_rectangle(bounds.x, bounds.y, bounds.w, bounds.h, SLOT_HOVER_BORDER);
+                    draw_rectangle(bounds.x + 1.0, bounds.y + 1.0, bounds.w - 2.0, bounds.h - 2.0, SLOT_HOVER_BG);
+                }
+
+                let display_name = name.replace('_', " ");
+                let all_done = *got == *total && *total > 0;
+                let name_color = if all_done { Color::new(0.0, 0.8, 0.0, 1.0) } else { TEXT_NORMAL };
+                self.draw_text_sharp(&display_name, text_x, y + entry_padding + 12.0 * s, 16.0, name_color);
+
+                let count_text = format!("{}/{}", got, total);
+                let count_w = self.measure_text_sharp(&count_text, 16.0).width;
+                let count_color = if all_done { Color::new(0.0, 0.8, 0.0, 1.0) } else { TEXT_DIM };
+                self.draw_text_sharp(&count_text, content_x + content_w - count_w - 16.0 * s, y + entry_padding + 12.0 * s, 16.0, count_color);
+
+                y += entry_h;
+            }
+        } else {
+            // LEVEL 1: Top-level categories
+            let categories = [
+                ("monster_drops", "Monster Drops"),
+                ("boss_rewards", "Boss Rewards"),
+                ("skilling", "Skilling"),
+                ("quest_rewards", "Quest Rewards"),
+            ];
+
+            let mut y = content_y + 6.0 * s;
+            for (display_idx, (key, label)) in categories.iter().enumerate() {
+                let total: usize = defs.iter().filter(|(_, src, _)| src == key).count();
+                let got: usize = defs.iter()
+                    .filter(|(item_id, src, _)| src == key && obtained.contains_key(&(item_id.clone(), src.clone())))
+                    .count();
+
+                let entry_h = entry_padding + line_height + 4.0 * s + line_height + entry_padding;
+                let bounds = Rect::new(content_x + 4.0 * s, y, content_w - 8.0 * s, entry_h);
+                layout.add(UiElementId::CollectionLogCategory(display_idx), bounds);
+
+                let is_hovered = matches!(hovered, Some(UiElementId::CollectionLogCategory(idx)) if *idx == display_idx);
+                if is_hovered {
+                    draw_rectangle(bounds.x, bounds.y, bounds.w, bounds.h, SLOT_HOVER_BORDER);
+                    draw_rectangle(bounds.x + 1.0, bounds.y + 1.0, bounds.w - 2.0, bounds.h - 2.0, SLOT_HOVER_BG);
+                }
+
+                let all_done = got == total && total > 0;
+                let name_color = if all_done { Color::new(0.0, 0.8, 0.0, 1.0) } else { TEXT_TITLE };
+                self.draw_text_sharp(label, text_x, y + entry_padding + 12.0 * s, 16.0, name_color);
+
+                // Progress text
+                let progress = format!("{}/{}", got, total);
+                let progress_color = if all_done { Color::new(0.0, 0.8, 0.0, 1.0) } else { TEXT_DIM };
+                self.draw_text_sharp(&progress, text_x, y + entry_padding + 12.0 * s + line_height + 2.0 * s, 16.0, progress_color);
+
+                // Progress bar
+                let bar_x = text_x;
+                let bar_y = y + entry_padding + 12.0 * s + line_height + line_height;
+                let bar_w = content_w - 24.0 * s;
+                let bar_h = 3.0 * s;
+                let ratio = if total > 0 { got as f32 / total as f32 } else { 0.0 };
+                draw_rectangle(bar_x, bar_y, bar_w, bar_h, Color::new(0.15, 0.15, 0.2, 1.0));
+                if ratio > 0.0 {
+                    let fill_color = if all_done { Color::new(0.0, 0.8, 0.0, 1.0) } else { Color::new(0.855, 0.698, 0.424, 1.0) };
+                    draw_rectangle(bar_x, bar_y, bar_w * ratio, bar_h, fill_color);
+                }
+
+                y += entry_h + 4.0 * s;
+            }
+        }
+
+        // Footer
+        let footer_x = panel_x + frame_thickness;
+        let footer_y = panel_y + panel_height - frame_thickness - footer_h;
+        let footer_w = panel_width - frame_thickness * 2.0;
+        draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
+        draw_line(footer_x, footer_y, footer_x + footer_w, footer_y, 1.0, HEADER_BORDER);
+
+        let total = defs.len();
+        let got = obtained.len();
+        let footer_text = format!("{} / {} Collected", got, total);
+        let fw = self.measure_text_sharp(&footer_text, 16.0).width;
+        self.draw_text_sharp(&footer_text, footer_x + footer_w - fw - 10.0 * s, footer_y + footer_h * 0.67, 16.0, TEXT_DIM);
+    }
+
+    fn draw_collection_back_button(
+        &self,
+        _state: &GameState,
+        hovered: &Option<UiElementId>,
+        layout: &mut UiLayout,
+        content_x: f32,
+        content_y: f32,
+        s: f32,
+    ) {
+        let back_text = "< Back";
+        let back_h = 17.0 * s;
+        let back_w = self.measure_text_sharp(back_text, 16.0).width + 16.0 * s;
+        let back_rect = Rect::new(content_x + 4.0 * s, content_y + 2.0 * s, back_w, back_h);
+        let is_hovered = matches!(hovered, Some(UiElementId::CollectionLogBack));
+        if is_hovered {
+            draw_rectangle(back_rect.x, back_rect.y, back_rect.w, back_rect.h, Color::new(0.3, 0.25, 0.2, 0.5));
+        }
+        self.draw_text_sharp(back_text, content_x + 12.0 * s, content_y + 14.0 * s, 16.0, FRAME_ACCENT);
+        layout.add(UiElementId::CollectionLogBack, back_rect);
     }
 
     pub(crate) fn render_quest_completed(&self, state: &GameState) {

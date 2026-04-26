@@ -5276,6 +5276,53 @@ impl InputHandler {
                         state.ui_state.selected_quest_id = None;
                         state.ui_state.quest_log_scroll = 0.0;
                     }
+                    UiElementId::QuestsTab => {
+                        audio.play_sfx("enter");
+                        state.ui_state.collection_tab_active = false;
+                    }
+                    UiElementId::CollectionLogTab => {
+                        audio.play_sfx("enter");
+                        state.ui_state.collection_tab_active = true;
+                        state.ui_state.collection_category = None;
+                        state.ui_state.collection_subcategory = None;
+                        state.ui_state.collection_scroll = 0.0;
+                    }
+                    UiElementId::CollectionLogCategory(idx) => {
+                        audio.play_sfx("enter");
+                        let categories = ["monster_drops", "boss_rewards", "skilling", "quest_rewards"];
+                        if let Some(cat) = categories.get(*idx) {
+                            state.ui_state.collection_category = Some(cat.to_string());
+                            state.ui_state.collection_subcategory = None;
+                            state.ui_state.collection_scroll = 0.0;
+                        }
+                    }
+                    UiElementId::CollectionLogSubcategory(idx) => {
+                        audio.play_sfx("enter");
+                        // Rebuild sorted subcategory list matching render order
+                        if let Some(ref category) = state.ui_state.collection_category {
+                            let mut subcats: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+                            for (_, src, detail) in &state.ui_state.collection_log_definitions {
+                                if src == category {
+                                    *subcats.entry(detail.as_str()).or_insert(0) += 1;
+                                }
+                            }
+                            let mut sorted: Vec<&str> = subcats.keys().copied().collect();
+                            sorted.sort();
+                            if let Some(name) = sorted.get(*idx) {
+                                state.ui_state.collection_subcategory = Some(name.to_string());
+                                state.ui_state.collection_scroll = 0.0;
+                            }
+                        }
+                    }
+                    UiElementId::CollectionLogBack => {
+                        audio.play_sfx("enter");
+                        if state.ui_state.collection_subcategory.is_some() {
+                            state.ui_state.collection_subcategory = None;
+                        } else {
+                            state.ui_state.collection_category = None;
+                        }
+                        state.ui_state.collection_scroll = 0.0;
+                    }
                     _ => {
                         // Clicking elsewhere unfocuses the add friend input
                         if state.social_state.add_friend_focused {
