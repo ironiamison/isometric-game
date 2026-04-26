@@ -8400,15 +8400,17 @@ impl GameRoom {
                     vec![]
                 };
 
-                // Record collection log entries for monster drops
+                // Record collection log entries for monster drops (skip gold)
                 for item in &drops {
-                    self.record_collection_entry(
-                        player_id,
-                        &item.item_id,
-                        "monster_drops",
-                        &prototype_id,
-                    )
-                    .await;
+                    if item.item_id != "gold" {
+                        self.record_collection_entry(
+                            player_id,
+                            &item.item_id,
+                            "monster_drops",
+                            &prototype_id,
+                        )
+                        .await;
+                    }
                 }
 
                 for item in drops {

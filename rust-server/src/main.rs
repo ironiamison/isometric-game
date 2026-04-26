@@ -3229,6 +3229,27 @@ async fn handle_socket(
         }
     }
 
+    // Send collection log definitions
+    let clog_defs_msg = protocol::ServerMessage::CollectionLogDefinitions {
+        entries: state.collection_log_defs.all_entries(),
+    };
+    if let Ok(bytes) = protocol::encode_server_message(&clog_defs_msg) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
+    // Send collection log sync (player's obtained entries)
+    match state.db.load_collection_log(character_id).await {
+        Ok(entries) => {
+            let clog_sync = protocol::ServerMessage::CollectionLogSync { entries };
+            if let Ok(bytes) = protocol::encode_server_message(&clog_sync) {
+                let _ = sender.send(Message::Binary(bytes)).await;
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to load collection log for sync: {}", e);
+        }
+    }
+
     // Only send overworld data if the player is NOT reconnecting into an instance
     let reconnecting_to_instance = current_map.is_some();
 
