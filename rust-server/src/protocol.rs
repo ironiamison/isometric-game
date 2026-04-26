@@ -1423,6 +1423,19 @@ pub enum ServerMessage {
         player_name: Option<String>,
         second_player_name: Option<String>,
     },
+    // Collection log messages
+    CollectionLogDefinitions {
+        entries: Vec<(String, String, String)>,
+    },
+    CollectionLogSync {
+        entries: Vec<(String, String, String, String)>,
+    },
+    CollectionLogEntry {
+        item_id: String,
+        source: String,
+        source_detail: String,
+        obtained_at: String,
+    },
 }
 
 /// Scroll spell definition sent to clients
@@ -1892,6 +1905,10 @@ impl ServerMessage {
             ServerMessage::StallSaleNotification { .. } => "stallSaleNotification",
             ServerMessage::StallItemUpdate { .. } => "stallItemUpdate",
             ServerMessage::TopPlayerChanged { .. } => "topPlayerChanged",
+            // Collection log
+            ServerMessage::CollectionLogDefinitions { .. } => "collectionLogDefinitions",
+            ServerMessage::CollectionLogSync { .. } => "collectionLogSync",
+            ServerMessage::CollectionLogEntry { .. } => "collectionLogEntry",
         }
     }
 }
@@ -6740,6 +6757,68 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     Some(name) => Value::String(name.clone().into()),
                     None => Value::Nil,
                 },
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::CollectionLogDefinitions { entries } => {
+            let items: Vec<Value> = entries
+                .iter()
+                .map(|(item_id, source, source_detail)| {
+                    Value::Array(vec![
+                        Value::String(item_id.clone().into()),
+                        Value::String(source.clone().into()),
+                        Value::String(source_detail.clone().into()),
+                    ])
+                })
+                .collect();
+            let mut map = Vec::new();
+            map.push((
+                Value::String("entries".into()),
+                Value::Array(items),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::CollectionLogSync { entries } => {
+            let items: Vec<Value> = entries
+                .iter()
+                .map(|(item_id, source, source_detail, obtained_at)| {
+                    Value::Array(vec![
+                        Value::String(item_id.clone().into()),
+                        Value::String(source.clone().into()),
+                        Value::String(source_detail.clone().into()),
+                        Value::String(obtained_at.clone().into()),
+                    ])
+                })
+                .collect();
+            let mut map = Vec::new();
+            map.push((
+                Value::String("entries".into()),
+                Value::Array(items),
+            ));
+            Value::Map(map)
+        }
+        ServerMessage::CollectionLogEntry {
+            item_id,
+            source,
+            source_detail,
+            obtained_at,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("item_id".into()),
+                Value::String(item_id.clone().into()),
+            ));
+            map.push((
+                Value::String("source".into()),
+                Value::String(source.clone().into()),
+            ));
+            map.push((
+                Value::String("source_detail".into()),
+                Value::String(source_detail.clone().into()),
+            ));
+            map.push((
+                Value::String("obtained_at".into()),
+                Value::String(obtained_at.clone().into()),
             ));
             Value::Map(map)
         }
