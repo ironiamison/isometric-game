@@ -727,6 +727,22 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Collection log table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS collection_log (
+                character_id INTEGER NOT NULL,
+                item_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                source_detail TEXT,
+                obtained_at TEXT NOT NULL,
+                PRIMARY KEY (character_id, item_id, source)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -2516,5 +2532,57 @@ impl Database {
         .await
         .ok()
         .flatten()
+    }
+
+    // =========================================================================
+    // Collection Log
+    // =========================================================================
+
+    pub async fn save_collection_entry(
+        &self,
+        character_id: i64,
+        item_id: &str,
+        source: &str,
+        source_detail: &str,
+        obtained_at: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO collection_log (character_id, item_id, source, source_detail, obtained_at)
+            VALUES (?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(character_id)
+        .bind(item_id)
+        .bind(source)
+        .bind(source_detail)
+        .bind(obtained_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn load_collection_log(
+        &self,
+        character_id: i64,
+    ) -> Result<Vec<(String, String, String, String)>, sqlx::Error> {
+        let rows = sqlx::query(
+            "SELECT item_id, source, source_detail, obtained_at FROM collection_log WHERE character_id = ?",
+        )
+        .bind(character_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .iter()
+            .map(|row| {
+                (
+                    row.get("item_id"),
+                    row.get("source"),
+                    row.get::<String, _>("source_detail"),
+                    row.get("obtained_at"),
+                )
+            })
+            .collect())
     }
 }
