@@ -38,13 +38,15 @@ pub enum UiElementId {
     QuestDetailBack,
 
     // Collection Log
-    QuestsTab,
-    CollectionLogTab,
-    CollectionLogCategory(usize),
-    CollectionLogSubcategory(usize),
-    CollectionLogBack,
-    CollectionLogScrollArea,
-    CollectionLogScrollbar,
+    CollectionLogLink,
+    CollectionLogClose,
+    CollectionLogCategoryHeader(usize),
+    CollectionLogSubcategoryEntry(usize),
+    CollectionLogSidebarScrollArea,
+    CollectionLogSidebarScrollbar,
+    CollectionLogGridScrollArea,
+    CollectionLogGridScrollbar,
+    CollectionLogGridItem(usize),
 
     // Context Menu
     ContextMenuOption(usize),
