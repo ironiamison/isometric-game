@@ -14,6 +14,12 @@ pub enum UiElementId {
     AdventureBoardDifficulty(usize),
     AdventureBoardClaim,
     AdventureBoardAbandon,
+    AdventureBoardTabContracts,
+    AdventureBoardTabOrders,
+    CraftingOrder(usize),
+    CraftingOrderAccept,
+    CraftingOrderClaim,
+    CraftingOrderAbandon,
 
     // Crafting
     CraftingCategoryTab(usize),

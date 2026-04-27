@@ -1140,6 +1140,46 @@ pub struct AdventureBoardPanelState {
     pub offers: Vec<AdventureBoardOfferInfo>,
     pub active_contract: Option<AdventureBoardActiveContractInfo>,
     pub stats: AdventureBoardStatsInfo,
+    pub crafting_orders: Vec<CraftingOrderOfferInfo>,
+    pub crafting_order_active: Option<CraftingOrderActiveInfo>,
+    pub crafting_order_stats: CraftingOrderStatsInfo,
+}
+
+#[derive(Debug, Clone)]
+pub struct CraftingOrderOfferInfo {
+    pub order_id: String,
+    pub tier: String,
+    pub skill: String,
+    pub min_level: i32,
+    pub items: Vec<CraftingOrderItemInfo>,
+    pub reward_gold: i32,
+    pub reward_xp: Vec<(String, i64)>,
+    pub reward_marks: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct CraftingOrderItemInfo {
+    pub item_id: String,
+    pub item_name: String,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct CraftingOrderActiveInfo {
+    pub order_id: String,
+    pub tier: String,
+    pub skill: String,
+    pub items: Vec<CraftingOrderItemInfo>,
+    pub reward_gold: i32,
+    pub reward_marks: i32,
+    pub can_claim: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct CraftingOrderStatsInfo {
+    pub orders_completed: i32,
+    pub masterwork_completed: i32,
+    pub commission_marks: i32,
 }
 
 /// A gathering marker tile in the world (fishing spot, mining node, etc.)
@@ -1454,6 +1494,8 @@ pub struct UiState {
     pub active_dialogue: Option<ActiveDialogue>,
     pub adventure_board: Option<AdventureBoardPanelState>,
     pub adventure_board_selected_offer: usize,
+    pub adventure_board_tab: u8, // 0 = Contracts, 1 = Orders
+    pub adventure_board_selected_order: usize,
     pub active_quests: Vec<ActiveQuest>,
     pub completed_quest_ids: HashSet<String>,
     pub adventurer_selected_tab: usize,
@@ -1751,6 +1793,8 @@ impl Default for UiState {
             active_dialogue: None,
             adventure_board: None,
             adventure_board_selected_offer: 0,
+            adventure_board_tab: 0,
+            adventure_board_selected_order: 0,
             active_quests: Vec::new(),
             completed_quest_ids: HashSet::new(),
             adventurer_selected_tab: 0,

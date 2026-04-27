@@ -36,6 +36,7 @@ pub use state::{
     quest_status_order, ActiveDialogue, ActivePotionBuff, ActiveQuest,
     AdventureBoardActiveContractInfo, AdventureBoardDifficultyInfo, AdventureBoardOfferInfo,
     AdventureBoardPanelState, AdventureBoardStatsInfo, AltarPanelState, Announcement,
+    CraftingOrderActiveInfo, CraftingOrderItemInfo, CraftingOrderOfferInfo, CraftingOrderStatsInfo,
     AoeWarningZone, AutoActionState, BankDrag, BankQuantityAction, BankQuantityDialog,
     BossClientState, Camera, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice,

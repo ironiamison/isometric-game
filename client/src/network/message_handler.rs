@@ -11,6 +11,8 @@ use crate::game::{
     ActiveDialogue, ActivePotionBuff, ActiveQuest, AdventureBoardActiveContractInfo,
     AdventureBoardDifficultyInfo, AdventureBoardOfferInfo, AdventureBoardPanelState,
     AdventureBoardStatsInfo, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
+    CraftingOrderActiveInfo, CraftingOrderItemInfo, CraftingOrderOfferInfo,
+    CraftingOrderStatsInfo,
     ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
     FriendInfo, GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot,
     ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal,
@@ -1942,11 +1944,93 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         total_xp_earned: 0,
                     });
 
+                // Parse crafting orders
+                let mut crafting_orders = Vec::new();
+                if let Some(orders_arr) = extract_array(value, "crafting_orders") {
+                    for order_value in orders_arr {
+                        let mut items = Vec::new();
+                        if let Some(items_arr) = extract_array(order_value, "items") {
+                            for item_value in items_arr {
+                                items.push(CraftingOrderItemInfo {
+                                    item_id: extract_string(item_value, "item_id")
+                                        .unwrap_or_default(),
+                                    item_name: extract_string(item_value, "item_name")
+                                        .unwrap_or_default(),
+                                    quantity: extract_i32(item_value, "quantity").unwrap_or(0),
+                                });
+                            }
+                        }
+                        let mut reward_xp = Vec::new();
+                        if let Some(xp_arr) = extract_array(order_value, "reward_xp") {
+                            for xp_value in xp_arr {
+                                let skill =
+                                    extract_string(xp_value, "skill").unwrap_or_default();
+                                let amount = extract_i64(xp_value, "amount").unwrap_or(0);
+                                reward_xp.push((skill, amount));
+                            }
+                        }
+                        crafting_orders.push(CraftingOrderOfferInfo {
+                            order_id: extract_string(order_value, "order_id")
+                                .unwrap_or_default(),
+                            tier: extract_string(order_value, "tier").unwrap_or_default(),
+                            skill: extract_string(order_value, "skill").unwrap_or_default(),
+                            min_level: extract_i32(order_value, "min_level").unwrap_or(0),
+                            items,
+                            reward_gold: extract_i32(order_value, "reward_gold").unwrap_or(0),
+                            reward_xp,
+                            reward_marks: extract_i32(order_value, "reward_marks").unwrap_or(0),
+                        });
+                    }
+                }
+
+                // Parse active crafting order
+                let crafting_order_active = extract_map_field(value, "crafting_order_active")
+                    .filter(|v| !v.is_nil())
+                    .map(|order| {
+                        let mut items = Vec::new();
+                        if let Some(items_arr) = extract_array(order, "items") {
+                            for item_value in items_arr {
+                                items.push(CraftingOrderItemInfo {
+                                    item_id: extract_string(item_value, "item_id")
+                                        .unwrap_or_default(),
+                                    item_name: extract_string(item_value, "item_name")
+                                        .unwrap_or_default(),
+                                    quantity: extract_i32(item_value, "quantity").unwrap_or(0),
+                                });
+                            }
+                        }
+                        CraftingOrderActiveInfo {
+                            order_id: extract_string(order, "order_id").unwrap_or_default(),
+                            tier: extract_string(order, "tier").unwrap_or_default(),
+                            skill: extract_string(order, "skill").unwrap_or_default(),
+                            items,
+                            reward_gold: extract_i32(order, "reward_gold").unwrap_or(0),
+                            reward_marks: extract_i32(order, "reward_marks").unwrap_or(0),
+                            can_claim: extract_bool(order, "can_claim").unwrap_or(false),
+                        }
+                    });
+
+                // Parse crafting order stats
+                let crafting_order_stats = extract_map_field(value, "crafting_order_stats")
+                    .map(|s| CraftingOrderStatsInfo {
+                        orders_completed: extract_i32(s, "orders_completed").unwrap_or(0),
+                        masterwork_completed: extract_i32(s, "masterwork_completed").unwrap_or(0),
+                        commission_marks: extract_i32(s, "commission_marks").unwrap_or(0),
+                    })
+                    .unwrap_or(CraftingOrderStatsInfo {
+                        orders_completed: 0,
+                        masterwork_completed: 0,
+                        commission_marks: 0,
+                    });
+
                 state.ui_state.adventure_board = Some(AdventureBoardPanelState {
                     npc_id: npc_id.clone(),
                     offers,
                     active_contract,
                     stats,
+                    crafting_orders,
+                    crafting_order_active,
+                    crafting_order_stats,
                 });
 
                 if let Some(target_kind) = previous_kind {

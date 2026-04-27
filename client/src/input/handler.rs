@@ -5709,6 +5709,62 @@ impl InputHandler {
                 if mouse_clicked {
                     if let Some(ref element) = clicked_element {
                         match element {
+                            UiElementId::AdventureBoardTabContracts => {
+                                state.ui_state.adventure_board_tab = 0;
+                                return commands;
+                            }
+                            UiElementId::AdventureBoardTabOrders => {
+                                state.ui_state.adventure_board_tab = 1;
+                                return commands;
+                            }
+                            UiElementId::CraftingOrder(idx) => {
+                                state.ui_state.adventure_board_selected_order = *idx;
+                                return commands;
+                            }
+                            UiElementId::CraftingOrderAccept => {
+                                if let Some(board) = state.ui_state.adventure_board.as_ref() {
+                                    let selected = state.ui_state.adventure_board_selected_order;
+                                    if let Some(order) = board.crafting_orders.get(selected) {
+                                        if board.crafting_order_active.is_none() {
+                                            commands.push(InputCommand::DialogueChoice {
+                                                quest_id: dialogue.quest_id.clone(),
+                                                choice_id: format!("order_accept:{}", order.order_id),
+                                            });
+                                            return commands;
+                                        }
+                                    }
+                                }
+                            }
+                            UiElementId::CraftingOrderClaim => {
+                                if state
+                                    .ui_state
+                                    .adventure_board
+                                    .as_ref()
+                                    .and_then(|b| b.crafting_order_active.as_ref())
+                                    .is_some_and(|o| o.can_claim)
+                                {
+                                    commands.push(InputCommand::DialogueChoice {
+                                        quest_id: dialogue.quest_id.clone(),
+                                        choice_id: "order_claim".to_string(),
+                                    });
+                                    return commands;
+                                }
+                            }
+                            UiElementId::CraftingOrderAbandon => {
+                                if state
+                                    .ui_state
+                                    .adventure_board
+                                    .as_ref()
+                                    .and_then(|b| b.crafting_order_active.as_ref())
+                                    .is_some()
+                                {
+                                    commands.push(InputCommand::DialogueChoice {
+                                        quest_id: dialogue.quest_id.clone(),
+                                        choice_id: "order_abandon".to_string(),
+                                    });
+                                    return commands;
+                                }
+                            }
                             UiElementId::AdventureBoardOffer(idx) => {
                                 if let Some(board) = state.ui_state.adventure_board.as_ref() {
                                     if *idx < board.offers.len() {
@@ -5776,6 +5832,8 @@ impl InputHandler {
                                 state.ui_state.active_dialogue = None;
                                 state.ui_state.adventure_board = None;
                                 state.ui_state.adventure_board_selected_offer = 0;
+                                state.ui_state.adventure_board_tab = 0;
+                                state.ui_state.adventure_board_selected_order = 0;
                                 state.pending_sfx.push("enter".to_string());
                                 return commands;
                             }
@@ -5789,6 +5847,8 @@ impl InputHandler {
                     state.ui_state.active_dialogue = None;
                     state.ui_state.adventure_board = None;
                     state.ui_state.adventure_board_selected_offer = 0;
+                    state.ui_state.adventure_board_tab = 0;
+                    state.ui_state.adventure_board_selected_order = 0;
                     return commands;
                 }
 
@@ -5946,6 +6006,8 @@ impl InputHandler {
                                 commands.push(InputCommand::CloseDialogue);
                                 state.ui_state.active_dialogue = None;
                                 state.ui_state.adventure_board = None;
+                                state.ui_state.adventure_board_tab = 0;
+                                state.ui_state.adventure_board_selected_order = 0;
                                 state.pending_sfx.push("enter".to_string());
                                 return commands;
                             }
@@ -5965,6 +6027,8 @@ impl InputHandler {
                     commands.push(InputCommand::CloseDialogue);
                     state.ui_state.active_dialogue = None;
                     state.ui_state.adventure_board = None;
+                    state.ui_state.adventure_board_tab = 0;
+                    state.ui_state.adventure_board_selected_order = 0;
                     return commands;
                 }
 
@@ -6002,6 +6066,8 @@ impl InputHandler {
                     commands.push(InputCommand::CloseDialogue);
                     state.ui_state.active_dialogue = None;
                     state.ui_state.adventure_board = None;
+                    state.ui_state.adventure_board_tab = 0;
+                    state.ui_state.adventure_board_selected_order = 0;
                     return commands;
                 }
 
