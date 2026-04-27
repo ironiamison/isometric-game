@@ -1265,7 +1265,143 @@ async fn matchmake_join_or_create(
 
                 let old_player_id = old_sess.player_id.clone();
 
-                // Clean up old session state (skip DB save — auto-save covers it)
+                // Save current in-memory state to DB before cleanup.
+                // The old handle_socket will skip its save (session already removed),
+                // so we must persist here to avoid rolling back to stale DB state.
+                if let Some(old_room) = state.rooms.get(&old_sess.room_id) {
+                    let old_room_ref = old_room.clone();
+                    let played_time_delta = state
+                        .play_time_anchors
+                        .remove(&character_id)
+                        .map(|(_, anchor)| anchor.elapsed().as_secs() as i64)
+                        .unwrap_or(0);
+                    if let Some(mut save_data) =
+                        old_room_ref.get_player_save_data(&old_player_id).await
+                    {
+                        if save_data.current_map.is_some() {
+                            let entrance_positions =
+                                state.player_entrance_positions.read().await;
+                            if let Some(&(ex, ey)) = entrance_positions.get(&old_player_id) {
+                                save_data.entrance_x = Some(ex as f32);
+                                save_data.entrance_y = Some(ey as f32);
+                            }
+                        }
+                        if let Err(e) = state
+                            .db
+                            .save_character(
+                                character_id,
+                                save_data.x,
+                                save_data.y,
+                                save_data.z,
+                                save_data.hp,
+                                save_data.prayer_points,
+                                save_data.mp,
+                                &save_data.skills,
+                                save_data.gold,
+                                &save_data.inventory_json,
+                                save_data.equipped_head.as_deref(),
+                                save_data.equipped_body.as_deref(),
+                                save_data.equipped_weapon.as_deref(),
+                                save_data.equipped_back.as_deref(),
+                                save_data.equipped_feet.as_deref(),
+                                save_data.equipped_ring.as_deref(),
+                                save_data.equipped_gloves.as_deref(),
+                                save_data.equipped_necklace.as_deref(),
+                                save_data.equipped_belt.as_deref(),
+                                played_time_delta,
+                                save_data.current_map.as_deref(),
+                                save_data.sitting_at_x,
+                                save_data.sitting_at_y,
+                                save_data.entrance_x,
+                                save_data.entrance_y,
+                                &save_data.bank_json,
+                                save_data.bank_gold,
+                                save_data.bank_max_slots,
+                                &save_data.combat_style_prefs,
+                            )
+                            .await
+                        {
+                            error!(
+                                "Session takeover: failed to save character {} before eviction: {}",
+                                old_sess.character_name, e
+                            );
+                        } else {
+                            info!(
+                                "Session takeover: saved character {} to DB before eviction (played_time +{}s)",
+                                old_sess.character_name, played_time_delta
+                            );
+                        }
+                    }
+
+                    // Save quest state, recipes, spells, and slayer
+                    if character_id > 0 {
+                        if let Some(quest_state) =
+                            old_room_ref.get_player_quest_state(&old_player_id).await
+                        {
+                            if let Err(e) = state
+                                .db
+                                .save_character_quest_state(character_id, &quest_state)
+                                .await
+                            {
+                                error!(
+                                    "Session takeover: failed to save quest state for {}: {}",
+                                    old_sess.character_name, e
+                                );
+                            }
+                        }
+
+                        let discovered = old_room_ref
+                            .get_player_discovered_recipes(&old_player_id)
+                            .await;
+                        for recipe_id in &discovered {
+                            if let Err(e) = state
+                                .db
+                                .save_discovered_recipe(character_id, recipe_id)
+                                .await
+                            {
+                                error!(
+                                    "Session takeover: failed to save recipe {} for {}: {}",
+                                    recipe_id, old_sess.character_name, e
+                                );
+                            }
+                        }
+
+                        let unlocked = old_room_ref
+                            .get_player_unlocked_spells(&old_player_id)
+                            .await;
+                        for spell_id in &unlocked {
+                            if let Err(e) =
+                                state.db.save_unlocked_spell(character_id, spell_id).await
+                            {
+                                error!(
+                                    "Session takeover: failed to save spell {} for {}: {}",
+                                    spell_id, old_sess.character_name, e
+                                );
+                            }
+                        }
+
+                        let slayer_state = old_room_ref
+                            .get_player_slayer_state(&old_player_id)
+                            .await;
+                        if slayer_state.current_task.is_some()
+                            || slayer_state.tasks_completed > 0
+                            || slayer_state.points > 0
+                        {
+                            if let Err(e) = state
+                                .db
+                                .save_character_slayer_state(character_id, &slayer_state)
+                                .await
+                            {
+                                error!(
+                                    "Session takeover: failed to save slayer state for {}: {}",
+                                    old_sess.character_name, e
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Clean up old session state from room
                 if let Some(old_room) = state.rooms.get(&old_sess.room_id) {
                     let old_room = old_room.clone();
 
@@ -1335,7 +1471,8 @@ async fn matchmake_join_or_create(
                         .await;
                 }
 
-                // Clean up play time anchor (skip saving — auto-save covers it)
+                // Clean up play time anchor (already consumed during save above, but
+                // remove defensively in case save was skipped)
                 state.play_time_anchors.remove(&character_id);
 
                 // Mark offline (will be re-marked online when new socket connects)
