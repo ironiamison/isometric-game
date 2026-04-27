@@ -2788,9 +2788,10 @@ impl Database {
         date: &str,
         order_ids: &[String],
     ) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
         sqlx::query("DELETE FROM crafting_orders_available WHERE character_id = ?")
             .bind(character_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         for order_id in order_ids {
             sqlx::query(
@@ -2799,9 +2800,10 @@ impl Database {
             .bind(character_id)
             .bind(order_id)
             .bind(date)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
+        tx.commit().await?;
         Ok(())
     }
 
