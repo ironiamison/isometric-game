@@ -4749,6 +4749,7 @@ impl InputHandler {
                             state.ui_state.minimap_panel_open = false;
                             state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
+                            state.ui_state.close_collection_log();
                         }
                         return commands;
                     }
@@ -4766,6 +4767,7 @@ impl InputHandler {
                             state.ui_state.minimap_panel_open = false;
                             state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
+                            state.ui_state.close_collection_log();
                         }
                         return commands;
                     }
@@ -4784,6 +4786,7 @@ impl InputHandler {
                             state.ui_state.minimap_panel_open = false;
                             state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
+                            state.ui_state.close_collection_log();
                             // Request online players list when opening panel
                             commands.push(InputCommand::GetOnlinePlayers);
                         }
@@ -4803,6 +4806,7 @@ impl InputHandler {
                             state.ui_state.minimap_panel_open = false;
                             state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
+                            state.ui_state.close_collection_log();
                         }
                         return commands;
                     }
@@ -4820,6 +4824,7 @@ impl InputHandler {
                             state.ui_state.minimap_panel_open = false;
                             state.ui_state.escape_menu_open = false;
                             state.ui_state.close_quest_log();
+                            state.ui_state.close_collection_log();
                         }
                         return commands;
                     }
@@ -4839,6 +4844,7 @@ impl InputHandler {
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
                             state.ui_state.escape_menu_open = false;
+                            state.ui_state.close_collection_log();
                         }
                         return commands;
                     }
@@ -4856,6 +4862,7 @@ impl InputHandler {
                             state.ui_state.prayer_book_open = false;
                             state.ui_state.minimap_panel_open = false;
                             state.ui_state.close_quest_log();
+                            state.ui_state.close_collection_log();
                         }
                         return commands;
                     }
@@ -5279,7 +5286,54 @@ impl InputHandler {
                     UiElementId::CollectionLogLink => {
                         audio.play_sfx("enter");
                         state.ui_state.close_quest_log();
+                        state.ui_state.inventory_open = false;
+                        state.ui_state.character_panel_open = false;
+                        state.ui_state.social_open = false;
+                        state.ui_state.skills_open = false;
+                        state.ui_state.prayer_book_open = false;
+                        state.ui_state.minimap_panel_open = false;
                         state.ui_state.collection_log_open = true;
+                    }
+                    UiElementId::CollectionLogClose => {
+                        audio.play_sfx("enter");
+                        state.ui_state.close_collection_log();
+                    }
+                    UiElementId::CollectionLogCategoryHeader(idx) => {
+                        audio.play_sfx("enter");
+                        let categories = ["monster_drops", "boss_rewards", "skilling", "quest_rewards"];
+                        if let Some(cat) = categories.get(*idx) {
+                            if state.ui_state.collection_log_selected_category.as_deref() == Some(*cat) {
+                                // Collapse - deselect
+                                state.ui_state.collection_log_selected_category = None;
+                                state.ui_state.collection_log_selected_subcategory = None;
+                            } else {
+                                // Expand
+                                state.ui_state.collection_log_selected_category = Some(cat.to_string());
+                                state.ui_state.collection_log_selected_subcategory = None;
+                            }
+                            state.ui_state.collection_log_grid_scroll = 0.0;
+                        }
+                    }
+                    UiElementId::CollectionLogSubcategoryEntry(idx) => {
+                        audio.play_sfx("enter");
+                        // Rebuild sorted subcategory list matching render order
+                        if let Some(ref category) = state.ui_state.collection_log_selected_category.clone() {
+                            let mut subcats_map: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+                            for (_, src, detail) in &state.ui_state.collection_log_definitions {
+                                if src == category {
+                                    *subcats_map.entry(detail.as_str()).or_insert(0) += 1;
+                                }
+                            }
+                            let mut sorted: Vec<&str> = subcats_map.keys().copied().collect();
+                            sorted.sort();
+                            if let Some(name) = sorted.get(*idx) {
+                                state.ui_state.collection_log_selected_subcategory = Some(name.to_string());
+                                state.ui_state.collection_log_grid_scroll = 0.0;
+                            }
+                        }
+                    }
+                    UiElementId::CollectionLogGridItem(_) => {
+                        // No action on click - hover tooltip only
                     }
                     _ => {
                         // Clicking elsewhere unfocuses the add friend input
@@ -11393,7 +11447,10 @@ impl InputHandler {
                 state.ui_state.hotkey_settings_open = false;
             } else
             // Check if any panel is open and close it
-            if state.ui_state.inventory_open
+            if state.ui_state.collection_log_open {
+                audio.play_sfx("enter");
+                state.ui_state.close_collection_log();
+            } else if state.ui_state.inventory_open
                 || state.ui_state.character_panel_open
                 || state.ui_state.social_open
                 || state.ui_state.skills_open
@@ -11433,6 +11490,7 @@ impl InputHandler {
                 state.ui_state.prayer_book_open = false;
                 state.ui_state.minimap_panel_open = false;
                 state.ui_state.close_quest_log();
+                state.ui_state.close_collection_log();
             }
         }
 
@@ -11449,6 +11507,7 @@ impl InputHandler {
                 state.ui_state.prayer_book_open = false;
                 state.ui_state.minimap_panel_open = false;
                 state.ui_state.close_quest_log();
+                state.ui_state.close_collection_log();
             }
         }
 
@@ -11860,6 +11919,54 @@ impl InputHandler {
                 state.ui_state.skills_open = false;
                 state.ui_state.prayer_book_open = false;
                 state.ui_state.minimap_panel_open = false;
+                state.ui_state.close_collection_log();
+            }
+        }
+
+        // Toggle collection log (V key) with mutual exclusivity
+        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::V) {
+            audio.play_sfx("enter");
+            if state.ui_state.collection_log_open {
+                state.ui_state.close_collection_log();
+            } else {
+                state.ui_state.close_quest_log();
+                state.ui_state.inventory_open = false;
+                state.ui_state.character_panel_open = false;
+                state.ui_state.social_open = false;
+                state.ui_state.skills_open = false;
+                state.ui_state.prayer_book_open = false;
+                state.ui_state.minimap_panel_open = false;
+                state.ui_state.collection_log_open = true;
+            }
+        }
+
+        // Collection log scrolling
+        if state.ui_state.collection_log_open {
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 {
+                const SCROLL_SPEED: f32 = 30.0;
+                match &state.ui_state.hovered_element {
+                    Some(UiElementId::CollectionLogSidebarScrollArea)
+                    | Some(UiElementId::CollectionLogCategoryHeader(_))
+                    | Some(UiElementId::CollectionLogSubcategoryEntry(_)) => {
+                        let max_scroll = layout
+                            .get_max_scroll(&UiElementId::CollectionLogSidebarScrollbar)
+                            .unwrap_or(2000.0);
+                        state.ui_state.collection_log_sidebar_scroll =
+                            (state.ui_state.collection_log_sidebar_scroll - wheel_y * SCROLL_SPEED)
+                                .clamp(0.0, max_scroll);
+                    }
+                    Some(UiElementId::CollectionLogGridScrollArea)
+                    | Some(UiElementId::CollectionLogGridItem(_)) => {
+                        let max_scroll = layout
+                            .get_max_scroll(&UiElementId::CollectionLogGridScrollbar)
+                            .unwrap_or(2000.0);
+                        state.ui_state.collection_log_grid_scroll =
+                            (state.ui_state.collection_log_grid_scroll - wheel_y * SCROLL_SPEED)
+                                .clamp(0.0, max_scroll);
+                    }
+                    _ => {}
+                }
             }
         }
 
