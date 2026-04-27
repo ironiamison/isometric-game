@@ -47,7 +47,7 @@ mod social;
 mod stall;
 mod tick_resources;
 mod tick_snapshots;
-mod titles;
+pub(crate) mod titles;
 mod trade;
 mod travel;
 mod world_map;
@@ -3102,6 +3102,14 @@ impl GameRoom {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
             player.collection_log = log;
+        }
+    }
+
+    /// Set active title for a player (called on connect after loading from DB)
+    pub async fn set_player_active_title(&self, player_id: &str, title: Option<String>) {
+        let mut players = self.players.write().await;
+        if let Some(player) = players.get_mut(player_id) {
+            player.active_title = title;
         }
     }
 

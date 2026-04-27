@@ -1684,6 +1684,28 @@ async fn matchmake_join_or_create(
         );
     }
 
+    // Load active title from database
+    match state.db.get_active_title(character_id).await {
+        Ok(Some(title_id)) => {
+            if let Some(title_text) = crate::game::titles::title_display(&title_id) {
+                room.set_player_active_title(&player_id, Some(title_text.to_string()))
+                    .await;
+                info!(
+                    "Loaded active title for {}: {}",
+                    character_data.name, title_text
+                );
+            }
+        }
+        Ok(None) => {} // No title set
+        Err(e) => {
+            tracing::warn!(
+                "Failed to load active title for character {}: {}",
+                character_id,
+                e
+            );
+        }
+    }
+
     let client_count = room.player_count().await;
 
     // Generate signed session token for WebSocket upgrade
