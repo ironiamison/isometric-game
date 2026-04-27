@@ -106,6 +106,9 @@ impl Renderer {
         // Background
         draw_rectangle(x, y, w, h, SLOT_BG_EMPTY);
 
+        // Register scroll area FIRST so category/subcategory entries (registered later) take priority in hit_test
+        layout.add(UiElementId::CollectionLogSidebarScrollArea, Rect::new(x, y, w, h));
+
         let categories = [
             ("monster_drops", "Monster Drops"),
             ("boss_rewards", "Boss Rewards"),
@@ -206,9 +209,6 @@ impl Renderer {
         let mut gl = unsafe { macroquad::window::get_internal_gl() };
         gl.flush();
         gl.quad_gl.scissor(None);
-
-        // Register scroll area
-        layout.add(UiElementId::CollectionLogSidebarScrollArea, Rect::new(x, y, w, h));
     }
 
     fn render_collection_grid(
@@ -228,6 +228,9 @@ impl Renderer {
         // Background
         draw_rectangle(x, y, w, h, SLOT_BG_EMPTY);
 
+        // Register scroll area FIRST so grid items (registered later) take priority in hit_test
+        layout.add(UiElementId::CollectionLogGridScrollArea, Rect::new(x, y, w, h));
+
         let category = state.ui_state.collection_log_selected_category.as_deref();
         let subcategory = state.ui_state.collection_log_selected_subcategory.as_deref();
 
@@ -236,9 +239,6 @@ impl Renderer {
             let placeholder = "Select a category";
             let pw = self.measure_text_sharp(placeholder, 16.0).width;
             self.draw_text_sharp(placeholder, x + (w - pw) / 2.0, y + h / 2.0, 16.0, TEXT_DIM);
-
-            // Register scroll area anyway
-            layout.add(UiElementId::CollectionLogGridScrollArea, Rect::new(x, y, w, h));
             return;
         }
 
@@ -329,9 +329,6 @@ impl Renderer {
         let mut gl = unsafe { macroquad::window::get_internal_gl() };
         gl.flush();
         gl.quad_gl.scissor(None);
-
-        // Register scroll area
-        layout.add(UiElementId::CollectionLogGridScrollArea, Rect::new(x, grid_clip_y, w, grid_clip_h));
 
         // Draw tooltip for hovered item
         if let Some(UiElementId::CollectionLogGridItem(idx)) = hovered {
