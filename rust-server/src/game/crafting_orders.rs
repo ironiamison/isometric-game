@@ -183,7 +183,10 @@ fn skill_level_by_name(skills: &crate::skills::Skills, name: &str) -> i32 {
         "hitpoints" => skills.hitpoints.level,
         "slayer" => skills.slayer.level,
         "survivalist" => skills.survivalist.level,
-        _ => 1,
+        _ => {
+            tracing::warn!("Unknown skill name in crafting order: {}", name);
+            1
+        }
     }
 }
 
@@ -379,14 +382,14 @@ impl GameRoom {
         let template = template.clone();
 
         // 3-6. Check inventory, remove items, grant rewards (all under player write lock)
-        let result = {
+        let result: Result<_, String> = 'claim: {
             let mut players = self.players.write().await;
             let Some(player) = players.get_mut(player_id) else {
-                return;
+                break 'claim Err(String::new());
             };
 
             // 3. Check player's inventory has all required items
-            for item in &template.items {
+            let missing = template.items.iter().find_map(|item| {
                 if !player.inventory.has_item(&item.id, item.quantity) {
                     let name = self
                         .item_registry
@@ -394,16 +397,16 @@ impl GameRoom {
                         .map(|def| def.display_name.clone())
                         .unwrap_or_else(|| item.id.clone());
                     let have = player.inventory.count_item(&item.id);
-                    return self
-                        .send_system_message(
-                            player_id,
-                            &format!(
-                                "You need {}x {} ({}/{}).",
-                                item.quantity, name, have, item.quantity
-                            ),
-                        )
-                        .await;
+                    Some(format!(
+                        "You need {}x {} ({}/{}).",
+                        item.quantity, name, have, item.quantity
+                    ))
+                } else {
+                    None
                 }
+            });
+            if let Some(msg) = missing {
+                break 'claim Err(msg);
             }
 
             // 4. Remove items from inventory
@@ -433,11 +436,16 @@ impl GameRoom {
             let inventory_update = player.inventory.to_update();
             let gold = player.inventory.gold;
 
-            Some((inventory_update, gold, xp_results))
-        };
+            Ok((inventory_update, gold, xp_results))
+        }; // write lock dropped here
 
-        let Some((inventory_update, gold, xp_results)) = result else {
-            return;
+        let (inventory_update, gold, xp_results) = match result {
+            Ok(data) => data,
+            Err(msg) if !msg.is_empty() => {
+                self.send_system_message(player_id, &msg).await;
+                return;
+            }
+            Err(_) => return,
         };
 
         // 7. Grant commission marks if marks > 0
