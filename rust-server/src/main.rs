@@ -16,7 +16,12 @@ use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sqlx::Row;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{RwLock, broadcast, mpsc, watch};
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
@@ -125,6 +130,8 @@ struct AppState {
     log_buffer: log_buffer::LogBuffer,
     /// In-memory rolling performance metrics for /api/perf endpoint
     perf_metrics: perf_metrics::PerfMetrics,
+    /// Derived stats rows for public leaderboard/profile endpoints.
+    leaderboard_cache: Arc<RwLock<LeaderboardCache>>,
 }
 
 impl AppState {
@@ -248,6 +255,7 @@ impl AppState {
             online_characters: Arc::new(DashSet::new()),
             log_buffer,
             perf_metrics: perf_metrics::PerfMetrics::new(),
+            leaderboard_cache: Arc::new(RwLock::new(LeaderboardCache::default())),
         }
     }
 
@@ -1670,6 +1678,14 @@ struct LeaderboardEntry {
     monster_kills: i32,
 }
 
+#[derive(Default)]
+struct LeaderboardCache {
+    entries: Vec<LeaderboardEntry>,
+    refreshed_at: Option<Instant>,
+}
+
+const LEADERBOARD_CACHE_TTL: Duration = Duration::from_secs(10);
+
 #[derive(Serialize)]
 struct PlayerProfileRanks {
     total_level: usize,
@@ -1701,12 +1717,23 @@ struct PlayerProfileResponse {
 }
 
 async fn load_leaderboard_entries(state: &AppState) -> Vec<LeaderboardEntry> {
+    {
+        let cache = state.leaderboard_cache.read().await;
+        if cache
+            .refreshed_at
+            .is_some_and(|refreshed_at| refreshed_at.elapsed() < LEADERBOARD_CACHE_TTL)
+        {
+            return cache.entries.clone();
+        }
+    }
+
     let rows = sqlx::query("SELECT name, skills_json, played_time, monster_kills FROM characters WHERE is_admin = FALSE")
         .fetch_all(state.db.pool())
         .await
         .unwrap_or_default();
 
-    rows.into_iter()
+    let entries: Vec<LeaderboardEntry> = rows
+        .into_iter()
         .filter_map(|row| {
             let name: String = row.try_get("name").ok()?;
             let skills_json: String = row.try_get("skills_json").unwrap_or_default();
@@ -1736,7 +1763,12 @@ async fn load_leaderboard_entries(state: &AppState) -> Vec<LeaderboardEntry> {
                 monster_kills,
             })
         })
-        .collect()
+        .collect();
+
+    let mut cache = state.leaderboard_cache.write().await;
+    cache.entries = entries.clone();
+    cache.refreshed_at = Some(Instant::now());
+    entries
 }
 
 fn sort_leaderboard_entries(entries: &mut [LeaderboardEntry], sort: &str) {

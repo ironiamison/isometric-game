@@ -527,9 +527,6 @@ impl GameRoom {
                 .filter_map(|player| player.pending_move_seq.map(|seq| (player.id.clone(), seq)))
                 .collect()
         };
-        valid_moves.retain(|(id, _, _, _, _, _, _, sampled_seq)| {
-            current_pending_seqs.get(id).copied() == Some(*sampled_seq)
-        });
 
         let gathering_player_ids = {
             let gathering = self.gathering.read().await;
