@@ -743,6 +743,75 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Player titles table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS player_titles (
+                character_id INTEGER NOT NULL,
+                title_id TEXT NOT NULL,
+                unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (character_id, title_id),
+                FOREIGN KEY(character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        // Crafting orders - available daily orders per player
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS crafting_orders_available (
+                character_id INTEGER NOT NULL,
+                order_id TEXT NOT NULL,
+                generated_date TEXT NOT NULL,
+                PRIMARY KEY (character_id, order_id),
+                FOREIGN KEY(character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        // Crafting orders - currently active order per player
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS crafting_orders_active (
+                character_id INTEGER PRIMARY KEY,
+                order_id TEXT NOT NULL,
+                accepted_at INTEGER NOT NULL,
+                FOREIGN KEY(character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        // Crafting order lifetime stats
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS crafting_order_stats (
+                character_id INTEGER PRIMARY KEY,
+                orders_completed INTEGER NOT NULL DEFAULT 0,
+                masterwork_completed INTEGER NOT NULL DEFAULT 0,
+                total_marks_earned INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        // ALTER TABLE: active_title and commission_marks on characters
+        sqlx::query("ALTER TABLE characters ADD COLUMN active_title TEXT DEFAULT NULL")
+            .execute(pool)
+            .await
+            .ok();
+        sqlx::query("ALTER TABLE characters ADD COLUMN commission_marks INTEGER DEFAULT 0")
+            .execute(pool)
+            .await
+            .ok();
+
         tracing::info!("Database migrations complete");
         Ok(())
     }
@@ -2599,5 +2668,215 @@ impl Database {
                 )
             })
             .collect())
+    }
+
+    // =========================================================================
+    // Player Titles
+    // =========================================================================
+
+    pub async fn get_player_titles(&self, character_id: i64) -> Result<Vec<String>, sqlx::Error> {
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT title_id FROM player_titles WHERE character_id = ?")
+                .bind(character_id)
+                .fetch_all(&self.pool)
+                .await?;
+        Ok(rows.into_iter().map(|(id,)| id).collect())
+    }
+
+    pub async fn unlock_title(
+        &self,
+        character_id: i64,
+        title_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("INSERT OR IGNORE INTO player_titles (character_id, title_id) VALUES (?, ?)")
+            .bind(character_id)
+            .bind(title_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_active_title(
+        &self,
+        character_id: i64,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let row: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT active_title FROM characters WHERE id = ?")
+                .bind(character_id)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(row.and_then(|(t,)| t))
+    }
+
+    pub async fn set_active_title(
+        &self,
+        character_id: i64,
+        title_id: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE characters SET active_title = ? WHERE id = ?")
+            .bind(title_id)
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    // =========================================================================
+    // Commission Marks
+    // =========================================================================
+
+    pub async fn get_commission_marks(&self, character_id: i64) -> Result<i32, sqlx::Error> {
+        let row: (i32,) =
+            sqlx::query_as("SELECT commission_marks FROM characters WHERE id = ?")
+                .bind(character_id)
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(row.0)
+    }
+
+    pub async fn add_commission_marks(
+        &self,
+        character_id: i64,
+        amount: i32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE characters SET commission_marks = commission_marks + ? WHERE id = ?")
+            .bind(amount)
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn spend_commission_marks(
+        &self,
+        character_id: i64,
+        amount: i32,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE characters SET commission_marks = commission_marks - ? WHERE id = ? AND commission_marks >= ?",
+        )
+        .bind(amount)
+        .bind(character_id)
+        .bind(amount)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    // =========================================================================
+    // Crafting Orders
+    // =========================================================================
+
+    pub async fn get_available_orders(
+        &self,
+        character_id: i64,
+        date: &str,
+    ) -> Result<Vec<String>, sqlx::Error> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT order_id FROM crafting_orders_available WHERE character_id = ? AND generated_date = ?",
+        )
+        .bind(character_id)
+        .bind(date)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|(id,)| id).collect())
+    }
+
+    pub async fn save_available_orders(
+        &self,
+        character_id: i64,
+        date: &str,
+        order_ids: &[String],
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM crafting_orders_available WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
+        for order_id in order_ids {
+            sqlx::query(
+                "INSERT INTO crafting_orders_available (character_id, order_id, generated_date) VALUES (?, ?, ?)",
+            )
+            .bind(character_id)
+            .bind(order_id)
+            .bind(date)
+            .execute(&self.pool)
+            .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn get_active_order(
+        &self,
+        character_id: i64,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT order_id FROM crafting_orders_active WHERE character_id = ?")
+                .bind(character_id)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(row.map(|(id,)| id))
+    }
+
+    pub async fn save_active_order(
+        &self,
+        character_id: i64,
+        order_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT OR REPLACE INTO crafting_orders_active (character_id, order_id, accepted_at) VALUES (?, ?, unixepoch())",
+        )
+        .bind(character_id)
+        .bind(order_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn remove_active_order(&self, character_id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM crafting_orders_active WHERE character_id = ?")
+            .bind(character_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_crafting_order_stats(
+        &self,
+        character_id: i64,
+    ) -> Result<(i32, i32, i32), sqlx::Error> {
+        let row: Option<(i32, i32, i32)> = sqlx::query_as(
+            "SELECT orders_completed, masterwork_completed, total_marks_earned FROM crafting_order_stats WHERE character_id = ?",
+        )
+        .bind(character_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.unwrap_or((0, 0, 0)))
+    }
+
+    pub async fn increment_crafting_order_stats(
+        &self,
+        character_id: i64,
+        is_masterwork: bool,
+        marks: i32,
+    ) -> Result<(), sqlx::Error> {
+        let masterwork_inc: i32 = if is_masterwork { 1 } else { 0 };
+        sqlx::query(
+            r#"
+            INSERT INTO crafting_order_stats (character_id, orders_completed, masterwork_completed, total_marks_earned)
+            VALUES (?, 1, ?, ?)
+            ON CONFLICT(character_id) DO UPDATE SET
+                orders_completed = orders_completed + 1,
+                masterwork_completed = masterwork_completed + ?,
+                total_marks_earned = total_marks_earned + ?
+            "#,
+        )
+        .bind(character_id)
+        .bind(masterwork_inc)
+        .bind(marks)
+        .bind(masterwork_inc)
+        .bind(marks)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }
