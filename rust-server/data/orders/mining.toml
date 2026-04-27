@@ -1,0 +1,120 @@
+# Mining Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "mine_copper_ore"
+tier = "regular"
+skill = "mining"
+min_level = 1
+items = [{ id = "copper_ore", quantity = 20 }]
+
+[orders.rewards]
+gold = 200
+marks = 0
+
+[orders.rewards.xp]
+mining = 200
+
+[[orders]]
+id = "mine_tin_ore"
+tier = "regular"
+skill = "mining"
+min_level = 5
+items = [{ id = "tin_ore", quantity = 20 }]
+
+[orders.rewards]
+gold = 250
+marks = 0
+
+[orders.rewards.xp]
+mining = 250
+
+[[orders]]
+id = "mine_iron_ore"
+tier = "regular"
+skill = "mining"
+min_level = 15
+items = [{ id = "iron_ore", quantity = 15 }]
+
+[orders.rewards]
+gold = 450
+marks = 0
+
+[orders.rewards.xp]
+mining = 400
+
+[[orders]]
+id = "mine_coal_ore"
+tier = "regular"
+skill = "mining"
+min_level = 20
+items = [{ id = "coal_ore", quantity = 15 }]
+
+[orders.rewards]
+gold = 550
+marks = 0
+
+[orders.rewards.xp]
+mining = 500
+
+[[orders]]
+id = "mine_mithril_ore"
+tier = "regular"
+skill = "mining"
+min_level = 30
+items = [{ id = "mithril_ore", quantity = 10 }]
+
+[orders.rewards]
+gold = 800
+marks = 0
+
+[orders.rewards.xp]
+mining = 700
+
+# --- Masterwork Orders (mining + smithing) ---
+
+[[orders]]
+id = "masterwork_iron_bars"
+tier = "masterwork"
+skill = "mining"
+min_level = 15
+items = [{ id = "iron_bar", quantity = 15 }]
+
+[orders.rewards]
+gold = 1200
+marks = 2
+
+[orders.rewards.xp]
+mining = 500
+smithing = 600
+
+[[orders]]
+id = "masterwork_steel_bars"
+tier = "masterwork"
+skill = "mining"
+min_level = 25
+items = [{ id = "steel_bar", quantity = 10 }]
+
+[orders.rewards]
+gold = 2000
+marks = 2
+
+[orders.rewards.xp]
+mining = 600
+smithing = 800
+
+[[orders]]
+id = "masterwork_adamant_bars"
+tier = "masterwork"
+skill = "mining"
+min_level = 45
+items = [{ id = "adamant_bar", quantity = 5 }]
+
+[orders.rewards]
+gold = 3500
+marks = 2
+
+[orders.rewards.xp]
+mining = 800
+smithing = 1000

@@ -1,0 +1,120 @@
+# Smithing Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "smith_bronze_swords"
+tier = "regular"
+skill = "smithing"
+min_level = 5
+items = [{ id = "bronze_sword", quantity = 5 }]
+
+[orders.rewards]
+gold = 250
+marks = 0
+
+[orders.rewards.xp]
+smithing = 200
+
+[[orders]]
+id = "smith_iron_scimitars"
+tier = "regular"
+skill = "smithing"
+min_level = 15
+items = [{ id = "iron_scimitar", quantity = 3 }]
+
+[orders.rewards]
+gold = 400
+marks = 0
+
+[orders.rewards.xp]
+smithing = 350
+
+[[orders]]
+id = "smith_steel_boots"
+tier = "regular"
+skill = "smithing"
+min_level = 30
+items = [{ id = "steel_boots", quantity = 4 }]
+
+[orders.rewards]
+gold = 600
+marks = 0
+
+[orders.rewards.xp]
+smithing = 500
+
+[[orders]]
+id = "smith_mithril_gloves"
+tier = "regular"
+skill = "smithing"
+min_level = 40
+items = [{ id = "mithril_gloves", quantity = 3 }]
+
+[orders.rewards]
+gold = 750
+marks = 0
+
+[orders.rewards.xp]
+smithing = 600
+
+[[orders]]
+id = "smith_adamant_scimitar"
+tier = "regular"
+skill = "smithing"
+min_level = 50
+items = [{ id = "adamant_scimitar", quantity = 2 }]
+
+[orders.rewards]
+gold = 1000
+marks = 0
+
+[orders.rewards.xp]
+smithing = 800
+
+# --- Masterwork Orders (mining + smithing) ---
+
+[[orders]]
+id = "masterwork_steel_platebody"
+tier = "masterwork"
+skill = "smithing"
+min_level = 30
+items = [{ id = "steel_body", quantity = 2 }]
+
+[orders.rewards]
+gold = 1500
+marks = 2
+
+[orders.rewards.xp]
+mining = 400
+smithing = 800
+
+[[orders]]
+id = "masterwork_mithril_scimitar"
+tier = "masterwork"
+skill = "smithing"
+min_level = 40
+items = [{ id = "mithril_scimitar", quantity = 2 }]
+
+[orders.rewards]
+gold = 2500
+marks = 2
+
+[orders.rewards.xp]
+mining = 600
+smithing = 1000
+
+[[orders]]
+id = "masterwork_rune_scimitar"
+tier = "masterwork"
+skill = "smithing"
+min_level = 60
+items = [{ id = "rune_scimitar", quantity = 1 }]
+
+[orders.rewards]
+gold = 3500
+marks = 2
+
+[orders.rewards.xp]
+mining = 800
+smithing = 1200

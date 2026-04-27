@@ -1,0 +1,91 @@
+# Woodcutting Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "chop_oak_logs"
+tier = "regular"
+skill = "woodcutting"
+min_level = 1
+items = [{ id = "oak_log", quantity = 25 }]
+
+[orders.rewards]
+gold = 200
+marks = 0
+
+[orders.rewards.xp]
+woodcutting = 200
+
+[[orders]]
+id = "chop_willow_logs"
+tier = "regular"
+skill = "woodcutting"
+min_level = 15
+items = [{ id = "willow_log", quantity = 20 }]
+
+[orders.rewards]
+gold = 450
+marks = 0
+
+[orders.rewards.xp]
+woodcutting = 400
+
+[[orders]]
+id = "chop_maple_logs"
+tier = "regular"
+skill = "woodcutting"
+min_level = 45
+items = [{ id = "maple_log", quantity = 15 }]
+
+[orders.rewards]
+gold = 750
+marks = 0
+
+[orders.rewards.xp]
+woodcutting = 650
+
+[[orders]]
+id = "chop_yew_logs"
+tier = "regular"
+skill = "woodcutting"
+min_level = 60
+items = [{ id = "yew_log", quantity = 10 }]
+
+[orders.rewards]
+gold = 1000
+marks = 0
+
+[orders.rewards.xp]
+woodcutting = 800
+
+# --- Masterwork Orders (woodcutting + fletching) ---
+
+[[orders]]
+id = "masterwork_willow_bows"
+tier = "masterwork"
+skill = "woodcutting"
+min_level = 15
+items = [{ id = "willow_bow", quantity = 5 }]
+
+[orders.rewards]
+gold = 1200
+marks = 2
+
+[orders.rewards.xp]
+woodcutting = 500
+fletching = 700
+
+[[orders]]
+id = "masterwork_arrow_shafts_and_bows"
+tier = "masterwork"
+skill = "woodcutting"
+min_level = 35
+items = [{ id = "yew_bow", quantity = 2 }, { id = "arrow_shaft", quantity = 60 }]
+
+[orders.rewards]
+gold = 2500
+marks = 2
+
+[orders.rewards.xp]
+woodcutting = 700
+fletching = 900

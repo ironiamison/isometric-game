@@ -1,0 +1,105 @@
+# Leatherworking Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "craft_leather_gloves_order"
+tier = "regular"
+skill = "leatherworking"
+min_level = 1
+items = [{ id = "leather_gloves", quantity = 5 }]
+
+[orders.rewards]
+gold = 200
+marks = 0
+
+[orders.rewards.xp]
+leatherworking = 200
+
+[[orders]]
+id = "craft_leather_belts"
+tier = "regular"
+skill = "leatherworking"
+min_level = 2
+items = [{ id = "leather_belt", quantity = 5 }]
+
+[orders.rewards]
+gold = 250
+marks = 0
+
+[orders.rewards.xp]
+leatherworking = 250
+
+[[orders]]
+id = "craft_leather_boots_order"
+tier = "regular"
+skill = "leatherworking"
+min_level = 3
+items = [{ id = "leather_boots", quantity = 5 }]
+
+[orders.rewards]
+gold = 300
+marks = 0
+
+[orders.rewards.xp]
+leatherworking = 300
+
+[[orders]]
+id = "craft_backpacks"
+tier = "regular"
+skill = "leatherworking"
+min_level = 5
+items = [{ id = "backpack", quantity = 3 }]
+
+[orders.rewards]
+gold = 400
+marks = 0
+
+[orders.rewards.xp]
+leatherworking = 400
+
+[[orders]]
+id = "craft_leather_bodies"
+tier = "regular"
+skill = "leatherworking"
+min_level = 11
+items = [{ id = "leather_body", quantity = 3 }]
+
+[orders.rewards]
+gold = 600
+marks = 0
+
+[orders.rewards.xp]
+leatherworking = 550
+
+# --- Masterwork Orders (leatherworking + fletching for bowstrings) ---
+
+[[orders]]
+id = "masterwork_bowstrings_and_boots"
+tier = "masterwork"
+skill = "leatherworking"
+min_level = 5
+items = [{ id = "bowstring", quantity = 10 }, { id = "leather_boots", quantity = 3 }]
+
+[orders.rewards]
+gold = 1000
+marks = 2
+
+[orders.rewards.xp]
+leatherworking = 600
+fletching = 400
+
+[[orders]]
+id = "masterwork_leather_armor_set"
+tier = "masterwork"
+skill = "leatherworking"
+min_level = 11
+items = [{ id = "leather_body", quantity = 2 }, { id = "leather_hat", quantity = 2 }, { id = "leather_boots", quantity = 2 }]
+
+[orders.rewards]
+gold = 2000
+marks = 2
+
+[orders.rewards.xp]
+leatherworking = 900
+gathering = 600

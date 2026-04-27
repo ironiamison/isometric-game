@@ -1,0 +1,106 @@
+# Fletching Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "fletch_bronze_arrows"
+tier = "regular"
+skill = "fletching"
+min_level = 1
+items = [{ id = "bronze_arrow", quantity = 75 }]
+
+[orders.rewards]
+gold = 200
+marks = 0
+
+[orders.rewards.xp]
+fletching = 200
+
+[[orders]]
+id = "fletch_oak_bows"
+tier = "regular"
+skill = "fletching"
+min_level = 5
+items = [{ id = "oak_bow", quantity = 5 }]
+
+[orders.rewards]
+gold = 350
+marks = 0
+
+[orders.rewards.xp]
+fletching = 300
+
+[[orders]]
+id = "fletch_iron_arrows"
+tier = "regular"
+skill = "fletching"
+min_level = 15
+items = [{ id = "iron_arrow", quantity = 60 }]
+
+[orders.rewards]
+gold = 500
+marks = 0
+
+[orders.rewards.xp]
+fletching = 450
+
+[[orders]]
+id = "fletch_maple_bows"
+tier = "regular"
+skill = "fletching"
+min_level = 25
+items = [{ id = "maple_bow", quantity = 3 }]
+
+[orders.rewards]
+gold = 700
+marks = 0
+
+[orders.rewards.xp]
+fletching = 600
+
+[[orders]]
+id = "fletch_steel_arrows"
+tier = "regular"
+skill = "fletching"
+min_level = 30
+items = [{ id = "steel_arrow", quantity = 45 }]
+
+[orders.rewards]
+gold = 800
+marks = 0
+
+[orders.rewards.xp]
+fletching = 700
+
+# --- Masterwork Orders (woodcutting + fletching + smithing for arrows) ---
+
+[[orders]]
+id = "masterwork_yew_bows"
+tier = "masterwork"
+skill = "fletching"
+min_level = 35
+items = [{ id = "yew_bow", quantity = 3 }]
+
+[orders.rewards]
+gold = 2000
+marks = 2
+
+[orders.rewards.xp]
+woodcutting = 500
+fletching = 1000
+
+[[orders]]
+id = "masterwork_mithril_arrows"
+tier = "masterwork"
+skill = "fletching"
+min_level = 45
+items = [{ id = "mithril_arrow", quantity = 75 }]
+
+[orders.rewards]
+gold = 3500
+marks = 4
+
+[orders.rewards.xp]
+woodcutting = 400
+smithing = 600
+fletching = 1000

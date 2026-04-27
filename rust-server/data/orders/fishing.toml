@@ -1,0 +1,105 @@
+# Fishing Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "catch_raw_shrimp"
+tier = "regular"
+skill = "fishing"
+min_level = 1
+items = [{ id = "raw_shrimp", quantity = 20 }]
+
+[orders.rewards]
+gold = 200
+marks = 0
+
+[orders.rewards.xp]
+fishing = 200
+
+[[orders]]
+id = "catch_raw_herring"
+tier = "regular"
+skill = "fishing"
+min_level = 5
+items = [{ id = "raw_herring", quantity = 15 }]
+
+[orders.rewards]
+gold = 300
+marks = 0
+
+[orders.rewards.xp]
+fishing = 300
+
+[[orders]]
+id = "catch_raw_trout"
+tier = "regular"
+skill = "fishing"
+min_level = 10
+items = [{ id = "raw_trout", quantity = 12 }]
+
+[orders.rewards]
+gold = 400
+marks = 0
+
+[orders.rewards.xp]
+fishing = 400
+
+[[orders]]
+id = "catch_raw_lobster"
+tier = "regular"
+skill = "fishing"
+min_level = 25
+items = [{ id = "raw_lobster", quantity = 8 }]
+
+[orders.rewards]
+gold = 650
+marks = 0
+
+[orders.rewards.xp]
+fishing = 600
+
+[[orders]]
+id = "catch_raw_swordfish"
+tier = "regular"
+skill = "fishing"
+min_level = 40
+items = [{ id = "raw_swordfish", quantity = 5 }]
+
+[orders.rewards]
+gold = 900
+marks = 0
+
+[orders.rewards.xp]
+fishing = 750
+
+# --- Masterwork Orders (fishing + cooking) ---
+
+[[orders]]
+id = "masterwork_cooked_salmon_supply"
+tier = "masterwork"
+skill = "fishing"
+min_level = 15
+items = [{ id = "cooked_salmon", quantity = 15 }]
+
+[orders.rewards]
+gold = 1200
+marks = 2
+
+[orders.rewards.xp]
+fishing = 600
+cooking = 600
+
+[[orders]]
+id = "masterwork_cooked_swordfish_supply"
+tier = "masterwork"
+skill = "fishing"
+min_level = 40
+items = [{ id = "cooked_swordfish", quantity = 8 }]
+
+[orders.rewards]
+gold = 2500
+marks = 2
+
+[orders.rewards.xp]
+fishing = 800
+cooking = 900

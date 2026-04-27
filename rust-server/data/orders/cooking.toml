@@ -1,0 +1,105 @@
+# Cooking Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "cook_shrimp_batch"
+tier = "regular"
+skill = "cooking"
+min_level = 1
+items = [{ id = "cooked_shrimp", quantity = 15 }]
+
+[orders.rewards]
+gold = 200
+marks = 0
+
+[orders.rewards.xp]
+cooking = 200
+
+[[orders]]
+id = "cook_trout_batch"
+tier = "regular"
+skill = "cooking"
+min_level = 10
+items = [{ id = "cooked_trout", quantity = 10 }]
+
+[orders.rewards]
+gold = 400
+marks = 0
+
+[orders.rewards.xp]
+cooking = 350
+
+[[orders]]
+id = "cook_salmon_batch"
+tier = "regular"
+skill = "cooking"
+min_level = 15
+items = [{ id = "cooked_salmon", quantity = 8 }]
+
+[orders.rewards]
+gold = 500
+marks = 0
+
+[orders.rewards.xp]
+cooking = 450
+
+[[orders]]
+id = "cook_lobster_batch"
+tier = "regular"
+skill = "cooking"
+min_level = 25
+items = [{ id = "cooked_lobster", quantity = 6 }]
+
+[orders.rewards]
+gold = 700
+marks = 0
+
+[orders.rewards.xp]
+cooking = 600
+
+[[orders]]
+id = "cook_swordfish_batch"
+tier = "regular"
+skill = "cooking"
+min_level = 35
+items = [{ id = "cooked_swordfish", quantity = 5 }]
+
+[orders.rewards]
+gold = 900
+marks = 0
+
+[orders.rewards.xp]
+cooking = 800
+
+# --- Masterwork Orders (fishing + cooking) ---
+
+[[orders]]
+id = "masterwork_lobster_feast"
+tier = "masterwork"
+skill = "cooking"
+min_level = 25
+items = [{ id = "cooked_lobster", quantity = 12 }]
+
+[orders.rewards]
+gold = 1500
+marks = 2
+
+[orders.rewards.xp]
+fishing = 500
+cooking = 800
+
+[[orders]]
+id = "masterwork_swordfish_banquet"
+tier = "masterwork"
+skill = "cooking"
+min_level = 35
+items = [{ id = "cooked_swordfish", quantity = 10 }]
+
+[orders.rewards]
+gold = 2500
+marks = 2
+
+[orders.rewards.xp]
+fishing = 700
+cooking = 1000

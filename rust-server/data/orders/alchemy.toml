@@ -1,0 +1,105 @@
+# Alchemy Crafting Orders
+
+# --- Regular Orders ---
+
+[[orders]]
+id = "brew_weak_health_potions"
+tier = "regular"
+skill = "alchemy"
+min_level = 1
+items = [{ id = "weak_health_potion", quantity = 10 }]
+
+[orders.rewards]
+gold = 200
+marks = 0
+
+[orders.rewards.xp]
+alchemy = 200
+
+[[orders]]
+id = "brew_antidotes"
+tier = "regular"
+skill = "alchemy"
+min_level = 10
+items = [{ id = "antidote", quantity = 8 }]
+
+[orders.rewards]
+gold = 350
+marks = 0
+
+[orders.rewards.xp]
+alchemy = 300
+
+[[orders]]
+id = "brew_attack_potions"
+tier = "regular"
+skill = "alchemy"
+min_level = 15
+items = [{ id = "attack_potion", quantity = 6 }]
+
+[orders.rewards]
+gold = 500
+marks = 0
+
+[orders.rewards.xp]
+alchemy = 450
+
+[[orders]]
+id = "brew_strong_health_potions"
+tier = "regular"
+skill = "alchemy"
+min_level = 45
+items = [{ id = "strong_health_potion", quantity = 5 }]
+
+[orders.rewards]
+gold = 800
+marks = 0
+
+[orders.rewards.xp]
+alchemy = 700
+
+[[orders]]
+id = "brew_super_strength_potions"
+tier = "regular"
+skill = "alchemy"
+min_level = 60
+items = [{ id = "super_strength_potion", quantity = 3 }]
+
+[orders.rewards]
+gold = 1000
+marks = 0
+
+[orders.rewards.xp]
+alchemy = 800
+
+# --- Masterwork Orders ---
+
+[[orders]]
+id = "masterwork_scroll_greater_healing"
+tier = "masterwork"
+skill = "alchemy"
+min_level = 25
+items = [{ id = "scroll_greater_healing", quantity = 3 }]
+
+[orders.rewards]
+gold = 1200
+marks = 2
+
+[orders.rewards.xp]
+alchemy = 600
+gathering = 400
+
+[[orders]]
+id = "masterwork_super_defence_potions"
+tier = "masterwork"
+skill = "alchemy"
+min_level = 65
+items = [{ id = "super_defence_potion", quantity = 5 }]
+
+[orders.rewards]
+gold = 3000
+marks = 2
+
+[orders.rewards.xp]
+alchemy = 1000
+gathering = 500
