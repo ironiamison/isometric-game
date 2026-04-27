@@ -712,7 +712,7 @@ impl Renderer {
     }
 
     /// Draw item icon with a custom tint (for ghost/depleted items)
-    fn draw_item_icon_tinted(
+    pub(crate) fn draw_item_icon_tinted(
         &self,
         item_id: &str,
         x: f32,

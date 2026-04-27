@@ -220,7 +220,7 @@ impl Renderer {
     ) {
         let s = state.ui_state.ui_scale;
         let pad = 8.0 * s;
-        let slot_size = 32.0 * s;
+        let slot_size = (INV_SLOT_SIZE * s).max(MIN_SLOT_SIZE);
         let slot_gap = 4.0 * s;
         let defs = &state.ui_state.collection_log_definitions;
         let obtained = &state.ui_state.collection_log;
@@ -298,23 +298,26 @@ impl Renderer {
             let item_hovered = matches!(hovered, Some(UiElementId::CollectionLogGridItem(idx)) if *idx == i);
 
             // Draw slot background
-            let slot_bg = if item_hovered && is_obtained {
+            let slot_bg = if item_hovered {
                 SLOT_HOVER_BG
             } else if is_obtained {
                 SLOT_BG_FILLED
             } else {
-                Color::new(0.06, 0.06, 0.08, 1.0) // very dark for unobtained
+                SLOT_BG_EMPTY
             };
             draw_rectangle(slot_x, slot_y, slot_size, slot_size, SLOT_BORDER);
             draw_rectangle(slot_x + 1.0, slot_y + 1.0, slot_size - 2.0, slot_size - 2.0, slot_bg);
 
             if is_obtained {
-                // Draw item icon
+                // Draw full-color item icon
                 self.draw_item_icon(item_id, slot_x + 1.0, slot_y + 1.0, slot_size - 2.0, slot_size - 2.0, state, false);
+            } else {
+                // Draw greyed-out silhouette
+                self.draw_item_icon_tinted(item_id, slot_x + 1.0, slot_y + 1.0, slot_size - 2.0, slot_size - 2.0, state, Color::new(0.25, 0.25, 0.25, 0.6));
             }
 
-            // Draw hover border for obtained items
-            if item_hovered && is_obtained {
+            // Draw hover border
+            if item_hovered {
                 draw_rectangle(slot_x, slot_y, slot_size, 1.0, SLOT_HOVER_BORDER);
                 draw_rectangle(slot_x, slot_y + slot_size - 1.0, slot_size, 1.0, SLOT_HOVER_BORDER);
                 draw_rectangle(slot_x, slot_y, 1.0, slot_size, SLOT_HOVER_BORDER);
@@ -333,23 +336,22 @@ impl Renderer {
         // Draw tooltip for hovered item
         if let Some(UiElementId::CollectionLogGridItem(idx)) = hovered {
             if let Some(item_id) = items.get(*idx) {
-                if obtained.contains_key(&(item_id.to_string(), category.to_string())) {
-                    let display = item_id.replace('_', " ");
-                    let (mx, my) = mouse_position();
-                    // Convert mouse to virtual screen coords
-                    let vx = mx / scale_x;
-                    let vy = my / scale_y;
-                    let tw = self.measure_text_sharp(&display, 16.0).width;
-                    let tp = 6.0 * s;
-                    let tx = (vx + 12.0).min(vw - tw - tp * 2.0);
-                    let ty = vy - 24.0 * s;
-                    draw_rectangle(tx - tp, ty - 14.0 * s, tw + tp * 2.0, 20.0 * s, TOOLTIP_BG);
-                    draw_rectangle(tx - tp, ty - 14.0 * s, tw + tp * 2.0, 1.0, TOOLTIP_FRAME);
-                    draw_rectangle(tx - tp, ty - 14.0 * s + 20.0 * s - 1.0, tw + tp * 2.0, 1.0, TOOLTIP_FRAME);
-                    draw_rectangle(tx - tp, ty - 14.0 * s, 1.0, 20.0 * s, TOOLTIP_FRAME);
-                    draw_rectangle(tx - tp + tw + tp * 2.0 - 1.0, ty - 14.0 * s, 1.0, 20.0 * s, TOOLTIP_FRAME);
-                    self.draw_text_sharp(&display, tx, ty, 16.0, TEXT_NORMAL);
-                }
+                let is_obtained = obtained.contains_key(&(item_id.to_string(), category.to_string()));
+                let display = item_id.replace('_', " ");
+                let (mx, my) = mouse_position();
+                let vx = mx / scale_x;
+                let vy = my / scale_y;
+                let tw = self.measure_text_sharp(&display, 16.0).width;
+                let tp = 6.0 * s;
+                let tx = (vx + 12.0).min(vw - tw - tp * 2.0);
+                let ty = vy - 24.0 * s;
+                draw_rectangle(tx - tp, ty - 14.0 * s, tw + tp * 2.0, 20.0 * s, TOOLTIP_BG);
+                draw_rectangle(tx - tp, ty - 14.0 * s, tw + tp * 2.0, 1.0, TOOLTIP_FRAME);
+                draw_rectangle(tx - tp, ty - 14.0 * s + 20.0 * s - 1.0, tw + tp * 2.0, 1.0, TOOLTIP_FRAME);
+                draw_rectangle(tx - tp, ty - 14.0 * s, 1.0, 20.0 * s, TOOLTIP_FRAME);
+                draw_rectangle(tx - tp + tw + tp * 2.0 - 1.0, ty - 14.0 * s, 1.0, 20.0 * s, TOOLTIP_FRAME);
+                let text_color = if is_obtained { TEXT_NORMAL } else { TEXT_DIM };
+                self.draw_text_sharp(&display, tx, ty, 16.0, text_color);
             }
         }
     }
