@@ -2897,13 +2897,12 @@ impl GameRoom {
         let key = (item_id.to_string(), source.to_string());
 
         // Check + insert in-memory
-        let (is_new, account_id) = {
+        let is_new = {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                let is_new = player.collection_log.insert(key);
-                (is_new, Some(player.account_id))
+                player.collection_log.insert(key)
             } else {
-                (false, None)
+                false
             }
         };
 
@@ -2911,12 +2910,12 @@ impl GameRoom {
             return false;
         }
 
-        // Persist to DB
+        // Persist to DB using character_id (parsed from player_id "char_123")
         let obtained_at = chrono::Utc::now().to_rfc3339();
         if let Some(ref db) = self.db {
-            if let Some(account_id) = account_id {
+            if let Some(character_id) = Self::parse_character_id(player_id) {
                 if let Err(e) = db
-                    .save_collection_entry(account_id, item_id, source, source_detail, &obtained_at)
+                    .save_collection_entry(character_id, item_id, source, source_detail, &obtained_at)
                     .await
                 {
                     tracing::warn!("Failed to save collection entry for {}: {}", player_id, e);
