@@ -5441,7 +5441,13 @@ impl Renderer {
 
             let combat_level = player.combat_level();
             let level_text = format!(" (Lvl {})", combat_level);
+            let title_text = player.title.as_ref().map(|t| format!(" ({})", t)).unwrap_or_default();
             let name_width = self.measure_text_sharp(&player.name, font_size).width;
+            let title_width = if title_text.is_empty() {
+                0.0
+            } else {
+                self.measure_text_sharp(&title_text, font_size).width
+            };
             let level_width = self.measure_text_sharp(&level_text, font_size).width - 2.0 * zoom;
             let is_top_player =
                 state.top_level_player_name.as_deref() == Some(player.name.as_str());
@@ -5455,7 +5461,7 @@ impl Renderer {
             } else {
                 0.0
             };
-            let total_width = trophy_width + name_width + level_width;
+            let total_width = trophy_width + name_width + title_width + level_width;
             let name_x = screen_x - total_width / 2.0;
             let name_y = screen_y - name_y_offset + 2.0 * zoom;
 
@@ -5501,10 +5507,20 @@ impl Renderer {
                 font_size,
                 WHITE,
             );
+            if !title_text.is_empty() {
+                let title_color = Color::from_rgba(255, 215, 100, 255);
+                self.draw_text_sharp(
+                    &title_text,
+                    name_x + trophy_width + name_width,
+                    name_y,
+                    font_size,
+                    title_color,
+                );
+            }
             let level_color = Color::from_rgba(180, 220, 255, 255);
             self.draw_text_sharp(
                 &level_text,
-                name_x + trophy_width + name_width,
+                name_x + trophy_width + name_width + title_width,
                 name_y,
                 font_size,
                 level_color,

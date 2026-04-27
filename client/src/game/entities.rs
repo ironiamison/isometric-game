@@ -150,6 +150,9 @@ pub struct Player {
     // Admin status
     pub is_admin: bool,
 
+    // Title (e.g. "Master Artisan")
+    pub title: Option<String>,
+
     // Animation
     pub animation: PlayerAnimation,
 
@@ -223,6 +226,7 @@ impl Player {
             equipped_necklace: None,
             equipped_belt: None,
             is_admin: false,
+            title: None,
             animation: PlayerAnimation::new(),
             last_damage_time: 0.0,
             is_gathering: false,

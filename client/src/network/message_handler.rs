@@ -429,6 +429,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             let equipped_belt =
                 extract_string(player_value, "equipped_belt").filter(|s| !s.is_empty());
             let is_admin = extract_bool(player_value, "is_admin").unwrap_or(false);
+            let title = extract_string(player_value, "title");
             let has_stall = extract_bool(player_value, "has_stall").unwrap_or(false);
             let stall_name = extract_string(player_value, "stall_name");
             let move_ack_seq = extract_u32(player_value, "moveAckSeq");
@@ -544,6 +545,8 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 player.equipped_belt = equipped_belt.clone();
                 // Update admin status
                 player.is_admin = is_admin;
+                // Update title
+                player.title = title.clone();
                 // Update stall status
                 player.has_stall = has_stall;
                 player.stall_name = stall_name.clone();
@@ -632,6 +635,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                     new_player.equipped_necklace = equipped_necklace;
                     new_player.equipped_belt = equipped_belt;
                     new_player.is_admin = is_admin;
+                    new_player.title = title;
                     new_player.has_stall = has_stall;
                     new_player.stall_name = stall_name;
                     let sitting = extract_bool(player_value, "sitting").unwrap_or(false);
