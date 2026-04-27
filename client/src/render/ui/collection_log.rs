@@ -116,6 +116,26 @@ impl Renderer {
             ("quest_rewards", "Quest Rewards"),
         ];
 
+        // Calculate total content height for scroll clamping
+        let mut total_content_h = pad;
+        for (_, (key, _)) in categories.iter().enumerate() {
+            total_content_h += line_height + 6.0 * s; // category header
+            let is_expanded = state.ui_state.collection_log_selected_category.as_deref() == Some(*key);
+            if is_expanded {
+                let subcat_count = {
+                    let mut seen = std::collections::HashSet::new();
+                    for (_, src, detail) in defs.iter() {
+                        if src == key { seen.insert(detail.as_str()); }
+                    }
+                    seen.len()
+                };
+                total_content_h += subcat_count as f32 * (line_height + 2.0 * s) + 4.0 * s;
+            }
+        }
+        total_content_h += pad;
+        let max_scroll = (total_content_h - h).max(0.0);
+        layout.set_max_scroll(UiElementId::CollectionLogSidebarScrollbar, max_scroll);
+
         // Enable scissor clipping for scrollable sidebar
         let (sw_screen, sh_screen) = (screen_width(), screen_height());
         let (vw, _vh) = virtual_screen_size();
@@ -131,7 +151,8 @@ impl Renderer {
             (h * scale_y) as i32,
         )));
 
-        let mut cur_y = y + pad - state.ui_state.collection_log_sidebar_scroll;
+        let scroll_offset = state.ui_state.collection_log_sidebar_scroll.clamp(0.0, max_scroll);
+        let mut cur_y = y + pad - scroll_offset;
         let mut global_subcat_idx = 0usize;
 
         for (cat_idx, (key, label)) in categories.iter().enumerate() {
@@ -272,6 +293,12 @@ impl Renderer {
         let grid_clip_y = grid_y_start;
         let grid_clip_h = y + h - grid_y_start;
 
+        // Calculate total grid content height for scroll clamping
+        let rows = (items.len() + cols - 1) / cols;
+        let total_grid_h = rows as f32 * (slot_size + slot_gap);
+        let max_grid_scroll = (total_grid_h - grid_clip_h).max(0.0);
+        layout.set_max_scroll(UiElementId::CollectionLogGridScrollbar, max_grid_scroll);
+
         let mut gl = unsafe { macroquad::window::get_internal_gl() };
         gl.flush();
         gl.quad_gl.scissor(Some((
@@ -281,7 +308,7 @@ impl Renderer {
             (grid_clip_h * scale_y) as i32,
         )));
 
-        let scroll = state.ui_state.collection_log_grid_scroll;
+        let scroll = state.ui_state.collection_log_grid_scroll.clamp(0.0, max_grid_scroll);
 
         for (i, item_id) in items.iter().enumerate() {
             let col = i % cols;
