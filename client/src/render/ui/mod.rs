@@ -10,6 +10,7 @@ pub mod bottom_bar;
 pub mod character;
 pub mod chat_panel;
 pub mod chest_panel;
+pub mod collection_log;
 pub mod common;
 pub mod context_menu;
 pub mod crafting;

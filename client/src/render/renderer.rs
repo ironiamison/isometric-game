@@ -11158,6 +11158,11 @@ impl Renderer {
         self.render_trade_panel(state, &mut layout);
         self.render_trade_request_popup(state, &mut layout);
 
+        // Collection Log popup (renders over everything)
+        if state.ui_state.collection_log_open {
+            self.render_collection_log(state, hovered, &mut layout);
+        }
+
         // Stall panels
         self.render_stall_setup_panel(state, &mut layout);
         self.render_stall_browse_panel(state, &mut layout);
