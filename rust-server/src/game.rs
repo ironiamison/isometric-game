@@ -5740,6 +5740,15 @@ impl GameRoom {
             } else if choice_id == "board_abandon" {
                 self.handle_abandon_resource_contract(player_id).await;
                 self.show_adventure_board_dialogue(player_id, npc_id).await;
+            } else if let Some(order_id) = choice_id.strip_prefix("order_accept:") {
+                self.handle_accept_crafting_order(player_id, order_id).await;
+                self.show_adventure_board_dialogue(player_id, npc_id).await;
+            } else if choice_id == "order_claim" {
+                self.handle_claim_crafting_order(player_id).await;
+                self.show_adventure_board_dialogue(player_id, npc_id).await;
+            } else if choice_id == "order_abandon" {
+                self.handle_abandon_crafting_order(player_id).await;
+                self.show_adventure_board_dialogue(player_id, npc_id).await;
             } else {
                 match choice_id {
                     "board_farming" => {

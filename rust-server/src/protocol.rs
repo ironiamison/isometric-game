@@ -1262,6 +1262,9 @@ pub enum ServerMessage {
         offers: Vec<AdventureBoardOfferData>,
         active_contract: Option<AdventureBoardActiveContractData>,
         stats: AdventureBoardStatsData,
+        crafting_orders: Vec<CraftingOrderOfferData>,
+        crafting_order_active: Option<CraftingOrderActiveData>,
+        crafting_order_stats: CraftingOrderStatsData,
     },
 
     // ===== Slayer System Messages =====
@@ -1743,6 +1746,43 @@ pub struct AdventureBoardOfferData {
     pub description: String,
     pub skill_level: i32,
     pub difficulties: Vec<AdventureBoardDifficultyData>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CraftingOrderOfferData {
+    pub order_id: String,
+    pub tier: String,
+    pub skill: String,
+    pub min_level: i32,
+    pub items: Vec<CraftingOrderItemData>,
+    pub reward_gold: i32,
+    pub reward_xp: Vec<(String, i64)>,
+    pub reward_marks: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CraftingOrderItemData {
+    pub item_id: String,
+    pub item_name: String,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CraftingOrderActiveData {
+    pub order_id: String,
+    pub tier: String,
+    pub skill: String,
+    pub items: Vec<CraftingOrderItemData>,
+    pub reward_gold: i32,
+    pub reward_marks: i32,
+    pub can_claim: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CraftingOrderStatsData {
+    pub orders_completed: i32,
+    pub masterwork_completed: i32,
+    pub commission_marks: i32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -5984,6 +6024,9 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             offers,
             active_contract,
             stats,
+            crafting_orders,
+            crafting_order_active,
+            crafting_order_stats,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -6132,6 +6175,169 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 Value::Integer(stats.total_xp_earned.into()),
             ));
             map.push((Value::String("stats".into()), Value::Map(stats_map)));
+
+            // Crafting orders tab
+            map.push((
+                Value::String("crafting_orders".into()),
+                Value::Array(
+                    crafting_orders
+                        .iter()
+                        .map(|order| {
+                            let mut order_map = Vec::new();
+                            order_map.push((
+                                Value::String("order_id".into()),
+                                Value::String(order.order_id.clone().into()),
+                            ));
+                            order_map.push((
+                                Value::String("tier".into()),
+                                Value::String(order.tier.clone().into()),
+                            ));
+                            order_map.push((
+                                Value::String("skill".into()),
+                                Value::String(order.skill.clone().into()),
+                            ));
+                            order_map.push((
+                                Value::String("min_level".into()),
+                                Value::Integer((order.min_level as i64).into()),
+                            ));
+                            order_map.push((
+                                Value::String("items".into()),
+                                Value::Array(
+                                    order
+                                        .items
+                                        .iter()
+                                        .map(|item| {
+                                            let mut item_map = Vec::new();
+                                            item_map.push((
+                                                Value::String("item_id".into()),
+                                                Value::String(item.item_id.clone().into()),
+                                            ));
+                                            item_map.push((
+                                                Value::String("item_name".into()),
+                                                Value::String(item.item_name.clone().into()),
+                                            ));
+                                            item_map.push((
+                                                Value::String("quantity".into()),
+                                                Value::Integer((item.quantity as i64).into()),
+                                            ));
+                                            Value::Map(item_map)
+                                        })
+                                        .collect(),
+                                ),
+                            ));
+                            order_map.push((
+                                Value::String("reward_gold".into()),
+                                Value::Integer((order.reward_gold as i64).into()),
+                            ));
+                            order_map.push((
+                                Value::String("reward_xp".into()),
+                                Value::Array(
+                                    order
+                                        .reward_xp
+                                        .iter()
+                                        .map(|(skill, amount)| {
+                                            let mut xp_map = Vec::new();
+                                            xp_map.push((
+                                                Value::String("skill".into()),
+                                                Value::String(skill.clone().into()),
+                                            ));
+                                            xp_map.push((
+                                                Value::String("amount".into()),
+                                                Value::Integer((*amount).into()),
+                                            ));
+                                            Value::Map(xp_map)
+                                        })
+                                        .collect(),
+                                ),
+                            ));
+                            order_map.push((
+                                Value::String("reward_marks".into()),
+                                Value::Integer((order.reward_marks as i64).into()),
+                            ));
+                            Value::Map(order_map)
+                        })
+                        .collect(),
+                ),
+            ));
+
+            let crafting_active_value = if let Some(active) = crafting_order_active {
+                let mut active_map = Vec::new();
+                active_map.push((
+                    Value::String("order_id".into()),
+                    Value::String(active.order_id.clone().into()),
+                ));
+                active_map.push((
+                    Value::String("tier".into()),
+                    Value::String(active.tier.clone().into()),
+                ));
+                active_map.push((
+                    Value::String("skill".into()),
+                    Value::String(active.skill.clone().into()),
+                ));
+                active_map.push((
+                    Value::String("items".into()),
+                    Value::Array(
+                        active
+                            .items
+                            .iter()
+                            .map(|item| {
+                                let mut item_map = Vec::new();
+                                item_map.push((
+                                    Value::String("item_id".into()),
+                                    Value::String(item.item_id.clone().into()),
+                                ));
+                                item_map.push((
+                                    Value::String("item_name".into()),
+                                    Value::String(item.item_name.clone().into()),
+                                ));
+                                item_map.push((
+                                    Value::String("quantity".into()),
+                                    Value::Integer((item.quantity as i64).into()),
+                                ));
+                                Value::Map(item_map)
+                            })
+                            .collect(),
+                    ),
+                ));
+                active_map.push((
+                    Value::String("reward_gold".into()),
+                    Value::Integer((active.reward_gold as i64).into()),
+                ));
+                active_map.push((
+                    Value::String("reward_marks".into()),
+                    Value::Integer((active.reward_marks as i64).into()),
+                ));
+                active_map.push((
+                    Value::String("can_claim".into()),
+                    Value::Boolean(active.can_claim),
+                ));
+                Value::Map(active_map)
+            } else {
+                Value::Nil
+            };
+            map.push((
+                Value::String("crafting_order_active".into()),
+                crafting_active_value,
+            ));
+
+            let mut co_stats_map = Vec::new();
+            co_stats_map.push((
+                Value::String("orders_completed".into()),
+                Value::Integer((crafting_order_stats.orders_completed as i64).into()),
+            ));
+            co_stats_map.push((
+                Value::String("masterwork_completed".into()),
+                Value::Integer((crafting_order_stats.masterwork_completed as i64).into()),
+            ));
+            co_stats_map.push((
+                Value::String("commission_marks".into()),
+                Value::Integer((crafting_order_stats.commission_marks as i64).into()),
+            ));
+            map.push((
+                Value::String("crafting_order_stats".into()),
+                Value::Map(co_stats_map),
+            ));
+
             Value::Map(map)
         }
         ServerMessage::BankOpen {

@@ -1,7 +1,8 @@
 use super::GameRoom;
 use crate::protocol::{
     AdventureBoardActiveContractData, AdventureBoardDifficultyData, AdventureBoardOfferData,
-    AdventureBoardStatsData, DialogueChoice, ServerMessage,
+    AdventureBoardStatsData, CraftingOrderActiveData, CraftingOrderItemData,
+    CraftingOrderOfferData, CraftingOrderStatsData, DialogueChoice, ServerMessage,
 };
 use crate::resource_contracts::{ContractDifficulty, ResourceContract, ResourceContractKind};
 use rand::Rng;
@@ -270,11 +271,140 @@ impl GameRoom {
             }
         };
 
+        // === Crafting Orders Tab ===
+        let character_id = Self::parse_character_id(player_id);
+        let skills_map = {
+            let players = self.players.read().await;
+            players
+                .get(player_id)
+                .map(|p| super::crafting_orders::skills_to_map(&p.skills))
+                .unwrap_or_default()
+        };
+
+        let mut crafting_orders = Vec::new();
+        let mut crafting_order_active = None;
+        let mut crafting_order_stats = CraftingOrderStatsData {
+            orders_completed: 0,
+            masterwork_completed: 0,
+            commission_marks: 0,
+        };
+
+        if let (Some(db), Some(char_id)) = (&self.db, character_id) {
+            // Get or generate daily orders
+            let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+            let order_ids = match db.get_available_orders(char_id, &today).await {
+                Ok(ids) if !ids.is_empty() => ids,
+                _ => {
+                    let new_ids = self
+                        .crafting_order_registry
+                        .generate_daily_orders(&skills_map);
+                    if let Err(e) = db.save_available_orders(char_id, &today, &new_ids).await {
+                        tracing::warn!("Failed to save daily crafting orders: {}", e);
+                    }
+                    new_ids
+                }
+            };
+
+            // Map order IDs to CraftingOrderOfferData
+            for order_id in &order_ids {
+                if let Some(template) = self.crafting_order_registry.get_order(order_id) {
+                    let items: Vec<CraftingOrderItemData> = template
+                        .items
+                        .iter()
+                        .map(|item| {
+                            let item_name = self
+                                .item_registry
+                                .get(&item.id)
+                                .map(|def| def.display_name.clone())
+                                .unwrap_or_else(|| item.id.clone());
+                            CraftingOrderItemData {
+                                item_id: item.id.clone(),
+                                item_name,
+                                quantity: item.quantity,
+                            }
+                        })
+                        .collect();
+                    let reward_xp: Vec<(String, i64)> =
+                        template.rewards.xp.iter().map(|(k, v)| (k.clone(), *v)).collect();
+                    crafting_orders.push(CraftingOrderOfferData {
+                        order_id: template.id.clone(),
+                        tier: template.tier.clone(),
+                        skill: template.skill.clone(),
+                        min_level: template.min_level,
+                        items,
+                        reward_gold: template.rewards.gold,
+                        reward_xp,
+                        reward_marks: template.rewards.marks,
+                    });
+                }
+            }
+
+            // Check for active order
+            if let Ok(Some(active_order_id)) = db.get_active_order(char_id).await {
+                if let Some(template) = self.crafting_order_registry.get_order(&active_order_id) {
+                    let items: Vec<CraftingOrderItemData> = template
+                        .items
+                        .iter()
+                        .map(|item| {
+                            let item_name = self
+                                .item_registry
+                                .get(&item.id)
+                                .map(|def| def.display_name.clone())
+                                .unwrap_or_else(|| item.id.clone());
+                            CraftingOrderItemData {
+                                item_id: item.id.clone(),
+                                item_name,
+                                quantity: item.quantity,
+                            }
+                        })
+                        .collect();
+
+                    // Check if player can claim (has all required items)
+                    let can_claim = {
+                        let players = self.players.read().await;
+                        if let Some(player) = players.get(player_id) {
+                            template
+                                .items
+                                .iter()
+                                .all(|item| player.inventory.has_item(&item.id, item.quantity))
+                        } else {
+                            false
+                        }
+                    };
+
+                    crafting_order_active = Some(CraftingOrderActiveData {
+                        order_id: active_order_id,
+                        tier: template.tier.clone(),
+                        skill: template.skill.clone(),
+                        items,
+                        reward_gold: template.rewards.gold,
+                        reward_marks: template.rewards.marks,
+                        can_claim,
+                    });
+                }
+            }
+
+            // Load crafting order stats
+            if let Ok((completed, masterwork, _total_marks)) =
+                db.get_crafting_order_stats(char_id).await
+            {
+                let commission_marks = db.get_commission_marks(char_id).await.unwrap_or(0);
+                crafting_order_stats = CraftingOrderStatsData {
+                    orders_completed: completed,
+                    masterwork_completed: masterwork,
+                    commission_marks,
+                };
+            }
+        }
+
         ServerMessage::AdventureBoardState {
             npc_id: npc_id.to_string(),
             offers,
             active_contract,
             stats,
+            crafting_orders,
+            crafting_order_active,
+            crafting_order_stats,
         }
     }
 
