@@ -26,6 +26,7 @@ mod chairs;
 mod chat;
 mod chests;
 mod crafting;
+pub(crate) mod crafting_orders;
 mod farming;
 mod instance_npc_tick;
 mod inventory;
@@ -1334,6 +1335,8 @@ pub struct GameRoom {
     pvp_zones: HashSet<(i32, i32)>,
     /// Movement anomaly counters exported through /api/perf.
     movement_anomalies: MovementAnomalyCounters,
+    /// Crafting order template registry (loaded from data/orders/)
+    crafting_order_registry: crafting_orders::CraftingOrderRegistry,
     /// Cached name of the all-time highest total level player (gold trophy)
     top_level_player_name: RwLock<Option<String>>,
     /// Cached total level value of the #1 player
@@ -1995,6 +1998,7 @@ impl GameRoom {
             overworld_world_map,
             pvp_zones,
             movement_anomalies: MovementAnomalyCounters::default(),
+            crafting_order_registry: crafting_orders::CraftingOrderRegistry::load("data"),
             top_level_player_name: RwLock::new(None),
             top_level_value: RwLock::new(0),
             second_level_player_name: RwLock::new(None),
