@@ -10,7 +10,7 @@ use crate::game::world_map::{
 use crate::game::{
     ActiveDialogue, ActivePotionBuff, ActiveQuest, AdventureBoardActiveContractInfo,
     AdventureBoardDifficultyInfo, AdventureBoardOfferInfo, AdventureBoardPanelState,
-    AdventureBoardStatsInfo, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
+    AdventureBoardStatsInfo, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
     FriendInfo, GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot,
     ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal,
@@ -3487,48 +3487,6 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
             }
         }
 
-        "bonusTileSpawned" => {
-            if let Some(value) = data {
-                let x = extract_i32(value, "x").unwrap_or(0);
-                let y = extract_i32(value, "y").unwrap_or(0);
-                let zone_id = extract_string(value, "zone_id").unwrap_or_default();
-                let telegraph_duration =
-                    extract_u64(value, "telegraph_duration").unwrap_or(5) as f64;
-                log::info!("Bonus tile spawned at ({}, {}) in zone {}", x, y, zone_id);
-                state.bonus_tiles.push(BonusTile {
-                    x,
-                    y,
-                    zone_id,
-                    spawn_time: macroquad::time::get_time(),
-                    telegraph_duration,
-                });
-            }
-        }
-
-        "bonusTileClaimed" => {
-            if let Some(value) = data {
-                let x = extract_i32(value, "x").unwrap_or(0);
-                let y = extract_i32(value, "y").unwrap_or(0);
-                let player_id = extract_string(value, "player_id").unwrap_or_default();
-                log::info!("Bonus tile at ({}, {}) claimed by {}", x, y, player_id);
-                // Remove the bonus tile
-                state.bonus_tiles.retain(|t| t.x != x || t.y != y);
-                if state.local_player_id.as_deref() == Some(&player_id) {
-                    state.push_chat_message(ChatMessage::system(
-                        "You claimed the bonus spot! 2x gathering speed for 30s!".to_string(),
-                    ));
-                }
-            }
-        }
-
-        "bonusTileExpired" => {
-            if let Some(value) = data {
-                let x = extract_i32(value, "x").unwrap_or(0);
-                let y = extract_i32(value, "y").unwrap_or(0);
-                log::info!("Bonus tile at ({}, {}) expired", x, y);
-                state.bonus_tiles.retain(|t| t.x != x || t.y != y);
-            }
-        }
 
         "buffApplied" => {
             if let Some(value) = data {

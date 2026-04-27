@@ -1,4 +1,4 @@
-use crate::chunk::CHUNK_SIZE;
+
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ pub struct GatheringZoneConfig {
     pub skill: String,
     pub level_required: i32,
     pub loot_table: String,
-    pub bonus_spawn_frequency: u64,
+
     pub base_gather_speed: f32,
     pub base_xp: i64,
 }
@@ -63,28 +63,12 @@ pub struct PlayerGatheringState {
     pub marker_x: i32,
     pub marker_y: i32,
     pub last_gather_tick: u64,
-    pub buff_expires_at: u64,
-}
-
-#[derive(Debug, Clone)]
-pub struct BonusTile {
-    pub x: i32,
-    pub y: i32,
-    pub zone_id: String,
-    pub spawn_time: u64,
-    pub telegraph_duration: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct GatherResult {
     pub item_id: String,
     pub xp_gained: i64,
-}
-
-#[derive(Debug, Clone)]
-pub enum BonusTileEvent {
-    Spawned { x: i32, y: i32, zone_id: String },
-    Expired { x: i32, y: i32 },
 }
 
 // ---------------------------------------------------------------------------
@@ -101,8 +85,6 @@ pub struct GatheringSystem {
     /// (instance_id, x, y) -> player_id (None = overworld)
     pub occupied_markers: HashMap<(Option<String>, i32, i32), String>,
     pub player_states: HashMap<String, PlayerGatheringState>,
-    pub bonus_tiles: Vec<BonusTile>,
-    pub last_bonus_check: HashMap<String, u64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -170,8 +152,6 @@ impl GatheringSystem {
             instance_markers: HashMap::new(),
             occupied_markers: HashMap::new(),
             player_states: HashMap::new(),
-            bonus_tiles: Vec::new(),
-            last_bonus_check: HashMap::new(),
         }
     }
 
@@ -192,8 +172,6 @@ impl GatheringSystem {
             instance_markers: HashMap::new(),
             occupied_markers: HashMap::new(),
             player_states: HashMap::new(),
-            bonus_tiles: Vec::new(),
-            last_bonus_check: HashMap::new(),
         })
     }
 
@@ -253,7 +231,6 @@ impl GatheringSystem {
                 marker_x,
                 marker_y,
                 last_gather_tick: current_time,
-                buff_expires_at: 0,
             },
         );
 
@@ -310,11 +287,8 @@ impl GatheringSystem {
         let state = self.player_states.get(player_id)?;
         let zone = self.zones.get(&state.zone_id)?;
 
-        // Determine gather speed (2x if buffed, plus prayer and rod bonuses)
-        let has_buff = state.buff_expires_at > 0 && current_time < state.buff_expires_at;
-        let buff_multiplier = if has_buff { 2.0 } else { 1.0 };
-        // Combined multiplier: buff, prayer, and rod speed stack multiplicatively
-        let total_multiplier = buff_multiplier * prayer_speed_multiplier * rod_speed_multiplier;
+        // Combined multiplier: prayer and rod speed stack multiplicatively
+        let total_multiplier = prayer_speed_multiplier * rod_speed_multiplier;
         let gather_speed_ms = (zone.base_gather_speed * 1000.0 / total_multiplier) as u64;
 
         // Check if enough time has elapsed
@@ -441,113 +415,4 @@ impl GatheringSystem {
             .unwrap_or(&[])
     }
 
-    pub fn tick_bonus_tiles(&mut self, current_time: u64) -> Vec<BonusTileEvent> {
-        let mut events = Vec::new();
-
-        // Expire old bonus tiles (telegraph_duration has elapsed)
-        let mut i = 0;
-        while i < self.bonus_tiles.len() {
-            let tile = &self.bonus_tiles[i];
-            if current_time >= tile.spawn_time + tile.telegraph_duration {
-                let expired = self.bonus_tiles.remove(i);
-                events.push(BonusTileEvent::Expired {
-                    x: expired.x,
-                    y: expired.y,
-                });
-            } else {
-                i += 1;
-            }
-        }
-
-        // Spawn new bonus tiles per zone frequency
-        let mut rng = rand::thread_rng();
-        let zone_ids: Vec<String> = self.zones.keys().cloned().collect();
-
-        for zone_id in &zone_ids {
-            let zone = match self.zones.get(zone_id) {
-                Some(z) => z,
-                None => continue,
-            };
-
-            let freq_ms = zone.bonus_spawn_frequency * 1000;
-            let last_check = self.last_bonus_check.get(zone_id).copied().unwrap_or(0);
-
-            if current_time < last_check + freq_ms {
-                continue;
-            }
-
-            self.last_bonus_check.insert(zone_id.clone(), current_time);
-
-            // Pick a random marker in this zone to spawn a bonus tile near
-            // Only spawn bonus tiles in chunk 0,0 of the overworld
-            let zone_markers: Vec<&GatheringMarker> = self
-                .markers
-                .iter()
-                .filter(|m| {
-                    m.zone_id == *zone_id
-                        && m.x >= 0
-                        && m.x < CHUNK_SIZE as i32
-                        && m.y >= 0
-                        && m.y < CHUNK_SIZE as i32
-                })
-                .collect();
-
-            if zone_markers.is_empty() {
-                continue;
-            }
-
-            let marker = zone_markers[rng.gen_range(0..zone_markers.len())];
-            // Spawn bonus tile at a small random offset from the marker
-            let offset_x = rng.gen_range(-2..=2);
-            let offset_y = rng.gen_range(-2..=2);
-            let bx = marker.x + offset_x;
-            let by = marker.y + offset_y;
-
-            let bonus = BonusTile {
-                x: bx,
-                y: by,
-                zone_id: zone_id.clone(),
-                spawn_time: current_time,
-                telegraph_duration: 5000,
-            };
-
-            info!(
-                "Bonus tile spawned at ({}, {}) in zone '{}'",
-                bx, by, zone_id
-            );
-
-            events.push(BonusTileEvent::Spawned {
-                x: bx,
-                y: by,
-                zone_id: zone_id.clone(),
-            });
-
-            self.bonus_tiles.push(bonus);
-        }
-
-        events
-    }
-
-    pub fn claim_bonus_tile(&mut self, player_id: &str, x: i32, y: i32, current_time: u64) -> bool {
-        // Find and remove the bonus tile at (x, y)
-        let idx = self.bonus_tiles.iter().position(|t| t.x == x && t.y == y);
-        let idx = match idx {
-            Some(i) => i,
-            None => return false,
-        };
-
-        self.bonus_tiles.remove(idx);
-
-        // Apply 2x gather speed buff for 30 seconds
-        if let Some(state) = self.player_states.get_mut(player_id) {
-            state.buff_expires_at = current_time + 30_000;
-            info!(
-                "Player {} claimed bonus tile at ({}, {}), buff until {}",
-                player_id, x, y, state.buff_expires_at
-            );
-            true
-        } else {
-            false
-        }
-    }
 }

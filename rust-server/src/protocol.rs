@@ -983,21 +983,7 @@ pub enum ServerMessage {
         player_id: String,
         reason: String, // "cancelled", "moved", "inventory_full"
     },
-    BonusTileSpawned {
-        x: i32,
-        y: i32,
-        zone_id: String,
-        telegraph_duration: u64,
-    },
-    BonusTileClaimed {
-        x: i32,
-        y: i32,
-        player_id: String,
-    },
-    BonusTileExpired {
-        x: i32,
-        y: i32,
-    },
+
     BuffApplied {
         player_id: String,
         buff_type: String,
@@ -1847,9 +1833,7 @@ impl ServerMessage {
             ServerMessage::GatheringStarted { .. } => "gatheringStarted",
             ServerMessage::GatheringResult { .. } => "gatheringResult",
             ServerMessage::GatheringStopped { .. } => "gatheringStopped",
-            ServerMessage::BonusTileSpawned { .. } => "bonusTileSpawned",
-            ServerMessage::BonusTileClaimed { .. } => "bonusTileClaimed",
-            ServerMessage::BonusTileExpired { .. } => "bonusTileExpired",
+
             ServerMessage::BuffApplied { .. } => "buffApplied",
             ServerMessage::BuffExpired { .. } => "buffExpired",
             ServerMessage::PotionBuffsSync { .. } => "potionBuffsSync",
@@ -5002,59 +4986,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::BonusTileSpawned {
-            x,
-            y,
-            zone_id,
-            telegraph_duration,
-        } => {
-            let mut map = Vec::new();
-            map.push((
-                Value::String("x".into()),
-                Value::Integer((*x as i64).into()),
-            ));
-            map.push((
-                Value::String("y".into()),
-                Value::Integer((*y as i64).into()),
-            ));
-            map.push((
-                Value::String("zone_id".into()),
-                Value::String(zone_id.clone().into()),
-            ));
-            map.push((
-                Value::String("telegraph_duration".into()),
-                Value::Integer((*telegraph_duration as i64).into()),
-            ));
-            Value::Map(map)
-        }
-        ServerMessage::BonusTileClaimed { x, y, player_id } => {
-            let mut map = Vec::new();
-            map.push((
-                Value::String("x".into()),
-                Value::Integer((*x as i64).into()),
-            ));
-            map.push((
-                Value::String("y".into()),
-                Value::Integer((*y as i64).into()),
-            ));
-            map.push((
-                Value::String("player_id".into()),
-                Value::String(player_id.clone().into()),
-            ));
-            Value::Map(map)
-        }
-        ServerMessage::BonusTileExpired { x, y } => {
-            let mut map = Vec::new();
-            map.push((
-                Value::String("x".into()),
-                Value::Integer((*x as i64).into()),
-            ));
-            map.push((
-                Value::String("y".into()),
-                Value::Integer((*y as i64).into()),
-            ));
-            Value::Map(map)
-        }
+
         ServerMessage::BuffApplied {
             player_id,
             buff_type,

@@ -1151,16 +1151,6 @@ pub struct GatheringMarker {
     pub skill: String,
 }
 
-/// An active bonus tile event (glowing spot that gives 2x gather speed)
-#[derive(Debug, Clone)]
-pub struct BonusTile {
-    pub x: i32,
-    pub y: i32,
-    pub zone_id: String,
-    pub spawn_time: f64,
-    pub telegraph_duration: f64,
-}
-
 /// An active gathering buff on a player
 #[derive(Debug, Clone)]
 pub struct GatheringBuff {
@@ -2054,8 +2044,7 @@ pub struct GameState {
     pub pending_harvest_patch: Option<String>,
     /// Timestamp when gathering started (for cast animation delay)
     pub gathering_started_at: f64,
-    /// Active bonus tile events
-    pub bonus_tiles: Vec<BonusTile>,
+
     /// Active gathering buff on local player
     pub gathering_buff: Option<GatheringBuff>,
     /// Active potion buffs (attack/strength/defence boosts with timers)
@@ -2286,7 +2275,7 @@ impl GameState {
             pending_chair_sit: None,
             pending_harvest_patch: None,
             gathering_started_at: 0.0,
-            bonus_tiles: Vec::new(),
+
             gathering_buff: None,
             active_potion_buffs: Vec::new(),
             dash_cooldown_end: 0.0,

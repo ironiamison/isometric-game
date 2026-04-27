@@ -766,7 +766,7 @@ impl GameRoom {
                 .collect()
         };
 
-        let (gather_results, bonus_events) = {
+        let gather_results = {
             let mut gathering = self.gathering.write().await;
             let mut results: Vec<GatherResult> = Vec::new();
             let gatherer_ids: Vec<String> = gathering.player_states.keys().cloned().collect();
@@ -789,8 +789,7 @@ impl GameRoom {
                     });
                 }
             }
-            let bonus_events = gathering.tick_bonus_tiles(current_time);
-            (results, bonus_events)
+            results
         };
 
         let mut inventory_full_players: Vec<String> = Vec::new();
@@ -886,26 +885,7 @@ impl GameRoom {
             .await;
         }
 
-        for event in bonus_events {
-            match event {
-                crate::gathering::BonusTileEvent::Spawned { x, y, zone_id } => {
-                    self.send_to_overworld_players(
-                        ServerMessage::BonusTileSpawned {
-                            x,
-                            y,
-                            zone_id,
-                            telegraph_duration: 5000,
-                        },
-                        None,
-                    )
-                    .await;
-                }
-                crate::gathering::BonusTileEvent::Expired { x, y } => {
-                    self.send_to_overworld_players(ServerMessage::BonusTileExpired { x, y }, None)
-                        .await;
-                }
-            }
-        }
+
 
         let tree_respawn_events = {
             let mut woodcutting = self.woodcutting.write().await;

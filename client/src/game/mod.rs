@@ -36,7 +36,7 @@ pub use state::{
     quest_status_order, ActiveDialogue, ActivePotionBuff, ActiveQuest,
     AdventureBoardActiveContractInfo, AdventureBoardDifficultyInfo, AdventureBoardOfferInfo,
     AdventureBoardPanelState, AdventureBoardStatsInfo, AltarPanelState, Announcement,
-    AoeWarningZone, AutoActionState, BankDrag, BankQuantityAction, BankQuantityDialog, BonusTile,
+    AoeWarningZone, AutoActionState, BankDrag, BankQuantityAction, BankQuantityDialog,
     BossClientState, Camera, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice,
     DoubleClickState, DragSource, DragState, ExplosionEffect, FarmingPatch, FrameTimings,

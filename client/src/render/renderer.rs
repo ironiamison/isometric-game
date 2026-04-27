@@ -9762,45 +9762,6 @@ impl Renderer {
         }
     }
 
-    /// Render bonus tile indicators (pulsing golden glow on the ground)
-    fn render_bonus_tiles(&self, state: &GameState) {
-        let zoom = state.camera.zoom;
-        let time = macroquad::time::get_time();
-
-        for tile in &state.bonus_tiles {
-            let elapsed = time - tile.spawn_time;
-            let progress = (elapsed / tile.telegraph_duration).min(1.0) as f32;
-
-            // Pulsing alpha: oscillates faster as it approaches expiry
-            let pulse_speed = 3.0 + progress as f64 * 8.0;
-            let pulse = ((time * pulse_speed).sin() as f32 * 0.5 + 0.5) * 0.4 + 0.2;
-
-            let (screen_x, screen_y) = world_to_screen(tile.x as f32, tile.y as f32, &state.camera);
-
-            // Draw a golden diamond shape (isometric tile highlight)
-            let half_w = 16.0 * zoom;
-            let half_h = 8.0 * zoom;
-            let color = Color::new(1.0, 0.85, 0.2, pulse);
-
-            // Draw as a filled isometric diamond
-            draw_triangle(
-                Vec2::new(screen_x, screen_y - half_h),
-                Vec2::new(screen_x + half_w, screen_y),
-                Vec2::new(screen_x, screen_y + half_h),
-                color,
-            );
-            draw_triangle(
-                Vec2::new(screen_x, screen_y - half_h),
-                Vec2::new(screen_x - half_w, screen_y),
-                Vec2::new(screen_x, screen_y + half_h),
-                color,
-            );
-
-            // Draw a star/sparkle icon in the center
-            let star_color = Color::new(1.0, 1.0, 0.6, pulse + 0.3);
-            draw_circle(screen_x, screen_y, 3.0 * zoom, star_color);
-        }
-    }
 
     /// Render AOE warning zones as pulsing overlays on tiles
     fn render_aoe_warnings(&self, state: &GameState) {
