@@ -42,9 +42,17 @@ impl Direction {
         }
         // Cardinal only — pick the dominant axis, break ties with vertical
         if dx.abs() > dy.abs() {
-            if dx > 0.0 { Direction::Right } else { Direction::Left }
+            if dx > 0.0 {
+                Direction::Right
+            } else {
+                Direction::Left
+            }
         } else {
-            if dy > 0.0 { Direction::Down } else { Direction::Up }
+            if dy > 0.0 {
+                Direction::Down
+            } else {
+                Direction::Up
+            }
         }
     }
 

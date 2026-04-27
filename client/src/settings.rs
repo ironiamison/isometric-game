@@ -64,12 +64,18 @@ pub fn android_files_dir() -> Option<std::path::PathBuf> {
             return None;
         }
         // Call activity.getFilesDir() -> File
-        let files_dir = miniquad::call_object_method!(env, activity, "getFilesDir", "()Ljava/io/File;");
+        let files_dir =
+            miniquad::call_object_method!(env, activity, "getFilesDir", "()Ljava/io/File;");
         if files_dir.is_null() {
             return None;
         }
         // Call file.getAbsolutePath() -> String
-        let path_jstr = miniquad::call_object_method!(env, files_dir, "getAbsolutePath", "()Ljava/lang/String;");
+        let path_jstr = miniquad::call_object_method!(
+            env,
+            files_dir,
+            "getAbsolutePath",
+            "()Ljava/lang/String;"
+        );
         if path_jstr.is_null() {
             return None;
         }

@@ -773,15 +773,17 @@ impl QuestRunner {
 
         // set_flag — stores flags in the result table for later persistence
         let set_flag = lua
-            .create_function(|lua, (this, flag_name, flag_value): (Table, String, String)| {
-                let result: Table = this.get("_result")?;
-                let flags: Table = result
-                    .get::<Table>("_flags")
-                    .unwrap_or_else(|_| lua.create_table().unwrap());
-                flags.set(flag_name, flag_value)?;
-                result.set("_flags", flags)?;
-                Ok(())
-            })
+            .create_function(
+                |lua, (this, flag_name, flag_value): (Table, String, String)| {
+                    let result: Table = this.get("_result")?;
+                    let flags: Table = result
+                        .get::<Table>("_flags")
+                        .unwrap_or_else(|_| lua.create_table().unwrap());
+                    flags.set(flag_name, flag_value)?;
+                    result.set("_flags", flags)?;
+                    Ok(())
+                },
+            )
             .map_err(|e| format!("Lua error: {}", e))?;
         ctx_table
             .set("set_flag", set_flag)

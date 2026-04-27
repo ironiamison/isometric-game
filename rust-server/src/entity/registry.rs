@@ -251,7 +251,9 @@ impl EntityRegistry {
             parent.map(|p| p.loot_tables.clone()).unwrap_or_default();
         loot_tables.extend(raw.loot_tables.clone());
 
-        let size = raw.size.unwrap_or_else(|| parent.map(|p| p.size).unwrap_or(1));
+        let size = raw
+            .size
+            .unwrap_or_else(|| parent.map(|p| p.size).unwrap_or(1));
 
         // Parse animation type
         let animation_type = raw

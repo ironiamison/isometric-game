@@ -3,18 +3,22 @@ use super::protocol::{
     extract_u64, extract_u8,
 };
 use crate::game::npc::{Npc, NpcState};
-use crate::render::animation::{NpcAnimationLayout, NpcAnimationState};
+use crate::game::world_map::{
+    WORLD_MAP_POI_KIND_CHEST, WORLD_MAP_POI_KIND_QUEST, WORLD_MAP_POI_KIND_TELEPORT,
+    WORLD_MAP_POI_KIND_TREE,
+};
 use crate::game::{
     ActiveDialogue, ActivePotionBuff, ActiveQuest, AdventureBoardActiveContractInfo,
     AdventureBoardDifficultyInfo, AdventureBoardOfferInfo, AdventureBoardPanelState,
     AdventureBoardStatsInfo, BonusTile, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
     FriendInfo, GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot,
-    ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player,
-    Portal, QuestCatalogEntry, QuestCompletedEvent, QuestObjective, RecipeDefinition,
-    RecipeIngredient, RecipeResult, ShopData, ShopStockItem, SkillType, SkillXpEvent,
-    SpellEffect, TransitionState, Wall, WallEdge,
+    ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal,
+    QuestCatalogEntry, QuestCompletedEvent, QuestObjective, RecipeDefinition, RecipeIngredient,
+    RecipeResult, ShopData, ShopStockItem, SkillType, SkillXpEvent, SpellEffect, TransitionState,
+    Wall, WallEdge, WorldMapBounds, WorldMapChunkSample, WorldMapPoi, WorldMapSnapshot,
 };
+use crate::render::animation::{NpcAnimationLayout, NpcAnimationState};
 use crate::render::OVERWORLD_NAME;
 
 /// Max tile distance from local player to play other players' SFX.
@@ -155,10 +159,7 @@ fn extract_string_array(value: &rmpv::Value, key: &str) -> Vec<String> {
     result
 }
 
-fn extract_blockable_monsters(
-    value: &rmpv::Value,
-    key: &str,
-) -> Vec<(String, String)> {
+fn extract_blockable_monsters(value: &rmpv::Value, key: &str) -> Vec<(String, String)> {
     let mut result = Vec::new();
     if let Some(arr) = extract_map_field(value, key) {
         if let rmpv::Value::Array(ref items) = *arr {
@@ -458,8 +459,21 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 }
 
                 if let (Some(x), Some(y)) = (x, y) {
-                    if is_local_player && (vel_x != 0.0 || vel_y != 0.0 || player.vel_x != 0.0 || player.vel_y != 0.0) {
-                        macroquad::logging::info!("[SYNC] pos=({},{}) z={} vel=({},{}) ack={:?}", x, y, z, vel_x, vel_y, move_ack_seq);
+                    if is_local_player
+                        && (vel_x != 0.0
+                            || vel_y != 0.0
+                            || player.vel_x != 0.0
+                            || player.vel_y != 0.0)
+                    {
+                        macroquad::logging::info!(
+                            "[SYNC] pos=({},{}) z={} vel=({},{}) ack={:?}",
+                            x,
+                            y,
+                            z,
+                            vel_x,
+                            vel_y,
+                            move_ack_seq
+                        );
                     }
                     player.set_server_state(
                         x as f32,
@@ -700,7 +714,12 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                 return true;
             }
             if player.last_sync_tick > 0 && player.last_sync_tick < stale_threshold {
-                log::info!("Removing stale player {} (last seen tick {}, current {})", id, player.last_sync_tick, tick);
+                log::info!(
+                    "Removing stale player {} (last seen tick {}, current {})",
+                    id,
+                    player.last_sync_tick,
+                    tick
+                );
                 return false;
             }
             true
@@ -881,7 +900,9 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
                     NpcState::Submerging => npc.animation.set_state(NpcAnimationState::Submerging),
                     NpcState::Emerging => npc.animation.set_state(NpcAnimationState::Emerging),
                     NpcState::Burrowing => npc.animation.set_state(NpcAnimationState::Burrowing),
-                    NpcState::Dead => { npc.start_death(); }
+                    NpcState::Dead => {
+                        npc.start_death();
+                    }
                     _ => {}
                 }
                 npc.hostile = hostile;
@@ -920,7 +941,9 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
 
     // Instance full sync: remove NPCs no longer present in the server's list
     if is_full_sync && !sync_instance.is_empty() {
-        state.npcs.retain(|id, npc| synced_npc_ids.contains(id) || npc.is_dying());
+        state
+            .npcs
+            .retain(|id, npc| synced_npc_ids.contains(id) || npc.is_dying());
     }
 
     // Push NPC regen events as healing numbers (negative damage = green +X)
@@ -1115,7 +1138,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 let end_x = target_x.round();
                                 let end_y = target_y.round();
                                 // Look up target Z from terrain height
-                                let end_z = state.chunk_manager.get_height(end_x as i32, end_y as i32) as f32;
+                                let end_z =
+                                    state.chunk_manager.get_height(end_x as i32, end_y as i32)
+                                        as f32;
                                 let dx = end_x - src_x;
                                 let dy = end_y - src_y;
                                 let dist = (dx * dx + dy * dy).sqrt();
@@ -1688,23 +1713,33 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         .filter_map(|v| v.as_i64().map(|i| i as u8))
                         .collect()
                 });
-                let block_types_down: Option<Vec<u16>> = extract_array(value, "blockTypesDown").map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_i64().map(|i| i as u16))
-                        .collect()
-                });
-                let block_types_right: Option<Vec<u16>> = extract_array(value, "blockTypesRight").map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_i64().map(|i| i as u16))
-                        .collect()
-                });
+                let block_types_down: Option<Vec<u16>> = extract_array(value, "blockTypesDown")
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_i64().map(|i| i as u16))
+                            .collect()
+                    });
+                let block_types_right: Option<Vec<u16>> = extract_array(value, "blockTypesRight")
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_i64().map(|i| i as u16))
+                            .collect()
+                    });
 
                 log::debug!("Received chunk data: ({}, {}) with {} layers, {} collision bytes, {} objects, {} walls, {} portals",
                     chunk_x, chunk_y, layers.len(), collision.len(), objects.len(), walls.len(), portals.len());
 
                 state.chunk_manager.load_chunk(
-                    chunk_x, chunk_y, layers, &collision, objects, walls, portals,
-                    heightmap, block_types_down, block_types_right,
+                    chunk_x,
+                    chunk_y,
+                    layers,
+                    &collision,
+                    objects,
+                    walls,
+                    portals,
+                    heightmap,
+                    block_types_down,
+                    block_types_right,
                 );
             }
         }
@@ -1826,15 +1861,12 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
         "adventureBoardState" => {
             if let Some(value) = data {
                 let npc_id = extract_string(value, "npc_id").unwrap_or_default();
-                let previous_kind = state
-                    .ui_state
-                    .adventure_board
-                    .as_ref()
-                    .and_then(|board| {
-                        board.offers
-                            .get(state.ui_state.adventure_board_selected_offer)
-                            .map(|offer| offer.kind_id.clone())
-                    });
+                let previous_kind = state.ui_state.adventure_board.as_ref().and_then(|board| {
+                    board
+                        .offers
+                        .get(state.ui_state.adventure_board_selected_offer)
+                        .map(|offer| offer.kind_id.clone())
+                });
                 let already_open = state
                     .ui_state
                     .active_dialogue
@@ -1896,8 +1928,7 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 let stats = extract_map_field(value, "stats")
                     .map(|stats| AdventureBoardStatsInfo {
-                        contracts_completed: extract_i32(stats, "contracts_completed")
-                            .unwrap_or(0),
+                        contracts_completed: extract_i32(stats, "contracts_completed").unwrap_or(0),
                         total_gold_earned: extract_i32(stats, "total_gold_earned").unwrap_or(0),
                         total_xp_earned: extract_i64(stats, "total_xp_earned").unwrap_or(0),
                     })
@@ -1916,18 +1947,24 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 if let Some(target_kind) = previous_kind {
                     if let Some(board) = state.ui_state.adventure_board.as_ref() {
-                        if let Some(idx) =
-                            board.offers.iter().position(|offer| offer.kind_id == target_kind)
+                        if let Some(idx) = board
+                            .offers
+                            .iter()
+                            .position(|offer| offer.kind_id == target_kind)
                         {
                             state.ui_state.adventure_board_selected_offer = idx;
                         }
                     }
                 } else if let Some(board) = state.ui_state.adventure_board.as_ref() {
-                    if let Some(active_kind) =
-                        board.active_contract.as_ref().map(|contract| contract.kind_id.as_str())
+                    if let Some(active_kind) = board
+                        .active_contract
+                        .as_ref()
+                        .map(|contract| contract.kind_id.as_str())
                     {
-                        if let Some(idx) =
-                            board.offers.iter().position(|offer| offer.kind_id == active_kind)
+                        if let Some(idx) = board
+                            .offers
+                            .iter()
+                            .position(|offer| offer.kind_id == active_kind)
                         {
                             state.ui_state.adventure_board_selected_offer = idx;
                         }
@@ -2159,7 +2196,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                 if fields.len() >= 3 {
                                     let item_id = fields[0].as_str().unwrap_or("").to_string();
                                     let source = fields[1].as_str().unwrap_or("").to_string();
-                                    let source_detail = fields[2].as_str().unwrap_or("").to_string();
+                                    let source_detail =
+                                        fields[2].as_str().unwrap_or("").to_string();
                                     defs.push((item_id, source, source_detail));
                                 }
                             }
@@ -2215,10 +2253,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let obtained_at = extract_string(value, "obtained_at").unwrap_or_default();
 
                 log::info!("New collection log entry: {} from {}", item_id, source);
-                state.ui_state.collection_log.insert(
-                    (item_id.clone(), source),
-                    obtained_at,
-                );
+                state
+                    .ui_state
+                    .collection_log
+                    .insert((item_id.clone(), source), obtained_at);
 
                 let display_name = state.item_registry.get_display_name(&item_id).to_string();
                 state.push_system_chat(format!("New collection log entry: {}!", display_name));
@@ -2324,7 +2362,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                                     )
                                     .unwrap_or(1),
                                     mine_speed_multiplier: mine_speed,
-                                    ranged_strength_bonus: extract_i32(item_value, "ranged_strength_bonus").unwrap_or(0),
+                                    ranged_strength_bonus: extract_i32(
+                                        item_value,
+                                        "ranged_strength_bonus",
+                                    )
+                                    .unwrap_or(0),
                                 }
                             });
 
@@ -2345,7 +2387,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             weapon_type,
                             range,
                             prayer_xp: extract_i32(item_value, "prayer_xp").unwrap_or(0),
-                            ranged_strength: extract_i32(item_value, "ranged_strength").unwrap_or(0),
+                            ranged_strength: extract_i32(item_value, "ranged_strength")
+                                .unwrap_or(0),
                             use_effect: extract_string(item_value, "use_effect_type"),
                         });
                     }
@@ -2579,7 +2622,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     // so +1 to show 1-based count
                     state.push_system_chat(format!(
                         "{} ({}/{})",
-                        display_name, state.ui_state.batch_completed + 1, state.ui_state.batch_total
+                        display_name,
+                        state.ui_state.batch_completed + 1,
+                        state.ui_state.batch_total
                     ));
                 } else {
                     let verb = match station.as_deref() {
@@ -3031,7 +3076,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 } else {
                     // Switch to boss music if entering boss cave
                     if map_id.contains("desert_boss_cave") {
-                        state.pending_music = Some("assets/audio/desert-boss-battle.ogg".to_string());
+                        state.pending_music =
+                            Some("assets/audio/desert-boss-battle.ogg".to_string());
                     }
 
                     // Transitioning to interior - wait for interiorData
@@ -3129,12 +3175,11 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 }
 
                 // Parse optional heightmap
-                let heightmap: Option<Vec<u8>> = extract_array(value, "heightmap")
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_u64().map(|n| n as u8))
-                            .collect()
-                    });
+                let heightmap: Option<Vec<u8>> = extract_array(value, "heightmap").map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u8))
+                        .collect()
+                });
                 let block_types_down: Option<Vec<u16>> = extract_array(value, "blockTypesDown")
                     .map(|arr| {
                         arr.iter()
@@ -3168,9 +3213,18 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 }
 
                 // Load the interior
-                state
-                    .chunk_manager
-                    .load_interior(width, height, layers, &collision, portals, objects, walls, heightmap, block_types_down, block_types_right);
+                state.chunk_manager.load_interior(
+                    width,
+                    height,
+                    layers,
+                    &collision,
+                    portals,
+                    objects,
+                    walls,
+                    heightmap,
+                    block_types_down,
+                    block_types_right,
+                );
                 state.current_interior = Some(map_id.clone());
                 state.current_instance = Some(instance_id);
                 state.fishing_bubbles.clear();
@@ -3282,6 +3336,82 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     log::info!("Received {} gathering markers", markers.len());
                     state.gathering_markers = markers;
                 }
+            }
+        }
+
+        "worldMapData" => {
+            if let Some(value) = data {
+                let min_x = extract_i32(value, "minX").unwrap_or(0) as f32;
+                let min_y = extract_i32(value, "minY").unwrap_or(0) as f32;
+                let max_x = extract_i32(value, "maxX").unwrap_or(32) as f32;
+                let max_y = extract_i32(value, "maxY").unwrap_or(32) as f32;
+                let low_sample_dim = extract_u8(value, "lowSampleDim")
+                    .or_else(|| extract_u8(value, "chunkSampleDim"))
+                    .unwrap_or(4) as usize;
+                let high_sample_dim =
+                    extract_u8(value, "highSampleDim").unwrap_or(low_sample_dim as u8) as usize;
+
+                let mut chunks = Vec::new();
+                if let Some(chunks_arr) = extract_array(value, "chunks") {
+                    for chunk in chunks_arr {
+                        let chunk_x = extract_i32(chunk, "chunkX").unwrap_or(0);
+                        let chunk_y = extract_i32(chunk, "chunkY").unwrap_or(0);
+                        let low_tiles: Vec<u32> = extract_array(chunk, "lowTiles")
+                            .or_else(|| extract_array(chunk, "tiles"))
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_u64().map(|n| n as u32))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        let high_tiles: Vec<u32> = extract_array(chunk, "highTiles")
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_u64().map(|n| n as u32))
+                                    .collect()
+                            })
+                            .unwrap_or_else(|| low_tiles.clone());
+                        chunks.push(WorldMapChunkSample {
+                            chunk_x,
+                            chunk_y,
+                            low_tiles,
+                            high_tiles,
+                        });
+                    }
+                }
+
+                let mut pois = Vec::new();
+                if let Some(pois_arr) = extract_array(value, "pois") {
+                    for poi in pois_arr {
+                        pois.push(WorldMapPoi {
+                            x: extract_f32(poi, "x").unwrap_or(0.0),
+                            y: extract_f32(poi, "y").unwrap_or(0.0),
+                            label: extract_string(poi, "label").unwrap_or_default(),
+                            icon_index: extract_u8(poi, "iconIndex").unwrap_or(255),
+                            kind: extract_u8(poi, "kind").unwrap_or_else(|| {
+                                match extract_u8(poi, "iconIndex").unwrap_or(255) {
+                                    6 => WORLD_MAP_POI_KIND_QUEST,
+                                    7 => WORLD_MAP_POI_KIND_TELEPORT,
+                                    9 => WORLD_MAP_POI_KIND_CHEST,
+                                    _ => WORLD_MAP_POI_KIND_TREE,
+                                }
+                            }),
+                        });
+                    }
+                }
+
+                state.world_map_snapshot = Some(WorldMapSnapshot {
+                    bounds: WorldMapBounds {
+                        min_x,
+                        min_y,
+                        max_x,
+                        max_y,
+                    },
+                    low_sample_dim: low_sample_dim.max(1),
+                    high_sample_dim: high_sample_dim.max(low_sample_dim).max(1),
+                    chunks,
+                    pois,
+                });
             }
         }
 
@@ -3431,7 +3561,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                             let stat = extract_string(b, "stat")?;
                             let amount = extract_i32(b, "amount").unwrap_or(0);
                             let remaining_ms = extract_u64(b, "remaining_ms").unwrap_or(0);
-                            let source_item_id = extract_string(b, "source_item_id").unwrap_or_default();
+                            let source_item_id =
+                                extract_string(b, "source_item_id").unwrap_or_default();
                             Some(ActivePotionBuff {
                                 stat,
                                 amount,
@@ -4333,7 +4464,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     extract_string_array(value, "blocked_monsters");
                 state.ui_state.slayer_unlocked_monsters =
                     extract_string_array(value, "unlocked_monsters");
-                state.ui_state.slayer_blockable_monsters = extract_blockable_monsters(value, "blockable_monsters");
+                state.ui_state.slayer_blockable_monsters =
+                    extract_blockable_monsters(value, "blockable_monsters");
                 state.ui_state.slayer_selected_block_monster = None;
                 state.ui_state.slayer_panel_open = true;
                 state.ui_state.slayer_reward_tab = 0;

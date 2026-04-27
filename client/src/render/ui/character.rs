@@ -91,7 +91,11 @@ impl Renderer {
         // Position panel on right side, above menu buttons
         let panel_x = screen_w - panel_width - 8.0;
         let button_area_height = bottom_ui_height(scale);
-        let panel_top = if cfg!(target_os = "android") { 2.0 } else { 45.0 };
+        let panel_top = if cfg!(target_os = "android") {
+            2.0
+        } else {
+            45.0
+        };
         let panel_bottom = screen_h - button_area_height - 8.0;
         // On Android, recalculate height without header, shop button, and stats for compact fit
         let panel_height = if cfg!(target_os = "android") {
@@ -284,8 +288,16 @@ impl Renderer {
             let ar_enabled = state.auto_retaliate;
             let ar_hovered = matches!(hovered, Some(UiElementId::AutoRetaliateToggle));
 
-            let ar_bg = if ar_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY };
-            let ar_border = if ar_hovered { SLOT_HOVER_BORDER } else { SLOT_BORDER };
+            let ar_bg = if ar_hovered {
+                SLOT_HOVER_BG
+            } else {
+                SLOT_BG_EMPTY
+            };
+            let ar_border = if ar_hovered {
+                SLOT_HOVER_BORDER
+            } else {
+                SLOT_BORDER
+            };
 
             draw_rectangle(ar_x, ar_y, ar_w, ar_h, ar_border);
             draw_rectangle(ar_x + 1.0, ar_y + 1.0, ar_w - 2.0, ar_h - 2.0, ar_bg);
@@ -345,13 +357,7 @@ impl Renderer {
         // Label
         let label = "Style:";
         let label_w = self.measure_text_sharp(label, 16.0).width;
-        self.draw_text_sharp(
-            label,
-            style_x,
-            style_y + 17.0 * scale,
-            16.0,
-            TEXT_DIM,
-        );
+        self.draw_text_sharp(label, style_x, style_y + 17.0 * scale, 16.0, TEXT_DIM);
 
         // Dynamic style buttons filling the remaining width
         let combat_styles = get_combat_styles_for_weapon(state);
@@ -373,7 +379,8 @@ impl Renderer {
             layout.add(UiElementId::CombatStyleButton(i), bounds);
 
             let is_active = current_style == *style_id;
-            let is_hovered = matches!(hovered, Some(UiElementId::CombatStyleButton(idx)) if *idx == i);
+            let is_hovered =
+                matches!(hovered, Some(UiElementId::CombatStyleButton(idx)) if *idx == i);
 
             let (bg, border) = if is_active {
                 (SLOT_HOVER_BG, SLOT_SELECTED_BORDER)
@@ -402,7 +409,6 @@ impl Renderer {
                 text_color,
             );
         }
-
 
         // ===== OPEN SHOP BUTTON (desktop only) =====
         if cfg!(target_os = "android") {

@@ -29,7 +29,14 @@ impl Renderer {
             panel_height,
             Color::new(0.0, 0.0, 0.0, 0.75),
         );
-        draw_rectangle_lines(panel_x, panel_y, panel_width, panel_height, 2.0, FRAME_ACCENT);
+        draw_rectangle_lines(
+            panel_x,
+            panel_y,
+            panel_width,
+            panel_height,
+            2.0,
+            FRAME_ACCENT,
+        );
 
         // Boss name
         let name = "Desert Wurm";

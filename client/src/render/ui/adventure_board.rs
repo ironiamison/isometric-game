@@ -134,13 +134,7 @@ impl Renderer {
                 40.0 * s,
                 SLOT_BG_EMPTY,
             );
-            self.draw_text_sharp(
-                label,
-                card_x + 8.0 * s,
-                stats_y + 15.0 * s,
-                16.0,
-                TEXT_DIM,
-            );
+            self.draw_text_sharp(label, card_x + 8.0 * s, stats_y + 15.0 * s, 16.0, TEXT_DIM);
             self.draw_text_sharp(
                 value,
                 card_x + 8.0 * s,
@@ -154,7 +148,11 @@ impl Renderer {
         let content_y = stats_y + 52.0 * s;
         let content_h = panel_y + panel_h - content_y - 12.0 * s;
 
-        let left_w = if compact { panel_w - 24.0 * s } else { 220.0 * s };
+        let left_w = if compact {
+            panel_w - 24.0 * s
+        } else {
+            220.0 * s
+        };
         let left_x = panel_x + 12.0 * s;
         let left_y = content_y;
         let left_h = if compact {
@@ -361,10 +359,10 @@ impl Renderer {
             for (idx, difficulty) in offer.difficulties.iter().enumerate() {
                 let dy = row_y_start + idx as f32 * (diff_row_h + diff_row_gap);
                 let button_id = UiElementId::AdventureBoardDifficulty(idx);
-                let row_rect =
-                    Rect::new(right_x + 10.0 * s, dy, detail_w - 20.0 * s, diff_row_h);
+                let row_rect = Rect::new(right_x + 10.0 * s, dy, detail_w - 20.0 * s, diff_row_h);
                 layout.add(button_id.clone(), row_rect);
-                let row_hovered = matches!(hovered, Some(UiElementId::AdventureBoardDifficulty(i)) if *i == idx);
+                let row_hovered =
+                    matches!(hovered, Some(UiElementId::AdventureBoardDifficulty(i)) if *i == idx);
                 let available = difficulty.unlocked && !has_active;
 
                 let row_bg = if row_hovered && available {
@@ -400,15 +398,12 @@ impl Renderer {
                 }
 
                 // Top row: difficulty name + rewards
-                let rewards_text = format!("{} XP  {} gp", difficulty.reward_xp, difficulty.reward_gold);
+                let rewards_text =
+                    format!("{} XP  {} gp", difficulty.reward_xp, difficulty.reward_gold);
                 let rewards_w = self.measure_text_sharp(&rewards_text, 16.0).width;
-                let name_max_w =
-                    (row_rect.w - 18.0 * s - rewards_w - 8.0 * s).max(40.0 * s);
-                let name_display = self.truncate_text_to_width(
-                    &difficulty.difficulty_name,
-                    name_max_w,
-                    16.0,
-                );
+                let name_max_w = (row_rect.w - 18.0 * s - rewards_w - 8.0 * s).max(40.0 * s);
+                let name_display =
+                    self.truncate_text_to_width(&difficulty.difficulty_name, name_max_w, 16.0);
                 self.draw_text_sharp(
                     &name_display,
                     row_rect.x + 12.0 * s,
@@ -435,8 +430,7 @@ impl Renderer {
                     (req_text.as_str(), Color::new(0.85, 0.35, 0.35, 1.0))
                 };
                 let status_max_w = (row_rect.w - 18.0 * s).max(40.0 * s);
-                let status_display =
-                    self.truncate_text_to_width(final_status, status_max_w, 16.0);
+                let status_display = self.truncate_text_to_width(final_status, status_max_w, 16.0);
                 self.draw_text_sharp(
                     &status_display,
                     row_rect.x + 12.0 * s,
@@ -537,7 +531,13 @@ impl Renderer {
             let bar_w = active_w - 24.0 * s;
             let bar_h = 16.0 * s;
             draw_rectangle(bar_x, bar_y, bar_w, bar_h, SLOT_BORDER);
-            draw_rectangle(bar_x + 1.0, bar_y + 1.0, bar_w - 2.0, bar_h - 2.0, SLOT_BG_EMPTY);
+            draw_rectangle(
+                bar_x + 1.0,
+                bar_y + 1.0,
+                bar_w - 2.0,
+                bar_h - 2.0,
+                SLOT_BG_EMPTY,
+            );
             draw_rectangle(
                 bar_x + 2.0,
                 bar_y + 2.0,
@@ -549,7 +549,8 @@ impl Renderer {
                 "{}/{} {}",
                 contract.amount_completed, contract.amount_required, contract.progress_label
             );
-            let progress_display = self.truncate_text_to_width(&progress_text, bar_w - 8.0 * s, 16.0);
+            let progress_display =
+                self.truncate_text_to_width(&progress_text, bar_w - 8.0 * s, 16.0);
             self.draw_text_sharp(
                 &progress_display,
                 bar_x + 6.0 * s,
@@ -642,7 +643,11 @@ impl Renderer {
                 claim_bounds.y + btn_h * 0.67,
                 16.0,
                 if contract.can_claim {
-                    if claim_hovered { TEXT_TITLE } else { TEXT_NORMAL }
+                    if claim_hovered {
+                        TEXT_TITLE
+                    } else {
+                        TEXT_NORMAL
+                    }
                 } else {
                     TEXT_DIM
                 },
@@ -678,7 +683,11 @@ impl Renderer {
                 abandon_bounds.x + (abandon_bounds.w - abandon_label_w) * 0.5,
                 abandon_bounds.y + btn_h * 0.67,
                 16.0,
-                if abandon_hovered { TEXT_TITLE } else { TEXT_NORMAL },
+                if abandon_hovered {
+                    TEXT_TITLE
+                } else {
+                    TEXT_NORMAL
+                },
             );
         } else {
             self.draw_text_sharp(

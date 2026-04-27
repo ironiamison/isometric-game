@@ -8,6 +8,7 @@ use super::pathfinding::PathState;
 use super::shop::{ShopData, ShopSubTab};
 use super::tilemap::Tilemap;
 use super::tutorial::TutorialManager;
+use super::world_map::WorldMapSnapshot;
 use crate::render::AreaBanner;
 use crate::render::XpGlobesManager;
 use crate::ui::UiElementId;
@@ -809,8 +810,8 @@ impl RockParticle {
 pub struct BubbleParticle {
     pub tile_x: f32,
     pub tile_y: f32,
-    pub height: f32,       // Rises from 0 upward
-    pub drift_x: f32,      // Small horizontal wobble
+    pub height: f32,  // Rises from 0 upward
+    pub drift_x: f32, // Small horizontal wobble
     pub rise_speed: f32,
     pub size: f32,
     pub started_at: f64,
@@ -2038,6 +2039,8 @@ pub struct GameState {
     pub ground_tile_overrides: HashMap<(i32, i32), u32>,
     /// Gathering marker positions received from server
     pub gathering_markers: Vec<GatheringMarker>,
+    /// Lightweight static overworld atlas + POIs for the expanded world map.
+    pub world_map_snapshot: Option<WorldMapSnapshot>,
     /// Whether the local player is currently gathering
     pub is_gathering: bool,
     /// Whether the local player is currently sitting on a chair
@@ -2275,6 +2278,7 @@ impl GameState {
             resource_contract: None,
             ground_tile_overrides: HashMap::new(),
             gathering_markers: Vec::new(),
+            world_map_snapshot: None,
             is_gathering: false,
             is_sitting: false,
             chair_positions: Vec::new(),
@@ -2425,7 +2429,6 @@ impl GameState {
         self.pending_move_seqs.clear();
     }
 
-
     /// Append a chat message and bump revision so renderer cache invalidates once.
     pub fn push_chat_message(&mut self, message: ChatMessage) {
         self.ui_state.chat_messages.push(message);
@@ -2439,7 +2442,6 @@ impl GameState {
 
     /// Update all players in a server-authoritative step model.
     pub fn update(&mut self, delta: f32) {
-
         // Prune expired potion buffs
         let now = macroquad::time::get_time();
         self.active_potion_buffs.retain(|b| b.expires_at > now);
@@ -2584,7 +2586,8 @@ impl GameState {
             }
             // Cap total bubbles to avoid runaway with many markers
             if self.fishing_bubbles.len() > 80 {
-                self.fishing_bubbles.drain(0..self.fishing_bubbles.len() - 80);
+                self.fishing_bubbles
+                    .drain(0..self.fishing_bubbles.len() - 80);
             }
         }
 
@@ -2627,9 +2630,8 @@ impl GameState {
         });
 
         // Clean up expired explosions
-        self.explosions.retain(|e| {
-            current_time - e.created_at < 1.0
-        });
+        self.explosions
+            .retain(|e| current_time - e.created_at < 1.0);
 
         // Clean up old quest completion events (older than 4 seconds)
         self.ui_state

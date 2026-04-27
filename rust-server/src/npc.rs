@@ -11,7 +11,13 @@ pub fn npc_occupied_tiles(x: i32, y: i32, size: i32) -> impl Iterator<Item = (i3
 
 /// Like `npc_occupied_tiles` but with explicit tile offsets in both axes.
 /// In isometric, a screen-down shift requires offsetting both x and y.
-pub fn npc_occupied_tiles_offset(x: i32, y: i32, size: i32, offset_x: i32, offset_y: i32) -> impl Iterator<Item = (i32, i32)> {
+pub fn npc_occupied_tiles_offset(
+    x: i32,
+    y: i32,
+    size: i32,
+    offset_x: i32,
+    offset_y: i32,
+) -> impl Iterator<Item = (i32, i32)> {
     let ax = x + offset_x;
     let ay = y + offset_y;
     (0..size).flat_map(move |dy| (0..size).map(move |dx| (ax + dx, ay + dy)))
@@ -39,11 +45,11 @@ fn scale_damage(base_damage: i32, level: i32) -> i32 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcState {
-    Idle,      // 0
-    Chasing,   // 1
-    Attacking, // 2
-    Returning, // 3
-    Dead,      // 4
+    Idle,       // 0
+    Chasing,    // 1
+    Attacking,  // 2
+    Returning,  // 3
+    Dead,       // 4
     Wandering,  // 5 - added at end to preserve existing state values
     Submerging, // 6
     Emerging,   // 7
@@ -445,7 +451,15 @@ impl Npc {
     }
 
     /// Minimum Chebyshev distance from point (px, py) to any tile in a size-N NPC at (nx, ny).
-    fn grid_distance_to_npc(px: i32, py: i32, nx: i32, ny: i32, size: i32, offset_x: i32, offset_y: i32) -> i32 {
+    fn grid_distance_to_npc(
+        px: i32,
+        py: i32,
+        nx: i32,
+        ny: i32,
+        size: i32,
+        offset_x: i32,
+        offset_y: i32,
+    ) -> i32 {
         let ax = nx + offset_x;
         let ay = ny + offset_y;
         let closest_x = px.clamp(ax, ax + size - 1);
@@ -456,7 +470,16 @@ impl Npc {
     /// Check if target is within attack range AND in a cardinal direction (not diagonal).
     /// Works for multi-tile NPCs: checks if the player is cardinally adjacent to any
     /// tile in the NPC's footprint.
-    fn is_in_melee_range(px: i32, py: i32, nx: i32, ny: i32, size: i32, offset_x: i32, offset_y: i32, range: i32) -> bool {
+    fn is_in_melee_range(
+        px: i32,
+        py: i32,
+        nx: i32,
+        ny: i32,
+        size: i32,
+        offset_x: i32,
+        offset_y: i32,
+        range: i32,
+    ) -> bool {
         let ax = nx + offset_x;
         let ay = ny + offset_y;
         // Find closest tile in the NPC footprint to the player
@@ -535,8 +558,9 @@ impl Npc {
 
             // Check if all tiles in the NPC's footprint are walkable
             let (off_x, off_y) = self.tile_offset();
-            let all_walkable = npc_occupied_tiles_offset(new_x, new_y, self.stats.size, off_x, off_y)
-                .all(|(tx, ty)| walkable_check(tx, ty));
+            let all_walkable =
+                npc_occupied_tiles_offset(new_x, new_y, self.stats.size, off_x, off_y)
+                    .all(|(tx, ty)| walkable_check(tx, ty));
             if !all_walkable {
                 continue; // Tile has collision
             }
@@ -601,7 +625,15 @@ impl Npc {
                             if *hp <= 0 {
                                 continue; // Skip dead players
                             }
-                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
+                            let dist = Self::grid_distance_to_npc(
+                                *px,
+                                *py,
+                                self.x,
+                                self.y,
+                                self.stats.size,
+                                self.tile_offset().0,
+                                self.tile_offset().1,
+                            );
                             if dist <= aggro_range {
                                 if nearest.is_none() || dist < nearest.as_ref().unwrap().1 {
                                     nearest = Some((player_id.clone(), dist));
@@ -643,7 +675,15 @@ impl Npc {
                             if *hp <= 0 {
                                 continue;
                             }
-                            let dist = Self::grid_distance_to_npc(*px, *py, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
+                            let dist = Self::grid_distance_to_npc(
+                                *px,
+                                *py,
+                                self.x,
+                                self.y,
+                                self.stats.size,
+                                self.tile_offset().0,
+                                self.tile_offset().1,
+                            );
                             if dist <= aggro_range {
                                 self.target_id = Some(player_id.clone());
                                 self.state = NpcState::Chasing;
@@ -714,7 +754,15 @@ impl Npc {
                 if let Some((tx, ty)) = target_pos {
                     let spawn_dist =
                         Self::grid_distance(self.x, self.y, self.spawn_x, self.spawn_y);
-                    let target_dist = Self::grid_distance_to_npc(tx, ty, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1);
+                    let target_dist = Self::grid_distance_to_npc(
+                        tx,
+                        ty,
+                        self.x,
+                        self.y,
+                        self.stats.size,
+                        self.tile_offset().0,
+                        self.tile_offset().1,
+                    );
                     let movement_done =
                         current_time - self.last_move_time >= self.get_move_cooldown_ms();
 
@@ -723,23 +771,31 @@ impl Npc {
                         self.state = NpcState::Returning;
                         self.target_id = None;
                     } else {
-                    let in_range = Self::is_in_melee_range(tx, ty, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1, self.get_attack_range());
-                    if in_range && movement_done
-                    {
-                        // In attack range and movement completed
-                        self.state = NpcState::Attacking;
-                    } else if !in_range {
-                        // Not in range, move toward target (one tile at a time)
-                        self.try_move_toward(
+                        let in_range = Self::is_in_melee_range(
                             tx,
                             ty,
-                            current_time,
-                            other_npc_positions,
-                            walkable_check,
-                            height_check,
+                            self.x,
+                            self.y,
+                            self.stats.size,
+                            self.tile_offset().0,
+                            self.tile_offset().1,
+                            self.get_attack_range(),
                         );
-                    }
-                    // If in range but movement not done, stay in Chasing and wait
+                        if in_range && movement_done {
+                            // In attack range and movement completed
+                            self.state = NpcState::Attacking;
+                        } else if !in_range {
+                            // Not in range, move toward target (one tile at a time)
+                            self.try_move_toward(
+                                tx,
+                                ty,
+                                current_time,
+                                other_npc_positions,
+                                walkable_check,
+                                height_check,
+                            );
+                        }
+                        // If in range but movement not done, stay in Chasing and wait
                     }
                 } else {
                     // Target lost (died or disconnected)
@@ -758,7 +814,16 @@ impl Npc {
                 });
 
                 if let Some((target_id, tx, ty)) = target_info {
-                    let in_range = Self::is_in_melee_range(tx, ty, self.x, self.y, self.stats.size, self.tile_offset().0, self.tile_offset().1, self.get_attack_range());
+                    let in_range = Self::is_in_melee_range(
+                        tx,
+                        ty,
+                        self.x,
+                        self.y,
+                        self.stats.size,
+                        self.tile_offset().0,
+                        self.tile_offset().1,
+                        self.get_attack_range(),
+                    );
                     if !in_range {
                         // Target moved out of range, chase again
                         self.state = NpcState::Chasing;

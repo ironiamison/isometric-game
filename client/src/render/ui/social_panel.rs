@@ -5,8 +5,8 @@ use super::common::*;
 use crate::game::{GameState, SocialTab};
 use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
-use macroquad::prelude::*;
 use macroquad::miniquad::window::screen_size;
+use macroquad::prelude::*;
 use macroquad::window::get_internal_gl;
 
 /// Social panel dimensions (matches INV_WIDTH for consistency)

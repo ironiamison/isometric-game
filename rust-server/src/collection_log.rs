@@ -17,8 +17,7 @@ impl CollectionLogDefinitions {
     pub fn load(path: &str) -> Self {
         let content = std::fs::read_to_string(path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
-        toml::from_str(&content)
-            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+        toml::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
     }
 
     /// Get all (item_id, source, source_detail) triples for protocol transmission

@@ -420,12 +420,10 @@ pub fn run_game_frame(
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem {
                 slot_index: *slot_index as u32,
             },
-            InputCommand::UseItemOnEntity { slot_index, npc_id } => {
-                ClientMessage::UseItemOn {
-                    slot_index: *slot_index as u32,
-                    target_npc_id: npc_id.clone(),
-                }
-            }
+            InputCommand::UseItemOnEntity { slot_index, npc_id } => ClientMessage::UseItemOn {
+                slot_index: *slot_index as u32,
+                target_npc_id: npc_id.clone(),
+            },
             InputCommand::Interact { npc_id } => {
                 // Notify tutorial of NPC interaction
                 if let Some(tutorial) = &mut game_state.tutorial {
@@ -807,7 +805,9 @@ pub fn run_game_frame(
             },
             InputCommand::KothContinue => ClientMessage::KothContinue,
             InputCommand::KothLeave => ClientMessage::KothLeave,
-            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate { enabled: *enabled },
+            InputCommand::SetAutoRetaliate { enabled } => {
+                ClientMessage::SetAutoRetaliate { enabled: *enabled }
+            }
         };
         network.send(&msg);
     }

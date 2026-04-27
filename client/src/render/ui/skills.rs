@@ -227,10 +227,10 @@ impl Renderer {
         } else if let Some(ref texture) = self.ui_icons {
             let (icon_col, icon_row) = match skill_type {
                 SkillType::Hitpoints => (0, 6),
-                SkillType::Attack => (5, 5),    // Attack icon
-                SkillType::Strength => (2, 6),  // Fist/strength icon
-                SkillType::Defence => (4, 5),   // Defence icon
-                SkillType::Ranged => (3, 5),    // Ranged icon
+                SkillType::Attack => (5, 5),   // Attack icon
+                SkillType::Strength => (2, 6), // Fist/strength icon
+                SkillType::Defence => (4, 5),  // Defence icon
+                SkillType::Ranged => (3, 5),   // Ranged icon
                 SkillType::Fishing => (4, 6),
                 SkillType::Farming => (4, 6),
                 SkillType::Mining => (0, 5),
@@ -370,7 +370,7 @@ impl Renderer {
             SkillType::Alchemy => Color::new(0.5, 0.8, 0.4, 1.0),   // Potion green
             SkillType::Slayer => Color::new(0.6, 0.15, 0.15, 1.0),  // Dark red
             SkillType::Survivalist => Color::new(0.45, 0.55, 0.25, 1.0), // Olive/forest green
-            SkillType::Ranged => Color::new(0.2, 0.7, 0.6, 1.0), // Teal
+            SkillType::Ranged => Color::new(0.2, 0.7, 0.6, 1.0),    // Teal
         }
     }
 

@@ -885,8 +885,10 @@ impl GameRoom {
                 }
             }
             "/boss" => {
+                use crate::protocol::{
+                    ChunkLayerData, ChunkObjectData, ChunkPortalData, ChunkWallData,
+                };
                 use base64::Engine;
-                use crate::protocol::{ChunkLayerData, ChunkPortalData, ChunkObjectData, ChunkWallData};
 
                 let map_id = crate::game::boss_tick::BOSS_MAP_ID;
 
@@ -940,15 +942,14 @@ impl GameRoom {
                                 zone_id: gz.zone_id.clone(),
                             })
                             .collect();
-                        self.register_instance_gathering_markers(&instance.id, markers).await;
+                        self.register_instance_gathering_markers(&instance.id, markers)
+                            .await;
                     }
                 }
 
                 // Save current overworld position for return
-                let (entrance_x, entrance_y) = self
-                    .get_player_position(player_id)
-                    .await
-                    .unwrap_or((0, 0));
+                let (entrance_x, entrance_y) =
+                    self.get_player_position(player_id).await.unwrap_or((0, 0));
 
                 // Track player's instance
                 {
@@ -1206,7 +1207,10 @@ impl GameRoom {
                     Some(tid) => {
                         let admin_name = {
                             let players = self.players.read().await;
-                            players.get(player_id).map(|p| p.name.clone()).unwrap_or_default()
+                            players
+                                .get(player_id)
+                                .map(|p| p.name.clone())
+                                .unwrap_or_default()
                         };
                         tracing::info!("Admin {} kicked player {}", admin_name, target_name);
                         self.send_system_message(&tid, "You have been kicked by an admin.")
@@ -1222,7 +1226,8 @@ impl GameRoom {
                             text: format!("{} has been kicked.", target_name),
                             timestamp: chat_timestamp_ms(),
                             channel: "global".to_string(),
-                        }).await;
+                        })
+                        .await;
                     }
                     None => {
                         self.send_system_message(player_id, "Player not found or not online.")
@@ -1232,16 +1237,22 @@ impl GameRoom {
             }
             "/ban" => {
                 if parts.len() < 3 {
-                    self.send_system_message(player_id, "Usage: /ban <player_name> <hours> [reason]")
-                        .await;
+                    self.send_system_message(
+                        player_id,
+                        "Usage: /ban <player_name> <hours> [reason]",
+                    )
+                    .await;
                     return;
                 }
                 let target_name = parts[1];
                 let hours: f64 = match parts[2].parse() {
                     Ok(h) if h > 0.0 && h <= 87600.0 => h,
                     _ => {
-                        self.send_system_message(player_id, "Hours must be between 0 and 87600 (10 years).")
-                            .await;
+                        self.send_system_message(
+                            player_id,
+                            "Hours must be between 0 and 87600 (10 years).",
+                        )
+                        .await;
                         return;
                     }
                 };
@@ -1253,7 +1264,10 @@ impl GameRoom {
 
                 let admin_name = {
                     let players = self.players.read().await;
-                    players.get(player_id).map(|p| p.name.clone()).unwrap_or_default()
+                    players
+                        .get(player_id)
+                        .map(|p| p.name.clone())
+                        .unwrap_or_default()
                 };
 
                 // Check if player is online — get account_id and IP
@@ -1291,22 +1305,34 @@ impl GameRoom {
                     }
 
                     let ban_msg = match &reason {
-                        Some(r) => format!("You have been banned for {} hours. Reason: {}", hours, r),
+                        Some(r) => {
+                            format!("You have been banned for {} hours. Reason: {}", hours, r)
+                        }
                         None => format!("You have been banned for {} hours.", hours),
                     };
                     self.send_system_message(&tid, &ban_msg).await;
                     self.unregister_player_sender(&tid).await;
 
-                    tracing::info!("Admin {} banned {} for {} hours (reason: {:?})", admin_name, target_name, hours, reason);
-                    self.send_system_message(player_id, &format!("Banned {} for {} hours", target_name, hours))
-                        .await;
+                    tracing::info!(
+                        "Admin {} banned {} for {} hours (reason: {:?})",
+                        admin_name,
+                        target_name,
+                        hours,
+                        reason
+                    );
+                    self.send_system_message(
+                        player_id,
+                        &format!("Banned {} for {} hours", target_name, hours),
+                    )
+                    .await;
                     self.broadcast(ServerMessage::ChatMessage {
                         sender_id: "system".to_string(),
                         sender_name: "[System]".to_string(),
                         text: format!("{} has been banned.", target_name),
                         timestamp: chat_timestamp_ms(),
                         channel: "global".to_string(),
-                    }).await;
+                    })
+                    .await;
                 } else {
                     // Offline player — look up from DB
                     match db.get_account_id_by_character_name(target_name).await {
@@ -1315,11 +1341,20 @@ impl GameRoom {
                                 .insert_ban(account_id, None, &admin_name, reason.as_deref(), hours)
                                 .await
                             {
-                                self.send_system_message(player_id, &format!("Failed to ban: {}", e))
-                                    .await;
+                                self.send_system_message(
+                                    player_id,
+                                    &format!("Failed to ban: {}", e),
+                                )
+                                .await;
                                 return;
                             }
-                            tracing::info!("Admin {} banned offline player {} for {} hours (reason: {:?})", admin_name, target_name, hours, reason);
+                            tracing::info!(
+                                "Admin {} banned offline player {} for {} hours (reason: {:?})",
+                                admin_name,
+                                target_name,
+                                hours,
+                                reason
+                            );
                             self.send_system_message(
                                 player_id,
                                 &format!("Banned {} (offline) for {} hours", target_name, hours),

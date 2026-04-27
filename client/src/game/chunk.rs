@@ -424,7 +424,10 @@ impl ChunkManager {
                 // the block side face below it. The diamond extends
                 // TILE_HEIGHT/4 below its center.
                 let (_, center_sy) = world_to_screen_z_exact(
-                    tx as f32 + 0.5, ty as f32 + 0.5, probe_z as f32, camera,
+                    tx as f32 + 0.5,
+                    ty as f32 + 0.5,
+                    probe_z as f32,
+                    camera,
                 );
                 let half_diamond = (TILE_HEIGHT / 4.0) * camera.zoom;
                 if screen_y > center_sy + half_diamond {

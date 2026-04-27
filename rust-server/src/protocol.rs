@@ -46,7 +46,10 @@ pub enum ClientMessage {
     #[serde(rename = "useItem")]
     UseItem { slot_index: u8 },
 
-    UseItemOn { slot_index: u8, target_npc_id: String },
+    UseItemOn {
+        slot_index: u8,
+        target_npc_id: String,
+    },
 
     #[serde(rename = "auth")]
     Auth { username: String, password: String },
@@ -538,6 +541,23 @@ pub struct StallSlotData {
     pub price: i32,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct WorldMapChunkSampleData {
+    pub chunk_x: i32,
+    pub chunk_y: i32,
+    pub low_tiles: Vec<u32>,
+    pub high_tiles: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WorldMapPoiData {
+    pub x: f32,
+    pub y: f32,
+    pub label: String,
+    pub icon_index: u8,
+    pub kind: u8,
+}
+
 // ============================================================================
 // Slayer Data Structs
 // ============================================================================
@@ -760,11 +780,11 @@ pub enum ServerMessage {
         chunk_x: i32,
         chunk_y: i32,
         layers: Vec<ChunkLayerData>,
-        collision: Vec<u8>,            // Packed collision bits
-        objects: Vec<ChunkObjectData>, // Map objects (trees, rocks, etc.)
-        walls: Vec<ChunkWallData>,     // Edge-aligned walls
-        portals: Vec<ChunkPortalData>, // Portals to other maps
-        heightmap: Option<Vec<u8>>,    // Optional height data (CHUNK_SIZE^2 bytes)
+        collision: Vec<u8>,                  // Packed collision bits
+        objects: Vec<ChunkObjectData>,       // Map objects (trees, rocks, etc.)
+        walls: Vec<ChunkWallData>,           // Edge-aligned walls
+        portals: Vec<ChunkPortalData>,       // Portals to other maps
+        heightmap: Option<Vec<u8>>,          // Optional height data (CHUNK_SIZE^2 bytes)
         block_types_down: Option<Vec<u16>>,  // Wall sprite IDs for down (+Y) side face
         block_types_right: Option<Vec<u16>>, // Wall sprite IDs for right (+X) side face
     },
@@ -996,6 +1016,16 @@ pub enum ServerMessage {
     },
     ChestPositions {
         positions: Vec<(i32, i32)>,
+    },
+    WorldMapData {
+        min_x: i32,
+        min_y: i32,
+        max_x: i32,
+        max_y: i32,
+        low_sample_dim: u8,
+        high_sample_dim: u8,
+        chunks: Vec<WorldMapChunkSampleData>,
+        pois: Vec<WorldMapPoiData>,
     },
     SitResult {
         success: bool,
@@ -1825,6 +1855,7 @@ impl ServerMessage {
             ServerMessage::PotionBuffsSync { .. } => "potionBuffsSync",
             ServerMessage::ChairPositions { .. } => "chairPositions",
             ServerMessage::ChestPositions { .. } => "chestPositions",
+            ServerMessage::WorldMapData { .. } => "worldMapData",
             ServerMessage::SitResult { .. } => "sitResult",
             ServerMessage::FarmingPatchStates { .. } => "farmingPatchStates",
             ServerMessage::PatchStateUpdate { .. } => "patchStateUpdate",
@@ -3648,16 +3679,31 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
 
             // Encode optional heightmap data
             if let Some(hm) = heightmap {
-                let hm_values: Vec<Value> = hm.iter().map(|&h| Value::Integer((h as i64).into())).collect();
+                let hm_values: Vec<Value> = hm
+                    .iter()
+                    .map(|&h| Value::Integer((h as i64).into()))
+                    .collect();
                 map.push((Value::String("heightmap".into()), Value::Array(hm_values)));
             }
             if let Some(bt) = block_types_down {
-                let bt_values: Vec<Value> = bt.iter().map(|&b| Value::Integer((b as i64).into())).collect();
-                map.push((Value::String("blockTypesDown".into()), Value::Array(bt_values)));
+                let bt_values: Vec<Value> = bt
+                    .iter()
+                    .map(|&b| Value::Integer((b as i64).into()))
+                    .collect();
+                map.push((
+                    Value::String("blockTypesDown".into()),
+                    Value::Array(bt_values),
+                ));
             }
             if let Some(bt) = block_types_right {
-                let bt_values: Vec<Value> = bt.iter().map(|&b| Value::Integer((b as i64).into())).collect();
-                map.push((Value::String("blockTypesRight".into()), Value::Array(bt_values)));
+                let bt_values: Vec<Value> = bt
+                    .iter()
+                    .map(|&b| Value::Integer((b as i64).into()))
+                    .collect();
+                map.push((
+                    Value::String("blockTypesRight".into()),
+                    Value::Array(bt_values),
+                ));
             }
 
             Value::Map(map)
@@ -4462,79 +4508,217 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::KothStateUpdate { phase, wave, points, enemies_alive, enemies_total, countdown_ms } => {
+        ServerMessage::KothStateUpdate {
+            phase,
+            wave,
+            points,
+            enemies_alive,
+            enemies_total,
+            countdown_ms,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("phase".into()), Value::String(phase.clone().into())));
-            map.push((Value::String("wave".into()), Value::Integer((*wave as i64).into())));
-            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
-            map.push((Value::String("enemiesAlive".into()), Value::Integer((*enemies_alive as i64).into())));
-            map.push((Value::String("enemiesTotal".into()), Value::Integer((*enemies_total as i64).into())));
-            map.push((Value::String("countdownMs".into()), Value::Integer((*countdown_ms as i64).into())));
+            map.push((
+                Value::String("phase".into()),
+                Value::String(phase.clone().into()),
+            ));
+            map.push((
+                Value::String("wave".into()),
+                Value::Integer((*wave as i64).into()),
+            ));
+            map.push((
+                Value::String("points".into()),
+                Value::Integer((*points as i64).into()),
+            ));
+            map.push((
+                Value::String("enemiesAlive".into()),
+                Value::Integer((*enemies_alive as i64).into()),
+            ));
+            map.push((
+                Value::String("enemiesTotal".into()),
+                Value::Integer((*enemies_total as i64).into()),
+            ));
+            map.push((
+                Value::String("countdownMs".into()),
+                Value::Integer((*countdown_ms as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::KothCheckpoint { wave, points, rewards, next_wave_enemy_count } => {
+        ServerMessage::KothCheckpoint {
+            wave,
+            points,
+            rewards,
+            next_wave_enemy_count,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("wave".into()), Value::Integer((*wave as i64).into())));
-            map.push((Value::String("points".into()), Value::Integer((*points as i64).into())));
-            let reward_values: Vec<Value> = rewards.iter().map(|r| {
-                let mut rmap = Vec::new();
-                rmap.push((Value::String("itemId".into()), Value::String(r.item_id.clone().into())));
-                rmap.push((Value::String("quantity".into()), Value::Integer((r.quantity as i64).into())));
-                Value::Map(rmap)
-            }).collect();
+            map.push((
+                Value::String("wave".into()),
+                Value::Integer((*wave as i64).into()),
+            ));
+            map.push((
+                Value::String("points".into()),
+                Value::Integer((*points as i64).into()),
+            ));
+            let reward_values: Vec<Value> = rewards
+                .iter()
+                .map(|r| {
+                    let mut rmap = Vec::new();
+                    rmap.push((
+                        Value::String("itemId".into()),
+                        Value::String(r.item_id.clone().into()),
+                    ));
+                    rmap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((r.quantity as i64).into()),
+                    ));
+                    Value::Map(rmap)
+                })
+                .collect();
             map.push((Value::String("rewards".into()), Value::Array(reward_values)));
-            map.push((Value::String("nextWaveEnemyCount".into()), Value::Integer((*next_wave_enemy_count as i64).into())));
+            map.push((
+                Value::String("nextWaveEnemyCount".into()),
+                Value::Integer((*next_wave_enemy_count as i64).into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::KothGameOver { waves_completed, total_points, rewards, victory } => {
+        ServerMessage::KothGameOver {
+            waves_completed,
+            total_points,
+            rewards,
+            victory,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("wavesCompleted".into()), Value::Integer((*waves_completed as i64).into())));
-            map.push((Value::String("totalPoints".into()), Value::Integer((*total_points as i64).into())));
-            let reward_values: Vec<Value> = rewards.iter().map(|r| {
-                let mut rmap = Vec::new();
-                rmap.push((Value::String("itemId".into()), Value::String(r.item_id.clone().into())));
-                rmap.push((Value::String("quantity".into()), Value::Integer((r.quantity as i64).into())));
-                Value::Map(rmap)
-            }).collect();
+            map.push((
+                Value::String("wavesCompleted".into()),
+                Value::Integer((*waves_completed as i64).into()),
+            ));
+            map.push((
+                Value::String("totalPoints".into()),
+                Value::Integer((*total_points as i64).into()),
+            ));
+            let reward_values: Vec<Value> = rewards
+                .iter()
+                .map(|r| {
+                    let mut rmap = Vec::new();
+                    rmap.push((
+                        Value::String("itemId".into()),
+                        Value::String(r.item_id.clone().into()),
+                    ));
+                    rmap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer((r.quantity as i64).into()),
+                    ));
+                    Value::Map(rmap)
+                })
+                .collect();
             map.push((Value::String("rewards".into()), Value::Array(reward_values)));
             map.push((Value::String("victory".into()), Value::Boolean(*victory)));
             Value::Map(map)
         }
-        ServerMessage::BossStateUpdate { boss_id, hp, max_hp, phase, wurm_state } => {
+        ServerMessage::BossStateUpdate {
+            boss_id,
+            hp,
+            max_hp,
+            phase,
+            wurm_state,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("bossId".into()), Value::String(boss_id.clone().into())));
-            map.push((Value::String("hp".into()), Value::Integer((*hp as i64).into())));
-            map.push((Value::String("maxHp".into()), Value::Integer((*max_hp as i64).into())));
-            map.push((Value::String("phase".into()), Value::String(phase.clone().into())));
-            map.push((Value::String("wurmState".into()), Value::String(wurm_state.clone().into())));
+            map.push((
+                Value::String("bossId".into()),
+                Value::String(boss_id.clone().into()),
+            ));
+            map.push((
+                Value::String("hp".into()),
+                Value::Integer((*hp as i64).into()),
+            ));
+            map.push((
+                Value::String("maxHp".into()),
+                Value::Integer((*max_hp as i64).into()),
+            ));
+            map.push((
+                Value::String("phase".into()),
+                Value::String(phase.clone().into()),
+            ));
+            map.push((
+                Value::String("wurmState".into()),
+                Value::String(wurm_state.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::AoeWarning { tiles, delay_ms, effect } => {
+        ServerMessage::AoeWarning {
+            tiles,
+            delay_ms,
+            effect,
+        } => {
             let mut map = Vec::new();
-            let tile_values: Vec<Value> = tiles.iter().map(|(x, y)| {
-                Value::Array(vec![Value::Integer((*x as i64).into()), Value::Integer((*y as i64).into())])
-            }).collect();
+            let tile_values: Vec<Value> = tiles
+                .iter()
+                .map(|(x, y)| {
+                    Value::Array(vec![
+                        Value::Integer((*x as i64).into()),
+                        Value::Integer((*y as i64).into()),
+                    ])
+                })
+                .collect();
             map.push((Value::String("tiles".into()), Value::Array(tile_values)));
-            map.push((Value::String("delayMs".into()), Value::Integer((*delay_ms as i64).into())));
-            map.push((Value::String("effect".into()), Value::String(effect.clone().into())));
+            map.push((
+                Value::String("delayMs".into()),
+                Value::Integer((*delay_ms as i64).into()),
+            ));
+            map.push((
+                Value::String("effect".into()),
+                Value::String(effect.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::AoeDamage { tiles, damage, effect } => {
+        ServerMessage::AoeDamage {
+            tiles,
+            damage,
+            effect,
+        } => {
             let mut map = Vec::new();
-            let tile_values: Vec<Value> = tiles.iter().map(|(x, y)| {
-                Value::Array(vec![Value::Integer((*x as i64).into()), Value::Integer((*y as i64).into())])
-            }).collect();
+            let tile_values: Vec<Value> = tiles
+                .iter()
+                .map(|(x, y)| {
+                    Value::Array(vec![
+                        Value::Integer((*x as i64).into()),
+                        Value::Integer((*y as i64).into()),
+                    ])
+                })
+                .collect();
             map.push((Value::String("tiles".into()), Value::Array(tile_values)));
-            map.push((Value::String("damage".into()), Value::Integer((*damage as i64).into())));
-            map.push((Value::String("effect".into()), Value::String(effect.clone().into())));
+            map.push((
+                Value::String("damage".into()),
+                Value::Integer((*damage as i64).into()),
+            ));
+            map.push((
+                Value::String("effect".into()),
+                Value::String(effect.clone().into()),
+            ));
             Value::Map(map)
         }
-        ServerMessage::Explosion { x, y, radius, damage } => {
+        ServerMessage::Explosion {
+            x,
+            y,
+            radius,
+            damage,
+        } => {
             let mut map = Vec::new();
-            map.push((Value::String("x".into()), Value::Integer((*x as i64).into())));
-            map.push((Value::String("y".into()), Value::Integer((*y as i64).into())));
-            map.push((Value::String("radius".into()), Value::Integer((*radius as i64).into())));
-            map.push((Value::String("damage".into()), Value::Integer((*damage as i64).into())));
+            map.push((
+                Value::String("x".into()),
+                Value::Integer((*x as i64).into()),
+            ));
+            map.push((
+                Value::String("y".into()),
+                Value::Integer((*y as i64).into()),
+            ));
+            map.push((
+                Value::String("radius".into()),
+                Value::Integer((*radius as i64).into()),
+            ));
+            map.push((
+                Value::String("damage".into()),
+                Value::Integer((*damage as i64).into()),
+            ));
             Value::Map(map)
         }
         ServerMessage::InteriorData {
@@ -4704,16 +4888,31 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
 
             // Encode optional heightmap
             if let Some(hm) = heightmap {
-                let hm_values: Vec<Value> = hm.iter().map(|&h| Value::Integer((h as i64).into())).collect();
+                let hm_values: Vec<Value> = hm
+                    .iter()
+                    .map(|&h| Value::Integer((h as i64).into()))
+                    .collect();
                 map.push((Value::String("heightmap".into()), Value::Array(hm_values)));
             }
             if let Some(btd) = block_types_down {
-                let btd_values: Vec<Value> = btd.iter().map(|&b| Value::Integer((b as i64).into())).collect();
-                map.push((Value::String("blockTypesDown".into()), Value::Array(btd_values)));
+                let btd_values: Vec<Value> = btd
+                    .iter()
+                    .map(|&b| Value::Integer((b as i64).into()))
+                    .collect();
+                map.push((
+                    Value::String("blockTypesDown".into()),
+                    Value::Array(btd_values),
+                ));
             }
             if let Some(btr) = block_types_right {
-                let btr_values: Vec<Value> = btr.iter().map(|&b| Value::Integer((b as i64).into())).collect();
-                map.push((Value::String("blockTypesRight".into()), Value::Array(btr_values)));
+                let btr_values: Vec<Value> = btr
+                    .iter()
+                    .map(|&b| Value::Integer((b as i64).into()))
+                    .collect();
+                map.push((
+                    Value::String("blockTypesRight".into()),
+                    Value::Array(btr_values),
+                ));
             }
 
             Value::Map(map)
@@ -4961,6 +5160,108 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 })
                 .collect();
             map.push((Value::String("positions".into()), Value::Array(pos_values)));
+            Value::Map(map)
+        }
+        ServerMessage::WorldMapData {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+            low_sample_dim,
+            high_sample_dim,
+            chunks,
+            pois,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("minX".into()),
+                Value::Integer((*min_x as i64).into()),
+            ));
+            map.push((
+                Value::String("minY".into()),
+                Value::Integer((*min_y as i64).into()),
+            ));
+            map.push((
+                Value::String("maxX".into()),
+                Value::Integer((*max_x as i64).into()),
+            ));
+            map.push((
+                Value::String("maxY".into()),
+                Value::Integer((*max_y as i64).into()),
+            ));
+            map.push((
+                Value::String("lowSampleDim".into()),
+                Value::Integer((*low_sample_dim as i64).into()),
+            ));
+            map.push((
+                Value::String("highSampleDim".into()),
+                Value::Integer((*high_sample_dim as i64).into()),
+            ));
+            map.push((
+                Value::String("chunks".into()),
+                Value::Array(
+                    chunks
+                        .iter()
+                        .map(|chunk| {
+                            Value::Map(vec![
+                                (
+                                    Value::String("chunkX".into()),
+                                    Value::Integer((chunk.chunk_x as i64).into()),
+                                ),
+                                (
+                                    Value::String("chunkY".into()),
+                                    Value::Integer((chunk.chunk_y as i64).into()),
+                                ),
+                                (
+                                    Value::String("lowTiles".into()),
+                                    Value::Array(
+                                        chunk
+                                            .low_tiles
+                                            .iter()
+                                            .map(|tile| Value::Integer((*tile as i64).into()))
+                                            .collect(),
+                                    ),
+                                ),
+                                (
+                                    Value::String("highTiles".into()),
+                                    Value::Array(
+                                        chunk
+                                            .high_tiles
+                                            .iter()
+                                            .map(|tile| Value::Integer((*tile as i64).into()))
+                                            .collect(),
+                                    ),
+                                ),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ));
+            map.push((
+                Value::String("pois".into()),
+                Value::Array(
+                    pois.iter()
+                        .map(|poi| {
+                            Value::Map(vec![
+                                (Value::String("x".into()), Value::F32(poi.x)),
+                                (Value::String("y".into()), Value::F32(poi.y)),
+                                (
+                                    Value::String("label".into()),
+                                    Value::String(poi.label.clone().into()),
+                                ),
+                                (
+                                    Value::String("iconIndex".into()),
+                                    Value::Integer((poi.icon_index as i64).into()),
+                                ),
+                                (
+                                    Value::String("kind".into()),
+                                    Value::Integer((poi.kind as i64).into()),
+                                ),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ));
             Value::Map(map)
         }
         ServerMessage::SitResult {
@@ -5357,7 +5658,11 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::SpellResult { success, reason, spell_id } => {
+        ServerMessage::SpellResult {
+            success,
+            reason,
+            spell_id,
+        } => {
             let mut map = Vec::new();
             map.push((Value::String("success".into()), Value::Boolean(*success)));
             match reason {
@@ -6047,7 +6352,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 .map(|(id, name)| {
                     Value::Map(vec![
                         (Value::String("id".into()), Value::String(id.clone().into())),
-                        (Value::String("name".into()), Value::String(name.clone().into())),
+                        (
+                            Value::String("name".into()),
+                            Value::String(name.clone().into()),
+                        ),
                     ])
                 })
                 .collect();
@@ -6202,10 +6510,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
         }
         ServerMessage::AutoRetaliateChanged { enabled } => {
             let mut map = Vec::new();
-            map.push((
-                Value::String("enabled".into()),
-                Value::Boolean(*enabled),
-            ));
+            map.push((Value::String("enabled".into()), Value::Boolean(*enabled)));
             Value::Map(map)
         }
         ServerMessage::ScrollSpellDefinitions { spells } => {
@@ -6744,7 +7049,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::TopPlayerChanged { player_name, second_player_name } => {
+        ServerMessage::TopPlayerChanged {
+            player_name,
+            second_player_name,
+        } => {
             let mut map = Vec::new();
             map.push((
                 Value::String("player_name".into()),
@@ -6762,7 +7070,10 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::CollectionLogDefinitions { entries, display_names } => {
+        ServerMessage::CollectionLogDefinitions {
+            entries,
+            display_names,
+        } => {
             let items: Vec<Value> = entries
                 .iter()
                 .map(|(item_id, source, source_detail)| {
@@ -6783,14 +7094,8 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 })
                 .collect();
             let mut map = Vec::new();
-            map.push((
-                Value::String("entries".into()),
-                Value::Array(items),
-            ));
-            map.push((
-                Value::String("display_names".into()),
-                Value::Array(names),
-            ));
+            map.push((Value::String("entries".into()), Value::Array(items)));
+            map.push((Value::String("display_names".into()), Value::Array(names)));
             Value::Map(map)
         }
         ServerMessage::CollectionLogSync { entries } => {
@@ -6806,10 +7111,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                 })
                 .collect();
             let mut map = Vec::new();
-            map.push((
-                Value::String("entries".into()),
-                Value::Array(items),
-            ));
+            map.push((Value::String("entries".into()), Value::Array(items)));
             Value::Map(map)
         }
         ServerMessage::CollectionLogEntry {
@@ -6925,10 +7227,7 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
         "useItemOn" => {
             let slot_index = msg_data
                 .as_map()
-                .and_then(|map| {
-                    map.iter()
-                        .find(|(k, _)| k.as_str() == Some("slot_index"))
-                })
+                .and_then(|map| map.iter().find(|(k, _)| k.as_str() == Some("slot_index")))
                 .and_then(|(_, v)| v.as_u64().map(|u| u as u8))
                 .unwrap_or(0);
             let target_npc_id = extract_string(msg_data, "target_npc_id").unwrap_or_default();

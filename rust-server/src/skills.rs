@@ -259,7 +259,8 @@ impl Skills {
     /// base = (Defence + Hitpoints + floor(Prayer/2)) / 4
     /// combat_level = floor(base + max((Attack+Strength)*0.325, Ranged*0.4875, Magic*0.4875))
     pub fn combat_level(&self) -> i32 {
-        let base = (self.defence.level as f64 + self.hitpoints.level as f64
+        let base = (self.defence.level as f64
+            + self.hitpoints.level as f64
             + (self.prayer.level as f64 / 2.0).floor())
             / 4.0;
         let melee = (self.attack.level + self.strength.level) as f64 * 0.325;

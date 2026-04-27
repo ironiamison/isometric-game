@@ -31,7 +31,11 @@ impl Renderer {
         );
 
         // Panel dimensions — fullscreen on Android, small margin on desktop
-        let margin = if cfg!(target_os = "android") { 0.0 } else { 10.0 };
+        let margin = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            10.0
+        };
         let panel_x = margin;
         let panel_y = margin;
         let panel_w = sw - margin * 2.0;

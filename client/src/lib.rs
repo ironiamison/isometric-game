@@ -145,8 +145,10 @@ async fn async_main() {
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
                             game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized = ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public = ui_settings.hide_system_in_public;
+                            game_state.ui_state.quest_tracker_minimized =
+                                ui_settings.quest_tracker_minimized;
+                            game_state.ui_state.hide_system_in_public =
+                                ui_settings.hide_system_in_public;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -196,8 +198,10 @@ async fn async_main() {
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
                             game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized = ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public = ui_settings.hide_system_in_public;
+                            game_state.ui_state.quest_tracker_minimized =
+                                ui_settings.quest_tracker_minimized;
+                            game_state.ui_state.hide_system_in_public =
+                                ui_settings.hide_system_in_public;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -405,8 +409,10 @@ async fn async_main() {
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
                             game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized = ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public = ui_settings.hide_system_in_public;
+                            game_state.ui_state.quest_tracker_minimized =
+                                ui_settings.quest_tracker_minimized;
+                            game_state.ui_state.hide_system_in_public =
+                                ui_settings.hide_system_in_public;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -526,8 +532,10 @@ async fn async_main() {
                                 game_state.ui_state.chat_log_background =
                                     ui_settings.chat_log_background;
                                 game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                                game_state.ui_state.quest_tracker_minimized = ui_settings.quest_tracker_minimized;
-                                game_state.ui_state.hide_system_in_public = ui_settings.hide_system_in_public;
+                                game_state.ui_state.quest_tracker_minimized =
+                                    ui_settings.quest_tracker_minimized;
+                                game_state.ui_state.hide_system_in_public =
+                                    ui_settings.hide_system_in_public;
                                 if game_state.ui_state.classic_controls {
                                     game_state.ui_state.chat_open = true;
                                 }

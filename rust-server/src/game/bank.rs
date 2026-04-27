@@ -274,7 +274,9 @@ impl GameRoom {
         }
 
         // Clamp to what inventory can hold
-        let space = player.inventory.available_space_for(item_id, &self.item_registry);
+        let space = player
+            .inventory
+            .available_space_for(item_id, &self.item_registry);
         let quantity = quantity.min(space);
         if quantity <= 0 {
             let msg = ServerMessage::BankResult {

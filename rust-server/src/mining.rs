@@ -179,7 +179,8 @@ impl MiningSystem {
 
     /// Check if a rock at given position is depleted
     pub fn is_rock_depleted(&self, instance_id: Option<&str>, x: i32, y: i32) -> bool {
-        self.depleted_rocks.contains_key(&(instance_id.map(|s| s.to_string()), x, y))
+        self.depleted_rocks
+            .contains_key(&(instance_id.map(|s| s.to_string()), x, y))
     }
 
     /// Tick respawns and return list of rocks that respawned
@@ -212,7 +213,10 @@ impl MiningSystem {
     }
 
     /// Get all currently depleted rocks (for syncing to new clients)
-    pub fn get_depleted_rocks(&self, instance_id: Option<&str>) -> Vec<((i32, i32), &DepletedRock)> {
+    pub fn get_depleted_rocks(
+        &self,
+        instance_id: Option<&str>,
+    ) -> Vec<((i32, i32), &DepletedRock)> {
         self.depleted_rocks
             .iter()
             .filter(|((inst, _, _), _)| inst.as_deref() == instance_id)

@@ -133,11 +133,8 @@ impl GameRoom {
                             p.y = WORLD_SPAWN_Y;
                         }
                     }
-                    self.send_to_player(
-                        &player.id,
-                        overworld_transition_message(),
-                    )
-                    .await;
+                    self.send_to_player(&player.id, overworld_transition_message())
+                        .await;
                 } else {
                     self.send_to_player(&player.id, overworld_transition_message())
                         .await;

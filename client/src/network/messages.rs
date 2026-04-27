@@ -43,7 +43,10 @@ pub enum ClientMessage {
     UseItem { slot_index: u32 },
 
     #[serde(rename = "useItemOn")]
-    UseItemOn { slot_index: u32, target_npc_id: String },
+    UseItemOn {
+        slot_index: u32,
+        target_npc_id: String,
+    },
 
     #[serde(rename = "requestChunk")]
     RequestChunk { chunk_x: i32, chunk_y: i32 },

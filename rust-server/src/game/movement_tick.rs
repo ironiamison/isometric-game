@@ -104,15 +104,14 @@ impl GameRoom {
 
             let mut players = self.players.write().await;
             let chunks_guard = self.world.chunks_read().await;
-            for player in players
-                .values_mut()
-                .filter(|p| p.active && !p.is_dead)
-            {
+            for player in players.values_mut().filter(|p| p.active && !p.is_dead) {
                 let ground_height_fn = |px: i32, py: i32| -> i32 {
                     if let Some(Some(inst_id)) = gravity_instance_map.get(&player.id) {
                         if let Some(Some(hm)) = gravity_heightmaps.get(inst_id) {
                             // Use instance heightmap
-                            if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
+                            if let Some(instance) =
+                                self.instance_manager.get_by_instance_id(inst_id)
+                            {
                                 return instance.get_height_at_sync(&Some(hm.clone()), px, py);
                             }
                         }
@@ -254,8 +253,10 @@ impl GameRoom {
                 .collect()
         };
 
-        let mut instance_collision_snapshots: HashMap<String, (Vec<bool>, u32, u32, Option<Vec<u8>>)> =
-            HashMap::new();
+        let mut instance_collision_snapshots: HashMap<
+            String,
+            (Vec<bool>, u32, u32, Option<Vec<u8>>),
+        > = HashMap::new();
         let mut instance_npc_positions: HashMap<String, HashSet<(i32, i32)>> = HashMap::new();
         {
             let needed_instances: HashSet<&String> = pending_moves
@@ -269,7 +270,12 @@ impl GameRoom {
                     let heightmap = instance.heightmap.read().await;
                     instance_collision_snapshots.insert(
                         instance_id.clone(),
-                        (collision.clone(), instance.map_width, instance.map_height, heightmap.clone()),
+                        (
+                            collision.clone(),
+                            instance.map_width,
+                            instance.map_height,
+                            heightmap.clone(),
+                        ),
                     );
 
                     let npcs = instance.npcs.read().await;
@@ -324,7 +330,9 @@ impl GameRoom {
                     return MoveCheck::BlockedTile;
                 }
                 // Height check: get terrain height at target
-                let target_height = self.world.get_height_at_sync(target_x, target_y, &chunks_guard);
+                let target_height =
+                    self.world
+                        .get_height_at_sync(target_x, target_y, &chunks_guard);
                 let height_diff = target_height - player_z;
                 // Block if terrain is more than 1 block above player, unless airborne (jumping)
                 if height_diff > 1 && player_grounded {
@@ -419,7 +427,9 @@ impl GameRoom {
 
             // Compute resulting Z and grounded state after move
             let (result_z, result_grounded) = if is_overworld {
-                let target_height = self.world.get_height_at_sync(target_x, target_y, &chunks_guard);
+                let target_height =
+                    self.world
+                        .get_height_at_sync(target_x, target_y, &chunks_guard);
                 if !player_grounded && player_z > target_height + 1 {
                     // Player is airborne (jumping over a gap) - keep current z, gravity handles landing
                     (player_z, false)
@@ -459,13 +469,42 @@ impl GameRoom {
         let mut auto_sit_requests = Vec::new();
         let mut ghost_tick_updates: Vec<(String, u32)> = Vec::new();
         let mut blocked_by_player: HashSet<String> = HashSet::new();
-        for (id, target_x, target_y, sampled_dx, sampled_dy, player_z, player_grounded, sampled_seq, ghost_ticks) in pending_moves {
+        for (
+            id,
+            target_x,
+            target_y,
+            sampled_dx,
+            sampled_dy,
+            player_z,
+            player_grounded,
+            sampled_seq,
+            ghost_ticks,
+        ) in pending_moves
+        {
             let move_dir = Direction::from_velocity(sampled_dx as f32, sampled_dy as f32);
             let can_ghost = ghost_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
-            match check_move(&id, target_x, target_y, player_z, player_grounded, move_dir, true, can_ghost) {
+            match check_move(
+                &id,
+                target_x,
+                target_y,
+                player_z,
+                player_grounded,
+                move_dir,
+                true,
+                can_ghost,
+            ) {
                 MoveCheck::Valid(result_z, result_grounded) => {
                     ghost_tick_updates.push((id.clone(), 0));
-                    valid_moves.push((id, target_x, target_y, sampled_dx, sampled_dy, result_z, result_grounded, sampled_seq));
+                    valid_moves.push((
+                        id,
+                        target_x,
+                        target_y,
+                        sampled_dx,
+                        sampled_dy,
+                        result_z,
+                        result_grounded,
+                        sampled_seq,
+                    ));
                 }
                 MoveCheck::AutoSit => {
                     ghost_tick_updates.push((id.clone(), 0));
@@ -511,7 +550,17 @@ impl GameRoom {
                 }
             }
 
-            for (id, target_x, target_y, sampled_dx, sampled_dy, result_z, result_grounded, sampled_seq) in valid_moves {
+            for (
+                id,
+                target_x,
+                target_y,
+                sampled_dx,
+                sampled_dy,
+                result_z,
+                result_grounded,
+                sampled_seq,
+            ) in valid_moves
+            {
                 if let Some(player) = players.get_mut(&id) {
                     if player.pending_move_seq != Some(sampled_seq) {
                         if let Some(new_seq) = player.pending_move_seq {
@@ -523,7 +572,8 @@ impl GameRoom {
                                     let new_target_y = player.y + new_dy;
                                     let move_dir =
                                         Direction::from_velocity(new_dx as f32, new_dy as f32);
-                                    let re_ghost = player.ghost_player_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
+                                    let re_ghost =
+                                        player.ghost_player_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
                                     match check_move(
                                         &id,
                                         new_target_x,

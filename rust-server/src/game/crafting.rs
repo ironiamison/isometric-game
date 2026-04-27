@@ -150,7 +150,8 @@ impl GameRoom {
                     skill_type.as_str(),
                     level
                 );
-                self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
+                self.broadcast_skill_level_up(player_id, skill_type.as_str(), level)
+                    .await;
                 any_leveled = true;
             }
         }
@@ -819,8 +820,13 @@ impl GameRoom {
             if !completion.burned {
                 let skill = collection_log_skill(completion.category);
                 for (item_id_gained, _count) in &completion.items_gained {
-                    self.record_collection_entry(&completion.pid, item_id_gained, "skilling", skill)
-                        .await;
+                    self.record_collection_entry(
+                        &completion.pid,
+                        item_id_gained,
+                        "skilling",
+                        skill,
+                    )
+                    .await;
                 }
             }
 

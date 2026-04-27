@@ -105,7 +105,11 @@ impl Renderer {
 
         // ===== HEADER SECTION =====
         let header_h = HEADER_HEIGHT * s;
-        let footer_h = if cfg!(target_os = "android") { 0.0 } else { FOOTER_HEIGHT * s };
+        let footer_h = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            FOOTER_HEIGHT * s
+        };
         let header_x = panel_x + FRAME_THICKNESS;
         let header_y = panel_y + FRAME_THICKNESS;
         let header_w = panel_width - FRAME_THICKNESS * 2.0;
@@ -329,32 +333,84 @@ impl Renderer {
 
         // ===== FOOTER SECTION =====
         if !cfg!(target_os = "android") {
-        let footer_x = panel_x + FRAME_THICKNESS;
-        let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
-        let footer_w = panel_width - FRAME_THICKNESS * 2.0;
+            let footer_x = panel_x + FRAME_THICKNESS;
+            let footer_y = panel_y + panel_height - FRAME_THICKNESS - footer_h;
+            let footer_w = panel_width - FRAME_THICKNESS * 2.0;
 
-        draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
-        draw_line(
-            footer_x + 10.0 * s,
-            footer_y,
-            footer_x + footer_w - 10.0 * s,
-            footer_y,
-            1.0,
-            HEADER_BORDER,
-        );
+            draw_rectangle(footer_x, footer_y, footer_w, footer_h, FOOTER_BG);
+            draw_line(
+                footer_x + 10.0 * s,
+                footer_y,
+                footer_x + footer_w - 10.0 * s,
+                footer_y,
+                1.0,
+                HEADER_BORDER,
+            );
 
-        if state.ui_state.shop_main_tab == 0 {
-            if state.ui_state.crafting_in_progress {
-                // Show cancel hint while crafting
-                self.draw_text_sharp(
-                    "[Esc] Cancel",
-                    footer_x + 10.0 * s,
-                    footer_y + footer_h * 0.67,
-                    16.0,
-                    TEXT_DIM,
-                );
+            if state.ui_state.shop_main_tab == 0 {
+                if state.ui_state.crafting_in_progress {
+                    // Show cancel hint while crafting
+                    self.draw_text_sharp(
+                        "[Esc] Cancel",
+                        footer_x + 10.0 * s,
+                        footer_y + footer_h * 0.67,
+                        16.0,
+                        TEXT_DIM,
+                    );
+                } else {
+                    // Recipes tab controls
+                    self.draw_text_sharp(
+                        "[Q] Tab",
+                        footer_x + 10.0 * s,
+                        footer_y + footer_h * 0.67,
+                        16.0,
+                        TEXT_DIM,
+                    );
+
+                    let has_multiple_categories =
+                        build_categories(&state.shop_filtered_recipes()).len() > 1;
+
+                    if has_multiple_categories {
+                        self.draw_text_sharp(
+                            "[A/D] Category",
+                            footer_x + 100.0 * s,
+                            footer_y + footer_h * 0.67,
+                            16.0,
+                            TEXT_DIM,
+                        );
+                        self.draw_text_sharp(
+                            "[W/S] Select",
+                            footer_x + 230.0 * s,
+                            footer_y + footer_h * 0.67,
+                            16.0,
+                            TEXT_DIM,
+                        );
+                        self.draw_text_sharp(
+                            "[C] Craft",
+                            footer_x + 340.0 * s,
+                            footer_y + footer_h * 0.67,
+                            16.0,
+                            TEXT_DIM,
+                        );
+                    } else {
+                        self.draw_text_sharp(
+                            "[W/S] Select",
+                            footer_x + 100.0 * s,
+                            footer_y + footer_h * 0.67,
+                            16.0,
+                            TEXT_DIM,
+                        );
+                        self.draw_text_sharp(
+                            "[C] Craft",
+                            footer_x + 210.0 * s,
+                            footer_y + footer_h * 0.67,
+                            16.0,
+                            TEXT_DIM,
+                        );
+                    }
+                }
             } else {
-                // Recipes tab controls
+                // Shop tab controls
                 self.draw_text_sharp(
                     "[Q] Tab",
                     footer_x + 10.0 * s,
@@ -362,107 +418,55 @@ impl Renderer {
                     16.0,
                     TEXT_DIM,
                 );
+                self.draw_text_sharp(
+                    "[Tab] Buy/Sell",
+                    footer_x + 100.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
+                self.draw_text_sharp(
+                    "[W/S] Select",
+                    footer_x + 230.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
+                self.draw_text_sharp(
+                    "[+/-] Qty",
+                    footer_x + 340.0 * s,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_DIM,
+                );
 
-                let has_multiple_categories =
-                    build_categories(&state.shop_filtered_recipes()).len() > 1;
-
-                if has_multiple_categories {
-                    self.draw_text_sharp(
-                        "[A/D] Category",
-                        footer_x + 100.0 * s,
-                        footer_y + footer_h * 0.67,
-                        16.0,
-                        TEXT_DIM,
-                    );
-                    self.draw_text_sharp(
-                        "[W/S] Select",
-                        footer_x + 230.0 * s,
-                        footer_y + footer_h * 0.67,
-                        16.0,
-                        TEXT_DIM,
-                    );
-                    self.draw_text_sharp(
-                        "[C] Craft",
-                        footer_x + 340.0 * s,
-                        footer_y + footer_h * 0.67,
-                        16.0,
-                        TEXT_DIM,
-                    );
-                } else {
-                    self.draw_text_sharp(
-                        "[W/S] Select",
-                        footer_x + 100.0 * s,
-                        footer_y + footer_h * 0.67,
-                        16.0,
-                        TEXT_DIM,
-                    );
-                    self.draw_text_sharp(
-                        "[C] Craft",
-                        footer_x + 210.0 * s,
-                        footer_y + footer_h * 0.67,
-                        16.0,
-                        TEXT_DIM,
+                // Gold display - right-aligned in footer
+                let gold_text = format!("{}g", state.inventory.gold);
+                let gold_text_w = self.measure_text_sharp(&gold_text, 16.0).width;
+                let icon_size = 12.0 * s;
+                let icon_margin = 4.0 * s;
+                let total_gold_w = icon_size + icon_margin + gold_text_w;
+                let gold_x = footer_x + footer_w - total_gold_w - 10.0 * s;
+                if let Some(texture) = &self.gold_nugget_texture {
+                    draw_texture_ex(
+                        texture,
+                        gold_x,
+                        footer_y + footer_h * 0.33,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some(vec2(icon_size, icon_size)),
+                            ..Default::default()
+                        },
                     );
                 }
-            }
-        } else {
-            // Shop tab controls
-            self.draw_text_sharp(
-                "[Q] Tab",
-                footer_x + 10.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
-            self.draw_text_sharp(
-                "[Tab] Buy/Sell",
-                footer_x + 100.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
-            self.draw_text_sharp(
-                "[W/S] Select",
-                footer_x + 230.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
-            self.draw_text_sharp(
-                "[+/-] Qty",
-                footer_x + 340.0 * s,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_DIM,
-            );
-
-            // Gold display - right-aligned in footer
-            let gold_text = format!("{}g", state.inventory.gold);
-            let gold_text_w = self.measure_text_sharp(&gold_text, 16.0).width;
-            let icon_size = 12.0 * s;
-            let icon_margin = 4.0 * s;
-            let total_gold_w = icon_size + icon_margin + gold_text_w;
-            let gold_x = footer_x + footer_w - total_gold_w - 10.0 * s;
-            if let Some(texture) = &self.gold_nugget_texture {
-                draw_texture_ex(
-                    texture,
-                    gold_x,
-                    footer_y + footer_h * 0.33,
-                    WHITE,
-                    DrawTextureParams {
-                        dest_size: Some(vec2(icon_size, icon_size)),
-                        ..Default::default()
-                    },
+                self.draw_text_sharp(
+                    &gold_text,
+                    gold_x + icon_size + icon_margin,
+                    footer_y + footer_h * 0.67,
+                    16.0,
+                    TEXT_GOLD,
                 );
             }
-            self.draw_text_sharp(
-                &gold_text,
-                gold_x + icon_size + icon_margin,
-                footer_y + footer_h * 0.67,
-                16.0,
-                TEXT_GOLD,
-            );
-        }
         } // end !android footer
     }
 

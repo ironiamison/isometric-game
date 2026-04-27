@@ -304,7 +304,9 @@ pub fn find_path_within_range(
             }
 
             // Check max distance from start
-            let dist_from_start = (neighbor.0 - start.0).abs().max((neighbor.1 - start.1).abs());
+            let dist_from_start = (neighbor.0 - start.0)
+                .abs()
+                .max((neighbor.1 - start.1).abs());
             if dist_from_start > max_distance {
                 continue;
             }

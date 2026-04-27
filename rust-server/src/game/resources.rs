@@ -49,11 +49,12 @@ impl GameRoom {
 
     pub async fn get_gathering_markers_message(&self, instance_id: Option<&str>) -> ServerMessage {
         let gathering = self.gathering.read().await;
-        let source_markers: &[crate::gathering::GatheringMarker] = if let Some(inst_id) = instance_id {
-            gathering.get_instance_markers(inst_id)
-        } else {
-            &gathering.markers
-        };
+        let source_markers: &[crate::gathering::GatheringMarker] =
+            if let Some(inst_id) = instance_id {
+                gathering.get_instance_markers(inst_id)
+            } else {
+                &gathering.markers
+            };
         let markers = source_markers
             .iter()
             .map(|marker| {
@@ -109,7 +110,9 @@ impl GameRoom {
 
         {
             let gathering = self.gathering.read().await;
-            if let Some(zone) = gathering.get_zone_for_marker(instance_id.as_deref(), marker_x, marker_y) {
+            if let Some(zone) =
+                gathering.get_zone_for_marker(instance_id.as_deref(), marker_x, marker_y)
+            {
                 if zone.skill.as_str() == "fishing" && !has_fishing_rod(equipped_weapon.as_deref())
                 {
                     drop(gathering);
@@ -127,15 +130,24 @@ impl GameRoom {
         }
 
         let mut gathering = self.gathering.write().await;
-        match gathering.start_gathering(player_id, instance_id.as_deref(), marker_x, marker_y, fishing_level, current_time)
-        {
+        match gathering.start_gathering(
+            player_id,
+            instance_id.as_deref(),
+            marker_x,
+            marker_y,
+            fishing_level,
+            current_time,
+        ) {
             Ok(zone_id) => {
-                self.broadcast_to_zone(player_id, ServerMessage::GatheringStarted {
-                    player_id: player_id.to_string(),
-                    marker_x,
-                    marker_y,
-                    zone_id,
-                })
+                self.broadcast_to_zone(
+                    player_id,
+                    ServerMessage::GatheringStarted {
+                        player_id: player_id.to_string(),
+                        marker_x,
+                        marker_y,
+                        zone_id,
+                    },
+                )
                 .await;
             }
             Err(message) => {
@@ -148,10 +160,13 @@ impl GameRoom {
     pub async fn handle_stop_gathering(&self, player_id: &str) {
         let mut gathering = self.gathering.write().await;
         if gathering.stop_gathering(player_id).is_some() {
-            self.broadcast_to_zone(player_id, ServerMessage::GatheringStopped {
-                player_id: player_id.to_string(),
-                reason: "cancelled".to_string(),
-            })
+            self.broadcast_to_zone(
+                player_id,
+                ServerMessage::GatheringStopped {
+                    player_id: player_id.to_string(),
+                    reason: "cancelled".to_string(),
+                },
+            )
             .await;
         }
 
@@ -285,11 +300,14 @@ impl GameRoom {
 
         match chop_result {
             Ok(result) => {
-                self.broadcast_to_zone(player_id, ServerMessage::WoodcuttingSwing {
-                    player_id: player_id.to_string(),
-                    tree_x,
-                    tree_y,
-                })
+                self.broadcast_to_zone(
+                    player_id,
+                    ServerMessage::WoodcuttingSwing {
+                        player_id: player_id.to_string(),
+                        tree_x,
+                        tree_y,
+                    },
+                )
                 .await;
 
                 if result.success {
@@ -355,11 +373,17 @@ impl GameRoom {
                             .await;
                         self.record_resource_contract_progress(player_id, &result.log_item_id, 1)
                             .await;
-                        self.record_collection_entry(player_id, &result.log_item_id, "skilling", "woodcutting")
-                            .await;
+                        self.record_collection_entry(
+                            player_id,
+                            &result.log_item_id,
+                            "skilling",
+                            "woodcutting",
+                        )
+                        .await;
 
                         if leveled_up {
-                            self.broadcast_skill_level_up(player_id, "woodcutting", new_level).await;
+                            self.broadcast_skill_level_up(player_id, "woodcutting", new_level)
+                                .await;
                             self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
@@ -367,12 +391,15 @@ impl GameRoom {
 
                 if result.tree_depleted {
                     let respawn_delay = result.respawn_delay_ms.unwrap_or(7500);
-                    self.broadcast_to_zone(player_id, ServerMessage::TreeDepleted {
-                        x: tree_x,
-                        y: tree_y,
-                        gid: tree_gid,
-                        respawn_delay_ms: respawn_delay,
-                    })
+                    self.broadcast_to_zone(
+                        player_id,
+                        ServerMessage::TreeDepleted {
+                            x: tree_x,
+                            y: tree_y,
+                            gid: tree_gid,
+                            respawn_delay_ms: respawn_delay,
+                        },
+                    )
                     .await;
 
                     self.process_quest_tree_deplete(
@@ -515,11 +542,14 @@ impl GameRoom {
 
         match mine_result {
             Ok(result) => {
-                self.broadcast_to_zone(player_id, ServerMessage::MiningSwing {
-                    player_id: player_id.to_string(),
-                    rock_x,
-                    rock_y,
-                })
+                self.broadcast_to_zone(
+                    player_id,
+                    ServerMessage::MiningSwing {
+                        player_id: player_id.to_string(),
+                        rock_x,
+                        rock_y,
+                    },
+                )
                 .await;
 
                 if result.success {
@@ -645,11 +675,17 @@ impl GameRoom {
                             .await;
                         self.record_resource_contract_progress(player_id, &result.ore_item_id, 1)
                             .await;
-                        self.record_collection_entry(player_id, &result.ore_item_id, "skilling", "mining")
-                            .await;
+                        self.record_collection_entry(
+                            player_id,
+                            &result.ore_item_id,
+                            "skilling",
+                            "mining",
+                        )
+                        .await;
 
                         if leveled_up {
-                            self.broadcast_skill_level_up(player_id, "mining", new_level).await;
+                            self.broadcast_skill_level_up(player_id, "mining", new_level)
+                                .await;
                             self.process_quest_progression_snapshot(player_id).await;
                         }
                     }
@@ -657,12 +693,15 @@ impl GameRoom {
 
                 if result.rock_depleted {
                     let respawn_delay = result.respawn_delay_ms.unwrap_or(7500);
-                    self.broadcast_to_zone(player_id, ServerMessage::RockDepleted {
-                        x: rock_x,
-                        y: rock_y,
-                        gid: rock_gid,
-                        respawn_delay_ms: respawn_delay,
-                    })
+                    self.broadcast_to_zone(
+                        player_id,
+                        ServerMessage::RockDepleted {
+                            x: rock_x,
+                            y: rock_y,
+                            gid: rock_gid,
+                            respawn_delay_ms: respawn_delay,
+                        },
+                    )
                     .await;
 
                     self.process_quest_rock_deplete(player_id, &result.ore_type_id, rock_x, rock_y)
@@ -830,16 +869,20 @@ impl GameRoom {
             )
             .await;
             if tick.leveled {
-                self.broadcast_skill_level_up(&tick.pid, "fishing", tick.level).await;
+                self.broadcast_skill_level_up(&tick.pid, "fishing", tick.level)
+                    .await;
                 self.process_quest_progression_snapshot(&tick.pid).await;
             }
         }
 
         for player_id in inventory_full_players {
-            self.broadcast_to_zone(&player_id, ServerMessage::GatheringStopped {
-                player_id: player_id.clone(),
-                reason: "inventory_full".to_string(),
-            })
+            self.broadcast_to_zone(
+                &player_id,
+                ServerMessage::GatheringStopped {
+                    player_id: player_id.clone(),
+                    reason: "inventory_full".to_string(),
+                },
+            )
             .await;
         }
 

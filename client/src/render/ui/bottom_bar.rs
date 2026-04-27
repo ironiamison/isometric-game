@@ -161,10 +161,20 @@ impl Renderer {
             } else {
                 (SLOT_BG_EMPTY, SLOT_BORDER)
             };
-            draw_rectangle(toggle_x - 1.0, toggle_y - 1.0, btn_size + 2.0, btn_size + 2.0,
-                Color::new(toggle_border.r, toggle_border.g, toggle_border.b, 0.9));
-            draw_rectangle(toggle_x, toggle_y, btn_size, btn_size,
-                Color::new(toggle_bg.r, toggle_bg.g, toggle_bg.b, 0.85));
+            draw_rectangle(
+                toggle_x - 1.0,
+                toggle_y - 1.0,
+                btn_size + 2.0,
+                btn_size + 2.0,
+                Color::new(toggle_border.r, toggle_border.g, toggle_border.b, 0.9),
+            );
+            draw_rectangle(
+                toggle_x,
+                toggle_y,
+                btn_size,
+                btn_size,
+                Color::new(toggle_bg.r, toggle_bg.g, toggle_bg.b, 0.85),
+            );
 
             // Draw hamburger icon (3 lines) or X
             let line_color = if expanded { TEXT_GOLD } else { TEXT_NORMAL };
@@ -177,7 +187,7 @@ impl Renderer {
             } else {
                 // Hamburger icon
                 draw_line(cx - 6.0, cy - 4.0, cx + 6.0, cy - 4.0, 2.0, line_color);
-                draw_line(cx - 6.0, cy,       cx + 6.0, cy,       2.0, line_color);
+                draw_line(cx - 6.0, cy, cx + 6.0, cy, 2.0, line_color);
                 draw_line(cx - 6.0, cy + 4.0, cx + 6.0, cy + 4.0, 2.0, line_color);
             }
 
@@ -201,19 +211,41 @@ impl Renderer {
                 } else {
                     (SLOT_BG_EMPTY, SLOT_BORDER)
                 };
-                draw_rectangle(chat_x - 1.0, chat_y - 1.0, btn_size + 2.0, btn_size + 2.0,
-                    Color::new(chat_border.r, chat_border.g, chat_border.b, 0.9));
-                draw_rectangle(chat_x, chat_y, btn_size, btn_size,
-                    Color::new(chat_bg.r, chat_bg.g, chat_bg.b, 0.85));
+                draw_rectangle(
+                    chat_x - 1.0,
+                    chat_y - 1.0,
+                    btn_size + 2.0,
+                    btn_size + 2.0,
+                    Color::new(chat_border.r, chat_border.g, chat_border.b, 0.9),
+                );
+                draw_rectangle(
+                    chat_x,
+                    chat_y,
+                    btn_size,
+                    btn_size,
+                    Color::new(chat_bg.r, chat_bg.g, chat_bg.b, 0.85),
+                );
                 if let Some(ref tex) = self.chat_small_icon {
                     let icon_size = btn_size - 6.0;
                     let ix = (chat_x + (btn_size - icon_size) / 2.0).floor();
                     let iy = (chat_y + (btn_size - icon_size) / 2.0).floor();
-                    let tint = if chat_active { TEXT_GOLD } else if chat_hovered { TEXT_TITLE } else { TEXT_NORMAL };
-                    draw_texture_ex(tex, ix, iy, tint, DrawTextureParams {
-                        dest_size: Some(Vec2::new(icon_size, icon_size)),
-                        ..Default::default()
-                    });
+                    let tint = if chat_active {
+                        TEXT_GOLD
+                    } else if chat_hovered {
+                        TEXT_TITLE
+                    } else {
+                        TEXT_NORMAL
+                    };
+                    draw_texture_ex(
+                        tex,
+                        ix,
+                        iy,
+                        tint,
+                        DrawTextureParams {
+                            dest_size: Some(Vec2::new(icon_size, icon_size)),
+                            ..Default::default()
+                        },
+                    );
                 }
 
                 // Regular menu buttons
@@ -226,7 +258,15 @@ impl Renderer {
                     layout.add(element_id.clone(), bounds);
 
                     let is_hovered = hovered.as_ref() == Some(element_id);
-                    self.draw_menu_button_icon_scaled(x, y, btn_size, *icon_frame, is_hovered, *is_active, scale);
+                    self.draw_menu_button_icon_scaled(
+                        x,
+                        y,
+                        btn_size,
+                        *icon_frame,
+                        is_hovered,
+                        *is_active,
+                        scale,
+                    );
 
                     if *element_id == UiElementId::MenuButtonSocial {
                         self.render_social_badge(state, x, y, scale);
@@ -252,7 +292,15 @@ impl Renderer {
                 layout.add(element_id.clone(), bounds);
 
                 let is_hovered = hovered.as_ref() == Some(element_id);
-                self.draw_menu_button_icon_scaled(x, y, button_size, *icon_frame, is_hovered, *is_active, scale);
+                self.draw_menu_button_icon_scaled(
+                    x,
+                    y,
+                    button_size,
+                    *icon_frame,
+                    is_hovered,
+                    *is_active,
+                    scale,
+                );
 
                 if *element_id == UiElementId::MenuButtonSocial {
                     self.render_social_badge(state, x, y, scale);

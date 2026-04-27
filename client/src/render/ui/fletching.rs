@@ -69,11 +69,22 @@ impl Renderer {
             let cy = close_y + close_size / 2.0;
             draw_line(cx - 4.0, cy - 4.0, cx + 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
             draw_line(cx + 4.0, cy - 4.0, cx - 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
-            layout.add(UiElementId::FletchingCloseButton, Rect::new(close_x, close_y, close_size, close_size));
+            layout.add(
+                UiElementId::FletchingCloseButton,
+                Rect::new(close_x, close_y, close_size, close_size),
+            );
         }
 
-        let header_h = if cfg!(target_os = "android") { 0.0 } else { HEADER_HEIGHT * s };
-        let footer_h = if cfg!(target_os = "android") { 0.0 } else { FOOTER_HEIGHT * s };
+        let header_h = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            HEADER_HEIGHT * s
+        };
+        let footer_h = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            FOOTER_HEIGHT * s
+        };
 
         // ===== HEADER =====
         let header_x = panel_x + FRAME_THICKNESS;
@@ -326,8 +337,22 @@ impl Renderer {
             let mid_y = cy + cs / 2.0;
             draw_circle(mid_x, mid_y, cs / 2.0, Color::new(0.15, 0.1, 0.1, 0.85));
             draw_circle_lines(mid_x, mid_y, cs / 2.0, 1.0, Color::new(0.6, 0.3, 0.3, 0.9));
-            draw_line(mid_x - 4.0, mid_y - 4.0, mid_x + 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
-            draw_line(mid_x + 4.0, mid_y - 4.0, mid_x - 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
+            draw_line(
+                mid_x - 4.0,
+                mid_y - 4.0,
+                mid_x + 4.0,
+                mid_y + 4.0,
+                1.5,
+                TEXT_NORMAL,
+            );
+            draw_line(
+                mid_x + 4.0,
+                mid_y - 4.0,
+                mid_x - 4.0,
+                mid_y + 4.0,
+                1.5,
+                TEXT_NORMAL,
+            );
             layout.add(UiElementId::FletchingCloseButton, Rect::new(cx, cy, cs, cs));
         }
     }
@@ -949,6 +974,5 @@ impl Renderer {
             16.0,
             cancel_text_color,
         );
-
     }
 }

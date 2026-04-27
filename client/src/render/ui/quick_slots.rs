@@ -393,11 +393,21 @@ impl Renderer {
     ) {
         // Hide when any panel is open
         let ui = &state.ui_state;
-        if ui.inventory_open || ui.character_panel_open || ui.skills_open
-            || ui.prayer_book_open || ui.escape_menu_open || ui.quest_log_open
-            || ui.social_open || ui.chat_panel_open || ui.crafting_open
-            || ui.furnace_open || ui.anvil_open || ui.fletching_open
-            || ui.bank_open || ui.chest_open || ui.shop_data.is_some()
+        if ui.inventory_open
+            || ui.character_panel_open
+            || ui.skills_open
+            || ui.prayer_book_open
+            || ui.escape_menu_open
+            || ui.quest_log_open
+            || ui.social_open
+            || ui.chat_panel_open
+            || ui.crafting_open
+            || ui.furnace_open
+            || ui.anvil_open
+            || ui.fletching_open
+            || ui.bank_open
+            || ui.chest_open
+            || ui.shop_data.is_some()
             || state.ui_state.active_dialogue.is_some()
         {
             return;
@@ -414,7 +424,7 @@ impl Renderer {
         let attack_cx = sw - 42.0;
         let attack_cy = sh - 120.0;
         let arc_dist = 65.0; // distance from attack center to slot center
-        // 3 slots in an arc: left (170°), upper-left (130°), top (90°)
+                             // 3 slots in an arc: left (170°), upper-left (130°), top (90°)
         let angles: [f32; 3] = [170.0_f32, 130.0, 90.0];
 
         for i in 0..3 {
@@ -452,49 +462,88 @@ impl Renderer {
                 HotkeySlotBinding::Item { item_id } => {
                     let inv_slot = state.inventory.find_slot_by_item_id(item_id);
                     let quantity = inv_slot.and_then(|idx| {
-                        state.inventory.slots.get(idx).and_then(|s| s.as_ref()).map(|s| s.quantity)
+                        state
+                            .inventory
+                            .slots
+                            .get(idx)
+                            .and_then(|s| s.as_ref())
+                            .map(|s| s.quantity)
                     });
                     let has_item = quantity.is_some();
 
                     if has_item {
-                        self.draw_item_icon(item_id, icon_x, icon_y, icon_size, icon_size, state, false);
+                        self.draw_item_icon(
+                            item_id, icon_x, icon_y, icon_size, icon_size, state, false,
+                        );
                     } else {
                         let tint = Color::new(1.0, 1.0, 1.0, 0.3);
-                        self.draw_item_icon_tinted(item_id, icon_x, icon_y, icon_size, icon_size, state, tint);
+                        self.draw_item_icon_tinted(
+                            item_id, icon_x, icon_y, icon_size, icon_size, state, tint,
+                        );
                     }
 
                     // Quantity badge
                     if let Some(qty) = quantity {
                         if qty > 1 {
                             let qty_text = qty.to_string();
-                            self.draw_text_sharp(&qty_text, cx - radius + 4.0, cy + radius - 4.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
-                            self.draw_text_sharp(&qty_text, cx - radius + 3.0, cy + radius - 5.0, 16.0, TEXT_NORMAL);
+                            self.draw_text_sharp(
+                                &qty_text,
+                                cx - radius + 4.0,
+                                cy + radius - 4.0,
+                                16.0,
+                                Color::new(0.0, 0.0, 0.0, 0.8),
+                            );
+                            self.draw_text_sharp(
+                                &qty_text,
+                                cx - radius + 3.0,
+                                cy + radius - 5.0,
+                                16.0,
+                                TEXT_NORMAL,
+                            );
                         }
                     }
                 }
                 HotkeySlotBinding::Spell { spell_id } => {
                     let spell_info: Option<(&str, &str, crate::game::spell::SpellType, i32)> =
-                        SPELLS.iter().find(|s| s.id == spell_id)
+                        SPELLS
+                            .iter()
+                            .find(|s| s.id == spell_id)
                             .map(|s| (s.id, s.name, s.spell_type, s.mana_cost))
                             .or_else(|| {
-                                state.scroll_spell_definitions.iter()
+                                state
+                                    .scroll_spell_definitions
+                                    .iter()
                                     .find(|s| s.id == *spell_id)
-                                    .map(|s| (s.id.as_str(), s.name.as_str(), s.spell_type, s.mana_cost))
+                                    .map(|s| {
+                                        (s.id.as_str(), s.name.as_str(), s.spell_type, s.mana_cost)
+                                    })
                             });
 
                     if let Some((id, name, spell_type, mana_cost)) = spell_info {
                         // Spell icon
                         if let Some((texture, source_rect)) = self.spell_icons.get(id) {
-                            draw_texture_ex(texture, icon_x, icon_y, WHITE, DrawTextureParams {
-                                source: source_rect,
-                                dest_size: Some(Vec2::new(icon_size, icon_size)),
-                                ..Default::default()
-                            });
+                            draw_texture_ex(
+                                texture,
+                                icon_x,
+                                icon_y,
+                                WHITE,
+                                DrawTextureParams {
+                                    source: source_rect,
+                                    dest_size: Some(Vec2::new(icon_size, icon_size)),
+                                    ..Default::default()
+                                },
+                            );
                         } else {
                             let color = match spell_type {
-                                crate::game::spell::SpellType::Damage => Color::new(0.6, 0.15, 0.15, 0.9),
-                                crate::game::spell::SpellType::Heal => Color::new(0.15, 0.5, 0.15, 0.9),
-                                crate::game::spell::SpellType::Teleport => Color::new(0.2, 0.3, 0.6, 0.9),
+                                crate::game::spell::SpellType::Damage => {
+                                    Color::new(0.6, 0.15, 0.15, 0.9)
+                                }
+                                crate::game::spell::SpellType::Heal => {
+                                    Color::new(0.15, 0.5, 0.15, 0.9)
+                                }
+                                crate::game::spell::SpellType::Teleport => {
+                                    Color::new(0.2, 0.3, 0.6, 0.9)
+                                }
                             };
                             draw_circle(cx, cy, radius - 4.0, color);
                             let letter = &name[..1];
@@ -504,8 +553,20 @@ impl Renderer {
 
                         // Mana cost badge
                         let mana_text = mana_cost.to_string();
-                        self.draw_text_sharp(&mana_text, cx - radius + 4.0, cy + radius - 4.0, 16.0, Color::new(0.0, 0.0, 0.0, 0.8));
-                        self.draw_text_sharp(&mana_text, cx - radius + 3.0, cy + radius - 5.0, 16.0, Color::new(0.4, 0.6, 1.0, 1.0));
+                        self.draw_text_sharp(
+                            &mana_text,
+                            cx - radius + 4.0,
+                            cy + radius - 4.0,
+                            16.0,
+                            Color::new(0.0, 0.0, 0.0, 0.8),
+                        );
+                        self.draw_text_sharp(
+                            &mana_text,
+                            cx - radius + 3.0,
+                            cy + radius - 5.0,
+                            16.0,
+                            Color::new(0.4, 0.6, 1.0, 1.0),
+                        );
 
                         // Cooldown overlay
                         let on_cooldown = state.spell_cooldowns.get(id).map_or(false, |&t| now < t);
@@ -513,7 +574,10 @@ impl Renderer {
 
                         if on_cooldown {
                             draw_circle(cx, cy, radius - 1.0, Color::new(0.0, 0.0, 0.0, 0.55));
-                            let remaining = state.spell_cooldowns.get(id).map_or(0.0, |&t| (t - now).max(0.0));
+                            let remaining = state
+                                .spell_cooldowns
+                                .get(id)
+                                .map_or(0.0, |&t| (t - now).max(0.0));
                             let cd_text = format!("{:.1}", remaining);
                             let cd_w = self.measure_text_sharp(&cd_text, 16.0).width;
                             self.draw_text_sharp(&cd_text, cx - cd_w / 2.0, cy + 5.0, 16.0, WHITE);
@@ -527,7 +591,13 @@ impl Renderer {
             // Slot number badge (small, at top)
             let num_text = (i + 1).to_string();
             let tw = self.measure_text_sharp(&num_text, 12.0).width;
-            self.draw_text_sharp(&num_text, cx - tw / 2.0, cy - radius + 10.0, 12.0, Color::new(1.0, 1.0, 1.0, 0.5));
+            self.draw_text_sharp(
+                &num_text,
+                cx - tw / 2.0,
+                cy - radius + 10.0,
+                12.0,
+                Color::new(1.0, 1.0, 1.0, 0.5),
+            );
         }
     }
 

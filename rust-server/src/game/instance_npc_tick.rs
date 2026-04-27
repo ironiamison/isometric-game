@@ -125,9 +125,8 @@ impl GameRoom {
                     occupied_tiles.remove(&tile);
                 }
 
-                let height_check = |wx: i32, wy: i32| -> i32 {
-                    entry.get_height_at_sync(&heightmap, wx, wy)
-                };
+                let height_check =
+                    |wx: i32, wy: i32| -> i32 { entry.get_height_at_sync(&heightmap, wx, wy) };
                 if let Some((target_id, max_hit)) = npc.update(
                     delta_time,
                     &inst_player_list,
@@ -149,7 +148,8 @@ impl GameRoom {
                 if npc.is_alive() && npc.prototype_id == "wurm_minion" {
                     let attack_range = npc.stats.attack_range;
                     for (_player_id, px, py, _php) in &inst_player_list {
-                        let dist = npc.occupied_tiles()
+                        let dist = npc
+                            .occupied_tiles()
                             .map(|(tx, ty)| (tx - *px).abs().max((ty - *py).abs()))
                             .min()
                             .unwrap_or(i32::MAX);

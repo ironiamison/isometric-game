@@ -188,11 +188,7 @@ fn wave_points(wave: u32) -> u32 {
 
 fn speed_bonus(wave_start_time: u64, current_time: u64) -> u32 {
     let elapsed_ms = current_time.saturating_sub(wave_start_time);
-    if elapsed_ms < 30_000 {
-        20
-    } else {
-        0
-    }
+    if elapsed_ms < 30_000 { 20 } else { 0 }
 }
 
 // ---------------------------------------------------------------------------
@@ -203,43 +199,118 @@ fn checkpoint_rewards(wave: u32) -> Vec<KothReward> {
     match wave {
         // Wave 5: starter supplies - potions and food to keep you going
         1..=5 => vec![
-            KothReward { item_id: "gold_coins".to_string(), quantity: 75 },
-            KothReward { item_id: "health_potion".to_string(), quantity: 3 },
-            KothReward { item_id: "weak_mana_potion".to_string(), quantity: 2 },
-            KothReward { item_id: "cooked_trout".to_string(), quantity: 5 },
+            KothReward {
+                item_id: "gold_coins".to_string(),
+                quantity: 75,
+            },
+            KothReward {
+                item_id: "health_potion".to_string(),
+                quantity: 3,
+            },
+            KothReward {
+                item_id: "weak_mana_potion".to_string(),
+                quantity: 2,
+            },
+            KothReward {
+                item_id: "cooked_trout".to_string(),
+                quantity: 5,
+            },
         ],
         // Wave 10: better consumables + gems
         6..=10 => vec![
-            KothReward { item_id: "gold_coins".to_string(), quantity: 200 },
-            KothReward { item_id: "strong_health_potion".to_string(), quantity: 2 },
-            KothReward { item_id: "mana_potion".to_string(), quantity: 3 },
-            KothReward { item_id: "prayer_potion".to_string(), quantity: 2 },
-            KothReward { item_id: "uncut_sapphire".to_string(), quantity: 2 },
+            KothReward {
+                item_id: "gold_coins".to_string(),
+                quantity: 200,
+            },
+            KothReward {
+                item_id: "strong_health_potion".to_string(),
+                quantity: 2,
+            },
+            KothReward {
+                item_id: "mana_potion".to_string(),
+                quantity: 3,
+            },
+            KothReward {
+                item_id: "prayer_potion".to_string(),
+                quantity: 2,
+            },
+            KothReward {
+                item_id: "uncut_sapphire".to_string(),
+                quantity: 2,
+            },
         ],
         // Wave 15: first ancient fragments + good potions
         11..=15 => vec![
-            KothReward { item_id: "gold_coins".to_string(), quantity: 400 },
-            KothReward { item_id: "ancient_fragment".to_string(), quantity: 2 },
-            KothReward { item_id: "strong_health_potion".to_string(), quantity: 3 },
-            KothReward { item_id: "strong_mana_potion".to_string(), quantity: 2 },
-            KothReward { item_id: "uncut_ruby".to_string(), quantity: 1 },
+            KothReward {
+                item_id: "gold_coins".to_string(),
+                quantity: 400,
+            },
+            KothReward {
+                item_id: "ancient_fragment".to_string(),
+                quantity: 2,
+            },
+            KothReward {
+                item_id: "strong_health_potion".to_string(),
+                quantity: 3,
+            },
+            KothReward {
+                item_id: "strong_mana_potion".to_string(),
+                quantity: 2,
+            },
+            KothReward {
+                item_id: "uncut_ruby".to_string(),
+                quantity: 1,
+            },
         ],
         // Wave 20: solid fragment haul + top-tier supplies
         16..=20 => vec![
-            KothReward { item_id: "gold_coins".to_string(), quantity: 750 },
-            KothReward { item_id: "ancient_fragment".to_string(), quantity: 4 },
-            KothReward { item_id: "strong_health_potion".to_string(), quantity: 5 },
-            KothReward { item_id: "strong_mana_potion".to_string(), quantity: 3 },
-            KothReward { item_id: "uncut_diamond".to_string(), quantity: 1 },
+            KothReward {
+                item_id: "gold_coins".to_string(),
+                quantity: 750,
+            },
+            KothReward {
+                item_id: "ancient_fragment".to_string(),
+                quantity: 4,
+            },
+            KothReward {
+                item_id: "strong_health_potion".to_string(),
+                quantity: 5,
+            },
+            KothReward {
+                item_id: "strong_mana_potion".to_string(),
+                quantity: 3,
+            },
+            KothReward {
+                item_id: "uncut_diamond".to_string(),
+                quantity: 1,
+            },
         ],
         // Wave 25+: endgame fragment farming
         _ => vec![
-            KothReward { item_id: "gold_coins".to_string(), quantity: 1000 },
-            KothReward { item_id: "ancient_fragment".to_string(), quantity: 6 },
-            KothReward { item_id: "strong_health_potion".to_string(), quantity: 5 },
-            KothReward { item_id: "strong_mana_potion".to_string(), quantity: 5 },
-            KothReward { item_id: "strong_prayer_potion".to_string(), quantity: 2 },
-            KothReward { item_id: "uncut_diamond".to_string(), quantity: 2 },
+            KothReward {
+                item_id: "gold_coins".to_string(),
+                quantity: 1000,
+            },
+            KothReward {
+                item_id: "ancient_fragment".to_string(),
+                quantity: 6,
+            },
+            KothReward {
+                item_id: "strong_health_potion".to_string(),
+                quantity: 5,
+            },
+            KothReward {
+                item_id: "strong_mana_potion".to_string(),
+                quantity: 5,
+            },
+            KothReward {
+                item_id: "strong_prayer_potion".to_string(),
+                quantity: 2,
+            },
+            KothReward {
+                item_id: "uncut_diamond".to_string(),
+                quantity: 2,
+            },
         ],
     }
 }
@@ -248,12 +319,10 @@ fn consolation_rewards(waves_completed: u32) -> Vec<KothReward> {
     if waves_completed == 0 {
         return vec![];
     }
-    let mut rewards = vec![
-        KothReward {
-            item_id: "gold_coins".to_string(),
-            quantity: waves_completed * 15,
-        },
-    ];
+    let mut rewards = vec![KothReward {
+        item_id: "gold_coins".to_string(),
+        quantity: waves_completed * 15,
+    }];
     // Give a health potion if they made it past wave 2
     if waves_completed >= 2 {
         rewards.push(KothReward {
@@ -334,8 +403,7 @@ impl KothState {
                     && current_time.saturating_sub(self.last_spawn_time) >= 2000
                 {
                     let batch_size = 4.min(self.spawn_queue.len());
-                    let batch: Vec<PendingSpawn> =
-                        self.spawn_queue.drain(..batch_size).collect();
+                    let batch: Vec<PendingSpawn> = self.spawn_queue.drain(..batch_size).collect();
                     self.last_spawn_time = current_time;
 
                     for spawn in batch {
@@ -425,12 +493,7 @@ impl KothState {
     }
 
     /// Start a new wave
-    fn start_wave(
-        &mut self,
-        current_time: u64,
-        player_level: i32,
-        events: &mut Vec<KothEvent>,
-    ) {
+    fn start_wave(&mut self, current_time: u64, player_level: i32, events: &mut Vec<KothEvent>) {
         let count = enemies_for_wave(self.current_wave);
         let level = enemy_level_for_wave(self.current_wave, player_level);
         let prototype = enemy_prototype_for_wave(self.current_wave);

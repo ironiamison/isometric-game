@@ -375,7 +375,8 @@ impl GameRoom {
             .await;
 
             if leveled_up {
-                self.broadcast_skill_level_up(player_id, "slayer", level).await;
+                self.broadcast_skill_level_up(player_id, "slayer", level)
+                    .await;
             }
         }
 

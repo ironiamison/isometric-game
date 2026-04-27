@@ -73,7 +73,12 @@ pub fn world_to_screen_z(world_x: f32, world_y: f32, world_z: f32, camera: &Came
 }
 
 /// Convert world to screen with Z, without pixel snapping (for calculations)
-pub fn world_to_screen_z_exact(world_x: f32, world_y: f32, world_z: f32, camera: &Camera) -> (f32, f32) {
+pub fn world_to_screen_z_exact(
+    world_x: f32,
+    world_y: f32,
+    world_z: f32,
+    camera: &Camera,
+) -> (f32, f32) {
     let (sx, sy) = world_to_screen_exact(world_x, world_y, camera);
     let z_offset = world_z * (TILE_HEIGHT / 2.0) * camera.zoom;
     (sx, sy - z_offset)

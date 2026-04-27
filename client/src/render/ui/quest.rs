@@ -399,9 +399,18 @@ impl Renderer {
         let clog_text = "Collection Log";
         let clog_hovered = matches!(hovered, Some(UiElementId::CollectionLogLink));
         let clog_color = if clog_hovered { TEXT_TITLE } else { TEXT_DIM };
-        self.draw_text_sharp(clog_text, footer_x + 10.0 * s, footer_y + footer_h * 0.67, 16.0, clog_color);
+        self.draw_text_sharp(
+            clog_text,
+            footer_x + 10.0 * s,
+            footer_y + footer_h * 0.67,
+            16.0,
+            clog_color,
+        );
         let clog_w = self.measure_text_sharp(clog_text, 16.0).width;
-        layout.add(UiElementId::CollectionLogLink, Rect::new(footer_x + 10.0 * s, footer_y, clog_w + 4.0 * s, footer_h));
+        layout.add(
+            UiElementId::CollectionLogLink,
+            Rect::new(footer_x + 10.0 * s, footer_y, clog_w + 4.0 * s, footer_h),
+        );
 
         let completed_count = state.ui_state.completed_quest_ids.len();
         let total_count = state.ui_state.quest_catalog.len();
@@ -911,7 +920,11 @@ impl Renderer {
                 Color::from_rgba(255, 220, 100, 255),
             );
             // On Android, use a larger hit area for easier tapping
-            let hit_pad = if cfg!(target_os = "android") { 12.0 } else { 0.0 };
+            let hit_pad = if cfg!(target_os = "android") {
+                12.0
+            } else {
+                0.0
+            };
             let text_dims = self.measure_text_sharp(text, font_size);
             return Some(macroquad::math::Rect::new(
                 text_x - hit_pad,
@@ -1037,7 +1050,12 @@ impl Renderer {
             }
             y += line.height;
         }
-        Some(macroquad::math::Rect::new(min_x, tracker_y, right_edge - min_x, y - tracker_y))
+        Some(macroquad::math::Rect::new(
+            min_x,
+            tracker_y,
+            right_edge - min_x,
+            y - tracker_y,
+        ))
     }
 
     /// Render resource contract tracker (left-aligned, below stat bars)
@@ -1067,7 +1085,11 @@ impl Renderer {
             y += line_height;
         }
 
-        for line in self.wrap_text(&contract.task_text, max_width, 16.0).iter().take(2) {
+        for line in self
+            .wrap_text(&contract.task_text, max_width, 16.0)
+            .iter()
+            .take(2)
+        {
             self.draw_text_sharp(line, x, y, 16.0, WHITE);
             y += line_height;
         }

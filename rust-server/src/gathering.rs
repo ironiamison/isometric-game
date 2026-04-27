@@ -212,7 +212,9 @@ impl GatheringSystem {
                 .get(inst_id)
                 .and_then(|markers| markers.iter().find(|m| m.x == marker_x && m.y == marker_y))
         } else {
-            self.markers.iter().find(|m| m.x == marker_x && m.y == marker_y)
+            self.markers
+                .iter()
+                .find(|m| m.x == marker_x && m.y == marker_y)
         }
         .ok_or_else(|| format!("No gathering marker at ({}, {})", marker_x, marker_y))?;
 
@@ -238,8 +240,10 @@ impl GatheringSystem {
         }
 
         // Set occupied and player state
-        self.occupied_markers
-            .insert((instance_id.map(|s| s.to_string()), marker_x, marker_y), player_id.to_string());
+        self.occupied_markers.insert(
+            (instance_id.map(|s| s.to_string()), marker_x, marker_y),
+            player_id.to_string(),
+        );
 
         self.player_states.insert(
             player_id.to_string(),
@@ -274,7 +278,12 @@ impl GatheringSystem {
     }
 
     /// Get the zone config for a marker at the given position
-    pub fn get_zone_for_marker(&self, instance_id: Option<&str>, x: i32, y: i32) -> Option<&GatheringZoneConfig> {
+    pub fn get_zone_for_marker(
+        &self,
+        instance_id: Option<&str>,
+        x: i32,
+        y: i32,
+    ) -> Option<&GatheringZoneConfig> {
         let marker = if let Some(inst_id) = instance_id {
             self.instance_markers
                 .get(inst_id)
@@ -412,14 +421,16 @@ impl GatheringSystem {
             markers.len(),
             instance_id
         );
-        self.instance_markers.insert(instance_id.to_string(), markers);
+        self.instance_markers
+            .insert(instance_id.to_string(), markers);
     }
 
     /// Unregister gathering markers for an instance (when instance is destroyed)
     pub fn unregister_instance_markers(&mut self, instance_id: &str) {
         self.instance_markers.remove(instance_id);
         // Also clean up any occupied markers for this instance
-        self.occupied_markers.retain(|(inst, _, _), _| inst.as_deref() != Some(instance_id));
+        self.occupied_markers
+            .retain(|(inst, _, _), _| inst.as_deref() != Some(instance_id));
     }
 
     /// Get gathering markers for an instance

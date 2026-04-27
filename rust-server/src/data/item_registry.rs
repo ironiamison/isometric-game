@@ -137,12 +137,14 @@ impl ItemRegistry {
                         )
                     } else {
                         (
-                            None, None, None, None, None, None, None, None, None, None, None, None, None,
+                            None, None, None, None, None, None, None, None, None, None, None, None,
+                            None,
                         )
                     }
                 } else {
                     (
-                        None, None, None, None, None, None, None, None, None, None, None, None, None,
+                        None, None, None, None, None, None, None, None, None, None, None, None,
+                        None,
                     )
                 };
 

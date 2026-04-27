@@ -218,7 +218,9 @@ impl Npc {
 
         // Exploding rocks use their own explosion frames, no color tint
         if self.animation.layout == NpcAnimationLayout::ExplodingRock {
-            return self.death_timer.map(|_| Color::from_rgba(255, 255, 255, 255));
+            return self
+                .death_timer
+                .map(|_| Color::from_rgba(255, 255, 255, 255));
         }
 
         self.death_timer.map(|t| {

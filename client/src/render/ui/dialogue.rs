@@ -381,7 +381,12 @@ fn skilling_missing_tier_requirements(state: &GameState, tier_id: &str) -> Vec<&
 }
 
 impl Renderer {
-    pub(crate) fn truncate_text_to_width(&self, text: &str, max_width: f32, font_size: f32) -> String {
+    pub(crate) fn truncate_text_to_width(
+        &self,
+        text: &str,
+        max_width: f32,
+        font_size: f32,
+    ) -> String {
         if self.measure_text_sharp(text, font_size).width <= max_width {
             return text.to_string();
         }

@@ -36,7 +36,11 @@ impl Renderer {
         let padding = 10.0 * s;
 
         // ===== HEADER =====
-        let header_h = if cfg!(target_os = "android") { 0.0 } else { HEADER_HEIGHT * s };
+        let header_h = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            HEADER_HEIGHT * s
+        };
         let header_y = panel_y + FRAME_THICKNESS;
 
         draw_rectangle(inner_x, header_y, inner_w, header_h, HEADER_BG);

@@ -67,7 +67,11 @@ impl AudioManager {
 
     /// Preload music tracks at startup
     pub async fn preload_music(&mut self) {
-        let music_files = ["assets/audio/menu.ogg", "assets/audio/start.ogg", "assets/audio/desert-boss-battle.ogg"];
+        let music_files = [
+            "assets/audio/menu.ogg",
+            "assets/audio/start.ogg",
+            "assets/audio/desert-boss-battle.ogg",
+        ];
 
         for path in music_files {
             match load_sound(&asset_path(path)).await {

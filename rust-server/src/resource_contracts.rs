@@ -239,7 +239,8 @@ impl ResourceContractManager {
             return None;
         }
 
-        contract.amount_completed = (contract.amount_completed + amount).min(contract.amount_required);
+        contract.amount_completed =
+            (contract.amount_completed + amount).min(contract.amount_required);
         Some((
             contract.amount_completed,
             contract.amount_required,

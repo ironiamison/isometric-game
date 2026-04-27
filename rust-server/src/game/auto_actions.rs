@@ -221,17 +221,10 @@ impl GameRoom {
             }
         }
 
-        self.send_to_player(
-            player_id,
-            ServerMessage::AutoRetaliateChanged { enabled },
-        )
-        .await;
+        self.send_to_player(player_id, ServerMessage::AutoRetaliateChanged { enabled })
+            .await;
 
-        tracing::info!(
-            "Player {} set auto-retaliate to {}",
-            player_id,
-            enabled
-        );
+        tracing::info!("Player {} set auto-retaliate to {}", player_id, enabled);
     }
 
     pub(in crate::game) async fn clear_auto_action(&self, player_id: &str, reason: &str) {

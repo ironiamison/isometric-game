@@ -147,7 +147,8 @@ impl GameRoom {
 
     async fn send_prayer_level_up_updates(&self, player_id: &str, new_level: i32) {
         tracing::info!("Player {} leveled up Prayer to {}", player_id, new_level);
-        self.broadcast_skill_level_up(player_id, "prayer", new_level).await;
+        self.broadcast_skill_level_up(player_id, "prayer", new_level)
+            .await;
 
         if let Some(state) = self.get_player_prayer_state(player_id).await {
             self.send_to_player(player_id, state).await;

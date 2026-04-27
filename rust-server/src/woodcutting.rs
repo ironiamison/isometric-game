@@ -155,7 +155,8 @@ impl WoodcuttingSystem {
 
     /// Check if a tree at given position is depleted
     pub fn is_tree_depleted(&self, instance_id: Option<&str>, x: i32, y: i32) -> bool {
-        self.depleted_trees.contains_key(&(instance_id.map(|s| s.to_string()), x, y))
+        self.depleted_trees
+            .contains_key(&(instance_id.map(|s| s.to_string()), x, y))
     }
 
     /// Start woodcutting at a tree position
@@ -370,7 +371,10 @@ impl WoodcuttingSystem {
     }
 
     /// Get all currently depleted trees (for syncing to new clients)
-    pub fn get_depleted_trees(&self, instance_id: Option<&str>) -> Vec<((i32, i32), &DepletedTree)> {
+    pub fn get_depleted_trees(
+        &self,
+        instance_id: Option<&str>,
+    ) -> Vec<((i32, i32), &DepletedTree)> {
         self.depleted_trees
             .iter()
             .filter(|((inst, _, _), _)| inst.as_deref() == instance_id)

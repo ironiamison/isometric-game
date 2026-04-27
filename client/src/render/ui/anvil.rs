@@ -35,8 +35,16 @@ impl Renderer {
             (pw, ph, px, py)
         };
 
-        let header_h = if cfg!(target_os = "android") { 0.0 } else { HEADER_HEIGHT * s };
-        let footer_h = if cfg!(target_os = "android") { 0.0 } else { FOOTER_HEIGHT * s };
+        let header_h = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            HEADER_HEIGHT * s
+        };
+        let footer_h = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            FOOTER_HEIGHT * s
+        };
         let tab_h = TAB_HEIGHT * s;
 
         // Semi-transparent overlay
@@ -67,7 +75,10 @@ impl Renderer {
             let cy = close_y + close_size / 2.0;
             draw_line(cx - 4.0, cy - 4.0, cx + 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
             draw_line(cx + 4.0, cy - 4.0, cx - 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
-            layout.add(UiElementId::AnvilCloseButton, Rect::new(close_x, close_y, close_size, close_size));
+            layout.add(
+                UiElementId::AnvilCloseButton,
+                Rect::new(close_x, close_y, close_size, close_size),
+            );
         }
 
         // ===== HEADER =====
@@ -325,8 +336,22 @@ impl Renderer {
             let mid_y = cy + cs / 2.0;
             draw_circle(mid_x, mid_y, cs / 2.0, Color::new(0.15, 0.1, 0.1, 0.85));
             draw_circle_lines(mid_x, mid_y, cs / 2.0, 1.0, Color::new(0.6, 0.3, 0.3, 0.9));
-            draw_line(mid_x - 4.0, mid_y - 4.0, mid_x + 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
-            draw_line(mid_x + 4.0, mid_y - 4.0, mid_x - 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
+            draw_line(
+                mid_x - 4.0,
+                mid_y - 4.0,
+                mid_x + 4.0,
+                mid_y + 4.0,
+                1.5,
+                TEXT_NORMAL,
+            );
+            draw_line(
+                mid_x + 4.0,
+                mid_y - 4.0,
+                mid_x - 4.0,
+                mid_y + 4.0,
+                1.5,
+                TEXT_NORMAL,
+            );
             layout.add(UiElementId::AnvilCloseButton, Rect::new(cx, cy, cs, cs));
         }
     }
@@ -463,7 +488,8 @@ impl Renderer {
             let visible_top = cell_y.max(content_y);
             let visible_bottom = (cell_y + cell_h).min(content_y + content_h);
             if visible_bottom > visible_top {
-                let cell_bounds = Rect::new(cell_x, visible_top, cell_w, visible_bottom - visible_top);
+                let cell_bounds =
+                    Rect::new(cell_x, visible_top, cell_w, visible_bottom - visible_top);
                 layout.add(UiElementId::AnvilRecipeCell(i), cell_bounds);
             }
 
@@ -607,7 +633,10 @@ impl Renderer {
                 }
 
                 let (line1, line2) = if split_at > 0 {
-                    (ing_text[..split_at].to_string(), ing_text[split_at..].trim_start().to_string())
+                    (
+                        ing_text[..split_at].to_string(),
+                        ing_text[split_at..].trim_start().to_string(),
+                    )
                 } else {
                     // No comma break fits; hard-truncate line 1
                     let mut trunc = ing_text.clone();
@@ -1082,6 +1111,5 @@ impl Renderer {
             16.0,
             cancel_text_color,
         );
-
     }
 }

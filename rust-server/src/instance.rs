@@ -210,7 +210,10 @@ impl InstanceManager {
 
         self.public_instances
             .insert(map_id.to_string(), instance.clone());
-        info!("Created public instance: {} (pvp={})", instance_id, pvp_enabled);
+        info!(
+            "Created public instance: {} (pvp={})",
+            instance_id, pvp_enabled
+        );
         (instance, true)
     }
 

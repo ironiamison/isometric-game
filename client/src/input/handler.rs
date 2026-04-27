@@ -1,7 +1,6 @@
 use super::touch::TouchControls;
 use crate::audio::AudioManager;
 use crate::game::state::{ClickEffect, ClickEffectKind};
-use crate::render::isometric::screen_to_world;
 use crate::game::{
     pathfinding, quest_status_order, ActiveDialogue, BankDrag, BankQuantityAction,
     BankQuantityDialog, ChatChannel, ContextMenu, ContextMenuTarget, DragSource, DragState,
@@ -9,6 +8,7 @@ use crate::game::{
 };
 use crate::network::messages::ClientMessage;
 use crate::render::animation::AnimationState;
+use crate::render::isometric::screen_to_world;
 use crate::render::{section_sort_key, sections_for_tab, SECTION_HEADER_HEIGHT};
 use crate::settings::{save_ui_settings, UiSettings};
 use crate::ui::{UiElementId, UiLayout};
@@ -302,7 +302,9 @@ const AUTO_ACTION_NPC_SETTLE_EPS: f32 = 0.06;
 
 fn queue_face(state: &mut GameState, commands: &mut Vec<InputCommand>, direction: u8) {
     let dir = crate::game::Direction::from_u8(direction).to_cardinal();
-    commands.push(InputCommand::Face { direction: dir as u8 });
+    commands.push(InputCommand::Face {
+        direction: dir as u8,
+    });
     if let Some(local_id) = &state.local_player_id {
         if let Some(player) = state.players.get_mut(local_id) {
             player.direction = dir;
@@ -345,14 +347,18 @@ fn activate_hotkey_slot(state: &mut GameState, slot_idx: usize) -> Vec<InputComm
                                         item_id: item_id.clone(),
                                     }]
                                 } else {
-                                    state.push_system_chat("This patch already has something planted.".to_string());
+                                    state.push_system_chat(
+                                        "This patch already has something planted.".to_string(),
+                                    );
                                     vec![]
                                 }
                             } else {
                                 vec![]
                             }
                         } else {
-                            state.push_system_chat("Stand on a farming patch to plant seeds.".to_string());
+                            state.push_system_chat(
+                                "Stand on a farming patch to plant seeds.".to_string(),
+                            );
                             vec![]
                         }
                     } else {
@@ -558,20 +564,17 @@ fn auto_action_target_pos(
 ) -> Option<(f32, f32)> {
     match aa.target_type.as_str() {
         // Use server-authoritative positions for chase logic to avoid interpolation mismatches
-        "npc" => state
-            .npcs
-            .get(&aa.target_id)
-            .and_then(|n| {
-                // For multi-tile NPCs, target the nearest tile of the footprint
-                let player = state.get_local_player()?;
-                let px = player.server_x.round() as i32;
-                let py = player.server_y.round() as i32;
-                let nx = n.server_x.round() as i32;
-                let ny = n.server_y.round() as i32;
-                let closest_x = px.clamp(nx, nx + n.size - 1);
-                let closest_y = py.clamp(ny, ny + n.size - 1);
-                Some((closest_x as f32, closest_y as f32))
-            }),
+        "npc" => state.npcs.get(&aa.target_id).and_then(|n| {
+            // For multi-tile NPCs, target the nearest tile of the footprint
+            let player = state.get_local_player()?;
+            let px = player.server_x.round() as i32;
+            let py = player.server_y.round() as i32;
+            let nx = n.server_x.round() as i32;
+            let ny = n.server_y.round() as i32;
+            let closest_x = px.clamp(nx, nx + n.size - 1);
+            let closest_y = py.clamp(ny, ny + n.size - 1);
+            Some((closest_x as f32, closest_y as f32))
+        }),
         "player" => state
             .players
             .get(&aa.target_id)
@@ -620,7 +623,11 @@ fn sync_path_index(path_state: &mut PathState, player_pos: (i32, i32)) {
 }
 
 /// Build set of tiles occupied by entities (other players + NPCs) for pathfinding
-fn build_occupied_set(state: &GameState, include_chairs: bool, include_players: bool) -> HashSet<(i32, i32)> {
+fn build_occupied_set(
+    state: &GameState,
+    include_chairs: bool,
+    include_players: bool,
+) -> HashSet<(i32, i32)> {
     let mut occupied = HashSet::new();
 
     // When in interior mode, don't count overworld players as obstacles
@@ -834,7 +841,12 @@ fn find_path_to_attack_with_optimistic_splice(
     if weapon_range <= 1 {
         let preferred = preferred_adjacent_tile_for_target(state, target);
         return find_path_to_adjacent_with_optimistic_splice(
-            state, start, target, occupied, max_distance, preferred,
+            state,
+            start,
+            target,
+            occupied,
+            max_distance,
+            preferred,
         );
     }
 
@@ -1238,7 +1250,11 @@ fn pathfind_to_tile(
     }
 }
 
-fn rebuild_path_state(template: &PathState, path: Vec<(i32, i32)>, destination: (i32, i32)) -> PathState {
+fn rebuild_path_state(
+    template: &PathState,
+    path: Vec<(i32, i32)>,
+    destination: (i32, i32),
+) -> PathState {
     let mut next = template.clone();
     next.path = path;
     next.current_index = 0;
@@ -1443,13 +1459,20 @@ fn rebuild_current_auto_path(state: &mut GameState) -> bool {
     }
 
     let goal = template.destination;
-    if !state.chunk_manager.is_walkable(goal.0 as f32, goal.1 as f32) {
+    if !state
+        .chunk_manager
+        .is_walkable(goal.0 as f32, goal.1 as f32)
+    {
         return false;
     }
     let occupied = build_occupied_set(state, true, true);
-    if let Some(path) =
-        pathfinding::find_path(start, goal, &state.chunk_manager, &occupied, MAX_PATH_DISTANCE)
-    {
+    if let Some(path) = pathfinding::find_path(
+        start,
+        goal,
+        &state.chunk_manager,
+        &occupied,
+        MAX_PATH_DISTANCE,
+    ) {
         state.auto_path = Some(rebuild_path_state(&template, path, goal));
         return true;
     }
@@ -1784,17 +1807,31 @@ impl MoveDir {
     /// Determine direction from held keys + just-pressed info.
     /// Last key pressed wins. When released, falls back to whatever is still held.
     fn from_keys(
-        up: bool, down: bool, left: bool, right: bool,
-        up_just: bool, down_just: bool, left_just: bool, right_just: bool,
+        up: bool,
+        down: bool,
+        left: bool,
+        right: bool,
+        up_just: bool,
+        down_just: bool,
+        left_just: bool,
+        right_just: bool,
         active: MoveDir,
     ) -> Self {
         // If a key was just pressed this frame, it takes priority
         // (check in reverse order so last-processed wins if multiple pressed same frame)
         let mut new_active = active;
-        if up_just { new_active = MoveDir::Up; }
-        if down_just { new_active = MoveDir::Down; }
-        if left_just { new_active = MoveDir::Left; }
-        if right_just { new_active = MoveDir::Right; }
+        if up_just {
+            new_active = MoveDir::Up;
+        }
+        if down_just {
+            new_active = MoveDir::Down;
+        }
+        if left_just {
+            new_active = MoveDir::Left;
+        }
+        if right_just {
+            new_active = MoveDir::Right;
+        }
 
         // If the active direction's key is still held, use it
         let active_held = match new_active {
@@ -1810,10 +1847,18 @@ impl MoveDir {
 
         // Active key was released — fall back to whatever is still held
         // (pick first found, priority doesn't matter since only one should remain)
-        if up { return MoveDir::Up; }
-        if down { return MoveDir::Down; }
-        if left { return MoveDir::Left; }
-        if right { return MoveDir::Right; }
+        if up {
+            return MoveDir::Up;
+        }
+        if down {
+            return MoveDir::Down;
+        }
+        if left {
+            return MoveDir::Left;
+        }
+        if right {
+            return MoveDir::Right;
+        }
 
         MoveDir::None
     }
@@ -1908,6 +1953,13 @@ fn minimap_world_bounds(state: &GameState) -> Option<MinimapBounds> {
             min_y: 0.0,
             max_x: width as f32,
             max_y: height as f32,
+        }
+    } else if let Some(snapshot) = state.world_map_snapshot.as_ref() {
+        MinimapBounds {
+            min_x: snapshot.bounds.min_x,
+            min_y: snapshot.bounds.min_y,
+            max_x: snapshot.bounds.max_x,
+            max_y: snapshot.bounds.max_y,
         }
     } else if !state.chunk_manager.chunks().is_empty() {
         let mut min_x = f32::MAX;
@@ -2145,13 +2197,16 @@ impl InputHandler {
         if state.ui_state.hovered_element.is_none() && !touch_active {
             // Pick tile accounting for elevation (elevated tiles take priority)
             let (tile_x, tile_y, tile_z) =
-                state.chunk_manager.pick_tile_at_screen(mx, my, &state.camera);
+                state
+                    .chunk_manager
+                    .pick_tile_at_screen(mx, my, &state.camera);
             state.hovered_tile = Some((tile_x, tile_y));
             state.hovered_tile_z = tile_z;
 
             // Entity hover: compare in screen space so Z-elevated entities
             // are hovered when the cursor visually overlaps them.
-            let hover_radius_px = 0.6 * crate::render::isometric::TILE_WIDTH * state.camera.zoom * 0.5;
+            let hover_radius_px =
+                0.6 * crate::render::isometric::TILE_WIDTH * state.camera.zoom * 0.5;
             let hover_radius_sq = hover_radius_px * hover_radius_px;
             let mut hovered_entity: Option<String> = None;
 
@@ -2161,7 +2216,10 @@ impl InputHandler {
                     for dy in 0..npc.size {
                         for dx in 0..npc.size {
                             let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
-                                npc.x + dx as f32, npc.y + dy as f32, npc.z, &state.camera,
+                                npc.x + dx as f32,
+                                npc.y + dy as f32,
+                                npc.z,
+                                &state.camera,
                             );
                             let dmx = mx - sx;
                             let dmy = my - sy;
@@ -2178,7 +2236,10 @@ impl InputHandler {
                 for player in state.players.values() {
                     if !player.is_dead {
                         let (sx, sy) = crate::render::isometric::world_to_screen_z_exact(
-                            player.x, player.y, player.z, &state.camera,
+                            player.x,
+                            player.y,
+                            player.z,
+                            &state.camera,
                         );
                         let dx = mx - sx;
                         let dy = my - sy;
@@ -2805,9 +2866,7 @@ impl InputHandler {
             }
 
             // Block list scrollbar drag handling
-            if let Some(track_bounds) =
-                layout.get_bounds(&UiElementId::SlayerBlockScrollbar)
-            {
+            if let Some(track_bounds) = layout.get_bounds(&UiElementId::SlayerBlockScrollbar) {
                 let s = state.ui_state.ui_scale;
                 let compact_h = 24.0 * s;
                 let compact_sp = 2.0 * s;
@@ -2834,8 +2893,7 @@ impl InputHandler {
                 }
 
                 let max_scroll = (total_h - track_bounds.h).max(0.0);
-                let clicked_on =
-                    matches!(clicked_element, Some(UiElementId::SlayerBlockScrollbar));
+                let clicked_on = matches!(clicked_element, Some(UiElementId::SlayerBlockScrollbar));
                 let (_, raw_my) = mouse_position();
                 let (_, virt_my) = screen_to_virtual_coords(0.0, raw_my);
                 crate::ui::scroll::handle_scrollbar_drag(
@@ -2879,16 +2937,13 @@ impl InputHandler {
                             if let Some(reward) = state.ui_state.slayer_rewards.get(*idx) {
                                 if state.ui_state.slayer_points >= reward.cost {
                                     let target = if reward.category == "block" {
-                                        state
-                                            .ui_state
-                                            .slayer_selected_block_monster
-                                            .and_then(|i| {
-                                                state
-                                                    .ui_state
-                                                    .slayer_blockable_monsters
-                                                    .get(i)
-                                                    .map(|(id, _)| id.clone())
-                                            })
+                                        state.ui_state.slayer_selected_block_monster.and_then(|i| {
+                                            state
+                                                .ui_state
+                                                .slayer_blockable_monsters
+                                                .get(i)
+                                                .map(|(id, _)| id.clone())
+                                        })
                                     } else {
                                         reward.target_id.clone()
                                     };
@@ -3497,21 +3552,23 @@ impl InputHandler {
                     .unwrap_or(1),
                 ContextMenuTarget::Tile { .. } => 1,
                 ContextMenuTarget::HotkeySlot(_) => 1, // "Clear Slot"
-                ContextMenuTarget::Spell(_) => 3, // "Hotkey 1", "Hotkey 2", "Hotkey 3"
-                ContextMenuTarget::QuestTracker => 1, // "Minimize" or "Expand"
-                ContextMenuTarget::ChatTab => 1, // "Hide/Show System Messages"
-                ContextMenuTarget::BankSlot(idx) => {
-                    state.ui_state.bank_slots.get(*idx)
-                        .and_then(|s| s.as_ref())
-                        .map(|(_, qty)| if *qty > 1 { 3 } else { 1 })
-                        .unwrap_or(0)
-                }
-                ContextMenuTarget::BankInventorySlot(idx) => {
-                    state.inventory.slots.get(*idx)
-                        .and_then(|s| s.as_ref())
-                        .map(|slot| if slot.quantity > 1 { 3 } else { 1 })
-                        .unwrap_or(0)
-                }
+                ContextMenuTarget::Spell(_) => 3,      // "Hotkey 1", "Hotkey 2", "Hotkey 3"
+                ContextMenuTarget::QuestTracker => 1,  // "Minimize" or "Expand"
+                ContextMenuTarget::ChatTab => 1,       // "Hide/Show System Messages"
+                ContextMenuTarget::BankSlot(idx) => state
+                    .ui_state
+                    .bank_slots
+                    .get(*idx)
+                    .and_then(|s| s.as_ref())
+                    .map(|(_, qty)| if *qty > 1 { 3 } else { 1 })
+                    .unwrap_or(0),
+                ContextMenuTarget::BankInventorySlot(idx) => state
+                    .inventory
+                    .slots
+                    .get(*idx)
+                    .and_then(|s| s.as_ref())
+                    .map(|slot| if slot.quantity > 1 { 3 } else { 1 })
+                    .unwrap_or(0),
             };
 
             let menu_width = 140.0; // generous estimate
@@ -3629,7 +3686,11 @@ impl InputHandler {
                                     };
                                     let drop_idx = current_idx;
                                     current_idx += 1;
-                                    let hotkey_base_idx = if cfg!(target_os = "android") { Some(current_idx) } else { None };
+                                    let hotkey_base_idx = if cfg!(target_os = "android") {
+                                        Some(current_idx)
+                                    } else {
+                                        None
+                                    };
 
                                     if Some(*option_idx) == equip_idx {
                                         commands.push(InputCommand::Equip {
@@ -3672,8 +3733,11 @@ impl InputHandler {
                                     } else if let Some(base) = hotkey_base_idx {
                                         if *option_idx >= base && *option_idx < base + 3 {
                                             let hotkey_slot = *option_idx - base;
-                                            if let Some(Some(slot)) = state.inventory.slots.get(*slot_index) {
-                                                state.ui_state.hotkey_bar.active_mut().slots[hotkey_slot] =
+                                            if let Some(Some(slot)) =
+                                                state.inventory.slots.get(*slot_index)
+                                            {
+                                                state.ui_state.hotkey_bar.active_mut().slots
+                                                    [hotkey_slot] =
                                                     crate::game::hotkey::HotkeySlotBinding::Item {
                                                         item_id: slot.item_id.clone(),
                                                     };
@@ -4533,8 +4597,9 @@ impl InputHandler {
                                                                 },
                                                             );
                                                         } else {
-                                                            let occupied =
-                                                                build_occupied_set(state, true, true);
+                                                            let occupied = build_occupied_set(
+                                                                state, true, true,
+                                                            );
                                                             const MAX_PATH_DISTANCE: i32 = 32;
                                                             if let Some((dest, path)) =
                                                                 pathfinding::find_path_to_adjacent(
@@ -4625,19 +4690,23 @@ impl InputHandler {
                                 ContextMenuTarget::QuestTracker => {
                                     // Options: 0=Minimize or Expand
                                     if *option_idx == 0 {
-                                        state.ui_state.quest_tracker_minimized = !state.ui_state.quest_tracker_minimized;
+                                        state.ui_state.quest_tracker_minimized =
+                                            !state.ui_state.quest_tracker_minimized;
                                         save_current_ui_settings(state);
                                     }
                                 }
                                 ContextMenuTarget::ChatTab => {
                                     // Options: 0=Toggle system messages
                                     if *option_idx == 0 {
-                                        state.ui_state.hide_system_in_public = !state.ui_state.hide_system_in_public;
+                                        state.ui_state.hide_system_in_public =
+                                            !state.ui_state.hide_system_in_public;
                                         save_current_ui_settings(state);
                                     }
                                 }
                                 ContextMenuTarget::BankSlot(idx) => {
-                                    if let Some(Some((item_id, qty))) = state.ui_state.bank_slots.get(*idx) {
+                                    if let Some(Some((item_id, qty))) =
+                                        state.ui_state.bank_slots.get(*idx)
+                                    {
                                         let item_id = item_id.clone();
                                         let qty = *qty;
                                         let has_many = qty > 1;
@@ -4927,9 +4996,7 @@ impl InputHandler {
                                 let tile_x = world_x.round() as i32;
                                 let tile_y = world_y.round() as i32;
 
-                                let dist = (tile_x - player_x)
-                                    .abs()
-                                    .max((tile_y - player_y).abs());
+                                let dist = (tile_x - player_x).abs().max((tile_y - player_y).abs());
 
                                 if dist > 0
                                     && state
@@ -4947,15 +5014,13 @@ impl InputHandler {
                                     let path_limit = dist.min(64);
 
                                     // Use splice-aware pathfinding to preserve in-progress step
-                                    if let Some(path) =
-                                        find_path_with_committed_step_splice(
-                                            state,
-                                            (player_x, player_y),
-                                            (tile_x, tile_y),
-                                            &occupied,
-                                            path_limit,
-                                        )
-                                    {
+                                    if let Some(path) = find_path_with_committed_step_splice(
+                                        state,
+                                        (player_x, player_y),
+                                        (tile_x, tile_y),
+                                        &occupied,
+                                        path_limit,
+                                    ) {
                                         state.auto_path = Some(PathState {
                                             path,
                                             current_index: 0,
@@ -5300,15 +5365,19 @@ impl InputHandler {
                     }
                     UiElementId::CollectionLogCategoryHeader(idx) => {
                         audio.play_sfx("enter");
-                        let categories = ["monster_drops", "boss_rewards", "skilling", "quest_rewards"];
+                        let categories =
+                            ["monster_drops", "boss_rewards", "skilling", "quest_rewards"];
                         if let Some(cat) = categories.get(*idx) {
-                            if state.ui_state.collection_log_selected_category.as_deref() == Some(*cat) {
+                            if state.ui_state.collection_log_selected_category.as_deref()
+                                == Some(*cat)
+                            {
                                 // Collapse - deselect
                                 state.ui_state.collection_log_selected_category = None;
                                 state.ui_state.collection_log_selected_subcategory = None;
                             } else {
                                 // Expand
-                                state.ui_state.collection_log_selected_category = Some(cat.to_string());
+                                state.ui_state.collection_log_selected_category =
+                                    Some(cat.to_string());
                                 state.ui_state.collection_log_selected_subcategory = None;
                             }
                             state.ui_state.collection_log_grid_scroll = 0.0;
@@ -5317,8 +5386,11 @@ impl InputHandler {
                     UiElementId::CollectionLogSubcategoryEntry(idx) => {
                         audio.play_sfx("enter");
                         // Rebuild sorted subcategory list matching render order
-                        if let Some(ref category) = state.ui_state.collection_log_selected_category.clone() {
-                            let mut subcats_map: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+                        if let Some(ref category) =
+                            state.ui_state.collection_log_selected_category.clone()
+                        {
+                            let mut subcats_map: std::collections::HashMap<&str, usize> =
+                                std::collections::HashMap::new();
                             for (_, src, detail) in &state.ui_state.collection_log_definitions {
                                 if src == category {
                                     *subcats_map.entry(detail.as_str()).or_insert(0) += 1;
@@ -5327,7 +5399,8 @@ impl InputHandler {
                             let mut sorted: Vec<&str> = subcats_map.keys().copied().collect();
                             sorted.sort();
                             if let Some(name) = sorted.get(*idx) {
-                                state.ui_state.collection_log_selected_subcategory = Some(name.to_string());
+                                state.ui_state.collection_log_selected_subcategory =
+                                    Some(name.to_string());
                                 state.ui_state.collection_log_grid_scroll = 0.0;
                             }
                         }
@@ -5652,7 +5725,9 @@ impl InputHandler {
                                         .min(board.offers.len().saturating_sub(1));
                                     if let Some(offer) = board.offers.get(offer_idx) {
                                         if let Some(difficulty) = offer.difficulties.get(*idx) {
-                                            if difficulty.unlocked && board.active_contract.is_none() {
+                                            if difficulty.unlocked
+                                                && board.active_contract.is_none()
+                                            {
                                                 commands.push(InputCommand::DialogueChoice {
                                                     quest_id: dialogue.quest_id.clone(),
                                                     choice_id: format!(
@@ -8030,8 +8105,7 @@ impl InputHandler {
                             return commands;
                         }
                         UiElementId::AlchemyQuantityMax => {
-                            let tab_sections =
-                                sections_for_tab(state.ui_state.alchemy_station_tab);
+                            let tab_sections = sections_for_tab(state.ui_state.alchemy_station_tab);
                             let mut alchemy_recipes: Vec<_> = state
                                 .recipe_definitions
                                 .iter()
@@ -8051,8 +8125,8 @@ impl InputHandler {
                                     .cmp(&section_sort_key(sb))
                                     .then(a.level_required.cmp(&b.level_required))
                             });
-                            if let Some(recipe) = alchemy_recipes
-                                .get(state.ui_state.alchemy_station_selected_recipe)
+                            if let Some(recipe) =
+                                alchemy_recipes.get(state.ui_state.alchemy_station_selected_recipe)
                             {
                                 let mut max_possible = 99i32;
                                 for ing in &recipe.ingredients {
@@ -9064,10 +9138,26 @@ impl InputHandler {
         } else {
             // Read which keys are held (in classic mode, only arrow keys - WASD goes to chat)
             (
-                if classic { is_key_down(KeyCode::Up) } else { is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) },
-                if classic { is_key_down(KeyCode::Down) } else { is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) },
-                if classic { is_key_down(KeyCode::Left) } else { is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) },
-                if classic { is_key_down(KeyCode::Right) } else { is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) },
+                if classic {
+                    is_key_down(KeyCode::Up)
+                } else {
+                    is_key_down(KeyCode::W) || is_key_down(KeyCode::Up)
+                },
+                if classic {
+                    is_key_down(KeyCode::Down)
+                } else {
+                    is_key_down(KeyCode::S) || is_key_down(KeyCode::Down)
+                },
+                if classic {
+                    is_key_down(KeyCode::Left)
+                } else {
+                    is_key_down(KeyCode::A) || is_key_down(KeyCode::Left)
+                },
+                if classic {
+                    is_key_down(KeyCode::Right)
+                } else {
+                    is_key_down(KeyCode::D) || is_key_down(KeyCode::Right)
+                },
             )
         };
 
@@ -9076,10 +9166,26 @@ impl InputHandler {
             (false, false, false, false)
         } else {
             (
-                if classic { is_key_pressed(KeyCode::Up) } else { is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up) },
-                if classic { is_key_pressed(KeyCode::Down) } else { is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down) },
-                if classic { is_key_pressed(KeyCode::Left) } else { is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left) },
-                if classic { is_key_pressed(KeyCode::Right) } else { is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right) },
+                if classic {
+                    is_key_pressed(KeyCode::Up)
+                } else {
+                    is_key_pressed(KeyCode::W) || is_key_pressed(KeyCode::Up)
+                },
+                if classic {
+                    is_key_pressed(KeyCode::Down)
+                } else {
+                    is_key_pressed(KeyCode::S) || is_key_pressed(KeyCode::Down)
+                },
+                if classic {
+                    is_key_pressed(KeyCode::Left)
+                } else {
+                    is_key_pressed(KeyCode::A) || is_key_pressed(KeyCode::Left)
+                },
+                if classic {
+                    is_key_pressed(KeyCode::Right)
+                } else {
+                    is_key_pressed(KeyCode::D) || is_key_pressed(KeyCode::Right)
+                },
             )
         };
 
@@ -9097,8 +9203,14 @@ impl InputHandler {
 
         // Determine new direction from keyboard - last key pressed wins
         let keyboard_dir = MoveDir::from_keys(
-            up, down, left, right,
-            up_just, down_just, left_just, right_just,
+            up,
+            down,
+            left,
+            right,
+            up_just,
+            down_just,
+            left_just,
+            right_just,
             self.prev_dir,
         );
 
@@ -9110,7 +9222,10 @@ impl InputHandler {
                 DPadDirection::Left => MoveDir::Left,
                 DPadDirection::Right => MoveDir::Right,
                 // Map diagonals to the axis that differs from prev (cardinal only)
-                DPadDirection::UpLeft | DPadDirection::UpRight | DPadDirection::DownLeft | DPadDirection::DownRight => {
+                DPadDirection::UpLeft
+                | DPadDirection::UpRight
+                | DPadDirection::DownLeft
+                | DPadDirection::DownRight => {
                     let (dx, dy) = match dpad_dir {
                         DPadDirection::UpLeft => (true, true),    // left=true, up=true
                         DPadDirection::UpRight => (false, true),  // right, up
@@ -9120,9 +9235,17 @@ impl InputHandler {
                     };
                     let prev_is_vertical = matches!(self.prev_dir, MoveDir::Up | MoveDir::Down);
                     if prev_is_vertical {
-                        if dx { MoveDir::Left } else { MoveDir::Right }
+                        if dx {
+                            MoveDir::Left
+                        } else {
+                            MoveDir::Right
+                        }
                     } else {
-                        if dy { MoveDir::Up } else { MoveDir::Down }
+                        if dy {
+                            MoveDir::Up
+                        } else {
+                            MoveDir::Down
+                        }
                     }
                 }
                 DPadDirection::None => keyboard_dir,
@@ -9146,7 +9269,10 @@ impl InputHandler {
                 // Direction released
                 if self.move_sent {
                     // Was moving, now stopped - send stop command
-                    macroquad::logging::info!("[MOVE] KEY RELEASED -> STOP (prev={:?})", self.prev_dir);
+                    macroquad::logging::info!(
+                        "[MOVE] KEY RELEASED -> STOP (prev={:?})",
+                        self.prev_dir
+                    );
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                     self.last_dx = 0.0;
                     self.last_dy = 0.0;
@@ -9300,13 +9426,15 @@ impl InputHandler {
                             .chunk_manager
                             .is_walkable(target_x as f32, target_y as f32);
                         // Match server: block if target terrain is more than 1 block above player
-                        let target_height = state.chunk_manager.get_height(target_x, target_y) as i32;
+                        let target_height =
+                            state.chunk_manager.get_height(target_x, target_y) as i32;
                         let height_ok = (target_height - player_z) <= 1;
 
                         // Player ghosting: after being blocked by a player for
                         // 500ms, stop treating players as obstacles so movement
                         // flows through them like normal walking.
-                        let ghosting = self.player_blocked_since
+                        let ghosting = self
+                            .player_blocked_since
                             .is_some_and(|since| current_time - since >= 0.5);
                         let occupied = build_occupied_set(state, false, !ghosting);
                         let not_occupied = !occupied.contains(&(target_x, target_y));
@@ -9316,12 +9444,13 @@ impl InputHandler {
                             // keep ghosting active so we don't flicker on/off.
                             if ghosting {
                                 let in_interior = state.current_interior.is_some();
-                                let player_at_target = !in_interior && state.players.iter().any(|(id, p)| {
-                                    state.local_player_id.as_ref() != Some(id)
-                                        && !p.is_dead
-                                        && p.server_x.round() as i32 == target_x
-                                        && p.server_y.round() as i32 == target_y
-                                });
+                                let player_at_target = !in_interior
+                                    && state.players.iter().any(|(id, p)| {
+                                        state.local_player_id.as_ref() != Some(id)
+                                            && !p.is_dead
+                                            && p.server_x.round() as i32 == target_x
+                                            && p.server_y.round() as i32 == target_y
+                                    });
                                 if !player_at_target {
                                     self.player_blocked_since = None;
                                 }
@@ -9332,12 +9461,13 @@ impl InputHandler {
                         } else if tile_walkable && height_ok {
                             // Blocked by something on the tile — check if it's a player
                             let in_interior = state.current_interior.is_some();
-                            let is_player = !in_interior && state.players.iter().any(|(id, p)| {
-                                state.local_player_id.as_ref() != Some(id)
-                                    && !p.is_dead
-                                    && p.server_x.round() as i32 == target_x
-                                    && p.server_y.round() as i32 == target_y
-                            });
+                            let is_player = !in_interior
+                                && state.players.iter().any(|(id, p)| {
+                                    state.local_player_id.as_ref() != Some(id)
+                                        && !p.is_dead
+                                        && p.server_x.round() as i32 == target_x
+                                        && p.server_y.round() as i32 == target_y
+                                });
                             if is_player {
                                 self.player_blocked_since.get_or_insert(current_time);
                             } else {
@@ -9450,15 +9580,14 @@ impl InputHandler {
                             // animations — the playerAttack message already set the
                             // authoritative direction and re-computing from visual
                             // positions causes rapid flip-flop on diagonal angles.
-                            let in_attack_anim =
-                                state.get_local_player().map_or(false, |p| {
-                                    matches!(
-                                        p.animation.state,
-                                        AnimationState::Attacking
-                                            | AnimationState::Casting
-                                            | AnimationState::ShootingBow
-                                    )
-                                });
+                            let in_attack_anim = state.get_local_player().map_or(false, |p| {
+                                matches!(
+                                    p.animation.state,
+                                    AnimationState::Attacking
+                                        | AnimationState::Casting
+                                        | AnimationState::ShootingBow
+                                )
+                            });
                             if !in_attack_anim {
                                 // Use server (grid) positions for both player and target
                                 // to match the server's direction computation and avoid
@@ -9546,7 +9675,8 @@ impl InputHandler {
                                         weapon_range,
                                     )
                                 } else {
-                                    let preferred = preferred_adjacent_tile_for_target(state, (tx, ty));
+                                    let preferred =
+                                        preferred_adjacent_tile_for_target(state, (tx, ty));
                                     find_path_to_adjacent_with_optimistic_splice(
                                         state,
                                         (player_x, player_y),
@@ -9721,7 +9851,11 @@ impl InputHandler {
         if state.auto_path.is_some() && (!no_manual_move || is_attacking) {
             macroquad::logging::info!(
                 "[AUTOPATH] GATE_BLOCKED no_manual={} is_attacking={} dx={} dy={} suppress={}",
-                no_manual_move, is_attacking, dx, dy, suppress_active
+                no_manual_move,
+                is_attacking,
+                dx,
+                dy,
+                suppress_active
             );
         }
         if no_manual_move && !is_attacking {
@@ -9816,10 +9950,8 @@ impl InputHandler {
                     if let Some((send_dx, send_dy)) = desired_dir {
                         let waypoint_changed =
                             self.auto_path_sent_waypoint != Some((next_x, next_y));
-                        let dir_changed =
-                            self.auto_path_sent_dir != Some((send_dx, send_dy));
-                        let time_elapsed =
-                            current_time - self.last_send_time >= self.send_interval;
+                        let dir_changed = self.auto_path_sent_dir != Some((send_dx, send_dy));
+                        let time_elapsed = current_time - self.last_send_time >= self.send_interval;
 
                         if waypoint_changed || dir_changed || time_elapsed {
                             commands.push(InputCommand::Move {
@@ -9832,7 +9964,11 @@ impl InputHandler {
                         }
                     }
                 } else {
-                    macroquad::logging::info!("[AUTOPATH] INDEX_PAST_END idx={} len={}", path_state.current_index, path_state.path.len());
+                    macroquad::logging::info!(
+                        "[AUTOPATH] INDEX_PAST_END idx={} len={}",
+                        path_state.current_index,
+                        path_state.path.len()
+                    );
                     self.reset_auto_path_motion_state();
                 }
             }
@@ -9988,7 +10124,11 @@ impl InputHandler {
         }
 
         // Jump (Ctrl key, modern only) - send jump command on press
-        if !chat_consuming_keyboard && !classic && (is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl)) && !state.is_sitting {
+        if !chat_consuming_keyboard
+            && !classic
+            && (is_key_pressed(KeyCode::LeftControl) || is_key_pressed(KeyCode::RightControl))
+            && !state.is_sitting
+        {
             commands.push(InputCommand::Jump);
         }
 
@@ -10014,7 +10154,11 @@ impl InputHandler {
 
             let attack_cooldown = {
                 let weapon_range = get_local_weapon_range(state);
-                if weapon_range > 1 { 0.8 } else { 0.8 }
+                if weapon_range > 1 {
+                    0.8
+                } else {
+                    0.8
+                }
             };
             if current_time - self.last_attack_time >= attack_cooldown {
                 // Check if we should gather instead of attack
@@ -10235,7 +10379,9 @@ impl InputHandler {
                             Some(crate::game::spell::SPELLS[*slot_idx].id.to_string())
                         } else {
                             let scroll_idx = *slot_idx - crate::game::spell::SPELLS.len();
-                            state.scroll_spell_definitions.get(scroll_idx)
+                            state
+                                .scroll_spell_definitions
+                                .get(scroll_idx)
                                 .filter(|s| state.unlocked_spells.contains(&s.id))
                                 .map(|s| s.id.clone())
                         };
@@ -10426,8 +10572,9 @@ impl InputHandler {
             let (click_world_x, click_world_y) = screen_to_world(mouse_x, mouse_y, &state.camera);
 
             // Get the clicked tile coordinates (elevation-aware)
-            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) =
-                state.chunk_manager.pick_tile_at_screen(mouse_x, mouse_y, &state.camera);
+            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) = state
+                .chunk_manager
+                .pick_tile_at_screen(mouse_x, mouse_y, &state.camera);
 
             // Find entity on the exact clicked tile
             let mut clicked_player: Option<String> = None;
@@ -10515,7 +10662,8 @@ impl InputHandler {
                                 let npc_x = npc.server_x.round() as i32;
                                 let npc_y = npc.server_y.round() as i32;
                                 let weapon_range = get_local_weapon_range(state);
-                                if !in_attack_range(player_x, player_y, npc_x, npc_y, weapon_range) {
+                                if !in_attack_range(player_x, player_y, npc_x, npc_y, weapon_range)
+                                {
                                     let occupied = build_occupied_set(state, true, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     let path_result = if weapon_range > 1 {
@@ -10599,7 +10747,8 @@ impl InputHandler {
                                 let dist_to_player = (dx * dx + dy * dy).sqrt();
 
                                 // If an inventory item is selected, use it on this NPC instead of interacting
-                                if let Some(selected_slot) = state.ui_state.selected_inventory_slot {
+                                if let Some(selected_slot) = state.ui_state.selected_inventory_slot
+                                {
                                     if dist_to_player < INTERACT_RANGE {
                                         commands.push(InputCommand::UseItemOnEntity {
                                             slot_index: selected_slot as u8,
@@ -10785,7 +10934,13 @@ impl InputHandler {
                                 let target_x = target_player.server_x.round() as i32;
                                 let target_y = target_player.server_y.round() as i32;
                                 let weapon_range = get_local_weapon_range(state);
-                                if !in_attack_range(player_x, player_y, target_x, target_y, weapon_range) {
+                                if !in_attack_range(
+                                    player_x,
+                                    player_y,
+                                    target_x,
+                                    target_y,
+                                    weapon_range,
+                                ) {
                                     let occupied = build_occupied_set(state, true, true);
                                     const MAX_PATH_DISTANCE: i32 = 32;
                                     let path_result = if weapon_range > 1 {
@@ -10867,15 +11022,13 @@ impl InputHandler {
                                 let occupied = build_occupied_set(state, true, true);
 
                                 const MAX_PATH_DISTANCE: i32 = 32;
-                                if let Some((dest, path)) =
-                                    pathfinding::find_path_to_adjacent(
-                                        (player_x, player_y),
-                                        (item_x, item_y),
-                                        &state.chunk_manager,
-                                        &occupied,
-                                        MAX_PATH_DISTANCE,
-                                    )
-                                {
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (player_x, player_y),
+                                    (item_x, item_y),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                ) {
                                     state.auto_path = Some(PathState {
                                         path,
                                         current_index: 0,
@@ -11266,7 +11419,11 @@ impl InputHandler {
                         ) {
                             macroquad::logging::info!(
                                 "[CLICK2MOVE] path created len={} from=({},{}) to=({},{})",
-                                path.len(), player_x, player_y, tile_x, tile_y
+                                path.len(),
+                                player_x,
+                                player_y,
+                                tile_x,
+                                tile_y
                             );
                             state.click_effects.clear();
                             state.click_effects.push(ClickEffect::new(
@@ -11287,14 +11444,19 @@ impl InputHandler {
                         } else {
                             macroquad::logging::info!(
                                 "[CLICK2MOVE] pathfind FAILED from=({},{}) to=({},{})",
-                                player_x, player_y, tile_x, tile_y
+                                player_x,
+                                player_y,
+                                tile_x,
+                                tile_y
                             );
                         }
                     } else {
                         macroquad::logging::info!(
                             "[CLICK2MOVE] BLOCKED dist={} walkable={}",
                             dist,
-                            state.chunk_manager.is_walkable(tile_x as f32, tile_y as f32)
+                            state
+                                .chunk_manager
+                                .is_walkable(tile_x as f32, tile_y as f32)
                         );
                     }
                 } else {
@@ -11315,7 +11477,8 @@ impl InputHandler {
             if tracker_rect.contains(macroquad::math::Vec2::new(mouse_vx, mouse_vy)) {
                 // On Android: tap toggles minimize/expand directly
                 if cfg!(target_os = "android") && mouse_clicked {
-                    state.ui_state.quest_tracker_minimized = !state.ui_state.quest_tracker_minimized;
+                    state.ui_state.quest_tracker_minimized =
+                        !state.ui_state.quest_tracker_minimized;
                     save_current_ui_settings(state);
                     return commands;
                 }
@@ -11336,8 +11499,9 @@ impl InputHandler {
             let (raw_x, raw_y) = mouse_position();
             let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
             // Use elevation-aware tile picking for right-click
-            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) =
-                state.chunk_manager.pick_tile_at_screen(mouse_vx, mouse_vy, &state.camera);
+            let (clicked_tile_x, clicked_tile_y, _clicked_tile_z) = state
+                .chunk_manager
+                .pick_tile_at_screen(mouse_vx, mouse_vy, &state.camera);
 
             // Determine what's under the cursor, same priority as left-click
             let target = 'find_target: {
@@ -11693,7 +11857,11 @@ impl InputHandler {
         }
 
         // Toggle expanded minimap panel (M key) — disabled in instances/interiors
-        if !classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::M) && state.current_instance.is_none() {
+        if !classic
+            && !chat_consuming_keyboard
+            && is_key_pressed(KeyCode::M)
+            && state.current_instance.is_none()
+        {
             audio.play_sfx("enter");
             state.ui_state.minimap_panel_open = !state.ui_state.minimap_panel_open;
             if state.ui_state.minimap_panel_open {
@@ -11759,8 +11927,8 @@ impl InputHandler {
 
         // Interact with nearest NPC (E key or touch interact button)
         // Touch interact button also picks up items if no NPC nearby
-        let interact_pressed =
-            (!classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::E)) || self.touch_controls.interact_pressed();
+        let interact_pressed = (!classic && !chat_consuming_keyboard && is_key_pressed(KeyCode::E))
+            || self.touch_controls.interact_pressed();
         if interact_pressed {
             // If sitting, stand up
             if state.is_sitting {

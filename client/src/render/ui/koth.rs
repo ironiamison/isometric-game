@@ -90,8 +90,20 @@ impl Renderer {
                     0.0
                 };
 
-                draw_rectangle(bar_x, bar_y, bar_width, bar_height, Color::new(0.2, 0.1, 0.1, 0.8));
-                draw_rectangle(bar_x, bar_y, bar_width * progress, bar_height, Color::new(0.8, 0.2, 0.2, 0.9));
+                draw_rectangle(
+                    bar_x,
+                    bar_y,
+                    bar_width,
+                    bar_height,
+                    Color::new(0.2, 0.1, 0.1, 0.8),
+                );
+                draw_rectangle(
+                    bar_x,
+                    bar_y,
+                    bar_width * progress,
+                    bar_height,
+                    Color::new(0.8, 0.2, 0.2, 0.9),
+                );
                 draw_rectangle_lines(bar_x, bar_y, bar_width, bar_height, 1.0, FRAME_OUTER);
 
                 let enemy_text = format!(
@@ -202,7 +214,13 @@ impl Renderer {
         // Rewards
         let rewards_label = "Rewards:";
         let rl_dims = self.measure_text_sharp(rewards_label, 16.0);
-        self.draw_text_sharp(rewards_label, cx - rl_dims.width / 2.0, y, 16.0, TEXT_NORMAL);
+        self.draw_text_sharp(
+            rewards_label,
+            cx - rl_dims.width / 2.0,
+            y,
+            16.0,
+            TEXT_NORMAL,
+        );
         y += 18.0 * s;
 
         for reward in &info.rewards {
@@ -310,7 +328,11 @@ impl Renderer {
         let mut y = box_y + 28.0 * s;
 
         // Title
-        let title = if info.victory { "Victory!" } else { "Defeated!" };
+        let title = if info.victory {
+            "Victory!"
+        } else {
+            "Defeated!"
+        };
         let title_color = if info.victory { GREEN } else { RED };
         let title_dims = self.measure_text_sharp(title, 16.0);
         self.draw_text_sharp(title, cx - title_dims.width / 2.0, y, 16.0, title_color);
@@ -331,7 +353,13 @@ impl Renderer {
         if !info.rewards.is_empty() {
             let rewards_label = "Rewards:";
             let rl_dims = self.measure_text_sharp(rewards_label, 16.0);
-            self.draw_text_sharp(rewards_label, cx - rl_dims.width / 2.0, y, 16.0, TEXT_NORMAL);
+            self.draw_text_sharp(
+                rewards_label,
+                cx - rl_dims.width / 2.0,
+                y,
+                16.0,
+                TEXT_NORMAL,
+            );
             y += 18.0 * s;
 
             for reward in &info.rewards {
@@ -355,13 +383,7 @@ impl Renderer {
         if remaining > 0.0 {
             let timer_text = format!("Returning in {:.0}s...", remaining.ceil());
             let timer_dims = self.measure_text_sharp(&timer_text, 16.0);
-            self.draw_text_sharp(
-                &timer_text,
-                cx - timer_dims.width / 2.0,
-                y,
-                16.0,
-                TEXT_DIM,
-            );
+            self.draw_text_sharp(&timer_text, cx - timer_dims.width / 2.0, y, 16.0, TEXT_DIM);
         }
 
         // Dismiss button

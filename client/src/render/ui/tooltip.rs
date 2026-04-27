@@ -54,7 +54,9 @@ impl Renderer {
                     }
                 }
             }
-            Some(UiElementId::EquipmentSlot(slot_type)) if state.ui_state.inventory_open || state.ui_state.character_panel_open => {
+            Some(UiElementId::EquipmentSlot(slot_type))
+                if state.ui_state.inventory_open || state.ui_state.character_panel_open =>
+            {
                 let equipped_item =
                     state
                         .get_local_player()
@@ -719,7 +721,13 @@ impl Renderer {
             y += 2.0;
             let stat_green = Color::new(0.392, 0.784, 0.392, 1.0);
             let rs_text = format!("+{} Ranged Str", item_def.ranged_strength);
-            self.draw_text_sharp(&rs_text, tooltip_x + padding, y, small_font_size, stat_green);
+            self.draw_text_sharp(
+                &rs_text,
+                tooltip_x + padding,
+                y,
+                small_font_size,
+                stat_green,
+            );
             y += line_height;
         }
 

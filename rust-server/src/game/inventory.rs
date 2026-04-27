@@ -196,11 +196,7 @@ impl GameRoom {
                                 prayer_state = Some(ServerMessage::PrayerStateUpdate {
                                     points: player.prayer_points,
                                     max_points: player.max_prayer_points(),
-                                    active_prayers: player
-                                        .active_prayers
-                                        .iter()
-                                        .cloned()
-                                        .collect(),
+                                    active_prayers: player.active_prayers.iter().cloned().collect(),
                                 });
                                 format!("prayer:{}", restored)
                             }
@@ -209,7 +205,13 @@ impl GameRoom {
                                 amount,
                                 duration_ms,
                             }) => {
-                                player.apply_buff(stat.clone(), *amount, *duration_ms, now_ms(), item_id.clone());
+                                player.apply_buff(
+                                    stat.clone(),
+                                    *amount,
+                                    *duration_ms,
+                                    now_ms(),
+                                    item_id.clone(),
+                                );
                                 format!("buff:{}:{}:{}", stat, amount, duration_ms)
                             }
                             Some(UseEffect::Teleport { destination, x, y }) => {
@@ -571,23 +573,30 @@ impl GameRoom {
             }
         };
 
-        let (item_id, attack_level, defence_level, woodcutting_level, magic_level, ranged_level, current_equipment) =
-            match item_info {
-                Some(info) => info,
-                None => {
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::EquipResult {
-                            success: false,
-                            slot_type: "unknown".to_string(),
-                            item_id: None,
-                            error: Some("No item in that slot".to_string()),
-                        },
-                    )
-                    .await;
-                    return;
-                }
-            };
+        let (
+            item_id,
+            attack_level,
+            defence_level,
+            woodcutting_level,
+            magic_level,
+            ranged_level,
+            current_equipment,
+        ) = match item_info {
+            Some(info) => info,
+            None => {
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::EquipResult {
+                        success: false,
+                        slot_type: "unknown".to_string(),
+                        item_id: None,
+                        error: Some("No item in that slot".to_string()),
+                    },
+                )
+                .await;
+                return;
+            }
+        };
 
         let item_def = match self.item_registry.get(&item_id) {
             Some(definition) => definition,
@@ -624,8 +633,7 @@ impl GameRoom {
         };
 
         let slot_type = equip_slot.as_str().to_string();
-        if equip_stats.attack_level_required > 0
-            && attack_level < equip_stats.attack_level_required
+        if equip_stats.attack_level_required > 0 && attack_level < equip_stats.attack_level_required
         {
             self.send_to_player(
                 player_id,
@@ -697,8 +705,7 @@ impl GameRoom {
             return;
         }
 
-        if equip_stats.ranged_level_required > 0
-            && ranged_level < equip_stats.ranged_level_required
+        if equip_stats.ranged_level_required > 0 && ranged_level < equip_stats.ranged_level_required
         {
             self.send_to_player(
                 player_id,
@@ -802,15 +809,22 @@ impl GameRoom {
             if let Some(player) = players.get_mut(player_id) {
                 if !player.combat_style.is_valid_for(new_weapon_type) {
                     // Try to restore preferred style for this weapon type
-                    let preferred = player.combat_style_prefs.get(weapon_key)
+                    let preferred = player
+                        .combat_style_prefs
+                        .get(weapon_key)
                         .copied()
                         .filter(|s| s.is_valid_for(new_weapon_type));
-                    let new_style = preferred.unwrap_or(CombatStyle::available_styles(new_weapon_type)[0]);
+                    let new_style =
+                        preferred.unwrap_or(CombatStyle::available_styles(new_weapon_type)[0]);
                     player.combat_style = new_style;
                     tracing::info!(
                         "Player {} combat style {} to {} for {:?} weapon",
                         player_id,
-                        if preferred.is_some() { "restored" } else { "auto-reset" },
+                        if preferred.is_some() {
+                            "restored"
+                        } else {
+                            "auto-reset"
+                        },
                         player.combat_style.as_str(),
                         new_weapon_type
                     );
@@ -979,10 +993,13 @@ impl GameRoom {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
                 if !player.combat_style.is_valid_for(WeaponType::Melee) {
-                    let preferred = player.combat_style_prefs.get("melee")
+                    let preferred = player
+                        .combat_style_prefs
+                        .get("melee")
                         .copied()
                         .filter(|s| s.is_valid_for(WeaponType::Melee));
-                    player.combat_style = preferred.unwrap_or(CombatStyle::available_styles(WeaponType::Melee)[0]);
+                    player.combat_style =
+                        preferred.unwrap_or(CombatStyle::available_styles(WeaponType::Melee)[0]);
                 }
             }
             drop(players);

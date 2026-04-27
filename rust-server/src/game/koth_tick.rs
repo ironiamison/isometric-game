@@ -34,10 +34,7 @@ impl GameRoom {
                 continue;
             }
 
-            let player_level = player_levels
-                .get(&koth.player_id)
-                .copied()
-                .unwrap_or(10);
+            let player_level = player_levels.get(&koth.player_id).copied().unwrap_or(10);
 
             let events = koth.tick(current_time, player_level);
             all_events.extend(events);
@@ -148,11 +145,7 @@ impl GameRoom {
                             .add_koth_pending_reward(&player_id, &reward.item_id, reward.quantity)
                             .await
                         {
-                            tracing::error!(
-                                "Failed to store KOTH reward for {}: {}",
-                                player_id,
-                                e
-                            );
+                            tracing::error!("Failed to store KOTH reward for {}: {}", player_id, e);
                         }
                     }
                 }
@@ -325,9 +318,7 @@ impl GameRoom {
         // Remove player from instance and clean up private instance
         if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
             let remaining = instance.remove_player(player_id).await;
-            if remaining == 0
-                && instance.instance_type == crate::interior::InstanceType::Private
-            {
+            if remaining == 0 && instance.instance_type == crate::interior::InstanceType::Private {
                 if let Some(owner_id) = &instance.owner_id {
                     self.instance_manager
                         .remove_private(owner_id, &instance.map_id);
@@ -381,7 +372,9 @@ impl GameRoom {
     /// Get the entrance position for a KOTH session (where the player should return to)
     pub async fn get_koth_entrance(&self, instance_id: &str) -> Option<(i32, i32)> {
         let states = self.koth_states.read().await;
-        states.get(instance_id).map(|k| (k.entrance_x, k.entrance_y))
+        states
+            .get(instance_id)
+            .map(|k| (k.entrance_x, k.entrance_y))
     }
 
     /// Clean up KOTH state when a player exits the instance (via portal or disconnect)
@@ -405,7 +398,9 @@ impl GameRoom {
     /// Show the KOTH rewards NPC dialogue with pending rewards summary
     pub async fn show_koth_rewards_dialogue(&self, player_id: &str, npc_id: &str) {
         let pending = if let Some(ref db) = self.db {
-            db.get_koth_pending_rewards(player_id).await.unwrap_or_default()
+            db.get_koth_pending_rewards(player_id)
+                .await
+                .unwrap_or_default()
         } else {
             vec![]
         };

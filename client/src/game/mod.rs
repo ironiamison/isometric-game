@@ -16,6 +16,7 @@ pub mod state;
 pub mod tilemap;
 pub mod tree_types;
 pub mod tutorial;
+pub mod world_map;
 
 pub use chunk::{
     Chunk, ChunkCoord, ChunkLayerType, ChunkManager, MapObject, Portal, Wall, WallEdge, CHUNK_SIZE,
@@ -32,18 +33,19 @@ pub use shop::{ShopData, ShopStockItem, ShopSubTab};
 pub use skills::{Skill, SkillType, Skills};
 pub use spectator_camera::SpectatorCamera;
 pub use state::{
-    quest_status_order, ActiveDialogue, ActiveQuest, AltarPanelState, Announcement,
-    AutoActionState, BankDrag, BankQuantityAction, BankQuantityDialog, BonusTile, Camera,
-    CatalogObjective, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus, ContextMenu,
-    ContextMenuTarget, DamageEvent, DialogueChoice, DoubleClickState, DragSource, DragState,
-    ActivePotionBuff, AdventureBoardActiveContractInfo, AdventureBoardDifficultyInfo,
-    AdventureBoardOfferInfo, AdventureBoardPanelState, AdventureBoardStatsInfo, FarmingPatch,
-    FrameTimings, FriendInfo, GameState, GatheringBuff, GatheringMarker, GoldDropDialog,
-    LevelUpEvent, MapTransition, OnlinePlayerInfo, PendingRequestInfo, Projectile,
-    QuestCatalogEntry, QuestCompletedEvent, QuestObjective, ResourceContractInfo, SkillXpEvent,
-    SocialState, SocialTab, SpellEffect, StallBrowseInfo, StallPriceDialog, StallSlotInfo,
-    TradeOfferItem, TransitionState, UiState, XpDropFeed,
-    KothClientState, KothCheckpointInfo, KothGameOverInfo, KothRewardPreview,
-    BossClientState, AoeWarningZone, ExplosionEffect,
+    quest_status_order, ActiveDialogue, ActivePotionBuff, ActiveQuest,
+    AdventureBoardActiveContractInfo, AdventureBoardDifficultyInfo, AdventureBoardOfferInfo,
+    AdventureBoardPanelState, AdventureBoardStatsInfo, AltarPanelState, Announcement,
+    AoeWarningZone, AutoActionState, BankDrag, BankQuantityAction, BankQuantityDialog, BonusTile,
+    BossClientState, Camera, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
+    ConnectionStatus, ContextMenu, ContextMenuTarget, DamageEvent, DialogueChoice,
+    DoubleClickState, DragSource, DragState, ExplosionEffect, FarmingPatch, FrameTimings,
+    FriendInfo, GameState, GatheringBuff, GatheringMarker, GoldDropDialog, KothCheckpointInfo,
+    KothClientState, KothGameOverInfo, KothRewardPreview, LevelUpEvent, MapTransition,
+    OnlinePlayerInfo, PendingRequestInfo, Projectile, QuestCatalogEntry, QuestCompletedEvent,
+    QuestObjective, ResourceContractInfo, SkillXpEvent, SocialState, SocialTab, SpellEffect,
+    StallBrowseInfo, StallPriceDialog, StallSlotInfo, TradeOfferItem, TransitionState, UiState,
+    XpDropFeed,
 };
 pub use tilemap::{LayerType, Tilemap, TilemapLayer};
+pub use world_map::{WorldMapBounds, WorldMapChunkSample, WorldMapPoi, WorldMapSnapshot};

@@ -30,9 +30,19 @@ pub enum BossPhase {
 #[derive(Debug, Clone, PartialEq)]
 pub enum WurmState {
     Surface,
-    Submerging { ends_at: u64 },
-    Digging { ends_at: u64, target_x: i32, target_y: i32 },
-    Emerging { ends_at: u64, target_x: i32, target_y: i32 },
+    Submerging {
+        ends_at: u64,
+    },
+    Digging {
+        ends_at: u64,
+        target_x: i32,
+        target_y: i32,
+    },
+    Emerging {
+        ends_at: u64,
+        target_x: i32,
+        target_y: i32,
+    },
     Dead,
 }
 
@@ -349,10 +359,8 @@ impl BossState {
                             .wrapping_add(self.minion_counter as u64)
                             .wrapping_add(i as u64 * 37);
                         let (x, y) = pick_minion_spawn(self.map_width, self.map_height, seed);
-                        let npc_id = format!(
-                            "boss_minion_{}_{}",
-                            self.instance_id, self.minion_counter
-                        );
+                        let npc_id =
+                            format!("boss_minion_{}_{}", self.instance_id, self.minion_counter);
                         events.push(BossEvent::SpawnMinion {
                             instance_id: self.instance_id.clone(),
                             npc_id,
@@ -365,7 +373,9 @@ impl BossState {
             WurmState::Submerging { ends_at } => {
                 if current_time >= ends_at {
                     // Submerge animation finished — pick emerge target and start burrowing toward it
-                    let seed = current_time.wrapping_mul(31).wrapping_add(self.boss_hp as u64);
+                    let seed = current_time
+                        .wrapping_mul(31)
+                        .wrapping_add(self.boss_hp as u64);
                     let (tx, ty) = pick_emerge_position(self.map_width, self.map_height, seed);
 
                     self.wurm_state = WurmState::Digging {
@@ -384,7 +394,11 @@ impl BossState {
                     self.last_burrow_move_time = current_time;
                 }
             }
-            WurmState::Digging { ends_at: _, target_x, target_y } => {
+            WurmState::Digging {
+                ends_at: _,
+                target_x,
+                target_y,
+            } => {
                 let tx = target_x;
                 let ty = target_y;
                 let at_target = self.boss_x == tx && self.boss_y == ty;

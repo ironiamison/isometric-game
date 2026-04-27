@@ -218,7 +218,9 @@ impl Renderer {
                     .find(|s| s.id == spell_id)
                     .map(|s| s.name.to_string())
                     .or_else(|| {
-                        state.scroll_spell_definitions.iter()
+                        state
+                            .scroll_spell_definitions
+                            .iter()
                             .find(|s| s.id == *spell_id)
                             .map(|s| s.name.clone())
                     })

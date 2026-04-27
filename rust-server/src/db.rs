@@ -1073,9 +1073,8 @@ impl Database {
         Ok(rows
             .into_iter()
             .map(|r| {
-                let skills = Skills::from_json(
-                    &r.try_get::<String, _>("skills_json").unwrap_or_default(),
-                );
+                let skills =
+                    Skills::from_json(&r.try_get::<String, _>("skills_json").unwrap_or_default());
 
                 CharacterData {
                     id: r.get("id"),
@@ -1151,7 +1150,9 @@ impl Database {
                         .unwrap_or_else(|_| "[]".to_string()),
                     bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
                     bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
-                    combat_style_prefs: r.try_get::<String, _>("combat_style_prefs").unwrap_or_else(|_| "{}".to_string()),
+                    combat_style_prefs: r
+                        .try_get::<String, _>("combat_style_prefs")
+                        .unwrap_or_else(|_| "{}".to_string()),
                 }
             })
             .collect())
@@ -1285,9 +1286,8 @@ impl Database {
         .await?;
 
         Ok(row.map(|r| {
-            let skills = Skills::from_json(
-                &r.try_get::<String, _>("skills_json").unwrap_or_default(),
-            );
+            let skills =
+                Skills::from_json(&r.try_get::<String, _>("skills_json").unwrap_or_default());
 
             CharacterData {
                 id: r.get("id"),
@@ -1363,7 +1363,9 @@ impl Database {
                     .unwrap_or_else(|_| "[]".to_string()),
                 bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
                 bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
-                combat_style_prefs: r.try_get::<String, _>("combat_style_prefs").unwrap_or_else(|_| "{}".to_string()),
+                combat_style_prefs: r
+                    .try_get::<String, _>("combat_style_prefs")
+                    .unwrap_or_else(|_| "{}".to_string()),
             }
         }))
     }
@@ -1976,7 +1978,18 @@ impl Database {
     pub async fn load_resource_contracts(
         &self,
     ) -> Result<
-        Vec<(String, String, String, String, String, i32, i32, String, String, u64)>,
+        Vec<(
+            String,
+            String,
+            String,
+            String,
+            String,
+            i32,
+            i32,
+            String,
+            String,
+            u64,
+        )>,
         sqlx::Error,
     > {
         let rows = sqlx::query(
@@ -2446,7 +2459,9 @@ impl Database {
 
     /// Get the top two non-admin characters by total level.
     /// Returns (first_place, second_place) where each is Option<(name, total_level)>.
-    pub async fn get_top_total_level_players(&self) -> (Option<(String, i32)>, Option<(String, i32)>) {
+    pub async fn get_top_total_level_players(
+        &self,
+    ) -> (Option<(String, i32)>, Option<(String, i32)>) {
         let rows = sqlx::query("SELECT name, skills_json FROM characters WHERE is_admin = FALSE")
             .fetch_all(&self.pool)
             .await
@@ -2525,7 +2540,7 @@ impl Database {
     /// Look up account_id by character name (for offline bans).
     pub async fn get_account_id_by_character_name(&self, name: &str) -> Option<i64> {
         sqlx::query_scalar::<_, i64>(
-            "SELECT account_id FROM characters WHERE name = ? COLLATE NOCASE LIMIT 1"
+            "SELECT account_id FROM characters WHERE name = ? COLLATE NOCASE LIMIT 1",
         )
         .bind(name)
         .fetch_optional(&self.pool)

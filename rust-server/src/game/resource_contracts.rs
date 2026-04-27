@@ -99,7 +99,9 @@ fn required_quest_for_contract_npc(entity_type: &str) -> Option<&'static str> {
 
 fn adventure_board_description(kind: ResourceContractKind) -> &'static str {
     match kind {
-        ResourceContractKind::Farming => "Short field orders for growers with fresh produce on hand.",
+        ResourceContractKind::Farming => {
+            "Short field orders for growers with fresh produce on hand."
+        }
         ResourceContractKind::Mining => "Ore runs and extraction jobs for the village stores.",
         ResourceContractKind::Woodcutting => "Log requests for builders, fires, and tool handles.",
         ResourceContractKind::Fishing => "Daily fish hauls for cooks, traders, and camp stock.",
@@ -190,7 +192,8 @@ impl GameRoom {
 
         let mut offers = Vec::new();
         for kind in adventure_board_kinds() {
-            let Some(skill_level) = self.player_skill_level_for_contract(player_id, kind).await else {
+            let Some(skill_level) = self.player_skill_level_for_contract(player_id, kind).await
+            else {
                 continue;
             };
 
@@ -547,8 +550,11 @@ impl GameRoom {
         {
             let resource_contracts = self.resource_contracts.read().await;
             if resource_contracts.has_contract(player_id) {
-                self.send_system_message(player_id, "You already have an active resource contract.")
-                    .await;
+                self.send_system_message(
+                    player_id,
+                    "You already have an active resource contract.",
+                )
+                .await;
                 return;
             }
         }
@@ -602,8 +608,11 @@ impl GameRoom {
         {
             let mut resource_contracts = self.resource_contracts.write().await;
             if resource_contracts.has_contract(player_id) {
-                self.send_system_message(player_id, "You already have an active resource contract.")
-                    .await;
+                self.send_system_message(
+                    player_id,
+                    "You already have an active resource contract.",
+                )
+                .await;
                 return;
             }
             resource_contracts.insert_contract(contract.clone());
@@ -663,8 +672,11 @@ impl GameRoom {
         {
             let resource_contracts = self.resource_contracts.read().await;
             if resource_contracts.has_contract(player_id) {
-                self.send_system_message(player_id, "You already have an active resource contract.")
-                    .await;
+                self.send_system_message(
+                    player_id,
+                    "You already have an active resource contract.",
+                )
+                .await;
                 return;
             }
         }
@@ -714,8 +726,11 @@ impl GameRoom {
         {
             let mut resource_contracts = self.resource_contracts.write().await;
             if resource_contracts.has_contract(player_id) {
-                self.send_system_message(player_id, "You already have an active resource contract.")
-                    .await;
+                self.send_system_message(
+                    player_id,
+                    "You already have an active resource contract.",
+                )
+                .await;
                 return;
             }
             resource_contracts.insert_contract(contract.clone());
@@ -925,7 +940,8 @@ impl GameRoom {
         .await;
 
         if leveled_up {
-            self.broadcast_skill_level_up(player_id, &skill_name, level).await;
+            self.broadcast_skill_level_up(player_id, &skill_name, level)
+                .await;
             self.process_quest_progression_snapshot(player_id).await;
         }
 
@@ -1033,11 +1049,17 @@ impl GameRoom {
         }
 
         if let Some(ref db) = self.db {
-            if let Err(e) = db.update_resource_contract_progress(player_id, completed).await {
+            if let Err(e) = db
+                .update_resource_contract_progress(player_id, completed)
+                .await
+            {
                 tracing::warn!("Failed to update resource contract progress: {}", e);
             }
             if contract.kind == ResourceContractKind::Farming {
-                if let Err(e) = db.update_farming_contract_progress(player_id, completed).await {
+                if let Err(e) = db
+                    .update_farming_contract_progress(player_id, completed)
+                    .await
+                {
                     tracing::warn!("Failed to update legacy farming contract progress: {}", e);
                 }
             }

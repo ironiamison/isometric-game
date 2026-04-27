@@ -71,7 +71,11 @@ impl Renderer {
             ((sw - pw) / 2.0, (sh - ph) / 2.0, pw, ph)
         };
 
-        let header_h = if cfg!(target_os = "android") { 0.0 } else { HEADER_HEIGHT * s };
+        let header_h = if cfg!(target_os = "android") {
+            0.0
+        } else {
+            HEADER_HEIGHT * s
+        };
         let gold_bar_h = GOLD_BAR_HEIGHT * s;
 
         // Semi-transparent overlay
@@ -226,7 +230,10 @@ impl Renderer {
             let cy = close_y + close_size / 2.0;
             draw_line(cx - 4.0, cy - 4.0, cx + 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
             draw_line(cx + 4.0, cy - 4.0, cx - 4.0, cy + 4.0, 1.5, TEXT_NORMAL);
-            layout.add(UiElementId::BankCloseButton, Rect::new(close_x, close_y, close_size, close_size));
+            layout.add(
+                UiElementId::BankCloseButton,
+                Rect::new(close_x, close_y, close_size, close_size),
+            );
         }
 
         // Content area
@@ -439,8 +446,22 @@ impl Renderer {
             let mid_y = cy + cs / 2.0;
             draw_circle(mid_x, mid_y, cs / 2.0, Color::new(0.15, 0.1, 0.1, 0.85));
             draw_circle_lines(mid_x, mid_y, cs / 2.0, 1.0, Color::new(0.6, 0.3, 0.3, 0.9));
-            draw_line(mid_x - 4.0, mid_y - 4.0, mid_x + 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
-            draw_line(mid_x + 4.0, mid_y - 4.0, mid_x - 4.0, mid_y + 4.0, 1.5, TEXT_NORMAL);
+            draw_line(
+                mid_x - 4.0,
+                mid_y - 4.0,
+                mid_x + 4.0,
+                mid_y + 4.0,
+                1.5,
+                TEXT_NORMAL,
+            );
+            draw_line(
+                mid_x + 4.0,
+                mid_y - 4.0,
+                mid_x - 4.0,
+                mid_y + 4.0,
+                1.5,
+                TEXT_NORMAL,
+            );
             layout.add(UiElementId::BankCloseButton, Rect::new(cx, cy, cs, cs));
         }
     }
@@ -1156,7 +1177,10 @@ impl Renderer {
 
         let max_hovered = matches!(hovered, Some(UiElementId::BankQuantityMax));
         let (max_bg, max_border) = if max_hovered {
-            (Color::new(0.141, 0.204, 0.235, 1.0), Color::new(0.4, 0.7, 0.9, 1.0))
+            (
+                Color::new(0.141, 0.204, 0.235, 1.0),
+                Color::new(0.4, 0.7, 0.9, 1.0),
+            )
         } else {
             (Color::new(0.110, 0.141, 0.157, 1.0), FRAME_MID)
         };
@@ -1181,11 +1205,7 @@ impl Renderer {
             );
         }
 
-        let max_text_color = if max_hovered {
-            TEXT_TITLE
-        } else {
-            TEXT_NORMAL
-        };
+        let max_text_color = if max_hovered { TEXT_TITLE } else { TEXT_NORMAL };
         let max_text = "Max";
         let max_text_width = self.measure_text_sharp(max_text, 16.0).width;
         self.draw_text_sharp(
@@ -1367,6 +1387,5 @@ impl Renderer {
             16.0,
             close_text_color,
         );
-
     }
 }

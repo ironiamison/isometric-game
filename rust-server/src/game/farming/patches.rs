@@ -64,7 +64,8 @@ impl GameRoom {
                 .await;
 
                 if leveled_up {
-                    self.broadcast_skill_level_up(player_id, "farming", level).await;
+                    self.broadcast_skill_level_up(player_id, "farming", level)
+                        .await;
                     self.process_quest_progression_snapshot(player_id).await;
                 }
 
@@ -177,7 +178,8 @@ impl GameRoom {
                 .await;
 
                 if leveled_up {
-                    self.broadcast_skill_level_up(player_id, "farming", level).await;
+                    self.broadcast_skill_level_up(player_id, "farming", level)
+                        .await;
                     self.process_quest_progression_snapshot(player_id).await;
                 }
 

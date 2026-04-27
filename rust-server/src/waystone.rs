@@ -103,4 +103,8 @@ impl WaystoneManager {
             .get(waystone_id)
             .and_then(|ws| self.waystones.get(&ws.linked_to))
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &WaystoneDef> {
+        self.waystones.values()
+    }
 }

@@ -80,12 +80,7 @@ impl Renderer {
 
     /// Render a small HUD chip showing the player's active combat style.
     /// Returns `(chip_width, chip_height)` so the caller can position adjacent chips.
-    pub(crate) fn render_combat_style_chip(
-        &self,
-        state: &GameState,
-        x: f32,
-        y: f32,
-    ) -> (f32, f32) {
+    pub(crate) fn render_combat_style_chip(&self, state: &GameState, x: f32, y: f32) -> (f32, f32) {
         let style_raw = match state.get_local_player() {
             Some(p) => p.combat_style.clone(),
             None => return (0.0, 0.0),
@@ -252,7 +247,11 @@ impl Renderer {
         let remaining = (buff.expires_at - now).max(0.0);
         let remaining_secs = remaining as u64;
         let time_str = if remaining_secs >= 60 {
-            format!("{}m {}s remaining", remaining_secs / 60, remaining_secs % 60)
+            format!(
+                "{}m {}s remaining",
+                remaining_secs / 60,
+                remaining_secs % 60
+            )
         } else {
             format!("{}s remaining", remaining_secs)
         };
@@ -288,8 +287,21 @@ impl Renderer {
         let tip_x = chip_x + chip_w + 4.0 * s;
         let tip_y = chip_y;
 
-        draw_rectangle(tip_x, tip_y, tip_w, tip_h, Color::from_rgba(12, 12, 18, 240));
-        draw_rectangle_lines(tip_x, tip_y, tip_w, tip_h, 1.0, Color::from_rgba(80, 70, 55, 200));
+        draw_rectangle(
+            tip_x,
+            tip_y,
+            tip_w,
+            tip_h,
+            Color::from_rgba(12, 12, 18, 240),
+        );
+        draw_rectangle_lines(
+            tip_x,
+            tip_y,
+            tip_w,
+            tip_h,
+            1.0,
+            Color::from_rgba(80, 70, 55, 200),
+        );
 
         for (i, (text, color)) in lines.iter().enumerate() {
             self.draw_text_sharp(
@@ -877,9 +889,7 @@ impl Renderer {
                 let scrollbar_w = 4.0 * s;
 
                 // List area starts after the reward rows (separator + padding)
-                let list_top = content_y + 4.0 * s
-                    + row_idx as f32 * (row_h + row_sp)
-                    + 4.0 * s;
+                let list_top = content_y + 4.0 * s + row_idx as f32 * (row_h + row_sp) + 4.0 * s;
                 let list_h = (content_y + content_h - list_top).max(0.0);
                 let list_w = content_w;
 
@@ -908,7 +918,10 @@ impl Renderer {
                 }
 
                 let max_scroll = (total_h - list_h).max(0.0);
-                let block_scroll = state.ui_state.slayer_block_scroll_offset.clamp(0.0, max_scroll);
+                let block_scroll = state
+                    .ui_state
+                    .slayer_block_scroll_offset
+                    .clamp(0.0, max_scroll);
                 let needs_scrollbar = max_scroll > 0.0;
                 let draw_w = if needs_scrollbar {
                     list_w - scrollbar_w - 4.0 * s
@@ -982,14 +995,16 @@ impl Renderer {
                             } else {
                                 Color::new(0.08, 0.08, 0.10, 0.6)
                             };
-                            draw_rectangle(
-                                content_x + 2.0, cur_y, draw_w - 4.0, compact_h, row_bg,
-                            );
+                            draw_rectangle(content_x + 2.0, cur_y, draw_w - 4.0, compact_h, row_bg);
 
                             if is_selected {
                                 draw_rectangle_lines(
-                                    content_x + 2.0, cur_y, draw_w - 4.0, compact_h,
-                                    1.0, FRAME_ACCENT,
+                                    content_x + 2.0,
+                                    cur_y,
+                                    draw_w - 4.0,
+                                    compact_h,
+                                    1.0,
+                                    FRAME_ACCENT,
                                 );
                             }
 
@@ -1048,9 +1063,7 @@ impl Renderer {
                             } else {
                                 Color::new(0.08, 0.08, 0.10, 0.6)
                             };
-                            draw_rectangle(
-                                content_x + 2.0, cur_y, draw_w - 4.0, compact_h, row_bg,
-                            );
+                            draw_rectangle(content_x + 2.0, cur_y, draw_w - 4.0, compact_h, row_bg);
 
                             self.draw_text_sharp(
                                 monster_name,
@@ -1087,12 +1100,12 @@ impl Renderer {
                                 )
                             };
 
+                            draw_rectangle(remove_x, remove_y, remove_w, remove_h, remove_border);
                             draw_rectangle(
-                                remove_x, remove_y, remove_w, remove_h, remove_border,
-                            );
-                            draw_rectangle(
-                                remove_x + 1.0, remove_y + 1.0,
-                                remove_w - 2.0, remove_h - 2.0,
+                                remove_x + 1.0,
+                                remove_y + 1.0,
+                                remove_w - 2.0,
+                                remove_h - 2.0,
                                 remove_bg,
                             );
 
@@ -1124,7 +1137,12 @@ impl Renderer {
                     gl.flush();
                 }
                 unsafe {
-                    miniquad::gl::glScissor(clip_x, real_sh as i32 - clip_y - clip_h, clip_w, clip_h);
+                    miniquad::gl::glScissor(
+                        clip_x,
+                        real_sh as i32 - clip_y - clip_h,
+                        clip_w,
+                        clip_h,
+                    );
                 }
 
                 // Draw scrollbar if content overflows
@@ -1135,7 +1153,10 @@ impl Renderer {
 
                     // Track background
                     draw_rectangle(
-                        track_x, track_y, scrollbar_w, track_h,
+                        track_x,
+                        track_y,
+                        scrollbar_w,
+                        track_h,
                         Color::new(0.1, 0.1, 0.13, 1.0),
                     );
 
@@ -1150,8 +1171,7 @@ impl Renderer {
                     let thumb_y = track_y + scroll_ratio * (track_h - thumb_h);
 
                     let is_dragging = state.ui_state.slayer_block_scroll_drag.dragging;
-                    let is_sb_hovered =
-                        matches!(hovered, Some(UiElementId::SlayerBlockScrollbar));
+                    let is_sb_hovered = matches!(hovered, Some(UiElementId::SlayerBlockScrollbar));
                     let thumb_color = if is_dragging || is_sb_hovered {
                         FRAME_ACCENT
                     } else {

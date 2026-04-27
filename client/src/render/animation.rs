@@ -422,30 +422,43 @@ impl NpcAnimation {
         let frame_in_anim = self.frame as u32;
 
         match self.layout {
-            NpcAnimationLayout::Standard => {
-                match self.state {
-                    NpcAnimationState::Idle => {
-                        let base = if use_up_left { 2 } else { 0 };
-                        if has_idle_animation { base + (frame_in_anim % 2) } else { base }
-                    }
-                    NpcAnimationState::Walking => {
-                        let base = if use_up_left { 8 } else { 4 };
-                        base + (frame_in_anim % Self::WALK_FRAMES)
-                    }
-                    NpcAnimationState::Attacking => {
-                        let base = if use_up_left { 14 } else { 12 };
-                        base + (frame_in_anim % Self::ATTACK_FRAMES)
-                    }
-                    NpcAnimationState::Submerging | NpcAnimationState::Emerging | NpcAnimationState::Burrowing | NpcAnimationState::Exploding => {
-                        if use_up_left { 2 } else { 0 }
+            NpcAnimationLayout::Standard => match self.state {
+                NpcAnimationState::Idle => {
+                    let base = if use_up_left { 2 } else { 0 };
+                    if has_idle_animation {
+                        base + (frame_in_anim % 2)
+                    } else {
+                        base
                     }
                 }
-            }
+                NpcAnimationState::Walking => {
+                    let base = if use_up_left { 8 } else { 4 };
+                    base + (frame_in_anim % Self::WALK_FRAMES)
+                }
+                NpcAnimationState::Attacking => {
+                    let base = if use_up_left { 14 } else { 12 };
+                    base + (frame_in_anim % Self::ATTACK_FRAMES)
+                }
+                NpcAnimationState::Submerging
+                | NpcAnimationState::Emerging
+                | NpcAnimationState::Burrowing
+                | NpcAnimationState::Exploding => {
+                    if use_up_left {
+                        2
+                    } else {
+                        0
+                    }
+                }
+            },
             NpcAnimationLayout::ExplodingRock => {
                 match self.state {
                     NpcAnimationState::Idle => {
                         let base = if use_up_left { 2 } else { 0 };
-                        if has_idle_animation { base + (frame_in_anim % 2) } else { base }
+                        if has_idle_animation {
+                            base + (frame_in_anim % 2)
+                        } else {
+                            base
+                        }
                     }
                     NpcAnimationState::Walking => {
                         let base = if use_up_left { 8 } else { 4 };
@@ -459,8 +472,14 @@ impl NpcAnimation {
                         // Frames 16-21: explosion animation (no direction)
                         16 + (frame_in_anim % 6)
                     }
-                    NpcAnimationState::Submerging | NpcAnimationState::Emerging | NpcAnimationState::Burrowing => {
-                        if use_up_left { 2 } else { 0 }
+                    NpcAnimationState::Submerging
+                    | NpcAnimationState::Emerging
+                    | NpcAnimationState::Burrowing => {
+                        if use_up_left {
+                            2
+                        } else {
+                            0
+                        }
                     }
                 }
             }
@@ -468,7 +487,11 @@ impl NpcAnimation {
                 match self.state {
                     NpcAnimationState::Idle => {
                         let base = if use_up_left { 2 } else { 0 };
-                        if has_idle_animation { base + (frame_in_anim % 2) } else { base }
+                        if has_idle_animation {
+                            base + (frame_in_anim % 2)
+                        } else {
+                            base
+                        }
                     }
                     NpcAnimationState::Walking => {
                         let base = if use_up_left { 8 } else { 4 };
@@ -496,7 +519,11 @@ impl NpcAnimation {
                         base + (frame_in_anim % 3)
                     }
                     NpcAnimationState::Exploding => {
-                        if use_up_left { 2 } else { 0 }
+                        if use_up_left {
+                            2
+                        } else {
+                            0
+                        }
                     }
                 }
             }

@@ -23,6 +23,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 mod arena;
+mod boss;
 mod chest;
 mod chunk;
 mod collection_log;
@@ -37,15 +38,14 @@ mod gathering;
 mod ground_spawn;
 mod instance;
 mod interior;
-mod koth;
-mod boss;
-mod pharaoh_boss;
 mod interior_registry;
 mod item;
+mod koth;
 mod log_buffer;
 mod mining;
 mod npc;
 mod perf_metrics;
+mod pharaoh_boss;
 mod prayer;
 mod protocol;
 mod quest;
@@ -170,12 +170,16 @@ impl AppState {
         chest_registry.load_from_file(&data_dir.join("chests.toml"));
 
         // Load collection log definitions from TOML file
-        let collection_log_defs = collection_log::CollectionLogDefinitions::load("data/collection_log.toml");
+        let collection_log_defs =
+            collection_log::CollectionLogDefinitions::load("data/collection_log.toml");
 
         // Build display name lookup for collection log subcategories
         let quest_names: std::collections::HashMap<String, String> = {
             let quests = quest_registry.all_quests().await;
-            quests.into_iter().map(|q| (q.id.clone(), q.name.clone())).collect()
+            quests
+                .into_iter()
+                .map(|q| (q.id.clone(), q.name.clone()))
+                .collect()
         };
         let collection_log_display_names: Vec<(String, String)> = collection_log_defs
             .build_display_names(&entity_registry, &quest_names)
@@ -1284,8 +1288,7 @@ async fn matchmake_join_or_create(
                                         )
                                         .await;
                                 }
-                                if remaining == 0
-                                    && instance.instance_type == InstanceType::Private
+                                if remaining == 0 && instance.instance_type == InstanceType::Private
                                 {
                                     if let Some(owner_id) = &instance.owner_id {
                                         state
@@ -1946,11 +1949,15 @@ async fn stats_items(State(state): State<AppState>) -> impl IntoResponse {
 async fn stats_entities(State(state): State<AppState>) -> impl IntoResponse {
     // Collect quest kill-objective targets
     let all_quests = state.quest_registry.all_quests().await;
-    let mut quest_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut quest_map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     for quest in &all_quests {
         for obj in &quest.objectives {
             if obj.objective_type == ObjectiveType::KillMonster {
-                quest_map.entry(obj.target.clone()).or_default().push(quest.id.clone());
+                quest_map
+                    .entry(obj.target.clone())
+                    .or_default()
+                    .push(quest.id.clone());
             }
         }
     }
@@ -1976,22 +1983,34 @@ async fn stats_entities(State(state): State<AppState>) -> impl IntoResponse {
             exp_base: e.rewards.exp_base,
             gold_min: e.rewards.gold_min,
             gold_max: e.rewards.gold_max,
-            loot: e.loot.iter().map(|l| StatsEntityLoot {
-                item_id: l.item_id.clone(),
-                drop_chance: l.drop_chance,
-                quantity_min: l.quantity_min,
-                quantity_max: l.quantity_max,
-            }).collect(),
-            loot_tables: e.loot_tables.iter().map(|t| StatsLootTable {
-                name: t.name.clone(),
-                chance: t.chance,
-                entries: t.entries.iter().map(|e| StatsLootTableEntry {
-                    item_id: e.item_id.clone(),
-                    weight: e.weight,
-                    quantity_min: e.quantity_min,
-                    quantity_max: e.quantity_max,
-                }).collect(),
-            }).collect(),
+            loot: e
+                .loot
+                .iter()
+                .map(|l| StatsEntityLoot {
+                    item_id: l.item_id.clone(),
+                    drop_chance: l.drop_chance,
+                    quantity_min: l.quantity_min,
+                    quantity_max: l.quantity_max,
+                })
+                .collect(),
+            loot_tables: e
+                .loot_tables
+                .iter()
+                .map(|t| StatsLootTable {
+                    name: t.name.clone(),
+                    chance: t.chance,
+                    entries: t
+                        .entries
+                        .iter()
+                        .map(|e| StatsLootTableEntry {
+                            item_id: e.item_id.clone(),
+                            weight: e.weight,
+                            quantity_min: e.quantity_min,
+                            quantity_max: e.quantity_max,
+                        })
+                        .collect(),
+                })
+                .collect(),
             quest_ids: quest_map.get(&e.id).cloned().unwrap_or_default(),
         })
         .collect();
@@ -2180,7 +2199,10 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                 Ok(Some(Ok(msg))) => msg,
                 Ok(Some(Err(_))) | Ok(None) => break,
                 Err(_) => {
-                    warn!("Spectator {} connection timed out (no data for 30s)", recv_spectator_id);
+                    warn!(
+                        "Spectator {} connection timed out (no data for 30s)",
+                        recv_spectator_id
+                    );
                     break;
                 }
             };
@@ -2335,8 +2357,14 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Gathering markers
-                            let gathering_markers = recv_room.get_gathering_markers_message(None).await;
+                            let gathering_markers =
+                                recv_room.get_gathering_markers_message(None).await;
                             if let Ok(bytes) = protocol::encode_server_message(&gathering_markers) {
+                                let _ = recv_tx.send(bytes).await;
+                            }
+
+                            let world_map = recv_room.get_world_map_message().await;
+                            if let Ok(bytes) = protocol::encode_server_message(&world_map) {
                                 let _ = recv_tx.send(bytes).await;
                             }
 
@@ -2376,10 +2404,14 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
 
                             // Collection log definitions
-                            let clog_defs_msg = crate::protocol::ServerMessage::CollectionLogDefinitions {
-                                entries: recv_state.collection_log_defs.all_entries(),
-                                display_names: recv_state.collection_log_display_names.as_ref().clone(),
-                            };
+                            let clog_defs_msg =
+                                crate::protocol::ServerMessage::CollectionLogDefinitions {
+                                    entries: recv_state.collection_log_defs.all_entries(),
+                                    display_names: recv_state
+                                        .collection_log_display_names
+                                        .as_ref()
+                                        .clone(),
+                                };
                             if let Ok(bytes) = protocol::encode_server_message(&clog_defs_msg) {
                                 let _ = recv_tx.send(bytes).await;
                             }
@@ -2387,9 +2419,10 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             // Collection log sync (player's obtained entries)
                             match recv_state.db.load_collection_log(character_id).await {
                                 Ok(entries) => {
-                                    let clog_sync = crate::protocol::ServerMessage::CollectionLogSync {
-                                        entries,
-                                    };
+                                    let clog_sync =
+                                        crate::protocol::ServerMessage::CollectionLogSync {
+                                            entries,
+                                        };
                                     if let Ok(bytes) = protocol::encode_server_message(&clog_sync) {
                                         let _ = recv_tx.send(bytes).await;
                                     }
@@ -2700,7 +2733,9 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             }
                             let (_, removed_sess) = removed_session.unwrap();
                             let character_id = removed_sess.character_id;
-                            let should_save = recv_state.auth_sessions.contains_key(&removed_sess.auth_token);
+                            let should_save = recv_state
+                                .auth_sessions
+                                .contains_key(&removed_sess.auth_token);
 
                             info!(
                                 "Upgraded player {} ({}) disconnected",
@@ -3211,6 +3246,11 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    let world_map = room.get_world_map_message().await;
+    if let Ok(bytes) = protocol::encode_server_message(&world_map) {
+        let _ = sender.send(Message::Binary(bytes)).await;
+    }
+
     // Send farming patch states (per-player instanced)
     let farming_patches = room.get_farming_patches_message(&player_id).await;
     if let Ok(bytes) = protocol::encode_server_message(&farming_patches) {
@@ -3534,9 +3574,13 @@ async fn handle_socket(
                 Ok(Some(Ok(msg))) => match msg {
                     Message::Binary(data) => {
                         last_app_msg = std::time::Instant::now();
-                        if let Err(e) =
-                            handle_client_message(&state_clone, &room_clone, &player_id_clone, &data)
-                                .await
+                        if let Err(e) = handle_client_message(
+                            &state_clone,
+                            &room_clone,
+                            &player_id_clone,
+                            &data,
+                        )
+                        .await
                         {
                             warn!("Error handling message: {}", e);
                         }
@@ -3548,7 +3592,10 @@ async fn handle_socket(
                     }
                     _ => {
                         if last_app_msg.elapsed() > Duration::from_secs(45) {
-                            warn!("Player {} timed out (no app messages for 45s)", player_id_clone);
+                            warn!(
+                                "Player {} timed out (no app messages for 45s)",
+                                player_id_clone
+                            );
                             break;
                         }
                     }
@@ -3557,7 +3604,10 @@ async fn handle_socket(
                 Err(_) => {
                     // Short timeout expired, check app-level activity
                     if last_app_msg.elapsed() > Duration::from_secs(45) {
-                        warn!("Player {} connection timed out (no data for 45s)", player_id_clone);
+                        warn!(
+                            "Player {} connection timed out (no data for 45s)",
+                            player_id_clone
+                        );
                         break;
                     }
                 }
@@ -3896,7 +3946,8 @@ async fn auto_enter_instance(
                     zone_id: gz.zone_id.clone(),
                 })
                 .collect();
-            room.register_instance_gathering_markers(&instance.id, markers).await;
+            room.register_instance_gathering_markers(&instance.id, markers)
+                .await;
         }
     }
 
@@ -4509,7 +4560,8 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                     zone_id: gz.zone_id.clone(),
                 })
                 .collect();
-            room.register_instance_gathering_markers(&instance.id, markers).await;
+            room.register_instance_gathering_markers(&instance.id, markers)
+                .await;
         }
     }
 
@@ -4626,10 +4678,7 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
             .unwrap()
             .as_millis() as u64;
         // Save the player's overworld position so we can teleport them back
-        let (entrance_x, entrance_y) = room
-            .get_player_position(player_id)
-            .await
-            .unwrap_or((0, 0));
+        let (entrance_x, entrance_y) = room.get_player_position(player_id).await.unwrap_or((0, 0));
         room.start_koth_session(
             &instance.id,
             player_id,
@@ -5135,8 +5184,11 @@ async fn handle_client_message(
                         // Re-send overworld data
                         room.send_to_player(player_id, room.get_chair_positions_message().await)
                             .await;
-                        room.send_to_player(player_id, room.get_gathering_markers_message(None).await)
-                            .await;
+                        room.send_to_player(
+                            player_id,
+                            room.get_gathering_markers_message(None).await,
+                        )
+                        .await;
                         room.send_to_player(
                             player_id,
                             room.get_chest_positions_message(None).await,
@@ -5354,7 +5406,10 @@ async fn handle_client_message(
                 .as_millis() as u64;
             room.handle_koth_leave(player_id, ct).await;
         }
-        ClientMessage::UseItemOn { slot_index, target_npc_id } => {
+        ClientMessage::UseItemOn {
+            slot_index,
+            target_npc_id,
+        } => {
             room.handle_use_item_on(player_id, slot_index, &target_npc_id)
                 .await;
         }

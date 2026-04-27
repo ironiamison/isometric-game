@@ -1948,7 +1948,13 @@ impl Screen for CharacterSelectScreen {
         // (skip when spectator backdrop is active — the full-screen overlay already covers it)
         if !self.has_spectator_backdrop {
             let button_zone_y = list_y + list_visible_height;
-            draw_rectangle(0.0, button_zone_y, sw, sh - button_zone_y, Color::from_rgba(25, 25, 35, 255));
+            draw_rectangle(
+                0.0,
+                button_zone_y,
+                sw,
+                sh - button_zone_y,
+                Color::from_rgba(25, 25, 35, 255),
+            );
         }
 
         // Error message

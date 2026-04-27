@@ -21,6 +21,7 @@ use crate::skills::{SkillType, Skills, calculate_hit, calculate_max_hit, roll_da
 use crate::world::World;
 mod auto_actions;
 mod bank;
+pub(crate) mod boss_tick;
 mod chairs;
 mod chat;
 mod chests;
@@ -29,7 +30,6 @@ mod farming;
 mod instance_npc_tick;
 mod inventory;
 pub(crate) mod koth_tick;
-pub(crate) mod boss_tick;
 mod movement_tick;
 mod npc_speech;
 mod npc_tick;
@@ -47,6 +47,7 @@ mod tick_resources;
 mod tick_snapshots;
 mod trade;
 mod travel;
+mod world_map;
 
 // ============================================================================
 // Constants
@@ -102,9 +103,17 @@ fn direction_from_delta(dx: i32, dy: i32) -> Direction {
     }
     // Cardinal only — pick the dominant axis, break ties with vertical
     if dx.abs() > dy.abs() {
-        if dx > 0 { Direction::Right } else { Direction::Left }
+        if dx > 0 {
+            Direction::Right
+        } else {
+            Direction::Left
+        }
     } else {
-        if dy > 0 { Direction::Down } else { Direction::Up }
+        if dy > 0 {
+            Direction::Down
+        } else {
+            Direction::Up
+        }
     }
 }
 
@@ -224,9 +233,17 @@ impl Direction {
         }
         // Cardinal only — pick the dominant axis, break ties with vertical
         if dx.abs() > dy.abs() {
-            if dx > 0.0 { Direction::Right } else { Direction::Left }
+            if dx > 0.0 {
+                Direction::Right
+            } else {
+                Direction::Left
+            }
         } else {
-            if dy > 0.0 { Direction::Down } else { Direction::Up }
+            if dy > 0.0 {
+                Direction::Down
+            } else {
+                Direction::Up
+            }
         }
     }
 
@@ -333,8 +350,17 @@ impl CombatStyle {
     /// Get available combat styles for a weapon type
     pub fn available_styles(weapon_type: WeaponType) -> &'static [CombatStyle] {
         match weapon_type {
-            WeaponType::Melee => &[CombatStyle::Accurate, CombatStyle::Aggressive, CombatStyle::Defensive, CombatStyle::Controlled],
-            WeaponType::Ranged => &[CombatStyle::Accurate, CombatStyle::Rapid, CombatStyle::Longrange],
+            WeaponType::Melee => &[
+                CombatStyle::Accurate,
+                CombatStyle::Aggressive,
+                CombatStyle::Defensive,
+                CombatStyle::Controlled,
+            ],
+            WeaponType::Ranged => &[
+                CombatStyle::Accurate,
+                CombatStyle::Rapid,
+                CombatStyle::Longrange,
+            ],
         }
     }
 
@@ -382,7 +408,7 @@ pub struct Player {
     pub skills: Skills,            // Combat skills (Hitpoints determines max HP)
     pub combat_style: CombatStyle, // Active combat style for XP distribution
     pub combat_style_prefs: HashMap<String, CombatStyle>, // Per-weapon-type preferences (e.g. "melee" -> Aggressive)
-    pub active: bool,              // Whether WebSocket is connected
+    pub active: bool,                                     // Whether WebSocket is connected
     pub target_id: Option<String>, // Currently targeted entity (player or NPC)
     pub last_attack_time: u64,     // Timestamp of last attack (ms)
     pub is_dead: bool,
@@ -746,11 +772,16 @@ impl Player {
     /// Accurate with ranged weapon: 4 XP/dmg to Ranged (not Attack).
     /// Hitpoints always gets 1.33 XP per damage.
     /// Returns a vector of (SkillType, xp_gained, total_xp, level, leveled_up) for skills that gained XP.
-    pub fn award_combat_xp(&mut self, damage: i32, style: CombatStyle, weapon_type: WeaponType) -> Vec<(SkillType, i64, i64, i32, bool)> {
+    pub fn award_combat_xp(
+        &mut self,
+        damage: i32,
+        style: CombatStyle,
+        weapon_type: WeaponType,
+    ) -> Vec<(SkillType, i64, i64, i32, bool)> {
         use crate::skills::{
-            ATTACK_XP_PER_DAMAGE, STRENGTH_XP_PER_DAMAGE, DEFENCE_XP_PER_DAMAGE,
-            CONTROLLED_XP_PER_DAMAGE, HITPOINTS_XP_PER_DAMAGE,
-            RANGED_XP_PER_DAMAGE, LONGRANGE_RANGED_XP_PER_DAMAGE, LONGRANGE_DEFENCE_XP_PER_DAMAGE,
+            ATTACK_XP_PER_DAMAGE, CONTROLLED_XP_PER_DAMAGE, DEFENCE_XP_PER_DAMAGE,
+            HITPOINTS_XP_PER_DAMAGE, LONGRANGE_DEFENCE_XP_PER_DAMAGE,
+            LONGRANGE_RANGED_XP_PER_DAMAGE, RANGED_XP_PER_DAMAGE, STRENGTH_XP_PER_DAMAGE,
         };
 
         let mut results = Vec::new();
@@ -766,33 +797,73 @@ impl Player {
                     let xp = (damage as f64 * RANGED_XP_PER_DAMAGE) as i64;
                     let leveled = self.skills.ranged.add_xp(xp);
                     if leveled {
-                        tracing::info!("{} leveled up Ranged to {}!", self.name, self.skills.ranged.level);
+                        tracing::info!(
+                            "{} leveled up Ranged to {}!",
+                            self.name,
+                            self.skills.ranged.level
+                        );
                     }
-                    results.push((SkillType::Ranged, xp, self.skills.ranged.xp, self.skills.ranged.level, leveled));
+                    results.push((
+                        SkillType::Ranged,
+                        xp,
+                        self.skills.ranged.xp,
+                        self.skills.ranged.level,
+                        leveled,
+                    ));
                 } else {
                     let xp = (damage as f64 * ATTACK_XP_PER_DAMAGE) as i64;
                     let leveled = self.skills.attack.add_xp(xp);
                     if leveled {
-                        tracing::info!("{} leveled up Attack to {}!", self.name, self.skills.attack.level);
+                        tracing::info!(
+                            "{} leveled up Attack to {}!",
+                            self.name,
+                            self.skills.attack.level
+                        );
                     }
-                    results.push((SkillType::Attack, xp, self.skills.attack.xp, self.skills.attack.level, leveled));
+                    results.push((
+                        SkillType::Attack,
+                        xp,
+                        self.skills.attack.xp,
+                        self.skills.attack.level,
+                        leveled,
+                    ));
                 }
             }
             CombatStyle::Aggressive => {
                 let xp = (damage as f64 * STRENGTH_XP_PER_DAMAGE) as i64;
                 let leveled = self.skills.strength.add_xp(xp);
                 if leveled {
-                    tracing::info!("{} leveled up Strength to {}!", self.name, self.skills.strength.level);
+                    tracing::info!(
+                        "{} leveled up Strength to {}!",
+                        self.name,
+                        self.skills.strength.level
+                    );
                 }
-                results.push((SkillType::Strength, xp, self.skills.strength.xp, self.skills.strength.level, leveled));
+                results.push((
+                    SkillType::Strength,
+                    xp,
+                    self.skills.strength.xp,
+                    self.skills.strength.level,
+                    leveled,
+                ));
             }
             CombatStyle::Defensive => {
                 let xp = (damage as f64 * DEFENCE_XP_PER_DAMAGE) as i64;
                 let leveled = self.skills.defence.add_xp(xp);
                 if leveled {
-                    tracing::info!("{} leveled up Defence to {}!", self.name, self.skills.defence.level);
+                    tracing::info!(
+                        "{} leveled up Defence to {}!",
+                        self.name,
+                        self.skills.defence.level
+                    );
                 }
-                results.push((SkillType::Defence, xp, self.skills.defence.xp, self.skills.defence.level, leveled));
+                results.push((
+                    SkillType::Defence,
+                    xp,
+                    self.skills.defence.xp,
+                    self.skills.defence.level,
+                    leveled,
+                ));
             }
             CombatStyle::Controlled => {
                 let xp = (damage as f64 * CONTROLLED_XP_PER_DAMAGE) as i64;
@@ -803,7 +874,12 @@ impl Player {
                 ] {
                     let leveled = skill.add_xp(xp);
                     if leveled {
-                        tracing::info!("{} leveled up {} to {}!", self.name, skill_type.as_str(), skill.level);
+                        tracing::info!(
+                            "{} leveled up {} to {}!",
+                            self.name,
+                            skill_type.as_str(),
+                            skill.level
+                        );
                     }
                     results.push((skill_type, xp, skill.xp, skill.level, leveled));
                 }
@@ -812,24 +888,54 @@ impl Player {
                 let xp = (damage as f64 * RANGED_XP_PER_DAMAGE) as i64;
                 let leveled = self.skills.ranged.add_xp(xp);
                 if leveled {
-                    tracing::info!("{} leveled up Ranged to {}!", self.name, self.skills.ranged.level);
+                    tracing::info!(
+                        "{} leveled up Ranged to {}!",
+                        self.name,
+                        self.skills.ranged.level
+                    );
                 }
-                results.push((SkillType::Ranged, xp, self.skills.ranged.xp, self.skills.ranged.level, leveled));
+                results.push((
+                    SkillType::Ranged,
+                    xp,
+                    self.skills.ranged.xp,
+                    self.skills.ranged.level,
+                    leveled,
+                ));
             }
             CombatStyle::Longrange => {
                 let ranged_xp = (damage as f64 * LONGRANGE_RANGED_XP_PER_DAMAGE) as i64;
                 let ranged_leveled = self.skills.ranged.add_xp(ranged_xp);
                 if ranged_leveled {
-                    tracing::info!("{} leveled up Ranged to {}!", self.name, self.skills.ranged.level);
+                    tracing::info!(
+                        "{} leveled up Ranged to {}!",
+                        self.name,
+                        self.skills.ranged.level
+                    );
                 }
-                results.push((SkillType::Ranged, ranged_xp, self.skills.ranged.xp, self.skills.ranged.level, ranged_leveled));
+                results.push((
+                    SkillType::Ranged,
+                    ranged_xp,
+                    self.skills.ranged.xp,
+                    self.skills.ranged.level,
+                    ranged_leveled,
+                ));
 
                 let def_xp = (damage as f64 * LONGRANGE_DEFENCE_XP_PER_DAMAGE) as i64;
                 let def_leveled = self.skills.defence.add_xp(def_xp);
                 if def_leveled {
-                    tracing::info!("{} leveled up Defence to {}!", self.name, self.skills.defence.level);
+                    tracing::info!(
+                        "{} leveled up Defence to {}!",
+                        self.name,
+                        self.skills.defence.level
+                    );
                 }
-                results.push((SkillType::Defence, def_xp, self.skills.defence.xp, self.skills.defence.level, def_leveled));
+                results.push((
+                    SkillType::Defence,
+                    def_xp,
+                    self.skills.defence.xp,
+                    self.skills.defence.level,
+                    def_leveled,
+                ));
             }
         }
 
@@ -1217,6 +1323,8 @@ pub struct GameRoom {
     player_trades: RwLock<HashMap<String, String>>,
     /// Pending trade requests: target_id -> (requester_id, tick_when_sent)
     trade_requests: RwLock<HashMap<String, (String, u64)>>,
+    /// Static overworld atlas + POIs for the expanded client world map.
+    overworld_world_map: ServerMessage,
     /// Chunk coordinates where PVP is allowed in the overworld (allowlist)
     pvp_zones: HashSet<(i32, i32)>,
     /// Movement anomaly counters exported through /api/perf.
@@ -1778,6 +1886,17 @@ impl GameRoom {
             }
         }
 
+        let waystone_manager = crate::waystone::WaystoneManager::load(std::path::Path::new("data"));
+        let overworld_world_map = world_map::build_overworld_world_map(
+            &world,
+            &chunk_coords,
+            &npcs,
+            &chest_registry,
+            &overworld_chest_spawns,
+            &waystone_manager,
+        )
+        .await;
+
         // Load PVP zone allowlist
         let pvp_zones: HashSet<(i32, i32)> = match std::fs::read_to_string("data/pvp_zones.toml") {
             Ok(content) => {
@@ -1793,7 +1912,11 @@ impl GameRoom {
                 }
                 match toml::from_str::<PvpZoneConfig>(&content) {
                     Ok(config) => {
-                        let set: HashSet<(i32, i32)> = config.zones.iter().map(|z| (z.chunk_x, z.chunk_y)).collect();
+                        let set: HashSet<(i32, i32)> = config
+                            .zones
+                            .iter()
+                            .map(|z| (z.chunk_x, z.chunk_y))
+                            .collect();
                         tracing::info!("Loaded {} PVP zone chunks", set.len());
                         set
                     }
@@ -1856,9 +1979,7 @@ impl GameRoom {
             dig_site_manager: RwLock::new(crate::dig_site::DigSiteManager::load(
                 std::path::Path::new("data"),
             )),
-            waystone_manager: RwLock::new(crate::waystone::WaystoneManager::load(
-                std::path::Path::new("data"),
-            )),
+            waystone_manager: RwLock::new(waystone_manager),
             chest_registry,
             chest_manager: RwLock::new(chest_manager),
             player_open_chests: RwLock::new(HashMap::new()),
@@ -1866,6 +1987,7 @@ impl GameRoom {
             trades: RwLock::new(HashMap::new()),
             player_trades: RwLock::new(HashMap::new()),
             trade_requests: RwLock::new(HashMap::new()),
+            overworld_world_map,
             pvp_zones,
             movement_anomalies: MovementAnomalyCounters::default(),
             top_level_player_name: RwLock::new(None),
@@ -1927,8 +2049,10 @@ impl GameRoom {
     pub async fn check_top_player_after_level_up(&self, player_name: &str, new_total_level: i32) {
         let current_top = *self.top_level_value.read().await;
         let current_second = *self.second_level_value.read().await;
-        let is_current_top = self.top_level_player_name.read().await.as_deref() == Some(player_name);
-        let is_current_second = self.second_level_player_name.read().await.as_deref() == Some(player_name);
+        let is_current_top =
+            self.top_level_player_name.read().await.as_deref() == Some(player_name);
+        let is_current_second =
+            self.second_level_player_name.read().await.as_deref() == Some(player_name);
 
         let mut changed = false;
 
@@ -2264,13 +2388,18 @@ impl GameRoom {
             } else {
                 tracing::warn!(
                     "Player {} has invalid position ({}, {}) — chunk {:?} missing on disk, resetting to spawn",
-                    player_id, x, y, coord
+                    player_id,
+                    x,
+                    y,
+                    coord
                 );
                 (WORLD_SPAWN_X, WORLD_SPAWN_Y, 0)
             }
         };
 
-        let mut player = Player::new(player_id, name, safe_x, safe_y, gender, skin, hair_style, hair_color);
+        let mut player = Player::new(
+            player_id, name, safe_x, safe_y, gender, skin, hair_style, hair_color,
+        );
         player.z = safe_z;
         player.bank_max_slots = bank_max_slots;
         player.bank = item::Bank::new_with_size(bank_max_slots as usize);
@@ -2302,7 +2431,8 @@ impl GameRoom {
         player.ip_address = ip_address;
 
         // Restore combat style preferences and set active style based on equipped weapon
-        if let Ok(prefs) = serde_json::from_str::<HashMap<String, String>>(combat_style_prefs_json) {
+        if let Ok(prefs) = serde_json::from_str::<HashMap<String, String>>(combat_style_prefs_json)
+        {
             for (weapon_key, style_str) in &prefs {
                 if let Some(style) = CombatStyle::from_str(style_str) {
                     player.combat_style_prefs.insert(weapon_key.clone(), style);
@@ -2310,7 +2440,9 @@ impl GameRoom {
             }
         }
         // Determine weapon type from equipped weapon and restore preferred style
-        let weapon_type = player.equipped_weapon.as_ref()
+        let weapon_type = player
+            .equipped_weapon
+            .as_ref()
             .and_then(|wid| self.item_registry.get(wid))
             .and_then(|def| def.equipment.as_ref())
             .map(|eq| eq.weapon_type)
@@ -2598,7 +2730,9 @@ impl GameRoom {
                 bank_gold: p.bank.gold,
                 bank_max_slots: p.bank_max_slots,
                 combat_style_prefs: {
-                    let prefs_map: HashMap<&str, &str> = p.combat_style_prefs.iter()
+                    let prefs_map: HashMap<&str, &str> = p
+                        .combat_style_prefs
+                        .iter()
                         .map(|(k, v)| (k.as_str(), v.as_str()))
                         .collect();
                     serde_json::to_string(&prefs_map).unwrap_or_else(|_| "{}".to_string())
@@ -2774,7 +2908,9 @@ impl GameRoom {
                 bank_gold: raw.bank_gold,
                 bank_max_slots: raw.bank_max_slots,
                 combat_style_prefs: {
-                    let prefs_map: HashMap<&str, &str> = raw.combat_style_prefs.iter()
+                    let prefs_map: HashMap<&str, &str> = raw
+                        .combat_style_prefs
+                        .iter()
                         .map(|(k, v)| (k.as_str(), v.as_str()))
                         .collect();
                     serde_json::to_string(&prefs_map).unwrap_or_else(|_| "{}".to_string())
@@ -2915,7 +3051,13 @@ impl GameRoom {
         if let Some(ref db) = self.db {
             if let Some(character_id) = Self::parse_character_id(player_id) {
                 if let Err(e) = db
-                    .save_collection_entry(character_id, item_id, source, source_detail, &obtained_at)
+                    .save_collection_entry(
+                        character_id,
+                        item_id,
+                        source,
+                        source_detail,
+                        &obtained_at,
+                    )
                     .await
                 {
                     tracing::warn!("Failed to save collection entry for {}: {}", player_id, e);
@@ -2938,10 +3080,7 @@ impl GameRoom {
         true
     }
 
-    pub async fn get_player_collection_log(
-        &self,
-        player_id: &str,
-    ) -> HashSet<(String, String)> {
+    pub async fn get_player_collection_log(&self, player_id: &str) -> HashSet<(String, String)> {
         let players = self.players.read().await;
         players
             .get(player_id)
@@ -2949,11 +3088,7 @@ impl GameRoom {
             .unwrap_or_default()
     }
 
-    pub async fn set_player_collection_log(
-        &self,
-        player_id: &str,
-        log: HashSet<(String, String)>,
-    ) {
+    pub async fn set_player_collection_log(&self, player_id: &str, log: HashSet<(String, String)>) {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
             player.collection_log = log;
@@ -3161,7 +3296,9 @@ impl GameRoom {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
             // Get current weapon type to validate style
-            let weapon_type = player.equipped_weapon.as_ref()
+            let weapon_type = player
+                .equipped_weapon
+                .as_ref()
                 .and_then(|wid| self.item_registry.get(wid))
                 .and_then(|def| def.equipment.as_ref())
                 .map(|eq| eq.weapon_type)
@@ -3175,7 +3312,9 @@ impl GameRoom {
                     WeaponType::Melee => "melee",
                     WeaponType::Ranged => "ranged",
                 };
-                player.combat_style_prefs.insert(weapon_key.to_string(), style);
+                player
+                    .combat_style_prefs
+                    .insert(weapon_key.to_string(), style);
             }
         }
     }
@@ -3848,7 +3987,8 @@ impl GameRoom {
             let ranged_str = player.ranged_strength_bonus(&self.item_registry);
 
             // Collect equipped item IDs for type bonus lookups
-            let equipped: Vec<Option<String>> = player.all_equipped().iter().map(|s| (*s).clone()).collect();
+            let equipped: Vec<Option<String>> =
+                player.all_equipped().iter().map(|s| (*s).clone()).collect();
 
             // Apply prayer bonuses to attack and strength
             let active_ids: Vec<String> = player.active_prayers.iter().cloned().collect();
@@ -3929,7 +4069,10 @@ impl GameRoom {
         let (attack_level, strength_level) = if weapon_type == WeaponType::Ranged {
             let ranged_level = {
                 let players = self.players.read().await;
-                players.get(player_id).map(|p| p.skills.ranged.level).unwrap_or(1)
+                players
+                    .get(player_id)
+                    .map(|p| p.skills.ranged.level)
+                    .unwrap_or(1)
             };
             // Accurate style: +3 to effective ranged level for accuracy
             let effective_ranged = if combat_style == CombatStyle::Accurate {
@@ -4089,7 +4232,9 @@ impl GameRoom {
                     for (npc_id, npc) in npcs.iter() {
                         if npc.is_alive()
                             && npc.is_attackable()
-                            && npc.occupied_tiles().any(|(tx, ty)| tx == check_x && ty == check_y)
+                            && npc
+                                .occupied_tiles()
+                                .any(|(tx, ty)| tx == check_x && ty == check_y)
                         {
                             target_id = Some(npc_id.clone());
                             is_npc = true;
@@ -4113,7 +4258,9 @@ impl GameRoom {
                         for (npc_id, npc) in npcs.iter() {
                             if npc.is_alive()
                                 && npc.is_attackable()
-                                && npc.occupied_tiles().any(|(tx, ty)| tx == check_x && ty == check_y)
+                                && npc
+                                    .occupied_tiles()
+                                    .any(|(tx, ty)| tx == check_x && ty == check_y)
                             {
                                 target_id = Some(npc_id.clone());
                                 is_npc = true;
@@ -4279,7 +4426,11 @@ impl GameRoom {
                         drop(players);
                     }
                     // Look up arrow's ranged_strength bonus
-                    let bonus = self.item_registry.get(&arrow_id).map(|def| def.ranged_strength).unwrap_or(0);
+                    let bonus = self
+                        .item_registry
+                        .get(&arrow_id)
+                        .map(|def| def.ranged_strength)
+                        .unwrap_or(0);
                     (bonus, Some(arrow_id))
                 } else {
                     // Arrows ran out between check and consumption (unlikely but safe)
@@ -4317,65 +4468,66 @@ impl GameRoom {
                         let name = npc.name();
                         (npc.hp, name, false, 0)
                     } else {
-                    let npc_defence_level = npc.level;
-                    let npc_defence_bonus = npc.stats.defence_bonus;
+                        let npc_defence_level = npc.level;
+                        let npc_defence_bonus = npc.stats.defence_bonus;
 
-                    if !calculate_hit(
-                        attack_level,
-                        attack_bonus,
-                        npc_defence_level,
-                        npc_defence_bonus,
-                    ) {
-                        npc.take_damage(0, current_time, Some(player_id));
-                        let name = npc.name();
-                        tracing::info!(
-                            "{} misses instance NPC {} (atk {} + {} vs def {} + {})",
-                            attacker_name,
-                            name,
+                        if !calculate_hit(
                             attack_level,
                             attack_bonus,
                             npc_defence_level,
-                            npc_defence_bonus
-                        );
-                        (npc.hp, name, false, 0)
-                    } else {
-                        let mut max_hit = calculate_max_hit(strength_level, strength_bonus);
-                        // Slayer helmet: 15% damage boost against current slayer task
-                        if let Some(ref task_monster) = slayer_task_monster {
-                            let proto = &npc.prototype_id;
-                            if proto == task_monster
-                                || proto.starts_with(&format!("{}_", task_monster))
-                            {
-                                max_hit = ((max_hit as f32) * 1.15).floor() as i32;
-                            }
-                        }
-                        // Equipment type bonuses (e.g. +15% vs desert enemies)
-                        let type_str_pct = calc_type_bonus_str(&npc.stats.tags);
-                        if type_str_pct > 0.0 {
-                            max_hit = ((max_hit as f32) * (1.0 + type_str_pct / 100.0)).floor() as i32;
-                        }
-                        let damage = roll_damage(max_hit).min(npc.hp);
-                        let died = npc.take_damage(damage, current_time, Some(player_id));
-                        let name = npc.name();
-                        tracing::info!(
-                            "{} hits instance NPC {} for {} damage (max: {}, HP: {})",
-                            attacker_name,
-                            name,
-                            damage,
-                            max_hit,
-                            npc.hp
-                        );
-                        // Track damage dealer for boss loot distribution
-                        if damage > 0 {
-                            if let Some(ref inst_id) = attacker_instance {
-                                let mut boss_states = self.boss_states.write().await;
-                                if let Some(boss) = boss_states.get_mut(inst_id) {
-                                    boss.damage_dealers.insert(player_id.to_string());
+                            npc_defence_bonus,
+                        ) {
+                            npc.take_damage(0, current_time, Some(player_id));
+                            let name = npc.name();
+                            tracing::info!(
+                                "{} misses instance NPC {} (atk {} + {} vs def {} + {})",
+                                attacker_name,
+                                name,
+                                attack_level,
+                                attack_bonus,
+                                npc_defence_level,
+                                npc_defence_bonus
+                            );
+                            (npc.hp, name, false, 0)
+                        } else {
+                            let mut max_hit = calculate_max_hit(strength_level, strength_bonus);
+                            // Slayer helmet: 15% damage boost against current slayer task
+                            if let Some(ref task_monster) = slayer_task_monster {
+                                let proto = &npc.prototype_id;
+                                if proto == task_monster
+                                    || proto.starts_with(&format!("{}_", task_monster))
+                                {
+                                    max_hit = ((max_hit as f32) * 1.15).floor() as i32;
                                 }
                             }
+                            // Equipment type bonuses (e.g. +15% vs desert enemies)
+                            let type_str_pct = calc_type_bonus_str(&npc.stats.tags);
+                            if type_str_pct > 0.0 {
+                                max_hit = ((max_hit as f32) * (1.0 + type_str_pct / 100.0)).floor()
+                                    as i32;
+                            }
+                            let damage = roll_damage(max_hit).min(npc.hp);
+                            let died = npc.take_damage(damage, current_time, Some(player_id));
+                            let name = npc.name();
+                            tracing::info!(
+                                "{} hits instance NPC {} for {} damage (max: {}, HP: {})",
+                                attacker_name,
+                                name,
+                                damage,
+                                max_hit,
+                                npc.hp
+                            );
+                            // Track damage dealer for boss loot distribution
+                            if damage > 0 {
+                                if let Some(ref inst_id) = attacker_instance {
+                                    let mut boss_states = self.boss_states.write().await;
+                                    if let Some(boss) = boss_states.get_mut(inst_id) {
+                                        boss.damage_dealers.insert(player_id.to_string());
+                                    }
+                                }
+                            }
+                            (npc.hp, name, died, damage)
                         }
-                        (npc.hp, name, died, damage)
-                    }
                     } // end invulnerable else
                 } else {
                     return;
@@ -4492,7 +4644,9 @@ impl GameRoom {
                     let max_hit = calculate_max_hit(strength_level, strength_bonus);
                     let raw_damage = roll_damage(max_hit);
                     // Apply prayer damage reduction, then clamp to remaining HP
-                    let damage = target_prayer_effects.apply_damage_reduction(raw_damage).min(target.hp);
+                    let damage = target_prayer_effects
+                        .apply_damage_reduction(raw_damage)
+                        .min(target.hp);
                     target.hp -= damage;
                     let name = target.name.clone();
                     let died = target.hp <= 0;
@@ -4575,7 +4729,8 @@ impl GameRoom {
                             skill_type.as_str(),
                             level
                         );
-                        self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
+                        self.broadcast_skill_level_up(player_id, skill_type.as_str(), level)
+                            .await;
                         progression_needs_sync = true;
                     }
                 }
@@ -4657,17 +4812,13 @@ impl GameRoom {
                         .await;
 
                     // Check boss NPC death (player killed the boss)
-                    self.check_boss_npc_death(
-                        &target_id,
-                        inst_id,
-                        Some(player_id),
-                        ct,
-                    )
-                    .await;
+                    self.check_boss_npc_death(&target_id, inst_id, Some(player_id), ct)
+                        .await;
                 }
 
                 // Skip loot drops in boss arena (rewards come from battle master)
-                let in_boss_arena = attacker_instance.as_ref()
+                let in_boss_arena = attacker_instance
+                    .as_ref()
                     .map(|id| id.contains(crate::game::boss_tick::BOSS_MAP_ID))
                     .unwrap_or(false);
 
@@ -5441,12 +5592,7 @@ impl GameRoom {
     }
 
     /// Handle using an item on an NPC target
-    pub async fn handle_use_item_on(
-        &self,
-        player_id: &str,
-        slot_index: u8,
-        target_npc_id: &str,
-    ) {
+    pub async fn handle_use_item_on(&self, player_id: &str, slot_index: u8, target_npc_id: &str) {
         // 1. Get player position and item from inventory
         let (player_x, player_y, item_id) = {
             let players = self.players.read().await;
@@ -5463,13 +5609,19 @@ impl GameRoom {
         };
 
         let Some(item_id) = item_id else {
-            tracing::warn!("UseItemOn: empty inventory slot {} for {}", slot_index, player_id);
+            tracing::warn!(
+                "UseItemOn: empty inventory slot {} for {}",
+                slot_index,
+                player_id
+            );
             return;
         };
 
         tracing::info!(
             "UseItemOn: player={} item={} target_npc={}",
-            player_id, item_id, target_npc_id
+            player_id,
+            item_id,
+            target_npc_id
         );
 
         // 2. Get NPC info (check instance first, then overworld)
@@ -5479,9 +5631,7 @@ impl GameRoom {
         };
 
         let npc_info = if instance_id.is_some() {
-            if let Some(instance) =
-                self.instance_manager.find_player_instance(player_id).await
-            {
+            if let Some(instance) = self.instance_manager.find_player_instance(player_id).await {
                 let npcs = instance.npcs.read().await;
                 npcs.get(target_npc_id).map(|npc| {
                     let dx = (npc.x - player_x) as f32;
@@ -5509,13 +5659,18 @@ impl GameRoom {
         };
 
         let Some((entity_type, _npc_runtime_id, distance)) = npc_info else {
-            tracing::warn!("UseItemOn: NPC {} not found (instance_id={:?})", target_npc_id, instance_id);
+            tracing::warn!(
+                "UseItemOn: NPC {} not found (instance_id={:?})",
+                target_npc_id,
+                instance_id
+            );
             return;
         };
 
         tracing::info!(
             "UseItemOn: found NPC entity_type={} distance={:.1}",
-            entity_type, distance
+            entity_type,
+            distance
         );
 
         // 3. Range check (same as NPC interaction: 2.5 tiles)
@@ -5564,8 +5719,10 @@ impl GameRoom {
         if let Some(npc_id) = quest_id.strip_prefix("adventure_board:") {
             if let Some(rest) = choice_id.strip_prefix("board_accept:") {
                 if let Some((kind_str, diff_str)) = rest.split_once(':') {
-                    self.handle_accept_adventure_board_contract(player_id, npc_id, kind_str, diff_str)
-                        .await;
+                    self.handle_accept_adventure_board_contract(
+                        player_id, npc_id, kind_str, diff_str,
+                    )
+                    .await;
                     self.show_adventure_board_dialogue(player_id, npc_id).await;
                 }
             } else if choice_id == "board_claim" {
@@ -5631,10 +5788,7 @@ impl GameRoom {
                         self.send_to_player(player_id, ServerMessage::DialogueClosed)
                             .await;
                         self.handle_accept_adventure_board_contract(
-                            player_id,
-                            npc_id,
-                            kind_str,
-                            diff_str,
+                            player_id, npc_id, kind_str, diff_str,
                         )
                         .await;
                     } else if choice_id == "claim_contract" {
@@ -5948,7 +6102,10 @@ impl GameRoom {
         // Send system message
         self.send_system_message(
             player_id,
-            &format!("You travel to {}. (-{}g)", destination.name, destination.cost),
+            &format!(
+                "You travel to {}. (-{}g)",
+                destination.name, destination.cost
+            ),
         )
         .await;
     }
@@ -6306,15 +6463,23 @@ impl GameRoom {
                                 self.instance_manager.get_by_instance_id(inst_id)
                             {
                                 let npcs = instance.npcs.read().await;
-                                npcs.get(npc_id)
-                                    .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size, n.tile_offset()))))
+                                npcs.get(npc_id).map_or((false, None), |n| {
+                                    (
+                                        n.is_alive(),
+                                        Some((n.x, n.y, n.stats.size, n.tile_offset())),
+                                    )
+                                })
                             } else {
                                 (false, None)
                             }
                         } else {
                             let npcs = self.npcs.read().await;
-                            npcs.get(npc_id)
-                                .map_or((false, None), |n| (n.is_alive(), Some((n.x, n.y, n.stats.size, n.tile_offset()))))
+                            npcs.get(npc_id).map_or((false, None), |n| {
+                                (
+                                    n.is_alive(),
+                                    Some((n.x, n.y, n.stats.size, n.tile_offset())),
+                                )
+                            })
                         };
 
                         if !npc_alive {
@@ -6323,61 +6488,89 @@ impl GameRoom {
                         }
 
                         // Check if in range, cooldown ready, and standing still
-                        let (in_range, cooldown_ready, is_still) = if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos {
-                            let players = self.players.read().await;
-                            if let Some(player) = players.get(&pid) {
-                                let closest_x = player.x.clamp(npc_x + npc_off_x, npc_x + npc_off_x + npc_size - 1);
-                                let closest_y = player.y.clamp(npc_y + npc_off_y, npc_y + npc_off_y + npc_size - 1);
-                                let dx = (player.x - closest_x).abs();
-                                let dy = (player.y - closest_y).abs();
-                                let (weapon_range, weapon_is_ranged) =
-                                    if let Some(ref weapon_id) = player.equipped_weapon {
-                                        if let Some(item_def) = self.item_registry.get(weapon_id) {
-                                            item_def.equipment.as_ref().map_or((1, false), |e| {
-                                                (e.range, e.weapon_type == WeaponType::Ranged)
-                                            })
+                        let (in_range, cooldown_ready, is_still) =
+                            if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos
+                            {
+                                let players = self.players.read().await;
+                                if let Some(player) = players.get(&pid) {
+                                    let closest_x = player
+                                        .x
+                                        .clamp(npc_x + npc_off_x, npc_x + npc_off_x + npc_size - 1);
+                                    let closest_y = player
+                                        .y
+                                        .clamp(npc_y + npc_off_y, npc_y + npc_off_y + npc_size - 1);
+                                    let dx = (player.x - closest_x).abs();
+                                    let dy = (player.y - closest_y).abs();
+                                    let (weapon_range, weapon_is_ranged) =
+                                        if let Some(ref weapon_id) = player.equipped_weapon {
+                                            if let Some(item_def) =
+                                                self.item_registry.get(weapon_id)
+                                            {
+                                                item_def.equipment.as_ref().map_or(
+                                                    (1, false),
+                                                    |e| {
+                                                        (
+                                                            e.range,
+                                                            e.weapon_type == WeaponType::Ranged,
+                                                        )
+                                                    },
+                                                )
+                                            } else {
+                                                (1, false)
+                                            }
                                         } else {
                                             (1, false)
-                                        }
+                                        };
+                                    let in_range = if weapon_range == 1 {
+                                        (dx + dy) == 1
                                     } else {
-                                        (1, false)
+                                        (dx + dy) <= weapon_range && (dx > 0 || dy > 0)
                                     };
-                                let in_range = if weapon_range == 1 {
-                                    (dx + dy) == 1
+                                    let cd = if weapon_is_ranged {
+                                        RANGED_ATTACK_COOLDOWN_MS
+                                    } else {
+                                        ATTACK_COOLDOWN_MS
+                                    };
+                                    let cooldown_ready =
+                                        current_time - player.last_attack_time >= cd;
+                                    let is_still = player.move_dx == 0
+                                        && player.move_dy == 0
+                                        && player.pending_move_seq.is_none()
+                                        && current_time.saturating_sub(player.last_move_input_ms)
+                                            >= 500;
+                                    (in_range, cooldown_ready, is_still)
                                 } else {
-                                    (dx + dy) <= weapon_range && (dx > 0 || dy > 0)
-                                };
-                                let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
-                                let cooldown_ready =
-                                    current_time - player.last_attack_time >= cd;
-                                let is_still = player.move_dx == 0
-                                    && player.move_dy == 0
-                                    && player.pending_move_seq.is_none()
-                                    && current_time.saturating_sub(player.last_move_input_ms) >= 500;
-                                (in_range, cooldown_ready, is_still)
+                                    (false, false, false)
+                                }
                             } else {
                                 (false, false, false)
-                            }
-                        } else {
-                            (false, false, false)
-                        };
+                            };
 
                         if in_range && cooldown_ready && is_still {
                             // Compute facing direction toward NPC target
-                            let face_dir = if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) = npc_pos {
-                                let players = self.players.read().await;
-                                if let Some(player) = players.get(&pid) {
-                                    let closest_x = player.x.clamp(npc_x + npc_off_x, npc_x + npc_off_x + npc_size - 1);
-                                    let closest_y = player.y.clamp(npc_y + npc_off_y, npc_y + npc_off_y + npc_size - 1);
-                                    let dx = closest_x - player.x;
-                                    let dy = closest_y - player.y;
-                                    Some(direction_from_delta(dx, dy))
+                            let face_dir =
+                                if let Some((npc_x, npc_y, npc_size, (npc_off_x, npc_off_y))) =
+                                    npc_pos
+                                {
+                                    let players = self.players.read().await;
+                                    if let Some(player) = players.get(&pid) {
+                                        let closest_x = player.x.clamp(
+                                            npc_x + npc_off_x,
+                                            npc_x + npc_off_x + npc_size - 1,
+                                        );
+                                        let closest_y = player.y.clamp(
+                                            npc_y + npc_off_y,
+                                            npc_y + npc_off_y + npc_size - 1,
+                                        );
+                                        let dx = closest_x - player.x;
+                                        let dy = closest_y - player.y;
+                                        Some(direction_from_delta(dx, dy))
+                                    } else {
+                                        None
+                                    }
                                 } else {
                                     None
-                                }
-                            } else {
-                                None
-                            };
+                                };
                             self.handle_attack(&pid, face_dir, Some(npc_id)).await;
                         }
                     }
@@ -6452,13 +6645,17 @@ impl GameRoom {
                                 } else {
                                     (dx + dy) <= weapon_range && (dx > 0 || dy > 0)
                                 };
-                                let cd = if weapon_is_ranged { RANGED_ATTACK_COOLDOWN_MS } else { ATTACK_COOLDOWN_MS };
-                                let cooldown_ready =
-                                    current_time - attacker.last_attack_time >= cd;
+                                let cd = if weapon_is_ranged {
+                                    RANGED_ATTACK_COOLDOWN_MS
+                                } else {
+                                    ATTACK_COOLDOWN_MS
+                                };
+                                let cooldown_ready = current_time - attacker.last_attack_time >= cd;
                                 let is_still = attacker.move_dx == 0
                                     && attacker.move_dy == 0
                                     && attacker.pending_move_seq.is_none()
-                                    && current_time.saturating_sub(attacker.last_move_input_ms) >= 500;
+                                    && current_time.saturating_sub(attacker.last_move_input_ms)
+                                        >= 500;
                                 (in_range, cooldown_ready, is_still)
                             } else {
                                 (false, false, false)
@@ -7606,8 +7803,14 @@ impl GameRoom {
                     .collect(),
                 portals,
                 heightmap: chunk.height_data.as_ref().map(|h| h.heights.clone()),
-                block_types_down: chunk.height_data.as_ref().map(|h| h.block_types_down.clone()),
-                block_types_right: chunk.height_data.as_ref().map(|h| h.block_types_right.clone()),
+                block_types_down: chunk
+                    .height_data
+                    .as_ref()
+                    .map(|h| h.block_types_down.clone()),
+                block_types_right: chunk
+                    .height_data
+                    .as_ref()
+                    .map(|h| h.block_types_right.clone()),
             })
         } else {
             Some(ServerMessage::ChunkNotFound { chunk_x, chunk_y })
@@ -8308,7 +8511,8 @@ impl GameRoom {
                             skill_type.as_str(),
                             level
                         );
-                        self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
+                        self.broadcast_skill_level_up(player_id, skill_type.as_str(), level)
+                            .await;
                         progression_needs_sync = true;
                     }
                 }
@@ -8368,7 +8572,8 @@ impl GameRoom {
                 self.process_slayer_kill(player_id, &prototype_id).await;
 
                 // Skip loot drops in boss arena (rewards come from battle master)
-                let in_boss_arena = caster_instance.as_ref()
+                let in_boss_arena = caster_instance
+                    .as_ref()
                     .map(|id| id.contains(crate::game::boss_tick::BOSS_MAP_ID))
                     .unwrap_or(false);
 
@@ -8782,7 +8987,8 @@ impl GameRoom {
                         skill_type.as_str(),
                         level
                     );
-                    self.broadcast_skill_level_up(player_id, skill_type.as_str(), level).await;
+                    self.broadcast_skill_level_up(player_id, skill_type.as_str(), level)
+                        .await;
                     self.process_quest_progression_snapshot(player_id).await;
                 }
             }

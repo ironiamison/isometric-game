@@ -135,9 +135,7 @@ fn sort_quests_for_npc(
         let a_idx = order_map.get(a.id.as_str()).copied().unwrap_or(usize::MAX);
         let b_idx = order_map.get(b.id.as_str()).copied().unwrap_or(usize::MAX);
 
-        a_idx
-            .cmp(&b_idx)
-            .then_with(|| a.id.cmp(&b.id))
+        a_idx.cmp(&b_idx).then_with(|| a.id.cmp(&b.id))
     });
 }
 
@@ -276,11 +274,16 @@ impl GameRoom {
                     for objective in &quest.objectives {
                         if objective.objective_type == ObjectiveType::CollectItem
                             && objective.consume
-                            && !player.inventory.has_item(&objective.target, objective.count)
+                            && !player
+                                .inventory
+                                .has_item(&objective.target, objective.count)
                         {
                             tracing::warn!(
                                 "Player {} tried to complete quest {} but missing {} x{} in inventory",
-                                player_id, quest_id, objective.target, objective.count
+                                player_id,
+                                quest_id,
+                                objective.target,
+                                objective.count
                             );
                             return;
                         }
@@ -546,7 +549,10 @@ impl GameRoom {
                             player_id: player_id.to_string(),
                             npc_id: entity_type.to_string(),
                         };
-                        let results = self.quest_registry.process_event(&accept_event, quest_state).await;
+                        let results = self
+                            .quest_registry
+                            .process_event(&accept_event, quest_state)
+                            .await;
                         for result in results {
                             if let (Some(objective_id), Some(current), Some(target)) =
                                 (&result.objective_id, result.new_progress, result.target)
@@ -1045,7 +1051,14 @@ impl GameRoom {
         for quest_id in active_quest_ids {
             match self
                 .quest_runner
-                .run_on_use_item(player_id, &quest_id, quest_state, item_id, entity_type, npc_id)
+                .run_on_use_item(
+                    player_id,
+                    &quest_id,
+                    quest_state,
+                    item_id,
+                    entity_type,
+                    npc_id,
+                )
                 .await
             {
                 Ok(Some(script_result)) => {

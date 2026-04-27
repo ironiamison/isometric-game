@@ -1,11 +1,12 @@
 //! UI rendering components split from the main renderer
 
-pub mod alchemy_station;
 pub mod adventure_board;
+pub mod alchemy_station;
 pub mod altar_panel;
 pub mod anvil;
 pub mod area_banner;
 pub mod bank;
+pub mod boss_hud;
 pub mod bottom_bar;
 pub mod character;
 pub mod chat_panel;
@@ -19,7 +20,6 @@ pub mod fletching;
 pub mod furnace;
 pub mod gold_drop_dialog;
 pub mod inventory;
-pub mod boss_hud;
 pub mod koth;
 pub mod menu;
 pub mod prayer;

@@ -129,9 +129,13 @@ impl VirtualDPad {
     pub fn update_position(&mut self) {
         let (_, screen_h) = virtual_screen_size();
         #[cfg(target_os = "android")]
-        { self.center = vec2(80.0, screen_h - 75.0); }
+        {
+            self.center = vec2(80.0, screen_h - 75.0);
+        }
         #[cfg(not(target_os = "android"))]
-        { self.center = vec2(90.0, screen_h - 100.0); }
+        {
+            self.center = vec2(90.0, screen_h - 100.0);
+        }
     }
 
     /// Get the button rect for a direction
@@ -142,15 +146,60 @@ impl VirtualDPad {
         let diag_half = diag_size / 2.0;
 
         match dir {
-            DPadDirection::Up => (self.center.x - half, self.center.y - offset - half, self.button_size, self.button_size),
-            DPadDirection::Down => (self.center.x - half, self.center.y + offset - half, self.button_size, self.button_size),
-            DPadDirection::Left => (self.center.x - offset - half, self.center.y - half, self.button_size, self.button_size),
-            DPadDirection::Right => (self.center.x + offset - half, self.center.y - half, self.button_size, self.button_size),
-            DPadDirection::UpLeft => (self.center.x - offset - diag_half, self.center.y - offset - diag_half, diag_size, diag_size),
-            DPadDirection::UpRight => (self.center.x + offset - diag_half, self.center.y - offset - diag_half, diag_size, diag_size),
-            DPadDirection::DownLeft => (self.center.x - offset - diag_half, self.center.y + offset - diag_half, diag_size, diag_size),
-            DPadDirection::DownRight => (self.center.x + offset - diag_half, self.center.y + offset - diag_half, diag_size, diag_size),
-            DPadDirection::None => (self.center.x - half, self.center.y - half, self.button_size, self.button_size),
+            DPadDirection::Up => (
+                self.center.x - half,
+                self.center.y - offset - half,
+                self.button_size,
+                self.button_size,
+            ),
+            DPadDirection::Down => (
+                self.center.x - half,
+                self.center.y + offset - half,
+                self.button_size,
+                self.button_size,
+            ),
+            DPadDirection::Left => (
+                self.center.x - offset - half,
+                self.center.y - half,
+                self.button_size,
+                self.button_size,
+            ),
+            DPadDirection::Right => (
+                self.center.x + offset - half,
+                self.center.y - half,
+                self.button_size,
+                self.button_size,
+            ),
+            DPadDirection::UpLeft => (
+                self.center.x - offset - diag_half,
+                self.center.y - offset - diag_half,
+                diag_size,
+                diag_size,
+            ),
+            DPadDirection::UpRight => (
+                self.center.x + offset - diag_half,
+                self.center.y - offset - diag_half,
+                diag_size,
+                diag_size,
+            ),
+            DPadDirection::DownLeft => (
+                self.center.x - offset - diag_half,
+                self.center.y + offset - diag_half,
+                diag_size,
+                diag_size,
+            ),
+            DPadDirection::DownRight => (
+                self.center.x + offset - diag_half,
+                self.center.y + offset - diag_half,
+                diag_size,
+                diag_size,
+            ),
+            DPadDirection::None => (
+                self.center.x - half,
+                self.center.y - half,
+                self.button_size,
+                self.button_size,
+            ),
         }
     }
 
@@ -763,13 +812,17 @@ impl TouchControls {
         // Position buttons on the right side of the screen
         #[cfg(target_os = "android")]
         let (attack_x, attack_y, interact_x, interact_y) = (
-            screen_w - 42.0, screen_h - 120.0,
-            screen_w - 100.0, screen_h - 72.0,
+            screen_w - 42.0,
+            screen_h - 120.0,
+            screen_w - 100.0,
+            screen_h - 72.0,
         );
         #[cfg(not(target_os = "android"))]
         let (attack_x, attack_y, interact_x, interact_y) = (
-            screen_w - 55.0, screen_h - 130.0,
-            screen_w - 115.0, screen_h - 85.0,
+            screen_w - 55.0,
+            screen_h - 130.0,
+            screen_w - 115.0,
+            screen_h - 85.0,
         );
 
         Self {
@@ -829,13 +882,17 @@ impl TouchControls {
         let (screen_w, screen_h) = virtual_screen_size();
         #[cfg(target_os = "android")]
         {
-            self.attack_button.set_position(screen_w - 42.0, screen_h - 120.0);
-            self.interact_button.set_position(screen_w - 100.0, screen_h - 72.0);
+            self.attack_button
+                .set_position(screen_w - 42.0, screen_h - 120.0);
+            self.interact_button
+                .set_position(screen_w - 100.0, screen_h - 72.0);
         }
         #[cfg(not(target_os = "android"))]
         {
-            self.attack_button.set_position(screen_w - 55.0, screen_h - 130.0);
-            self.interact_button.set_position(screen_w - 115.0, screen_h - 85.0);
+            self.attack_button
+                .set_position(screen_w - 55.0, screen_h - 130.0);
+            self.interact_button
+                .set_position(screen_w - 115.0, screen_h - 85.0);
         }
         self.dpad.update_position();
 

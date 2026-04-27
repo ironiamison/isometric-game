@@ -17,12 +17,11 @@ mod settings;
 mod ui;
 mod util;
 
-
+use audio::AudioManager;
 use game::GameState;
 use input::{InputCommand, InputHandler};
 use network::NetworkClient;
 use render::animation::AnimationState;
-use audio::AudioManager;
 use render::Renderer;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -287,8 +286,10 @@ async fn main() {
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
                             game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized = ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public = ui_settings.hide_system_in_public;
+                            game_state.ui_state.quest_tracker_minimized =
+                                ui_settings.quest_tracker_minimized;
+                            game_state.ui_state.hide_system_in_public =
+                                ui_settings.hide_system_in_public;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -480,8 +481,10 @@ async fn main() {
                             game_state.ui_state.chat_log_background =
                                 ui_settings.chat_log_background;
                             game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized = ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public = ui_settings.hide_system_in_public;
+                            game_state.ui_state.quest_tracker_minimized =
+                                ui_settings.quest_tracker_minimized;
+                            game_state.ui_state.hide_system_in_public =
+                                ui_settings.hide_system_in_public;
                             if game_state.ui_state.classic_controls {
                                 game_state.ui_state.chat_open = true;
                             }
@@ -783,8 +786,10 @@ fn run_game_frame(
                     }
                     // F9 to step forward one frame (auto-pauses)
                     if is_key_pressed(KeyCode::F9) {
-                        let config = crate::render::animation::get_animation_config(player.animation.state);
-                        player.animation.frame = ((player.animation.frame as u32 + 1) % config.frame_count) as f32;
+                        let config =
+                            crate::render::animation::get_animation_config(player.animation.state);
+                        player.animation.frame =
+                            ((player.animation.frame as u32 + 1) % config.frame_count) as f32;
                         *paused = true;
                     }
                 }
@@ -946,12 +951,10 @@ fn run_game_frame(
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem {
                 slot_index: *slot_index as u32,
             },
-            InputCommand::UseItemOnEntity { slot_index, npc_id } => {
-                ClientMessage::UseItemOn {
-                    slot_index: *slot_index as u32,
-                    target_npc_id: npc_id.clone(),
-                }
-            }
+            InputCommand::UseItemOnEntity { slot_index, npc_id } => ClientMessage::UseItemOn {
+                slot_index: *slot_index as u32,
+                target_npc_id: npc_id.clone(),
+            },
             // Quest-related commands
             InputCommand::Interact { npc_id } => {
                 // Notify tutorial of NPC interaction
@@ -1338,7 +1341,9 @@ fn run_game_frame(
             },
             InputCommand::KothContinue => ClientMessage::KothContinue,
             InputCommand::KothLeave => ClientMessage::KothLeave,
-            InputCommand::SetAutoRetaliate { enabled } => ClientMessage::SetAutoRetaliate { enabled: *enabled },
+            InputCommand::SetAutoRetaliate { enabled } => {
+                ClientMessage::SetAutoRetaliate { enabled: *enabled }
+            }
         };
         network.send(&msg);
     }
@@ -1416,9 +1421,16 @@ fn run_game_frame(
     // Save debug animation state before update overwrites it
     let debug_anim_freeze = if let Some((idx, true)) = game_state.debug_anim_viewer {
         if let Some(local_id) = &game_state.local_player_id {
-            game_state.players.get(local_id).map(|p| (idx, p.animation.state, p.animation.frame))
-        } else { None }
-    } else { None };
+            game_state
+                .players
+                .get(local_id)
+                .map(|p| (idx, p.animation.state, p.animation.frame))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     let update_start = get_time();
     game_state.update(delta);
@@ -1559,7 +1571,15 @@ fn run_game_frame(
 
             // Animation viewer info
             if let Some((idx, paused)) = game_state.debug_anim_viewer {
-                let anim_names = ["Idle", "Walking", "Attacking", "SittingGround", "SittingChair", "Casting", "ShootingBow"];
+                let anim_names = [
+                    "Idle",
+                    "Walking",
+                    "Attacking",
+                    "SittingGround",
+                    "SittingChair",
+                    "Casting",
+                    "ShootingBow",
+                ];
                 let config = crate::render::animation::get_animation_config(player.animation.state);
                 let pause_str = if paused { "PAUSED" } else { "PLAYING" };
                 renderer.draw_text_sharp(

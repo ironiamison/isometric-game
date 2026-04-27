@@ -629,7 +629,12 @@ impl World {
 
     /// Get the terrain height at a world position from loaded chunks.
     /// Returns 0 for tiles in unloaded chunks or chunks without height data.
-    pub fn get_height_at_sync(&self, world_x: i32, world_y: i32, chunks: &std::collections::HashMap<ChunkCoord, std::sync::Arc<crate::chunk::Chunk>>) -> i32 {
+    pub fn get_height_at_sync(
+        &self,
+        world_x: i32,
+        world_y: i32,
+        chunks: &std::collections::HashMap<ChunkCoord, std::sync::Arc<crate::chunk::Chunk>>,
+    ) -> i32 {
         let coord = ChunkCoord::from_world(world_x, world_y);
         if let Some(chunk) = chunks.get(&coord) {
             let (local_x, local_y) = world_to_local(world_x, world_y);
