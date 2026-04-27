@@ -2168,6 +2168,23 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         state.ui_state.collection_log_definitions = defs;
                     }
                 }
+                // Parse display names
+                if let Some(names_val) = extract_map_field(value, "display_names") {
+                    if let rmpv::Value::Array(arr) = names_val {
+                        let mut names = std::collections::HashMap::new();
+                        for entry in arr {
+                            if let rmpv::Value::Array(fields) = entry {
+                                if fields.len() >= 2 {
+                                    let id = fields[0].as_str().unwrap_or("").to_string();
+                                    let name = fields[1].as_str().unwrap_or("").to_string();
+                                    names.insert(id, name);
+                                }
+                            }
+                        }
+                        log::info!("Received {} collection log display names", names.len());
+                        state.ui_state.collection_log_display_names = names;
+                    }
+                }
             }
         }
         "collectionLogSync" => {

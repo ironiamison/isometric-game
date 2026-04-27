@@ -110,6 +110,7 @@ struct AppState {
     crafting_registry: Arc<CraftingRegistry>,
     chest_registry: Arc<crate::chest::ChestRegistry>,
     collection_log_defs: Arc<collection_log::CollectionLogDefinitions>,
+    collection_log_display_names: Arc<Vec<(String, String)>>,
     interior_registry: Arc<InteriorRegistry>,
     instance_manager: Arc<InstanceManager>,
     /// Tracks which instance each player is currently in (None = overworld)
@@ -171,6 +172,16 @@ impl AppState {
         // Load collection log definitions from TOML file
         let collection_log_defs = collection_log::CollectionLogDefinitions::load("data/collection_log.toml");
 
+        // Build display name lookup for collection log subcategories
+        let quest_names: std::collections::HashMap<String, String> = {
+            let quests = quest_registry.all_quests().await;
+            quests.into_iter().map(|q| (q.id.clone(), q.name.clone())).collect()
+        };
+        let collection_log_display_names: Vec<(String, String)> = collection_log_defs
+            .build_display_names(&entity_registry, &quest_names)
+            .into_iter()
+            .collect();
+
         // Load interior registry from JSON files
         let interior_registry = Arc::new(
             InteriorRegistry::load_from_directory("maps/interiors")
@@ -224,6 +235,7 @@ impl AppState {
             crafting_registry: Arc::new(crafting_registry),
             chest_registry: Arc::new(chest_registry),
             collection_log_defs: Arc::new(collection_log_defs),
+            collection_log_display_names: Arc::new(collection_log_display_names),
             interior_registry,
             instance_manager,
             player_instances: Arc::new(RwLock::new(HashMap::new())),
@@ -2366,6 +2378,7 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                             // Collection log definitions
                             let clog_defs_msg = crate::protocol::ServerMessage::CollectionLogDefinitions {
                                 entries: recv_state.collection_log_defs.all_entries(),
+                                display_names: recv_state.collection_log_display_names.as_ref().clone(),
                             };
                             if let Ok(bytes) = protocol::encode_server_message(&clog_defs_msg) {
                                 let _ = recv_tx.send(bytes).await;
@@ -3232,6 +3245,7 @@ async fn handle_socket(
     // Send collection log definitions
     let clog_defs_msg = protocol::ServerMessage::CollectionLogDefinitions {
         entries: state.collection_log_defs.all_entries(),
+        display_names: state.collection_log_display_names.as_ref().clone(),
     };
     if let Ok(bytes) = protocol::encode_server_message(&clog_defs_msg) {
         let _ = sender.send(Message::Binary(bytes)).await;

@@ -211,7 +211,9 @@ impl Renderer {
 
                     let sub_all_done = *sub_got == *sub_total && *sub_total > 0;
                     let sub_color = if sub_all_done { Color::new(0.0, 0.8, 0.0, 1.0) } else if is_selected { TEXT_TITLE } else { TEXT_DIM };
-                    let display_name = name.replace('_', " ");
+                    let display_name = state.ui_state.collection_log_display_names.get(*name)
+                        .cloned()
+                        .unwrap_or_else(|| name.replace('_', " "));
                     let sub_text = format!("{} ({}/{})", display_name, sub_got, sub_total);
                     self.draw_text_sharp(&sub_text, x + pad + indent, cur_y + 12.0 * s, 16.0, sub_color);
 
@@ -274,7 +276,9 @@ impl Renderer {
         items.sort();
 
         // Title - subcategory name
-        let display_name = subcategory.replace('_', " ");
+        let display_name = state.ui_state.collection_log_display_names.get(subcategory)
+            .cloned()
+            .unwrap_or_else(|| subcategory.replace('_', " "));
         let sub_got = items.iter().filter(|id| obtained.contains_key(&(id.to_string(), category.to_string()))).count();
         let title_text = format!("{} ({}/{})", display_name, sub_got, items.len());
         self.draw_text_sharp(&title_text, x + pad, y + pad + 12.0 * s, 16.0, TEXT_TITLE);

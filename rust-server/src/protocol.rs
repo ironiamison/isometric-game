@@ -1426,6 +1426,8 @@ pub enum ServerMessage {
     // Collection log messages
     CollectionLogDefinitions {
         entries: Vec<(String, String, String)>,
+        /// source_detail_id -> display_name (e.g., "pig" -> "Pig", "axe_to_grind" -> "Axe to Grind")
+        display_names: Vec<(String, String)>,
     },
     CollectionLogSync {
         entries: Vec<(String, String, String, String)>,
@@ -6760,7 +6762,7 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             ));
             Value::Map(map)
         }
-        ServerMessage::CollectionLogDefinitions { entries } => {
+        ServerMessage::CollectionLogDefinitions { entries, display_names } => {
             let items: Vec<Value> = entries
                 .iter()
                 .map(|(item_id, source, source_detail)| {
@@ -6771,10 +6773,23 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
                     ])
                 })
                 .collect();
+            let names: Vec<Value> = display_names
+                .iter()
+                .map(|(id, name)| {
+                    Value::Array(vec![
+                        Value::String(id.clone().into()),
+                        Value::String(name.clone().into()),
+                    ])
+                })
+                .collect();
             let mut map = Vec::new();
             map.push((
                 Value::String("entries".into()),
                 Value::Array(items),
+            ));
+            map.push((
+                Value::String("display_names".into()),
+                Value::Array(names),
             ));
             Value::Map(map)
         }

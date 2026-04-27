@@ -1480,6 +1480,8 @@ pub struct UiState {
     pub collection_log_definitions: Vec<(String, String, String)>,
     /// Player's obtained items: HashMap of (item_id, source) -> obtained_at
     pub collection_log: std::collections::HashMap<(String, String), String>,
+    /// Display names for source_detail IDs (e.g., "pig" -> "Pig", "fishing" -> "Fishing")
+    pub collection_log_display_names: std::collections::HashMap<String, String>,
     pub collection_log_selected_category: Option<String>,
     pub collection_log_selected_subcategory: Option<String>,
     pub collection_log_sidebar_scroll: f32,
@@ -1772,6 +1774,7 @@ impl Default for UiState {
             collection_log_open: false,
             collection_log_definitions: Vec::new(),
             collection_log: std::collections::HashMap::new(),
+            collection_log_display_names: std::collections::HashMap::new(),
             collection_log_selected_category: None,
             collection_log_selected_subcategory: None,
             collection_log_sidebar_scroll: 0.0,
