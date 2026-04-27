@@ -364,7 +364,7 @@ impl Renderer {
         if let Some(UiElementId::CollectionLogGridItem(idx)) = hovered {
             if let Some(item_id) = items.get(*idx) {
                 let is_obtained = obtained.contains_key(&(item_id.to_string(), category.to_string()));
-                let display = item_id.replace('_', " ");
+                let display = state.item_registry.get_display_name(item_id).to_string();
                 let (mx, my) = mouse_position();
                 let vx = mx / scale_x;
                 let vy = my / scale_y;

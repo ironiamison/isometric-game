@@ -2203,7 +2203,8 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     obtained_at,
                 );
 
-                state.push_system_chat(format!("New collection log entry: {}!", item_id));
+                let display_name = state.item_registry.get_display_name(&item_id).to_string();
+                state.push_system_chat(format!("New collection log entry: {}!", display_name));
                 state.pending_sfx.push("enter".to_string());
             }
         }
