@@ -1276,6 +1276,21 @@ attack_bonus = 0
 strength_bonus = 0
 defence_bonus = 12
 
+[artisan_cape]
+display_name = "Artisan's Cape"
+sprite = "artisan_cape"
+description = "A prestigious cape awarded to master artisans. It shimmers with the dedication of countless crafted works."
+category = "equipment"
+max_stack = 1
+base_price = 0
+sellable = false
+[artisan_cape.equipment]
+slot_type = "back"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 6
+
 # =============================================================================
 # METAL TIER SETS (Bronze / Iron / Steel / Ancient - Craftable at Blacksmith)
 # =============================================================================

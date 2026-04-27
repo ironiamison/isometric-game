@@ -36,6 +36,7 @@ mod npc_speech;
 mod npc_tick;
 mod post_movement;
 mod prayer;
+mod prestige_shop;
 mod quests;
 mod resource_contracts;
 mod resources;
@@ -5479,6 +5480,11 @@ impl GameRoom {
             return;
         }
 
+        if entity_type == "master_artisan" {
+            self.show_prestige_shop_dialogue(player_id, &npc_id).await;
+            return;
+        }
+
         let is_altar = self
             .entity_registry
             .get(&entity_type)
@@ -5721,6 +5727,12 @@ impl GameRoom {
 
         if let Some(altar_id) = quest_id.strip_prefix("altar:") {
             self.handle_altar_dialogue_choice(player_id, altar_id, choice_id)
+                .await;
+            return;
+        }
+
+        if let Some(npc_id) = quest_id.strip_prefix("prestige_shop:") {
+            self.handle_prestige_shop_choice(player_id, npc_id, choice_id)
                 .await;
             return;
         }
