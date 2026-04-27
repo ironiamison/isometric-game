@@ -82,6 +82,7 @@ fn player_update_from_player(
         has_stall: player.stall.as_ref().is_some_and(|stall| stall.active),
         stall_name: active_stall_name(player.stall.as_ref()),
         combat_style: player.combat_style.as_str().to_string(),
+        title: player.active_title.clone(),
     }
 }
 

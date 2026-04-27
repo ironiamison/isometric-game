@@ -45,6 +45,7 @@ mod social;
 mod stall;
 mod tick_resources;
 mod tick_snapshots;
+mod titles;
 mod trade;
 mod travel;
 mod world_map;
@@ -475,6 +476,8 @@ pub struct Player {
     pub stall: Option<PlayerStall>,
     /// Collection log: set of (item_id, source) pairs this player has obtained
     pub collection_log: HashSet<(String, String)>,
+    /// Display text of equipped title (e.g. "Master Smith")
+    pub active_title: Option<String>,
 }
 
 // ============================================================================
@@ -653,6 +656,7 @@ impl Player {
             last_activity_time: 0,
             stall: None,
             collection_log: HashSet::new(),
+            active_title: None,
         }
     }
 
@@ -1138,6 +1142,7 @@ pub struct PlayerUpdate {
     pub has_stall: bool,
     pub stall_name: Option<String>,
     pub combat_style: String,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]

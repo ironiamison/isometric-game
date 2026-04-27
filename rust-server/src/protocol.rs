@@ -2127,6 +2127,13 @@ pub fn player_update_to_value(p: &PlayerUpdate) -> rmpv::Value {
         Value::String("maxMp".into()),
         Value::Integer((p.max_mp as i64).into()),
     ));
+    pmap.push((
+        Value::String("title".into()),
+        match &p.title {
+            Some(t) => Value::String(t.clone().into()),
+            None => Value::Nil,
+        },
+    ));
     Value::Map(pmap)
 }
 

@@ -53,7 +53,11 @@ impl GameRoom {
             Some(p) => p,
             None => return,
         };
-        let sender_name = sender.name.clone();
+        let sender_name = if let Some(ref title) = sender.active_title {
+            format!("{} ({})", sender.name, title)
+        } else {
+            sender.name.clone()
+        };
         let sender_x = sender.x as i32;
         let sender_y = sender.y as i32;
         drop(players);
@@ -1367,6 +1371,9 @@ impl GameRoom {
                         }
                     }
                 }
+            }
+            "/title" => {
+                self.handle_title_command(player_id, &parts[1..]).await;
             }
             _ => {
                 self.send_system_message(
