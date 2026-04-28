@@ -3146,6 +3146,12 @@
       "x": 19,
       "y": 8,
       "level": 1
+    },
+    {
+      "entityId": "adventure_board",
+      "x": 17,
+      "y": 26,
+      "level": 1
     }
   ],
   "mapObjects": [
@@ -3365,13 +3371,6 @@
       "y": 31,
       "width": 120,
       "height": 182
-    },
-    {
-      "gid": 2250,
-      "x": 17,
-      "y": 26,
-      "width": 47,
-      "height": 51
     },
     {
       "gid": 2250,
