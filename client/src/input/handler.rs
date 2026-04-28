@@ -3385,12 +3385,9 @@ impl InputHandler {
                                 state.ui_state.double_click_state.last_click_slot = Some(*idx);
                                 state.ui_state.double_click_state.last_click_time = current_time;
 
-                                // Single click on inventory slot: toggle item selection
-                                if state.ui_state.selected_inventory_slot == Some(*idx) {
-                                    state.ui_state.selected_inventory_slot = None;
-                                } else {
-                                    state.ui_state.selected_inventory_slot = Some(*idx);
-                                }
+                                // Single click on inventory slot: clear any selection
+                                // (item selection for use-on-entity is disabled for now)
+                                state.ui_state.selected_inventory_slot = None;
 
                                 // Start drag from inventory
                                 state.ui_state.drag_state = Some(DragState {
