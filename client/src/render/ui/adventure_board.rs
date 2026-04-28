@@ -65,8 +65,13 @@ impl Renderer {
         );
 
         // ===== DAILY INFO (right-aligned) =====
-        let elapsed = macroquad::time::get_time() - board.opened_at;
-        let remaining = (board.seconds_until_reset - elapsed as i64).max(0);
+        // Calculate time until midnight UTC client-side
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let secs_into_day = now_secs % 86400;
+        let remaining = 86400 - secs_into_day;
         let hours = remaining / 3600;
         let minutes = (remaining % 3600) / 60;
         let reset_text = format!(

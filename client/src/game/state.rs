@@ -1143,10 +1143,8 @@ pub struct AdventureBoardPanelState {
     pub crafting_orders: Vec<CraftingOrderOfferInfo>,
     pub crafting_order_active: Option<CraftingOrderActiveInfo>,
     pub crafting_order_stats: CraftingOrderStatsInfo,
-    pub seconds_until_reset: i64,
     pub daily_contracts_completed: i32,
     pub daily_contract_limit: i32,
-    pub opened_at: f64,
 }
 
 #[derive(Debug, Clone)]
