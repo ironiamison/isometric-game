@@ -281,11 +281,11 @@ fn handle_chat_message(value: &rmpv::Value, state: &mut GameState) {
     state.pending_sfx.push("message_add".to_string());
 
     if matches!(channel, ChatChannel::Local) {
-        if let Some((player_id, _)) = state.players.iter().find(|(_, p)| p.name == sender_name) {
-            let player_id = player_id.clone();
-            state.chat_bubbles.retain(|b| b.player_id != player_id);
+        let sender_id = extract_string(value, "senderId").unwrap_or_default();
+        if !sender_id.is_empty() && state.players.contains_key(&sender_id) {
+            state.chat_bubbles.retain(|b| b.player_id != sender_id);
             state.chat_bubbles.push(ChatBubble {
-                player_id,
+                player_id: sender_id,
                 text,
                 time: current_time(),
             });
@@ -5191,6 +5191,7 @@ mod tests {
             .insert("remote-1".to_string(), player("remote-1", "Ayla"));
 
         let chat = map(vec![
+            ("senderId", Value::from("remote-1")),
             ("senderName", Value::from("Ayla")),
             ("text", Value::from("Hello there")),
             ("timestamp", Value::from(123_u64)),
