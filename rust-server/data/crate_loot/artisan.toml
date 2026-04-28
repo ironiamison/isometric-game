@@ -1,0 +1,170 @@
+[rarity_weights]
+common = 60
+uncommon = 30
+rare = 10
+
+# ---- Low bracket ----
+
+[[low.common]]
+item_id = "copper_ore"
+quantity_min = 15
+quantity_max = 25
+
+[[low.common]]
+item_id = "tin_ore"
+quantity_min = 15
+quantity_max = 25
+
+[[low.common]]
+item_id = "oak_log"
+quantity_min = 10
+quantity_max = 20
+
+[[low.common]]
+item_id = "raw_shrimp"
+quantity_min = 15
+quantity_max = 25
+
+[[low.common]]
+item_id = "raw_sardine"
+quantity_min = 10
+quantity_max = 20
+
+[[low.uncommon]]
+item_id = "weak_health_potion"
+quantity_min = 3
+quantity_max = 5
+
+[[low.uncommon]]
+item_id = "bronze_bar"
+quantity_min = 5
+quantity_max = 10
+
+[[low.uncommon]]
+item_id = "potato_seed"
+quantity_min = 3
+quantity_max = 6
+
+[[low.uncommon]]
+item_id = "onion_seed"
+quantity_min = 3
+quantity_max = 6
+
+[[low.rare]]
+item_id = "iron_bar"
+quantity_min = 3
+quantity_max = 5
+
+[[low.rare]]
+item_id = "commission_marks"
+quantity_min = 3
+quantity_max = 3
+
+# ---- Mid bracket ----
+
+[[mid.common]]
+item_id = "iron_ore"
+quantity_min = 10
+quantity_max = 20
+
+[[mid.common]]
+item_id = "coal_ore"
+quantity_min = 8
+quantity_max = 15
+
+[[mid.common]]
+item_id = "willow_log"
+quantity_min = 10
+quantity_max = 15
+
+[[mid.common]]
+item_id = "raw_salmon"
+quantity_min = 10
+quantity_max = 20
+
+[[mid.common]]
+item_id = "raw_lobster"
+quantity_min = 8
+quantity_max = 15
+
+[[mid.uncommon]]
+item_id = "health_potion"
+quantity_min = 2
+quantity_max = 4
+
+[[mid.uncommon]]
+item_id = "steel_bar"
+quantity_min = 3
+quantity_max = 5
+
+[[mid.uncommon]]
+item_id = "strawberry_seed"
+quantity_min = 2
+quantity_max = 4
+
+[[mid.uncommon]]
+item_id = "sweetcorn_seed"
+quantity_min = 2
+quantity_max = 3
+
+[[mid.rare]]
+item_id = "mithril_bar"
+quantity_min = 2
+quantity_max = 4
+
+[[mid.rare]]
+item_id = "commission_marks"
+quantity_min = 5
+quantity_max = 5
+
+# ---- High bracket ----
+
+[[high.common]]
+item_id = "mithril_ore"
+quantity_min = 8
+quantity_max = 15
+
+[[high.common]]
+item_id = "adamant_ore"
+quantity_min = 5
+quantity_max = 10
+
+[[high.common]]
+item_id = "yew_log"
+quantity_min = 8
+quantity_max = 12
+
+[[high.common]]
+item_id = "raw_swordfish"
+quantity_min = 8
+quantity_max = 15
+
+[[high.uncommon]]
+item_id = "super_attack_potion"
+quantity_min = 2
+quantity_max = 3
+
+[[high.uncommon]]
+item_id = "super_strength_potion"
+quantity_min = 2
+quantity_max = 3
+
+[[high.uncommon]]
+item_id = "adamant_bar"
+quantity_min = 3
+quantity_max = 5
+
+[[high.uncommon]]
+item_id = "watermelon_seed"
+quantity_min = 1
+quantity_max = 3
+
+[[high.rare]]
+item_id = "rune_bar"
+quantity_min = 1
+quantity_max = 2
+
+[[high.rare]]
+item_id = "commission_marks"
+quantity_min = 8
+quantity_max = 8

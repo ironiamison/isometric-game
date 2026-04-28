@@ -216,6 +216,10 @@ pub enum UseEffect {
         spell_id: String,
     },
     Dig,
+    OpenCrate {
+        tier: String,
+        bracket: String,
+    },
 }
 
 // ============================================================================

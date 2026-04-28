@@ -192,6 +192,7 @@ impl ItemRegistry {
                         super::UseEffect::Teleport { .. } => "teleport".to_string(),
                         super::UseEffect::LearnSpell { .. } => "learn_spell".to_string(),
                         super::UseEffect::Dig => "dig".to_string(),
+                        super::UseEffect::OpenCrate { .. } => "open_crate".to_string(),
                     }),
                 }
             })

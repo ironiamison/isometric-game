@@ -20,6 +20,7 @@ enum ItemUseRoute {
     RecipeScroll,
     SpellScroll,
     DigTool,
+    Crate,
     Consumable,
 }
 
@@ -37,6 +38,8 @@ fn classify_item_use(item_id: &str, use_effect: Option<&UseEffect>) -> ItemUseRo
         ItemUseRoute::SpellScroll
     } else if matches!(use_effect, Some(UseEffect::Dig)) {
         ItemUseRoute::DigTool
+    } else if matches!(use_effect, Some(UseEffect::OpenCrate { .. })) {
+        ItemUseRoute::Crate
     } else {
         ItemUseRoute::Consumable
     }
@@ -155,6 +158,10 @@ impl GameRoom {
                             self.handle_dig(player_id).await;
                             return;
                         }
+                        ItemUseRoute::Crate => {
+                            self.handle_open_crate(player_id, slot_index as usize).await;
+                            return;
+                        }
                         ItemUseRoute::Consumable => {}
                     }
                 }
@@ -222,7 +229,7 @@ impl GameRoom {
                                 teleport_pos = Some((*x, *y));
                                 format!("teleport:{}", destination)
                             }
-                            Some(UseEffect::LearnSpell { .. }) | Some(UseEffect::Dig) | None => {
+                            Some(UseEffect::LearnSpell { .. }) | Some(UseEffect::Dig) | Some(UseEffect::OpenCrate { .. }) | None => {
                                 "none".to_string()
                             }
                         }

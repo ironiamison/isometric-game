@@ -1,0 +1,90 @@
+# Crafting order reward crates
+# Opened via right-click "Use" in inventory for a single random loot roll
+
+# ---- Artisan's Crates (regular order rewards) ----
+
+[artisans_crate_low]
+display_name = "Artisan's Crate (Beginner)"
+sprite = "crate"
+description = "A sturdy crate packed by the Artisan's Guild. Contains beginner-tier rewards."
+category = "misc"
+max_stack = 100
+base_price = 0
+sellable = false
+
+[artisans_crate_low.use_effect]
+type = "open_crate"
+tier = "artisan"
+bracket = "low"
+
+[artisans_crate_mid]
+display_name = "Artisan's Crate (Intermediate)"
+sprite = "crate"
+description = "A sturdy crate packed by the Artisan's Guild. Contains intermediate-tier rewards."
+category = "misc"
+max_stack = 100
+base_price = 0
+sellable = false
+
+[artisans_crate_mid.use_effect]
+type = "open_crate"
+tier = "artisan"
+bracket = "mid"
+
+[artisans_crate_high]
+display_name = "Artisan's Crate (Advanced)"
+sprite = "crate"
+description = "A sturdy crate packed by the Artisan's Guild. Contains advanced-tier rewards."
+category = "misc"
+max_stack = 100
+base_price = 0
+sellable = false
+
+[artisans_crate_high.use_effect]
+type = "open_crate"
+tier = "artisan"
+bracket = "high"
+
+# ---- Master's Crates (masterwork order rewards) ----
+
+[masters_crate_low]
+display_name = "Master's Crate (Beginner)"
+sprite = "crate_gold"
+description = "A gilded crate reserved for master craftsmen. Contains beginner-tier exceptional rewards."
+category = "misc"
+max_stack = 100
+base_price = 0
+sellable = false
+
+[masters_crate_low.use_effect]
+type = "open_crate"
+tier = "master"
+bracket = "low"
+
+[masters_crate_mid]
+display_name = "Master's Crate (Intermediate)"
+sprite = "crate_gold"
+description = "A gilded crate reserved for master craftsmen. Contains intermediate-tier exceptional rewards."
+category = "misc"
+max_stack = 100
+base_price = 0
+sellable = false
+
+[masters_crate_mid.use_effect]
+type = "open_crate"
+tier = "master"
+bracket = "mid"
+
+[masters_crate_high]
+display_name = "Master's Crate (Advanced)"
+sprite = "crate_gold"
+description = "A gilded crate reserved for master craftsmen. Contains advanced-tier exceptional rewards."
+category = "misc"
+max_stack = 100
+base_price = 0
+sellable = false
+
+[masters_crate_high.use_effect]
+type = "open_crate"
+tier = "master"
+bracket = "high"

@@ -1,0 +1,146 @@
+[rarity_weights]
+common = 40
+uncommon = 40
+rare = 15
+epic = 5
+
+# ---- Low bracket ----
+
+[[low.common]]
+item_id = "iron_ore"
+quantity_min = 15
+quantity_max = 25
+
+[[low.common]]
+item_id = "oak_log"
+quantity_min = 15
+quantity_max = 25
+
+[[low.common]]
+item_id = "raw_trout"
+quantity_min = 15
+quantity_max = 25
+
+[[low.uncommon]]
+item_id = "health_potion"
+quantity_min = 3
+quantity_max = 5
+
+[[low.uncommon]]
+item_id = "iron_bar"
+quantity_min = 5
+quantity_max = 8
+
+[[low.uncommon]]
+item_id = "strawberry_seed"
+quantity_min = 3
+quantity_max = 5
+
+[[low.rare]]
+item_id = "steel_bar"
+quantity_min = 3
+quantity_max = 6
+
+[[low.rare]]
+item_id = "commission_marks"
+quantity_min = 5
+quantity_max = 5
+
+[[low.epic]]
+item_id = "commission_marks"
+quantity_min = 15
+quantity_max = 15
+
+# ---- Mid bracket ----
+
+[[mid.common]]
+item_id = "mithril_ore"
+quantity_min = 10
+quantity_max = 18
+
+[[mid.common]]
+item_id = "maple_log"
+quantity_min = 10
+quantity_max = 18
+
+[[mid.common]]
+item_id = "raw_lobster"
+quantity_min = 10
+quantity_max = 20
+
+[[mid.uncommon]]
+item_id = "super_strength_potion"
+quantity_min = 2
+quantity_max = 4
+
+[[mid.uncommon]]
+item_id = "mithril_bar"
+quantity_min = 3
+quantity_max = 6
+
+[[mid.uncommon]]
+item_id = "watermelon_seed"
+quantity_min = 2
+quantity_max = 3
+
+[[mid.rare]]
+item_id = "adamant_bar"
+quantity_min = 3
+quantity_max = 5
+
+[[mid.rare]]
+item_id = "commission_marks"
+quantity_min = 10
+quantity_max = 10
+
+[[mid.epic]]
+item_id = "commission_marks"
+quantity_min = 25
+quantity_max = 25
+
+# ---- High bracket ----
+
+[[high.common]]
+item_id = "adamant_ore"
+quantity_min = 8
+quantity_max = 15
+
+[[high.common]]
+item_id = "yew_log"
+quantity_min = 10
+quantity_max = 18
+
+[[high.common]]
+item_id = "raw_swordfish"
+quantity_min = 10
+quantity_max = 18
+
+[[high.uncommon]]
+item_id = "super_defence_potion"
+quantity_min = 2
+quantity_max = 4
+
+[[high.uncommon]]
+item_id = "adamant_bar"
+quantity_min = 4
+quantity_max = 8
+
+[[high.uncommon]]
+item_id = "nightthorn_seed"
+quantity_min = 1
+quantity_max = 2
+
+[[high.rare]]
+item_id = "rune_bar"
+quantity_min = 2
+quantity_max = 4
+
+[[high.rare]]
+item_id = "commission_marks"
+quantity_min = 15
+quantity_max = 15
+
+[[high.epic]]
+item_id = "commission_marks"
+quantity_min = 25
+quantity_max = 25

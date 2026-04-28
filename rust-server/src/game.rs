@@ -27,6 +27,7 @@ mod chat;
 mod chests;
 mod crafting;
 pub(crate) mod crafting_orders;
+pub(crate) mod crate_loot;
 mod farming;
 mod instance_npc_tick;
 mod inventory;
@@ -1338,6 +1339,8 @@ pub struct GameRoom {
     movement_anomalies: MovementAnomalyCounters,
     /// Crafting order template registry (loaded from data/orders/)
     crafting_order_registry: crafting_orders::CraftingOrderRegistry,
+    /// Crate loot table registry (loaded from data/crate_loot/)
+    pub crate_loot_registry: crate_loot::CrateLootRegistry,
     /// Cached name of the all-time highest total level player (gold trophy)
     top_level_player_name: RwLock<Option<String>>,
     /// Cached total level value of the #1 player
@@ -2000,6 +2003,7 @@ impl GameRoom {
             pvp_zones,
             movement_anomalies: MovementAnomalyCounters::default(),
             crafting_order_registry: crafting_orders::CraftingOrderRegistry::load("data"),
+            crate_loot_registry: crate_loot::CrateLootRegistry::load("data"),
             top_level_player_name: RwLock::new(None),
             top_level_value: RwLock::new(0),
             second_level_player_name: RwLock::new(None),
