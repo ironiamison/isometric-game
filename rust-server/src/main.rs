@@ -3454,6 +3454,13 @@ async fn handle_socket(
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
+    // Send crafting order tracker state (if player has an active order)
+    if let Some(order_msg) = room.get_crafting_order_tracker_message(&player_id).await {
+        if let Ok(bytes) = protocol::encode_server_message(&order_msg) {
+            let _ = sender.send(Message::Binary(bytes)).await;
+        }
+    }
+
     // Send chair positions
     let chair_positions = room.get_chair_positions_message().await;
     if let Ok(bytes) = protocol::encode_server_message(&chair_positions) {

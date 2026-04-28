@@ -243,6 +243,63 @@ pub fn skills_to_map(skills: &crate::skills::Skills) -> HashMap<String, i32> {
 // ============================================================================
 
 impl GameRoom {
+    /// Build a ResourceContractUpdate message for a crafting order (reuses the existing tracker UI).
+    fn crafting_order_tracker_message(&self, template: Option<&OrderTemplate>) -> ServerMessage {
+        match template {
+            Some(t) => {
+                let item_summary: Vec<String> = t
+                    .items
+                    .iter()
+                    .map(|item| {
+                        let name = self
+                            .item_registry
+                            .get(&item.id)
+                            .map(|def| def.display_name.clone())
+                            .unwrap_or_else(|| item.id.clone());
+                        format!("{}x {}", item.quantity, name)
+                    })
+                    .collect();
+                let tier_label = if t.tier == "masterwork" {
+                    "Masterwork"
+                } else {
+                    "Regular"
+                };
+                ServerMessage::ResourceContractUpdate {
+                    active: true,
+                    contract_kind: format!("{} Order", tier_label),
+                    difficulty: t.skill.clone(),
+                    task_text: format!("Deliver: {}", item_summary.join(", ")),
+                    progress_label: "delivered".to_string(),
+                    amount_required: 1,
+                    amount_completed: 0,
+                    giver_name: "Adventure Board".to_string(),
+                }
+            }
+            None => ServerMessage::ResourceContractUpdate {
+                active: false,
+                contract_kind: String::new(),
+                difficulty: String::new(),
+                task_text: String::new(),
+                progress_label: String::new(),
+                amount_required: 0,
+                amount_completed: 0,
+                giver_name: String::new(),
+            },
+        }
+    }
+
+    /// Get the tracker message for any active crafting order (for login sync).
+    pub async fn get_crafting_order_tracker_message(
+        &self,
+        player_id: &str,
+    ) -> Option<ServerMessage> {
+        let db = self.db.as_ref()?;
+        let character_id = Self::parse_character_id(player_id)?;
+        let order_id = db.get_active_order(character_id).await.ok()??;
+        let template = self.crafting_order_registry.get_order(&order_id)?;
+        Some(self.crafting_order_tracker_message(Some(template)))
+    }
+
     /// Accept a crafting order.
     pub(in crate::game) async fn handle_accept_crafting_order(
         &self,
@@ -333,6 +390,10 @@ impl GameRoom {
                 ),
             )
             .await;
+
+            // Send tracker update
+            let tracker_msg = self.crafting_order_tracker_message(Some(template));
+            self.send_to_player(player_id, tracker_msg).await;
         } else {
             self.send_system_message(player_id, "Database not available.")
                 .await;
@@ -417,6 +478,26 @@ impl GameRoom {
             // 5. Grant gold
             player.inventory.gold += template.rewards.gold;
 
+            // 5b. Grant reward crate
+            let bracket = if template.min_level >= 40 {
+                "high"
+            } else if template.min_level >= 20 {
+                "mid"
+            } else {
+                "low"
+            };
+            let crate_id = if template.tier == "masterwork" {
+                format!("masters_crate_{}", bracket)
+            } else {
+                format!("artisans_crate_{}", bracket)
+            };
+            player.inventory.add_item(&crate_id, 1, &self.item_registry);
+            let crate_name = self
+                .item_registry
+                .get(&crate_id)
+                .map(|d| d.display_name.clone())
+                .unwrap_or(crate_id);
+
             // 6. Grant XP for each skill in the rewards
             let mut xp_results: Vec<(String, i64, i64, i32, bool)> = Vec::new();
             for (skill_name, &xp_amount) in &template.rewards.xp {
@@ -436,10 +517,10 @@ impl GameRoom {
             let inventory_update = player.inventory.to_update();
             let gold = player.inventory.gold;
 
-            Ok((inventory_update, gold, xp_results))
+            Ok((inventory_update, gold, xp_results, crate_name))
         }; // write lock dropped here
 
-        let (inventory_update, gold, xp_results) = match result {
+        let (inventory_update, gold, xp_results, crate_name) = match result {
             Ok(data) => data,
             Err(msg) if !msg.is_empty() => {
                 self.send_system_message(player_id, &msg).await;
@@ -518,13 +599,18 @@ impl GameRoom {
         self.send_system_message(
             player_id,
             &format!(
-                "Crafting order complete! Received {}, {}gp{}.",
+                "Crafting order complete! Received {}, {}gp{}, and 1x {}.",
                 xp_text.join(", "),
                 template.rewards.gold,
-                marks_text
+                marks_text,
+                crate_name
             ),
         )
         .await;
+
+        // Clear tracker
+        let tracker_msg = self.crafting_order_tracker_message(None);
+        self.send_to_player(player_id, tracker_msg).await;
     }
 
     /// Abandon active crafting order.
@@ -567,5 +653,9 @@ impl GameRoom {
         // 2. Send system message confirming abandonment
         self.send_system_message(player_id, "Crafting order abandoned.")
             .await;
+
+        // Clear tracker
+        let tracker_msg = self.crafting_order_tracker_message(None);
+        self.send_to_player(player_id, tracker_msg).await;
     }
 }

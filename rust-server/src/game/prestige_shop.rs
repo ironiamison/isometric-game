@@ -73,7 +73,7 @@ impl GameRoom {
         let unlocked_titles = db.get_player_titles(character_id).await.unwrap_or_default();
 
         let mut text = format!(
-            "Welcome, artisan! I trade in Commission Marks earned from masterwork orders.\n\nYour Commission Marks: {}\n\nItems available:",
+            "Welcome, artisan! I trade in Commission Marks earned from masterwork orders.\n\nYour Commission Marks: {}",
             marks
         );
 
@@ -85,10 +85,7 @@ impl GameRoom {
                 PrestigeItemType::Equipment(_) => false,
             };
 
-            if owned {
-                text.push_str(&format!("\n  {} - OWNED", item.display));
-            } else {
-                text.push_str(&format!("\n  {} - {} marks", item.display, item.cost));
+            if !owned {
                 choices.push(crate::protocol::DialogueChoice {
                     id: item.id.to_string(),
                     text: format!("{} ({} marks)", item.display, item.cost),

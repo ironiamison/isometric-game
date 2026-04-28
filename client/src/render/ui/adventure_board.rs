@@ -687,9 +687,9 @@ impl Renderer {
                 claim_bg,
             );
             let claim_label = if contract.can_claim {
-                "Claim Rewards"
+                "Claim"
             } else {
-                "Finish Contract"
+                "Complete"
             };
             let claim_label_w = self.measure_text_sharp(claim_label, 16.0).width;
             self.draw_text_sharp(
@@ -1095,7 +1095,7 @@ impl Renderer {
                 claim_bounds.h - 2.0,
                 claim_bg,
             );
-            let claim_label = if can_claim { "Claim Rewards" } else { "Gather Items" };
+            let claim_label = if can_claim { "Claim" } else { "Gather Items" };
             let claim_label_w = self.measure_text_sharp(claim_label, 16.0).width;
             self.draw_text_sharp(
                 claim_label,

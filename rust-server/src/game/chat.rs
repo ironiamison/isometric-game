@@ -132,7 +132,19 @@ impl GameRoom {
                 }
 
                 let item_id = parts[1];
-                let quantity = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(1);
+                let quantity: i32 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(1);
+
+                // Special case: commission marks (not an inventory item)
+                if item_id == "commission_marks" {
+                    if let (Some(db), Some(character_id)) = (&self.db, Self::parse_character_id(player_id)) {
+                        if let Err(e) = db.add_commission_marks(character_id, quantity).await {
+                            self.send_system_message(player_id, &format!("Failed: {}", e)).await;
+                        } else {
+                            self.send_system_message(player_id, &format!("Gave {} commission marks.", quantity)).await;
+                        }
+                    }
+                    return;
+                }
 
                 if self.item_registry.get(item_id).is_none() {
                     self.send_system_message(player_id, &format!("Unknown item: {}", item_id))

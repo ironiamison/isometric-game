@@ -23,3 +23,4 @@ gold_max = 0
 
 [adventure_board.behaviors]
 hostile = false
+friendly = true
