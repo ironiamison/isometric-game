@@ -3154,12 +3154,6 @@
       "level": 1
     },
     {
-      "entityId": "master_artisan",
-      "x": 7,
-      "y": 15,
-      "level": 1
-    },
-    {
       "entityId": "old_thomas",
       "x": 2,
       "y": 14,
