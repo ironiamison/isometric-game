@@ -94,10 +94,7 @@ impl Renderer {
         draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
 
         // Daily info (right, before close button, vertically centered)
-        let now_secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now_secs = miniquad::date::now() as u64;
         let secs_into_day = now_secs % 86400;
         let remaining = 86400 - secs_into_day;
         let hours = remaining / 3600;
