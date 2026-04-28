@@ -64,6 +64,24 @@ impl Renderer {
             TEXT_TITLE,
         );
 
+        // ===== DAILY INFO (right-aligned) =====
+        let elapsed = macroquad::time::get_time() - board.opened_at;
+        let remaining = (board.seconds_until_reset - elapsed as i64).max(0);
+        let hours = remaining / 3600;
+        let minutes = (remaining % 3600) / 60;
+        let reset_text = format!(
+            "Contracts: {}/{}  |  Resets in {:02}:{:02}",
+            board.daily_contracts_completed, board.daily_contract_limit, hours, minutes
+        );
+        let reset_w = self.measure_text_sharp(&reset_text, 16.0).width;
+        self.draw_text_sharp(
+            &reset_text,
+            panel_x + panel_w - reset_w - 36.0 * s,
+            panel_y + 28.0 * s,
+            16.0,
+            TEXT_DIM,
+        );
+
         // ===== CLOSE BUTTON =====
         let close_w = 20.0 * s;
         let close_h = 16.0 * s;

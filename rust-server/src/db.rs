@@ -2871,6 +2871,21 @@ impl Database {
         Ok(())
     }
 
+    pub async fn remove_available_order(
+        &self,
+        character_id: i64,
+        order_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "DELETE FROM crafting_orders_available WHERE character_id = ? AND order_id = ?",
+        )
+        .bind(character_id)
+        .bind(order_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn get_active_order(
         &self,
         character_id: i64,

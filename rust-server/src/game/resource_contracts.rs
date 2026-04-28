@@ -398,6 +398,19 @@ impl GameRoom {
             }
         }
 
+        // Calculate seconds until next UTC midnight
+        let now = chrono::Utc::now();
+        let tomorrow = (now + chrono::Duration::days(1)).date_naive().and_hms_opt(0, 0, 0).unwrap();
+        let seconds_until_reset = (tomorrow - now.naive_utc()).num_seconds().max(0);
+
+        // Get daily contract count
+        let today = now.format("%Y-%m-%d").to_string();
+        let daily_contracts_completed = if let Some(ref db) = self.db {
+            db.get_daily_contracts_completed(player_id, &today).await.unwrap_or(0)
+        } else {
+            0
+        };
+
         ServerMessage::AdventureBoardState {
             npc_id: npc_id.to_string(),
             offers,
@@ -406,6 +419,9 @@ impl GameRoom {
             crafting_orders,
             crafting_order_active,
             crafting_order_stats,
+            seconds_until_reset,
+            daily_contracts_completed,
+            daily_contract_limit: DAILY_CONTRACT_LIMIT,
         }
     }
 

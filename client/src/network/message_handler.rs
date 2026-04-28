@@ -2023,6 +2023,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                         commission_marks: 0,
                     });
 
+                let seconds_until_reset = extract_i64(value, "seconds_until_reset").unwrap_or(0);
+                let daily_contracts_completed = extract_i32(value, "daily_contracts_completed").unwrap_or(0);
+                let daily_contract_limit = extract_i32(value, "daily_contract_limit").unwrap_or(5);
+
                 state.ui_state.adventure_board = Some(AdventureBoardPanelState {
                     npc_id: npc_id.clone(),
                     offers,
@@ -2031,6 +2035,10 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                     crafting_orders,
                     crafting_order_active,
                     crafting_order_stats,
+                    seconds_until_reset,
+                    daily_contracts_completed,
+                    daily_contract_limit,
+                    opened_at: macroquad::time::get_time(),
                 });
 
                 if let Some(target_kind) = previous_kind {

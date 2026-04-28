@@ -1265,6 +1265,9 @@ pub enum ServerMessage {
         crafting_orders: Vec<CraftingOrderOfferData>,
         crafting_order_active: Option<CraftingOrderActiveData>,
         crafting_order_stats: CraftingOrderStatsData,
+        seconds_until_reset: i64,
+        daily_contracts_completed: i32,
+        daily_contract_limit: i32,
     },
 
     // ===== Slayer System Messages =====
@@ -6027,6 +6030,9 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             crafting_orders,
             crafting_order_active,
             crafting_order_stats,
+            seconds_until_reset,
+            daily_contracts_completed,
+            daily_contract_limit,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -6336,6 +6342,18 @@ pub fn encode_server_message(msg: &ServerMessage) -> Result<Vec<u8>, String> {
             map.push((
                 Value::String("crafting_order_stats".into()),
                 Value::Map(co_stats_map),
+            ));
+            map.push((
+                Value::String("seconds_until_reset".into()),
+                Value::Integer((*seconds_until_reset).into()),
+            ));
+            map.push((
+                Value::String("daily_contracts_completed".into()),
+                Value::Integer((*daily_contracts_completed as i64).into()),
+            ));
+            map.push((
+                Value::String("daily_contract_limit".into()),
+                Value::Integer((*daily_contract_limit as i64).into()),
             ));
 
             Value::Map(map)

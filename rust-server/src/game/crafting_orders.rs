@@ -548,9 +548,12 @@ impl GameRoom {
             tracing::warn!("Failed to increment crafting order stats: {}", e);
         }
 
-        // 9. Remove active order from DB
+        // 9. Remove active order and remove from available pool (prevent re-acceptance)
         if let Err(e) = db.remove_active_order(character_id).await {
             tracing::error!("Failed to remove active crafting order: {}", e);
+        }
+        if let Err(e) = db.remove_available_order(character_id, &active_order_id).await {
+            tracing::warn!("Failed to remove completed order from available pool: {}", e);
         }
 
         // Send inventory update
