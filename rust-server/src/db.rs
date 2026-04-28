@@ -481,6 +481,16 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Daily contract limit columns
+        sqlx::query("ALTER TABLE resource_contract_stats ADD COLUMN daily_completed INTEGER NOT NULL DEFAULT 0")
+            .execute(pool)
+            .await
+            .ok();
+        sqlx::query("ALTER TABLE resource_contract_stats ADD COLUMN daily_date TEXT NOT NULL DEFAULT ''")
+            .execute(pool)
+            .await
+            .ok();
+
         // Friendships table - for friend system
         sqlx::query(
             r#"
@@ -2150,6 +2160,60 @@ impl Database {
         .bind(xp_earned)
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+
+    /// Get today's contract completion count for a player. Resets if the date has changed.
+    pub async fn get_daily_contracts_completed(
+        &self,
+        player_id: &str,
+        today: &str,
+    ) -> Result<i32, sqlx::Error> {
+        let row: Option<(i32, String)> = sqlx::query_as(
+            "SELECT daily_completed, daily_date FROM resource_contract_stats WHERE player_id = ?",
+        )
+        .bind(player_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(match row {
+            Some((count, date)) if date == today => count,
+            _ => 0,
+        })
+    }
+
+    /// Increment today's contract completion count. Resets if the date has changed.
+    pub async fn increment_daily_contracts(
+        &self,
+        player_id: &str,
+        today: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE resource_contract_stats
+            SET daily_completed = CASE WHEN daily_date = ? THEN daily_completed + 1 ELSE 1 END,
+                daily_date = ?
+            WHERE player_id = ?
+            "#,
+        )
+        .bind(today)
+        .bind(today)
+        .bind(player_id)
+        .execute(&self.pool)
+        .await?;
+
+        // If no row existed, the UPDATE affected 0 rows — insert a new one
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO resource_contract_stats (player_id, daily_completed, daily_date)
+            VALUES (?, 1, ?)
+            "#,
+        )
+        .bind(player_id)
+        .bind(today)
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 

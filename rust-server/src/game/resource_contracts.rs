@@ -9,6 +9,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 const ADVENTURE_BOARD_NAME: &str = "Adventure Board";
+const DAILY_CONTRACT_LIMIT: i32 = 5;
 
 enum ClaimContractStatus {
     Ready {
@@ -689,6 +690,21 @@ impl GameRoom {
             }
         }
 
+        // Check daily contract limit
+        if let Some(ref db) = self.db {
+            let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+            if let Ok(daily_count) = db.get_daily_contracts_completed(player_id, &today).await {
+                if daily_count >= DAILY_CONTRACT_LIMIT {
+                    self.send_system_message(
+                        player_id,
+                        &format!("You've reached your daily contract limit ({}/{}).", daily_count, DAILY_CONTRACT_LIMIT),
+                    )
+                    .await;
+                    return;
+                }
+            }
+        }
+
         let Some(player_level) = self.player_skill_level_for_contract(player_id, kind).await else {
             return;
         };
@@ -808,6 +824,21 @@ impl GameRoom {
                 )
                 .await;
                 return;
+            }
+        }
+
+        // Check daily contract limit
+        if let Some(ref db) = self.db {
+            let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+            if let Ok(daily_count) = db.get_daily_contracts_completed(player_id, &today).await {
+                if daily_count >= DAILY_CONTRACT_LIMIT {
+                    self.send_system_message(
+                        player_id,
+                        &format!("You've reached your daily contract limit ({}/{}).", daily_count, DAILY_CONTRACT_LIMIT),
+                    )
+                    .await;
+                    return;
+                }
             }
         }
 
@@ -1045,6 +1076,10 @@ impl GameRoom {
                 .await
             {
                 tracing::warn!("Failed to record resource contract totals: {}", e);
+            }
+            let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+            if let Err(e) = db.increment_daily_contracts(player_id, &today).await {
+                tracing::warn!("Failed to increment daily contract count: {}", e);
             }
         }
 
