@@ -53,7 +53,7 @@ pub const PRESTIGE_SHOP: &[PrestigeShopItem] = &[
     PrestigeShopItem {
         id: "buy_cape",
         display: "Artisan's Cape",
-        cost: 50,
+        cost: 100,
         item_type: PrestigeItemType::Equipment("artisan_cape"),
     },
 ];
