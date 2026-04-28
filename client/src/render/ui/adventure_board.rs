@@ -963,9 +963,16 @@ impl Renderer {
 
         if board.crafting_orders.is_empty() {
             self.draw_text_sharp(
-                "No orders available.",
+                "No orders left for today.",
                 left_x + 12.0 * s,
                 left_y + 30.0 * s,
+                16.0,
+                TEXT_DIM,
+            );
+            self.draw_text_sharp(
+                "Check back tomorrow!",
+                left_x + 12.0 * s,
+                left_y + 50.0 * s,
                 16.0,
                 TEXT_DIM,
             );

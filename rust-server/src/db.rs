@@ -783,6 +783,19 @@ impl Database {
         .execute(pool)
         .await?;
 
+        // Crafting orders - tracks which date orders were last generated per player
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS crafting_orders_generation (
+                character_id INTEGER PRIMARY KEY,
+                generated_date TEXT NOT NULL,
+                FOREIGN KEY(character_id) REFERENCES characters(id)
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
         // Crafting orders - currently active order per player
         sqlx::query(
             r#"
@@ -2868,6 +2881,34 @@ impl Database {
             .await?;
         }
         tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn get_orders_generated_date(
+        &self,
+        character_id: i64,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT generated_date FROM crafting_orders_generation WHERE character_id = ?",
+        )
+        .bind(character_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(d,)| d))
+    }
+
+    pub async fn set_orders_generated_date(
+        &self,
+        character_id: i64,
+        date: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT OR REPLACE INTO crafting_orders_generation (character_id, generated_date) VALUES (?, ?)",
+        )
+        .bind(character_id)
+        .bind(date)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 

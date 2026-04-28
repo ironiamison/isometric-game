@@ -293,17 +293,28 @@ impl GameRoom {
         if let (Some(db), Some(char_id)) = (&self.db, character_id) {
             // Get or generate daily orders
             let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-            let order_ids = match db.get_available_orders(char_id, &today).await {
-                Ok(ids) if !ids.is_empty() => ids,
-                _ => {
-                    let new_ids = self
-                        .crafting_order_registry
-                        .generate_daily_orders(&skills_map);
-                    if let Err(e) = db.save_available_orders(char_id, &today, &new_ids).await {
-                        tracing::warn!("Failed to save daily crafting orders: {}", e);
-                    }
-                    new_ids
+            let already_generated = db
+                .get_orders_generated_date(char_id)
+                .await
+                .ok()
+                .flatten()
+                .map_or(false, |d| d == today);
+
+            let order_ids = if already_generated {
+                // Orders were already generated today — return whatever remains (may be empty)
+                db.get_available_orders(char_id, &today).await.unwrap_or_default()
+            } else {
+                // New day or first time — generate fresh orders
+                let new_ids = self
+                    .crafting_order_registry
+                    .generate_daily_orders(&skills_map);
+                if let Err(e) = db.save_available_orders(char_id, &today, &new_ids).await {
+                    tracing::warn!("Failed to save daily crafting orders: {}", e);
                 }
+                if let Err(e) = db.set_orders_generated_date(char_id, &today).await {
+                    tracing::warn!("Failed to save orders generation date: {}", e);
+                }
+                new_ids
             };
 
             // Map order IDs to CraftingOrderOfferData
