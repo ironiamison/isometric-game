@@ -55,17 +55,45 @@ impl Renderer {
         self.draw_panel_frame(panel_x, panel_y, panel_w, panel_h);
         self.draw_corner_accents(panel_x, panel_y, panel_w, panel_h);
 
-        // ===== TITLE =====
+        // ===== HEADER ROW =====
+        let header_h = 36.0 * s;
+        let header_y = panel_y + 6.0 * s;
+        let header_center_y = header_y + header_h * 0.5;
+
+        // Title (left)
         self.draw_text_sharp(
             "ADVENTURE BOARD",
             panel_x + 18.0 * s,
-            panel_y + 28.0 * s,
+            header_center_y + 5.0 * s,
             16.0,
             TEXT_TITLE,
         );
 
-        // ===== DAILY INFO (right-aligned) =====
-        // Calculate time until midnight UTC client-side
+        // Close button (right, same style as shop/crafting)
+        let close_btn_size = 22.0 * s;
+        let close_btn_x = panel_x + panel_w - close_btn_size - 10.0 * s;
+        let close_btn_y = header_center_y - close_btn_size * 0.5;
+        let close_bounds = Rect::new(close_btn_x, close_btn_y, close_btn_size, close_btn_size);
+        layout.add(UiElementId::DialogueClose, close_bounds);
+        let close_hovered = matches!(hovered, Some(UiElementId::DialogueClose));
+        let (close_bg, close_border) = if close_hovered {
+            (
+                Color::new(0.4, 0.15, 0.15, 1.0),
+                Color::new(0.6, 0.2, 0.2, 1.0),
+            )
+        } else {
+            (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
+        };
+        draw_rectangle(close_btn_x, close_btn_y, close_btn_size, close_btn_size, close_border);
+        draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_size - 2.0, close_btn_size - 2.0, close_bg);
+        let cx = close_btn_x + close_btn_size / 2.0;
+        let cy = close_btn_y + close_btn_size / 2.0;
+        let cross = close_btn_size * 0.25;
+        let cross_color = if close_hovered { TEXT_TITLE } else { TEXT_DIM };
+        draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
+        draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
+
+        // Daily info (right, before close button, vertically centered)
         let now_secs = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -81,48 +109,10 @@ impl Renderer {
         let reset_w = self.measure_text_sharp(&reset_text, 16.0).width;
         self.draw_text_sharp(
             &reset_text,
-            panel_x + panel_w - reset_w - 36.0 * s,
-            panel_y + 28.0 * s,
+            close_btn_x - reset_w - 10.0 * s,
+            header_center_y + 5.0 * s,
             16.0,
             TEXT_DIM,
-        );
-
-        // ===== CLOSE BUTTON =====
-        let close_w = 20.0 * s;
-        let close_h = 16.0 * s;
-        let close_x = panel_x + panel_w - 32.0 * s;
-        let close_y = panel_y + 8.0 * s;
-        let close_bounds = Rect::new(close_x, close_y, close_w, close_h);
-        layout.add(UiElementId::DialogueClose, close_bounds);
-        let close_hovered = matches!(hovered, Some(UiElementId::DialogueClose));
-        draw_rectangle(
-            close_x,
-            close_y,
-            close_w,
-            close_h,
-            if close_hovered {
-                SLOT_SELECTED_BORDER
-            } else {
-                FRAME_MID
-            },
-        );
-        draw_rectangle(
-            close_x + 1.0,
-            close_y + 1.0,
-            close_w - 2.0,
-            close_h - 2.0,
-            if close_hovered {
-                SLOT_HOVER_BG
-            } else {
-                SLOT_BG_EMPTY
-            },
-        );
-        self.draw_text_sharp(
-            "X",
-            close_x + close_w * 0.35,
-            close_y + close_h * 0.75,
-            16.0,
-            if close_hovered { TEXT_TITLE } else { TEXT_DIM },
         );
 
         // ===== TAB BAR =====
