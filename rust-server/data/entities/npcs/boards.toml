@@ -5,7 +5,6 @@ display_name = "Adventure Board"
 sprite = "arena_board"
 animation_type = "static"
 description = "A weathered board covered in pinned jobs for gatherers and adventurers."
-no_shadow = true
 
 [adventure_board.stats]
 max_hp = 9999
@@ -25,3 +24,4 @@ gold_max = 0
 [adventure_board.behaviors]
 hostile = false
 friendly = true
+no_shadow = true
