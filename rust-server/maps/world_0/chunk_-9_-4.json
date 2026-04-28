@@ -3091,6 +3091,11 @@
       "entityId": "rock_golem",
       "x": 10,
       "y": 21
+    },
+    {
+      "entityId": "wurm_battle_master",
+      "x": 30,
+      "y": 0
     }
   ],
   "mapObjects": [
