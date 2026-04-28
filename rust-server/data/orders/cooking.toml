@@ -78,28 +78,28 @@ cooking = 800
 id = "masterwork_lobster_feast"
 tier = "masterwork"
 skill = "cooking"
-min_level = 25
-items = [{ id = "cooked_lobster", quantity = 12 }]
+min_level = 50
+items = [{ id = "cooked_lobster", quantity = 18 }]
 
 [orders.rewards]
-gold = 1500
-marks = 2
+gold = 2500
+marks = 3
 
 [orders.rewards.xp]
-fishing = 500
-cooking = 800
+fishing = 750
+cooking = 1200
 
 [[orders]]
 id = "masterwork_swordfish_banquet"
 tier = "masterwork"
 skill = "cooking"
-min_level = 35
-items = [{ id = "cooked_swordfish", quantity = 10 }]
+min_level = 50
+items = [{ id = "cooked_swordfish", quantity = 15 }]
 
 [orders.rewards]
-gold = 2500
-marks = 2
+gold = 4000
+marks = 3
 
 [orders.rewards.xp]
-fishing = 700
-cooking = 1000
+fishing = 1050
+cooking = 1500

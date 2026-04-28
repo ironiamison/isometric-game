@@ -78,28 +78,28 @@ leatherworking = 550
 id = "masterwork_bowstrings_and_boots"
 tier = "masterwork"
 skill = "leatherworking"
-min_level = 5
-items = [{ id = "bowstring", quantity = 10 }, { id = "leather_boots", quantity = 3 }]
+min_level = 50
+items = [{ id = "bowstring", quantity = 15 }, { id = "leather_boots", quantity = 5 }]
 
 [orders.rewards]
-gold = 1000
-marks = 2
+gold = 1500
+marks = 3
 
 [orders.rewards.xp]
-leatherworking = 600
-fletching = 400
+leatherworking = 900
+fletching = 600
 
 [[orders]]
 id = "masterwork_leather_armor_set"
 tier = "masterwork"
 skill = "leatherworking"
-min_level = 11
-items = [{ id = "leather_body", quantity = 2 }, { id = "leather_hat", quantity = 2 }, { id = "leather_boots", quantity = 2 }]
+min_level = 50
+items = [{ id = "leather_body", quantity = 3 }, { id = "leather_hat", quantity = 3 }, { id = "leather_boots", quantity = 3 }]
 
 [orders.rewards]
-gold = 2000
-marks = 2
+gold = 3000
+marks = 3
 
 [orders.rewards.xp]
-leatherworking = 900
-gathering = 600
+leatherworking = 1350
+gathering = 900

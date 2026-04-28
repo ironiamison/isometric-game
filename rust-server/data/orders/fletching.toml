@@ -78,29 +78,29 @@ fletching = 700
 id = "masterwork_yew_bows"
 tier = "masterwork"
 skill = "fletching"
-min_level = 35
-items = [{ id = "yew_bow", quantity = 3 }]
+min_level = 50
+items = [{ id = "yew_bow", quantity = 5 }]
 
 [orders.rewards]
-gold = 2000
-marks = 2
+gold = 3000
+marks = 3
 
 [orders.rewards.xp]
-woodcutting = 500
-fletching = 1000
+woodcutting = 750
+fletching = 1500
 
 [[orders]]
 id = "masterwork_mithril_arrows"
 tier = "masterwork"
 skill = "fletching"
-min_level = 45
-items = [{ id = "mithril_arrow", quantity = 75 }]
+min_level = 50
+items = [{ id = "mithril_arrow", quantity = 90 }]
 
 [orders.rewards]
-gold = 3500
-marks = 4
+gold = 4000
+marks = 5
 
 [orders.rewards.xp]
-woodcutting = 400
-smithing = 600
-fletching = 1000
+woodcutting = 500
+smithing = 700
+fletching = 1200

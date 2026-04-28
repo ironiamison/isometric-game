@@ -78,16 +78,16 @@ alchemy = 800
 id = "masterwork_scroll_greater_healing"
 tier = "masterwork"
 skill = "alchemy"
-min_level = 25
-items = [{ id = "scroll_greater_healing", quantity = 3 }]
+min_level = 50
+items = [{ id = "scroll_greater_healing", quantity = 5 }]
 
 [orders.rewards]
-gold = 1200
-marks = 2
+gold = 2000
+marks = 3
 
 [orders.rewards.xp]
-alchemy = 600
-gathering = 400
+alchemy = 900
+gathering = 600
 
 [[orders]]
 id = "masterwork_super_defence_potions"

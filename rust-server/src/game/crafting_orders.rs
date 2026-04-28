@@ -116,8 +116,8 @@ impl CraftingOrderRegistry {
             return Vec::new();
         }
 
-        // Check if player has 40+ in any skill (masterwork eligibility)
-        let has_masterwork_eligible_skill = player_skills.values().any(|&level| level >= 40);
+        // Check if player has 50+ in any skill (masterwork eligibility)
+        let has_masterwork_eligible_skill = player_skills.values().any(|&level| level >= 50);
 
         // Separate into regular and masterwork pools
         let regular: Vec<&OrderTemplate> =
@@ -479,7 +479,7 @@ impl GameRoom {
             player.inventory.gold += template.rewards.gold;
 
             // 5b. Grant reward crate
-            let bracket = if template.min_level >= 40 {
+            let bracket = if template.min_level >= 50 {
                 "high"
             } else if template.min_level >= 20 {
                 "mid"

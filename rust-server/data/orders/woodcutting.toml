@@ -64,28 +64,28 @@ woodcutting = 800
 id = "masterwork_willow_bows"
 tier = "masterwork"
 skill = "woodcutting"
-min_level = 15
-items = [{ id = "willow_bow", quantity = 5 }]
+min_level = 50
+items = [{ id = "willow_bow", quantity = 8 }]
 
 [orders.rewards]
-gold = 1200
-marks = 2
+gold = 2000
+marks = 3
 
 [orders.rewards.xp]
-woodcutting = 500
-fletching = 700
+woodcutting = 750
+fletching = 1050
 
 [[orders]]
 id = "masterwork_arrow_shafts_and_bows"
 tier = "masterwork"
 skill = "woodcutting"
-min_level = 35
-items = [{ id = "yew_bow", quantity = 2 }, { id = "arrow_shaft", quantity = 60 }]
+min_level = 50
+items = [{ id = "yew_bow", quantity = 3 }, { id = "arrow_shaft", quantity = 90 }]
 
 [orders.rewards]
-gold = 2500
-marks = 2
+gold = 4000
+marks = 3
 
 [orders.rewards.xp]
-woodcutting = 700
-fletching = 900
+woodcutting = 1050
+fletching = 1350
