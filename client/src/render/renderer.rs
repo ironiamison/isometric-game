@@ -5441,13 +5441,9 @@ impl Renderer {
 
             let combat_level = player.combat_level();
             let level_text = format!(" (Lvl {})", combat_level);
-            let title_text = player.title.as_ref().map(|t| format!(" ({})", t)).unwrap_or_default();
+            let has_title = player.title.is_some();
+            let title_text = player.title.as_deref().unwrap_or("");
             let name_width = self.measure_text_sharp(&player.name, font_size).width;
-            let title_width = if title_text.is_empty() {
-                0.0
-            } else {
-                self.measure_text_sharp(&title_text, font_size).width
-            };
             let level_width = self.measure_text_sharp(&level_text, font_size).width - 2.0 * zoom;
             let is_top_player =
                 state.top_level_player_name.as_deref() == Some(player.name.as_str());
@@ -5461,31 +5457,56 @@ impl Renderer {
             } else {
                 0.0
             };
-            let total_width = trophy_width + name_width + title_width + level_width;
-            let name_x = screen_x - total_width / 2.0;
+
+            // Title row (above name): centered independently
+            let title_width = if has_title {
+                self.measure_text_sharp(title_text, font_size).width
+            } else {
+                0.0
+            };
+            let row_height = 16.0 * zoom;
+            let title_row_offset = if has_title { row_height } else { 0.0 };
+
+            // Name row: trophy + name + level
+            let name_row_width = trophy_width + name_width + level_width;
+            let name_x = screen_x - name_row_width / 2.0;
             let name_y = screen_y - name_y_offset + 2.0 * zoom;
 
             let padding = 4.0 * zoom;
-            let bar_height = 18.0 * zoom;
+            let bar_height = if has_title { 18.0 * zoom + title_row_offset } else { 18.0 * zoom };
+            let bg_width = name_row_width.max(title_width);
+            let bg_x = screen_x - bg_width / 2.0;
+            let bg_top = name_y - 14.0 * zoom - title_row_offset;
             draw_rectangle(
-                name_x - padding,
-                name_y - 14.0 * zoom,
-                total_width + padding * 2.0,
+                bg_x - padding,
+                bg_top,
+                bg_width + padding * 2.0,
                 bar_height,
                 Color::from_rgba(0, 0, 0, 180),
             );
 
+            // Draw title above name
+            if has_title {
+                let title_color = Color::from_rgba(255, 215, 100, 255);
+                let title_x = screen_x - title_width / 2.0;
+                self.draw_text_sharp(
+                    title_text,
+                    title_x,
+                    name_y - title_row_offset,
+                    font_size,
+                    title_color,
+                );
+            }
+
             // Draw trophy icon: gold for #1, silver for #2
             if has_trophy {
                 if let Some(ref texture) = self.ui_icons {
-                    // Row 3 (1-indexed): col 1 = silver trophy, col 2 = gold trophy
                     let src_rect = if is_top_player {
                         Rect::new(24.0, 48.0, 24.0, 24.0)
                     } else {
                         Rect::new(0.0, 48.0, 24.0, 24.0)
                     };
-                    let bar_top = name_y - 14.0 * zoom;
-                    let icon_y = bar_top + (bar_height - trophy_icon_size) / 2.0;
+                    let icon_y = (name_y - 14.0 * zoom) + (18.0 * zoom - trophy_icon_size) / 2.0;
                     draw_texture_ex(
                         texture,
                         name_x,
@@ -5507,20 +5528,10 @@ impl Renderer {
                 font_size,
                 WHITE,
             );
-            if !title_text.is_empty() {
-                let title_color = Color::from_rgba(255, 215, 100, 255);
-                self.draw_text_sharp(
-                    &title_text,
-                    name_x + trophy_width + name_width,
-                    name_y,
-                    font_size,
-                    title_color,
-                );
-            }
             let level_color = Color::from_rgba(180, 220, 255, 255);
             self.draw_text_sharp(
                 &level_text,
-                name_x + trophy_width + name_width + title_width,
+                name_x + trophy_width + name_width,
                 name_y,
                 font_size,
                 level_color,

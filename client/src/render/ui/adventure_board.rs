@@ -1213,6 +1213,7 @@ impl Renderer {
                 1.0,
                 HEADER_BORDER,
             );
+            item_y += 8.0 * s;
             self.draw_text_sharp("Rewards:", right_x + 12.0 * s, item_y + 4.0 * s, 16.0, TEXT_NORMAL);
             item_y += 22.0 * s;
 

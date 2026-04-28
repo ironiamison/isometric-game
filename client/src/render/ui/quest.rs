@@ -1080,8 +1080,8 @@ impl Renderer {
         y += line_height;
 
         let title = format!(
-            "{} ({} {})",
-            contract.task_text, contract.difficulty, contract.contract_kind
+            "{} ({})",
+            contract.task_text, contract.difficulty
         );
         for line in self.wrap_text(&title, max_width, 16.0).iter().take(3) {
             self.draw_text_sharp(line, x, y, 16.0, WHITE);
