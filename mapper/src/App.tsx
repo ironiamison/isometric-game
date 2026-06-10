@@ -17,9 +17,11 @@ import { EntityPanel } from '@/components/EntityPanel';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { NotesPanel } from '@/components/NotesPanel';
 import { AssetManager } from '@/components/AssetManager';
+import { ContentStudio } from '@/components/ContentStudio';
 import './App.css';
 
 function App() {
+  const [workspaceMode, setWorkspaceMode] = useState<'map' | 'content'>('map');
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(250);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(250);
   const [tilePaletteHeight, setTilePaletteHeight] = useState(200);
@@ -334,6 +336,10 @@ function App() {
     );
   }
 
+  if (workspaceMode === 'content') {
+    return <ContentStudio onOpenMap={() => setWorkspaceMode('map')} />;
+  }
+
   const paletteSidebar = (
     <>
       <div style={{ height: tilePaletteHeight, flexShrink: 0, overflow: 'hidden' }}>
@@ -380,7 +386,7 @@ function App() {
 
   return (
     <div className="app">
-      <MenuBar />
+      <MenuBar onOpenContentStudio={() => setWorkspaceMode('content')} />
       <div className="main">
         <Toolbar />
         {/* Left sidebar */}

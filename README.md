@@ -68,6 +68,29 @@ rustup target add wasm32-unknown-unknown
 cargo build --target wasm32-unknown-unknown --profile release-wasm
 ```
 
+### Mapper and Content Studio
+
+Run the mapper API and frontend in separate terminals:
+
+```bash
+cd mapper/server
+npm install
+npm run dev
+```
+
+```bash
+cd mapper
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173/mapper/`, then select **Content Studio**. It provides:
+
+- Structured item, enemy, and attack/spell editors backed by the server TOML files
+- Balance tables using the game's combat formulas
+- Cross-file item, loot, entity-spawn, and map validation
+- A chunk-region generator for solid, checker, or noise-pattern terrain
+
 ## License
 
 All rights reserved.

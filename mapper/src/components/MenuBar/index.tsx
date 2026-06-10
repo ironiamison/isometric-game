@@ -8,7 +8,7 @@ import { storage } from '@/core/Storage';
 import { interiorStorage } from '@/core/InteriorStorage';
 import styles from './MenuBar.module.css';
 
-export function MenuBar() {
+export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => void }) {
   const [showNewInteriorModal, setShowNewInteriorModal] = useState(false);
   const [showOpenInteriorModal, setShowOpenInteriorModal] = useState(false);
   const [showResizeInteriorModal, setShowResizeInteriorModal] = useState(false);
@@ -791,6 +791,9 @@ export function MenuBar() {
             </button>
           </div>
         </div>
+        <button className={styles.studioButton} onClick={onOpenContentStudio}>
+          Content Studio
+        </button>
       </div>
 
       <div className={styles.status}>

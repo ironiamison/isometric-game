@@ -415,9 +415,22 @@ impl GameRoom {
         };
 
         let unit_price = shop_price(item_def.base_price, merchant_config.sell_multiplier);
-        let total_cost = unit_price * quantity;
+        let Some(total_cost) = item::checked_gold_total(unit_price, quantity) else {
+            drop(shop_registry);
+            self.send_shop_result(
+                player_id,
+                false,
+                "buy",
+                item_id,
+                0,
+                0,
+                Some("Invalid transaction total"),
+            )
+            .await;
+            return;
+        };
 
-        if player_gold < total_cost {
+        if item::checked_gold_debit(player_gold, total_cost).is_none() {
             drop(shop_registry);
             self.send_shop_result(
                 player_id,
@@ -461,44 +474,78 @@ impl GameRoom {
             }
         }
 
-        stock_item.current_quantity -= quantity;
-        let new_stock = stock_item.current_quantity;
-        drop(shop_registry);
-
         let mut players = self.players.write().await;
-        if let Some(player) = players.get_mut(player_id) {
-            player.inventory.gold -= total_cost;
-            player
-                .inventory
-                .add_item(item_id, quantity, &self.item_registry);
-
-            let inventory_update = player.inventory.to_update();
-            let gold = player.inventory.gold;
+        let Some(player) = players.get_mut(player_id) else {
+            return;
+        };
+        let Some(new_gold) = item::checked_gold_debit(player.inventory.gold, total_cost) else {
             drop(players);
-
-            self.send_shop_result(player_id, true, "buy", item_id, quantity, -total_cost, None)
-                .await;
-            self.send_to_player(
+            drop(shop_registry);
+            self.send_shop_result(
                 player_id,
-                ServerMessage::InventoryUpdate {
-                    player_id: player_id.to_string(),
-                    slots: inventory_update,
-                    gold,
-                },
+                false,
+                "buy",
+                item_id,
+                0,
+                0,
+                Some("Not enough gold"),
             )
             .await;
-            self.broadcast_shop_stock_update(npc_id, item_id, new_stock)
-                .await;
-
-            tracing::info!(
-                "Player {} bought {}x{} from {} for {} gold",
+            return;
+        };
+        if !player
+            .inventory
+            .has_space_for(item_id, quantity, &self.item_registry)
+        {
+            drop(players);
+            drop(shop_registry);
+            self.send_shop_result(
                 player_id,
-                quantity,
+                false,
+                "buy",
                 item_id,
-                npc_id,
-                total_cost
-            );
+                0,
+                0,
+                Some("Inventory full"),
+            )
+            .await;
+            return;
         }
+
+        stock_item.current_quantity -= quantity;
+        let new_stock = stock_item.current_quantity;
+        player.inventory.gold = new_gold;
+        player
+            .inventory
+            .add_item(item_id, quantity, &self.item_registry);
+
+        let inventory_update = player.inventory.to_update();
+        let gold = player.inventory.gold;
+        drop(players);
+        drop(shop_registry);
+
+        self.send_shop_result(player_id, true, "buy", item_id, quantity, -total_cost, None)
+            .await;
+        self.send_to_player(
+            player_id,
+            ServerMessage::InventoryUpdate {
+                player_id: player_id.to_string(),
+                slots: inventory_update,
+                gold,
+            },
+        )
+        .await;
+        self.broadcast_shop_stock_update(npc_id, item_id, new_stock)
+            .await;
+
+        tracing::info!(
+            "Player {} bought {}x{} from {} for {} gold",
+            player_id,
+            quantity,
+            item_id,
+            npc_id,
+            total_cost
+        );
     }
 
     pub async fn handle_shop_sell(
@@ -641,13 +688,39 @@ impl GameRoom {
             return;
         }
 
-        let total_value =
-            shop_price(item_def.base_price, merchant_config.buy_multiplier) * quantity;
+        let unit_price = shop_price(item_def.base_price, merchant_config.buy_multiplier);
+        let Some(total_value) = item::checked_gold_total(unit_price, quantity) else {
+            self.send_shop_result(
+                player_id,
+                false,
+                "sell",
+                item_id,
+                0,
+                0,
+                Some("Invalid transaction total"),
+            )
+            .await;
+            return;
+        };
 
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
+            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, total_value) else {
+                drop(players);
+                self.send_shop_result(
+                    player_id,
+                    false,
+                    "sell",
+                    item_id,
+                    0,
+                    0,
+                    Some("Gold limit reached"),
+                )
+                .await;
+                return;
+            };
             player.inventory.remove_item(item_id, quantity);
-            player.inventory.gold += total_value;
+            player.inventory.gold = new_gold;
 
             let inventory_update = player.inventory.to_update();
             let gold = player.inventory.gold;

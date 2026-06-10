@@ -259,8 +259,9 @@ impl Renderer {
 
         // Selected item info
         let selected_item = browse.items.get(state.ui_state.stall_browse_selected);
-        let total_price =
-            selected_item.map_or(0, |item| item.price * state.ui_state.stall_buy_quantity);
+        let total_price = selected_item
+            .and_then(|item| item.price.checked_mul(state.ui_state.stall_buy_quantity))
+            .unwrap_or(i32::MAX);
         let can_afford =
             state.inventory.gold >= total_price && selected_item.is_some() && total_price > 0;
 

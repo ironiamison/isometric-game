@@ -1,4 +1,5 @@
 use super::GameRoom;
+use crate::item;
 use crate::koth::{KothEvent, KothState};
 use crate::npc::Npc;
 use crate::protocol::{KothRewardData, ServerMessage};
@@ -389,9 +390,13 @@ impl GameRoom {
     pub(crate) async fn grant_item_to_player(&self, player_id: &str, item_id: &str, quantity: u32) {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
+            let Ok(quantity) = i32::try_from(quantity) else {
+                tracing::error!("Discarding oversized item reward for {}", item_id);
+                return;
+            };
             player
                 .inventory
-                .add_item(item_id, quantity as i32, &self.item_registry);
+                .add_item(item_id, quantity, &self.item_registry);
         }
     }
 
@@ -485,7 +490,15 @@ impl GameRoom {
 
         for (item_id, quantity) in &rewards {
             if item_id == "gold_coins" {
-                total_gold += *quantity as i32;
+                let Ok(quantity) = i32::try_from(*quantity) else {
+                    tracing::error!("Discarding oversized KOTH gold reward: {}", quantity);
+                    continue;
+                };
+                let Some(new_total) = item::checked_gold_credit(total_gold, quantity) else {
+                    tracing::error!("Discarding KOTH gold rewards above the currency cap");
+                    continue;
+                };
+                total_gold = new_total;
             } else {
                 self.grant_item_to_player(player_id, item_id, *quantity)
                     .await;
@@ -496,7 +509,13 @@ impl GameRoom {
         if total_gold > 0 {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                player.inventory.gold += total_gold;
+                if let Some(new_gold) =
+                    item::checked_gold_credit(player.inventory.gold, total_gold)
+                {
+                    player.inventory.gold = new_gold;
+                } else {
+                    tracing::error!("Player {} cannot receive KOTH gold at cap", player_id);
+                }
             }
         }
 

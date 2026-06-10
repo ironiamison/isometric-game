@@ -198,7 +198,7 @@ impl GameRoom {
         quantity: i32,
         price: i32,
     ) {
-        if quantity <= 0 || price < 0 {
+        if quantity <= 0 || price <= 0 {
             return;
         }
 
@@ -323,7 +323,7 @@ impl GameRoom {
     }
 
     pub async fn handle_stall_update_price(&self, player_id: &str, stall_slot: u8, price: i32) {
-        if price < 0 {
+        if price <= 0 {
             return;
         }
 
@@ -381,8 +381,9 @@ impl GameRoom {
         seller_id: &str,
         stall_slot: u8,
         quantity: i32,
+        expected_price: i32,
     ) {
-        if quantity <= 0 {
+        if quantity <= 0 || buyer_id == seller_id {
             return;
         }
 
@@ -430,14 +431,45 @@ impl GameRoom {
         };
 
         let buy_qty = quantity.min(available_qty);
-        let total_price = price_per * buy_qty;
+        if price_per != expected_price {
+            drop(players);
+            self.send_to_player(
+                buyer_id,
+                ServerMessage::StallBuyResult {
+                    success: false,
+                    item_id: item_id.clone(),
+                    quantity: buy_qty,
+                    total_price: 0,
+                    error: Some("The listing price changed. Review it and try again.".to_string()),
+                },
+            )
+            .await;
+            return;
+        }
+
+        let Some(total_price) = item::checked_gold_total(price_per, buy_qty) else {
+            drop(players);
+            self.send_to_player(
+                buyer_id,
+                ServerMessage::StallBuyResult {
+                    success: false,
+                    item_id: item_id.clone(),
+                    quantity: buy_qty,
+                    total_price: 0,
+                    error: Some("Invalid listing total.".to_string()),
+                },
+            )
+            .await;
+            return;
+        };
 
         let buyer = match players.get(buyer_id) {
             Some(p) if p.active => p,
             _ => return,
         };
 
-        if buyer.inventory.gold < total_price {
+        let Some(new_buyer_gold) = item::checked_gold_debit(buyer.inventory.gold, total_price)
+        else {
             drop(players);
             self.send_to_player(
                 buyer_id,
@@ -451,7 +483,27 @@ impl GameRoom {
             )
             .await;
             return;
-        }
+        };
+
+        let seller_gold = players
+            .get(seller_id)
+            .map(|seller| seller.inventory.gold)
+            .unwrap_or(-1);
+        let Some(new_seller_gold) = item::checked_gold_credit(seller_gold, total_price) else {
+            drop(players);
+            self.send_to_player(
+                buyer_id,
+                ServerMessage::StallBuyResult {
+                    success: false,
+                    item_id: item_id.clone(),
+                    quantity: buy_qty,
+                    total_price,
+                    error: Some("Seller cannot receive that much gold.".to_string()),
+                },
+            )
+            .await;
+            return;
+        };
 
         if !buyer.inventory.has_space_for(&item_id, buy_qty, &registry) {
             drop(players);
@@ -478,11 +530,11 @@ impl GameRoom {
                     }
                 }
             }
-            seller.inventory.gold += total_price;
+            seller.inventory.gold = new_seller_gold;
         }
 
         if let Some(buyer) = players.get_mut(buyer_id) {
-            buyer.inventory.gold -= total_price;
+            buyer.inventory.gold = new_buyer_gold;
             buyer.inventory.add_item(&item_id, buy_qty, &registry);
         }
 

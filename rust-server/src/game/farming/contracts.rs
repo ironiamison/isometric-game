@@ -3,6 +3,7 @@ use crate::protocol::DialogueChoice;
 
 enum ClaimContractStatus {
     Ready {
+        contract: crate::farming::FarmingContract,
         xp_reward: i64,
         gold_reward: i32,
         seed_count: i32,
@@ -239,26 +240,33 @@ impl GameRoom {
 
     pub(in crate::game) async fn handle_claim_contract(&self, player_id: &str) {
         let contract_status = {
-            let farming = self.farming.read().await;
+            let mut farming = self.farming.write().await;
             match farming.get_contract(player_id) {
-                Some(contract) if contract.is_complete() => ClaimContractStatus::Ready {
-                    xp_reward: contract.difficulty.xp_reward(),
-                    gold_reward: contract.difficulty.gold_reward(),
-                    seed_count: contract.difficulty.seed_reward_count(),
-                    diff_name: contract.difficulty.display_name().to_string(),
-                },
+                Some(contract) if contract.is_complete() => {
+                    let contract = farming
+                        .remove_contract(player_id)
+                        .expect("completed farming contract disappeared while locked");
+                    ClaimContractStatus::Ready {
+                        xp_reward: contract.difficulty.xp_reward(),
+                        gold_reward: contract.difficulty.gold_reward(),
+                        seed_count: contract.difficulty.seed_reward_count(),
+                        diff_name: contract.difficulty.display_name().to_string(),
+                        contract,
+                    }
+                }
                 Some(_) => ClaimContractStatus::Incomplete,
                 None => ClaimContractStatus::Missing,
             }
         };
 
-        let (xp_reward, gold_reward, seed_count, diff_name) = match contract_status {
+        let (contract, xp_reward, gold_reward, seed_count, diff_name) = match contract_status {
             ClaimContractStatus::Ready {
+                contract,
                 xp_reward,
                 gold_reward,
                 seed_count,
                 diff_name,
-            } => (xp_reward, gold_reward, seed_count, diff_name),
+            } => (contract, xp_reward, gold_reward, seed_count, diff_name),
             ClaimContractStatus::Incomplete => {
                 self.send_system_message(player_id, "Your contract isn't complete yet.")
                     .await;
@@ -275,10 +283,22 @@ impl GameRoom {
             let farming = self.farming.read().await;
             let mut players = self.players.write().await;
             let Some(player) = players.get_mut(player_id) else {
+                drop(players);
+                drop(farming);
+                let mut farming = self.farming.write().await;
+                farming.insert_contract(player_id, contract);
                 return;
             };
 
-            player.inventory.gold += gold_reward;
+            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, gold_reward) else {
+                drop(players);
+                drop(farming);
+                let mut farming = self.farming.write().await;
+                farming.insert_contract(player_id, contract);
+                self.send_system_message(player_id, "Gold limit reached.").await;
+                return;
+            };
+            player.inventory.gold = new_gold;
 
             let mut seed_names = Vec::new();
             for _ in 0..seed_count {
@@ -305,15 +325,6 @@ impl GameRoom {
                 seed_names,
             )
         };
-
-        {
-            let mut farming = self.farming.write().await;
-            if farming.remove_contract(player_id).is_none() {
-                self.send_system_message(player_id, "You don't have an active contract.")
-                    .await;
-                return;
-            }
-        }
 
         if let Some(ref db) = self.db {
             if let Err(e) = db.delete_farming_contract(player_id).await {

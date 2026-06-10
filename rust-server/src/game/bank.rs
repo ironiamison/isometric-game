@@ -324,8 +324,22 @@ impl GameRoom {
             return;
         }
 
-        player.inventory.gold -= amount;
-        player.bank.gold += amount;
+        let Some(new_inventory_gold) = item::checked_gold_debit(player.inventory.gold, amount)
+        else {
+            return;
+        };
+        let Some(new_bank_gold) = item::checked_gold_credit(player.bank.gold, amount) else {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "depositGold".to_string(),
+                error: Some("Bank gold limit reached.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        };
+        player.inventory.gold = new_inventory_gold;
+        player.bank.gold = new_bank_gold;
 
         let inv_msg = inventory_update_message(player_id, &player.inventory);
         let bank_msg = bank_update_message(&player.bank);
@@ -357,8 +371,22 @@ impl GameRoom {
             return;
         }
 
-        player.bank.gold -= amount;
-        player.inventory.gold += amount;
+        let Some(new_bank_gold) = item::checked_gold_debit(player.bank.gold, amount) else {
+            return;
+        };
+        let Some(new_inventory_gold) = item::checked_gold_credit(player.inventory.gold, amount)
+        else {
+            let msg = ServerMessage::BankResult {
+                success: false,
+                action: "withdrawGold".to_string(),
+                error: Some("Inventory gold limit reached.".to_string()),
+            };
+            drop(players);
+            self.send_to_player(player_id, msg).await;
+            return;
+        };
+        player.bank.gold = new_bank_gold;
+        player.inventory.gold = new_inventory_gold;
 
         let inv_msg = inventory_update_message(player_id, &player.inventory);
         let bank_msg = bank_update_message(&player.bank);

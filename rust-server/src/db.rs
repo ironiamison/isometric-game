@@ -881,20 +881,15 @@ impl Database {
         player_id: &str,
     ) -> Result<Vec<(String, u32)>, sqlx::Error> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT item_id, quantity FROM koth_pending_rewards WHERE player_id = ?",
+            "DELETE FROM koth_pending_rewards WHERE player_id = ? RETURNING item_id, quantity",
         )
         .bind(player_id)
         .fetch_all(&self.pool)
         .await?;
 
-        sqlx::query("DELETE FROM koth_pending_rewards WHERE player_id = ?")
-            .bind(player_id)
-            .execute(&self.pool)
-            .await?;
-
         Ok(rows
             .into_iter()
-            .map(|(item_id, qty)| (item_id, qty as u32))
+            .filter_map(|(item_id, qty)| u32::try_from(qty).ok().map(|qty| (item_id, qty)))
             .collect())
     }
 
@@ -940,20 +935,15 @@ impl Database {
         player_id: &str,
     ) -> Result<Vec<(String, u32)>, sqlx::Error> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT item_id, quantity FROM boss_pending_rewards WHERE player_id = ?",
+            "DELETE FROM boss_pending_rewards WHERE player_id = ? RETURNING item_id, quantity",
         )
         .bind(player_id)
         .fetch_all(&self.pool)
         .await?;
 
-        sqlx::query("DELETE FROM boss_pending_rewards WHERE player_id = ?")
-            .bind(player_id)
-            .execute(&self.pool)
-            .await?;
-
         Ok(rows
             .into_iter()
-            .map(|(item_id, qty)| (item_id, qty as u32))
+            .filter_map(|(item_id, qty)| u32::try_from(qty).ok().map(|qty| (item_id, qty)))
             .collect())
     }
 
@@ -2960,6 +2950,19 @@ impl Database {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    pub async fn take_active_order(
+        &self,
+        character_id: i64,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "DELETE FROM crafting_orders_active WHERE character_id = ? RETURNING order_id",
+        )
+        .bind(character_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(order_id,)| order_id))
     }
 
     pub async fn get_crafting_order_stats(

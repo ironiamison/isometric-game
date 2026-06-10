@@ -150,11 +150,11 @@ impl Skill {
 
     /// Add XP to this skill, returning true if leveled up
     pub fn add_xp(&mut self, amount: i64) -> bool {
-        if self.level >= MAX_LEVEL {
+        if self.level >= MAX_LEVEL || amount <= 0 {
             return false;
         }
 
-        self.xp += amount;
+        self.xp = self.xp.saturating_add(amount);
         let new_level = level_for_xp(self.xp).min(MAX_LEVEL);
 
         if new_level > self.level {

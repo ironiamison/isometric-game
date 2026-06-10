@@ -8,6 +8,28 @@ use crate::data::ItemRegistry;
 
 /// Gold item ID - gold is handled specially (stored in inventory.gold field)
 pub const GOLD_ITEM_ID: &str = "gold";
+pub const MAX_GOLD: i32 = i32::MAX;
+
+pub fn checked_gold_total(unit_price: i32, quantity: i32) -> Option<i32> {
+    if unit_price <= 0 || quantity <= 0 {
+        return None;
+    }
+    unit_price.checked_mul(quantity)
+}
+
+pub fn checked_gold_credit(balance: i32, amount: i32) -> Option<i32> {
+    if balance < 0 || amount < 0 {
+        return None;
+    }
+    balance.checked_add(amount).filter(|total| *total <= MAX_GOLD)
+}
+
+pub fn checked_gold_debit(balance: i32, amount: i32) -> Option<i32> {
+    if balance < 0 || amount < 0 {
+        return None;
+    }
+    balance.checked_sub(amount).filter(|total| *total >= 0)
+}
 
 /// Default max stack for unknown items
 pub const DEFAULT_MAX_STACK: i32 = 99;
@@ -48,8 +70,11 @@ impl Inventory {
     pub fn add_item(&mut self, item_id: &str, mut quantity: i32, registry: &ItemRegistry) -> i32 {
         // Gold goes to separate counter
         if item_id == GOLD_ITEM_ID {
-            self.gold += quantity;
-            return 0;
+            if let Some(new_gold) = checked_gold_credit(self.gold, quantity) {
+                self.gold = new_gold;
+                return 0;
+            }
+            return quantity;
         }
 
         let max_stack = registry
@@ -291,8 +316,11 @@ impl Bank {
     /// Each item type occupies exactly one slot with unlimited stacking.
     pub fn add_item(&mut self, item_id: &str, quantity: i32, _registry: &ItemRegistry) -> i32 {
         if item_id == GOLD_ITEM_ID {
-            self.gold += quantity;
-            return 0;
+            if let Some(new_gold) = checked_gold_credit(self.gold, quantity) {
+                self.gold = new_gold;
+                return 0;
+            }
+            return quantity;
         }
 
         // Find existing slot with this item and add to it
@@ -504,5 +532,29 @@ impl From<&GroundItem> for GroundItemUpdate {
             y: item.y,
             quantity: item.quantity,
         }
+    }
+}
+
+#[cfg(test)]
+mod economy_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_reported_stall_total_overflow() {
+        assert_eq!(checked_gold_total(1_610_612_737, 4), None);
+    }
+
+    #[test]
+    fn rejects_credit_above_gold_cap() {
+        assert_eq!(checked_gold_credit(i32::MAX, 1), None);
+        assert_eq!(checked_gold_credit(i32::MAX - 1, 1), Some(i32::MAX));
+    }
+
+    #[test]
+    fn rejects_negative_or_insufficient_balances() {
+        assert_eq!(checked_gold_credit(-1, 1), None);
+        assert_eq!(checked_gold_debit(-1, 1), None);
+        assert_eq!(checked_gold_debit(3, 4), None);
+        assert_eq!(checked_gold_debit(4, 4), Some(0));
     }
 }

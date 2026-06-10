@@ -181,6 +181,10 @@ impl FarmingSystem {
         self.contracts.remove(player_id)
     }
 
+    pub fn insert_contract(&mut self, player_id: &str, contract: FarmingContract) {
+        self.contracts.insert(player_id.to_string(), contract);
+    }
+
     /// Restore a contract from database
     pub fn restore_contract(
         &mut self,

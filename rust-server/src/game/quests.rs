@@ -1,4 +1,5 @@
 use super::GameRoom;
+use crate::item;
 use crate::protocol::{DialogueChoice, QuestObjectiveData, ServerMessage};
 use crate::quest::runner::{DialogueChoice as QuestDialogueChoice, ScriptResult};
 use crate::quest::{ObjectiveType, PlayerQuestState, Quest, QuestEvent, QuestStatus};
@@ -313,7 +314,9 @@ impl GameRoom {
                     }
                 }
 
-                player.inventory.gold += quest.rewards.gold;
+                player.inventory.gold =
+                    item::checked_gold_credit(player.inventory.gold, quest.rewards.gold)
+                        .unwrap_or(item::MAX_GOLD);
                 for item_reward in &quest.rewards.items {
                     player.inventory.add_item(
                         &item_reward.item_id,

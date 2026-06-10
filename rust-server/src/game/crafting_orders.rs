@@ -1,4 +1,5 @@
 use super::GameRoom;
+use crate::item;
 use crate::protocol::ServerMessage;
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -414,7 +415,7 @@ impl GameRoom {
         };
 
         // 1. Get active order from DB
-        let active_order_id = match db.get_active_order(character_id).await {
+        let active_order_id = match db.take_active_order(character_id).await {
             Ok(Some(id)) => id,
             Ok(None) => {
                 self.send_system_message(player_id, "You don't have an active crafting order.")
@@ -436,6 +437,9 @@ impl GameRoom {
                 active_order_id,
                 player_id
             );
+            if let Err(e) = db.save_active_order(character_id, &active_order_id).await {
+                tracing::error!("Failed to restore unknown crafting order: {}", e);
+            }
             self.send_system_message(player_id, "Order template not found. Try abandoning.")
                 .await;
             return;
@@ -476,7 +480,12 @@ impl GameRoom {
             }
 
             // 5. Grant gold
-            player.inventory.gold += template.rewards.gold;
+            let Some(new_gold) =
+                item::checked_gold_credit(player.inventory.gold, template.rewards.gold)
+            else {
+                break 'claim Err("Gold limit reached.".to_string());
+            };
+            player.inventory.gold = new_gold;
 
             // 5b. Grant reward crate
             let bracket = if template.min_level >= 50 {
@@ -523,10 +532,18 @@ impl GameRoom {
         let (inventory_update, gold, xp_results, crate_name) = match result {
             Ok(data) => data,
             Err(msg) if !msg.is_empty() => {
+                if let Err(e) = db.save_active_order(character_id, &active_order_id).await {
+                    tracing::error!("Failed to restore unclaimed crafting order: {}", e);
+                }
                 self.send_system_message(player_id, &msg).await;
                 return;
             }
-            Err(_) => return,
+            Err(_) => {
+                if let Err(e) = db.save_active_order(character_id, &active_order_id).await {
+                    tracing::error!("Failed to restore crafting order after missing player: {}", e);
+                }
+                return;
+            }
         };
 
         // 7. Grant commission marks if marks > 0
@@ -549,9 +566,6 @@ impl GameRoom {
         }
 
         // 9. Remove active order and remove from available pool (prevent re-acceptance)
-        if let Err(e) = db.remove_active_order(character_id).await {
-            tracing::error!("Failed to remove active crafting order: {}", e);
-        }
         if let Err(e) = db.remove_available_order(character_id, &active_order_id).await {
             tracing::warn!("Failed to remove completed order from available pool: {}", e);
         }

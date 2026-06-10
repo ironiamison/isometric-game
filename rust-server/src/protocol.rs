@@ -394,6 +394,7 @@ pub enum ClientMessage {
         seller_id: String,
         stall_slot: u8,
         quantity: i32,
+        expected_price: i32,
     },
 
     /// Set the player's combat style
@@ -7772,10 +7773,12 @@ pub fn decode_client_message(data: &[u8]) -> Result<ClientMessage, String> {
             let seller_id = extract_string(msg_data, "seller_id").unwrap_or_default();
             let stall_slot = extract_i32(msg_data, "stall_slot").unwrap_or(0) as u8;
             let quantity = extract_i32(msg_data, "quantity").unwrap_or(1);
+            let expected_price = extract_i32(msg_data, "expected_price").unwrap_or(-1);
             Ok(ClientMessage::StallBuy {
                 seller_id,
                 stall_slot,
                 quantity,
+                expected_price,
             })
         }
         "setCombatStyle" => {
@@ -7835,8 +7838,8 @@ fn extract_i32(value: &rmpv::Value, key: &str) -> Option<i32> {
             .find(|(k, _)| k.as_str() == Some(key))
             .and_then(|(_, v)| {
                 v.as_i64()
-                    .map(|i| i as i32)
-                    .or_else(|| v.as_u64().map(|u| u as i32))
+                    .and_then(|i| i32::try_from(i).ok())
+                    .or_else(|| v.as_u64().and_then(|u| i32::try_from(u).ok()))
             })
     })
 }
@@ -7847,8 +7850,8 @@ fn extract_u32(value: &rmpv::Value, key: &str) -> Option<u32> {
             .find(|(k, _)| k.as_str() == Some(key))
             .and_then(|(_, v)| {
                 v.as_u64()
-                    .map(|u| u as u32)
-                    .or_else(|| v.as_i64().map(|i| i as u32))
+                    .and_then(|u| u32::try_from(u).ok())
+                    .or_else(|| v.as_i64().and_then(|i| u32::try_from(i).ok()))
             })
     })
 }

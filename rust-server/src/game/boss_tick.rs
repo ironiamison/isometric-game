@@ -1,6 +1,7 @@
 use super::GameRoom;
 use crate::boss::BossEvent;
 use crate::chunk::ChunkCoord;
+use crate::item;
 use crate::npc::{Npc, NpcState};
 use crate::protocol::ServerMessage;
 use rand::Rng;
@@ -1166,7 +1167,7 @@ impl GameRoom {
             return;
         }
 
-        let mut total_gold = 0u32;
+        let mut total_gold = 0i32;
         let mut item_count = 0u32;
 
         for (item_id, quantity) in &rewards {
@@ -1176,7 +1177,15 @@ impl GameRoom {
                 quantity
             );
             if item_id == "gold" {
-                total_gold += quantity;
+                let Ok(quantity) = i32::try_from(*quantity) else {
+                    tracing::error!("Discarding oversized boss gold reward: {}", quantity);
+                    continue;
+                };
+                let Some(new_total) = item::checked_gold_credit(total_gold, quantity) else {
+                    tracing::error!("Discarding boss gold rewards above the currency cap");
+                    continue;
+                };
+                total_gold = new_total;
             } else {
                 tracing::info!(
                     "claim_boss_rewards: granting {} x{} to '{}'",
@@ -1193,7 +1202,13 @@ impl GameRoom {
         if total_gold > 0 {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                player.inventory.gold += total_gold as i32;
+                if let Some(new_gold) =
+                    item::checked_gold_credit(player.inventory.gold, total_gold)
+                {
+                    player.inventory.gold = new_gold;
+                } else {
+                    tracing::error!("Player {} cannot receive boss gold at cap", player_id);
+                }
             }
         }
 
@@ -1249,7 +1264,7 @@ impl GameRoom {
             return;
         }
 
-        let mut total_gold = 0u32;
+        let mut total_gold = 0i32;
         let mut item_count = 0u32;
         let mut overflow_items: Vec<(String, u32)> = Vec::new();
 
@@ -1258,8 +1273,22 @@ impl GameRoom {
             if let Some(player) = players.get_mut(player_id) {
                 for (item_id, quantity) in &rewards {
                     if item_id == "gold" {
-                        player.bank.gold += *quantity as i32;
-                        total_gold += quantity;
+                        let Ok(quantity) = i32::try_from(*quantity) else {
+                            tracing::error!("Discarding oversized boss gold reward: {}", quantity);
+                            continue;
+                        };
+                        let Some(new_bank_gold) =
+                            item::checked_gold_credit(player.bank.gold, quantity)
+                        else {
+                            tracing::error!(
+                                "Player {} cannot receive boss bank gold at cap",
+                                player_id
+                            );
+                            continue;
+                        };
+                        player.bank.gold = new_bank_gold;
+                        total_gold = item::checked_gold_credit(total_gold, quantity)
+                            .unwrap_or(item::MAX_GOLD);
                     } else if player.bank.has_space_for(
                         item_id,
                         *quantity as i32,

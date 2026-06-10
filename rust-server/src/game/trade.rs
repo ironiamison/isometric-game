@@ -403,7 +403,7 @@ impl GameRoom {
                 None => return,
             }
         };
-        let gold = amount.min(max_gold);
+        let gold = amount.min(max_gold.max(0));
 
         let mut trades = self.trades.write().await;
         if let Some(session) = trades.get_mut(&trade_id) {
@@ -601,6 +601,21 @@ impl GameRoom {
                     self.send_to_player(&session.player_b, msg).await;
                     return;
                 }
+                if item::checked_gold_debit(a.inventory.gold, session.offer_a.gold)
+                    .and_then(|gold| item::checked_gold_credit(gold, session.offer_b.gold))
+                    .is_none()
+                    || item::checked_gold_debit(b.inventory.gold, session.offer_b.gold)
+                        .and_then(|gold| item::checked_gold_credit(gold, session.offer_a.gold))
+                        .is_none()
+                {
+                    drop(players);
+                    let msg = ServerMessage::TradeCancelled {
+                        reason: "Trade would exceed the gold limit.".to_string(),
+                    };
+                    self.send_to_player(&session.player_a, msg.clone()).await;
+                    self.send_to_player(&session.player_b, msg).await;
+                    return;
+                }
                 (session.player_a.clone(), session.player_b.clone())
             }
             _ => return,
@@ -628,12 +643,16 @@ impl GameRoom {
         }
 
         if let Some(player_a) = players.get_mut(&pa) {
-            player_a.inventory.gold -= session.offer_a.gold;
-            player_a.inventory.gold += session.offer_b.gold;
+            player_a.inventory.gold =
+                item::checked_gold_debit(player_a.inventory.gold, session.offer_a.gold)
+                    .and_then(|gold| item::checked_gold_credit(gold, session.offer_b.gold))
+                    .expect("trade balances were validated before mutation");
         }
         if let Some(player_b) = players.get_mut(&pb) {
-            player_b.inventory.gold -= session.offer_b.gold;
-            player_b.inventory.gold += session.offer_a.gold;
+            player_b.inventory.gold =
+                item::checked_gold_debit(player_b.inventory.gold, session.offer_b.gold)
+                    .and_then(|gold| item::checked_gold_credit(gold, session.offer_a.gold))
+                    .expect("trade balances were validated before mutation");
         }
 
         for item in &session.offer_b.items {

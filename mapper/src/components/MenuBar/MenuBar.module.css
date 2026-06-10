@@ -16,6 +16,23 @@
   gap: 2px;
 }
 
+.studioButton {
+  align-self: center;
+  margin-left: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font: 600 11px var(--font-body);
+  cursor: pointer;
+}
+
+.studioButton:hover {
+  border-color: var(--border-focus);
+  color: var(--text-bright);
+}
+
 .menuItem {
   position: relative;
 }

@@ -1,4 +1,5 @@
 use super::GameRoom;
+use crate::item;
 use crate::protocol::{
     AdventureBoardActiveContractData, AdventureBoardDifficultyData, AdventureBoardOfferData,
     AdventureBoardStatsData, CraftingOrderActiveData, CraftingOrderItemData,
@@ -953,18 +954,23 @@ impl GameRoom {
 
     pub(in crate::game) async fn handle_claim_resource_contract(&self, player_id: &str) {
         let contract_status = {
-            let resource_contracts = self.resource_contracts.read().await;
+            let mut resource_contracts = self.resource_contracts.write().await;
             match resource_contracts.get_contract(player_id) {
-                Some(contract) if contract.is_complete() => ClaimContractStatus::Ready {
-                    contract: contract.clone(),
-                    xp_reward: contract.difficulty.xp_reward(contract.kind),
-                    gold_reward: contract.difficulty.gold_reward(contract.kind),
-                    seed_count: if contract.kind == ResourceContractKind::Farming {
-                        contract.difficulty.farming_seed_reward_count()
-                    } else {
-                        0
-                    },
-                },
+                Some(contract) if contract.is_complete() => {
+                    let contract = resource_contracts
+                        .remove_contract(player_id)
+                        .expect("completed contract disappeared while locked");
+                    ClaimContractStatus::Ready {
+                        xp_reward: contract.difficulty.xp_reward(contract.kind),
+                        gold_reward: contract.difficulty.gold_reward(contract.kind),
+                        seed_count: if contract.kind == ResourceContractKind::Farming {
+                            contract.difficulty.farming_seed_reward_count()
+                        } else {
+                            0
+                        },
+                        contract,
+                    }
+                }
                 Some(_) => ClaimContractStatus::Incomplete,
                 None => ClaimContractStatus::Missing,
             }
@@ -993,10 +999,21 @@ impl GameRoom {
             let farming = self.farming.read().await;
             let mut players = self.players.write().await;
             let Some(player) = players.get_mut(player_id) else {
+                drop(players);
+                drop(farming);
+                let mut resource_contracts = self.resource_contracts.write().await;
+                resource_contracts.insert_contract(contract.clone());
                 return;
             };
 
-            player.inventory.gold += gold_reward;
+            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, gold_reward) else {
+                drop(players);
+                let mut resource_contracts = self.resource_contracts.write().await;
+                resource_contracts.insert_contract(contract.clone());
+                self.send_system_message(player_id, "Gold limit reached.").await;
+                return;
+            };
+            player.inventory.gold = new_gold;
 
             let mut seed_names = Vec::new();
             if contract.kind == ResourceContractKind::Farming {
@@ -1073,15 +1090,6 @@ impl GameRoom {
                 seed_names,
             )
         };
-
-        {
-            let mut resource_contracts = self.resource_contracts.write().await;
-            if resource_contracts.remove_contract(player_id).is_none() {
-                self.send_system_message(player_id, "You don't have an active contract.")
-                    .await;
-                return;
-            }
-        }
 
         if let Some(ref db) = self.db {
             if let Err(e) = db.delete_resource_contract(player_id).await {

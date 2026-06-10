@@ -2578,7 +2578,11 @@ impl GameRoom {
                         for placement in &placements {
                             if placement.gold_reward > 0 {
                                 if let Some(p) = players.get_mut(&placement.player_id) {
-                                    p.inventory.gold += placement.gold_reward;
+                                    p.inventory.gold = item::checked_gold_credit(
+                                        p.inventory.gold,
+                                        placement.gold_reward,
+                                    )
+                                    .unwrap_or(item::MAX_GOLD);
                                 }
                             }
                         }
@@ -5001,7 +5005,11 @@ impl GameRoom {
                             for placement in &placements {
                                 if placement.gold_reward > 0 {
                                     if let Some(p) = players.get_mut(&placement.player_id) {
-                                        p.inventory.gold += placement.gold_reward;
+                                        p.inventory.gold = item::checked_gold_credit(
+                                            p.inventory.gold,
+                                            placement.gold_reward,
+                                        )
+                                        .unwrap_or(item::MAX_GOLD);
                                     }
                                 }
                             }
@@ -7648,7 +7656,11 @@ impl GameRoom {
                         for placement in &placements {
                             if placement.gold_reward > 0 {
                                 if let Some(player) = players.get_mut(&placement.player_id) {
-                                    player.inventory.gold += placement.gold_reward;
+                                    player.inventory.gold = item::checked_gold_credit(
+                                        player.inventory.gold,
+                                        placement.gold_reward,
+                                    )
+                                    .unwrap_or(item::MAX_GOLD);
                                 }
                             }
                         }
@@ -8772,7 +8784,11 @@ impl GameRoom {
                             for placement in &placements {
                                 if placement.gold_reward > 0 {
                                     if let Some(p) = players.get_mut(&placement.player_id) {
-                                        p.inventory.gold += placement.gold_reward;
+                                        p.inventory.gold = item::checked_gold_credit(
+                                            p.inventory.gold,
+                                            placement.gold_reward,
+                                        )
+                                        .unwrap_or(item::MAX_GOLD);
                                     }
                                 }
                             }

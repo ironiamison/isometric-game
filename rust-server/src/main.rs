@@ -5579,9 +5579,16 @@ async fn handle_client_message(
             seller_id,
             stall_slot,
             quantity,
+            expected_price,
         } => {
-            room.handle_stall_buy(player_id, &seller_id, stall_slot, quantity)
-                .await;
+            room.handle_stall_buy(
+                player_id,
+                &seller_id,
+                stall_slot,
+                quantity,
+                expected_price,
+            )
+            .await;
         }
         ClientMessage::SetCombatStyle { style } => {
             if let Some(combat_style) = crate::game::CombatStyle::from_str(&style) {

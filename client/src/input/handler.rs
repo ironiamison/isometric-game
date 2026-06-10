@@ -1768,6 +1768,7 @@ pub enum InputCommand {
         seller_id: String,
         stall_slot: u8,
         quantity: i32,
+        expected_price: i32,
     },
     // Combat style
     SetCombatStyle {
@@ -3205,6 +3206,7 @@ impl InputHandler {
                                         seller_id: browse.seller_id.clone(),
                                         stall_slot: item.slot,
                                         quantity: state.ui_state.stall_buy_quantity,
+                                        expected_price: item.price,
                                     });
                                 }
                             }

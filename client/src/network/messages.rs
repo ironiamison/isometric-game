@@ -304,6 +304,7 @@ pub enum ClientMessage {
         seller_id: String,
         stall_slot: u8,
         quantity: i32,
+        expected_price: i32,
     },
 
     /// Spectator upgrades to a full player session
@@ -788,6 +789,7 @@ impl ClientMessage {
                 seller_id,
                 stall_slot,
                 quantity,
+                expected_price,
             } => {
                 data.insert("seller_id".into(), Value::String(seller_id.clone().into()));
                 data.insert(
@@ -795,6 +797,10 @@ impl ClientMessage {
                     Value::Integer((*stall_slot as i64).into()),
                 );
                 data.insert("quantity".into(), Value::Integer((*quantity as i64).into()));
+                data.insert(
+                    "expected_price".into(),
+                    Value::Integer((*expected_price as i64).into()),
+                );
                 "stallBuy"
             }
             ClientMessage::SpectatorUpgrade { session_token } => {

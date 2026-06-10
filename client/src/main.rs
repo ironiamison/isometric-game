@@ -1331,10 +1331,12 @@ fn run_game_frame(
                 seller_id,
                 stall_slot,
                 quantity,
+                expected_price,
             } => ClientMessage::StallBuy {
                 seller_id: seller_id.clone(),
                 stall_slot: *stall_slot,
                 quantity: *quantity,
+                expected_price: *expected_price,
             },
             InputCommand::SetCombatStyle { style } => ClientMessage::SetCombatStyle {
                 style: style.clone(),

@@ -639,7 +639,11 @@ impl GameRoom {
                                     for placement in &placements {
                                         if placement.gold_reward > 0 {
                                             if let Some(p) = players.get_mut(&placement.player_id) {
-                                                p.inventory.gold += placement.gold_reward;
+                                                p.inventory.gold = item::checked_gold_credit(
+                                                    p.inventory.gold,
+                                                    placement.gold_reward,
+                                                )
+                                                .unwrap_or(item::MAX_GOLD);
                                             }
                                         }
                                     }
@@ -858,7 +862,9 @@ impl GameRoom {
                             let mut players = self.players.write().await;
                             for (pid, amount) in &refunds {
                                 if let Some(p) = players.get_mut(pid) {
-                                    p.inventory.gold += amount;
+                                    p.inventory.gold =
+                                        item::checked_gold_credit(p.inventory.gold, *amount)
+                                            .unwrap_or(item::MAX_GOLD);
                                 }
                             }
                         }
