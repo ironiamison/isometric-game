@@ -356,3 +356,19 @@ impl Default for EntityRegistry {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_split_dangerous_creature_catalogs() {
+        let mut registry = EntityRegistry::new();
+        registry
+            .load_from_directory(Path::new("data"))
+            .expect("production entity catalogs should parse");
+
+        assert!(registry.contains("spider"));
+        assert!(registry.contains("barbarian"));
+    }
+}

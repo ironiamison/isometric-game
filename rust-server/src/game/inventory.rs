@@ -229,9 +229,10 @@ impl GameRoom {
                                 teleport_pos = Some((*x, *y));
                                 format!("teleport:{}", destination)
                             }
-                            Some(UseEffect::LearnSpell { .. }) | Some(UseEffect::Dig) | Some(UseEffect::OpenCrate { .. }) | None => {
-                                "none".to_string()
-                            }
+                            Some(UseEffect::LearnSpell { .. })
+                            | Some(UseEffect::Dig)
+                            | Some(UseEffect::OpenCrate { .. })
+                            | None => "none".to_string(),
                         }
                     } else {
                         "none".to_string()

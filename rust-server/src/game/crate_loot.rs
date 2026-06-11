@@ -162,7 +162,12 @@ impl GameRoom {
                 Some(p) => p,
                 None => return,
             };
-            let slot = match player.inventory.slots.get(slot_index).and_then(|s| s.as_ref()) {
+            let slot = match player
+                .inventory
+                .slots
+                .get(slot_index)
+                .and_then(|s| s.as_ref())
+            {
                 Some(s) => s,
                 None => return,
             };
@@ -207,7 +212,9 @@ impl GameRoom {
             player.inventory.remove_item(&item_id, 1);
 
             if !is_commission_marks {
-                player.inventory.add_item(&reward_id, qty, &self.item_registry);
+                player
+                    .inventory
+                    .add_item(&reward_id, qty, &self.item_registry);
             }
 
             let slots = player.inventory.to_update();
@@ -220,11 +227,7 @@ impl GameRoom {
             if let Some(db) = &self.db {
                 if let Some(character_id) = Self::parse_character_id(player_id) {
                     if let Err(e) = db.add_commission_marks(character_id, qty).await {
-                        tracing::error!(
-                            "Failed to add commission marks for {}: {}",
-                            player_id,
-                            e
-                        );
+                        tracing::error!("Failed to add commission marks for {}: {}", player_id, e);
                     }
                 }
             }

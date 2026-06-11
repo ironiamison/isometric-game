@@ -1,0 +1,549 @@
+# =============================================================================
+# SCIMITARS (Attack requirement) - Slightly better than swords
+# =============================================================================
+
+[bronze_scimitar]
+display_name = "Bronze Scimitar"
+sprite = "bronze_scimitar"
+description = "A curved bronze blade. Quick and aggressive."
+category = "equipment"
+max_stack = 1
+base_price = 300
+sellable = true
+[bronze_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 5
+attack_bonus = 4
+strength_bonus = 2
+defence_bonus = 0
+
+[iron_scimitar]
+display_name = "Iron Scimitar"
+sprite = "iron_scimitar"
+description = "A curved iron blade. Slices faster than a straight sword."
+category = "equipment"
+max_stack = 1
+base_price = 800
+sellable = true
+[iron_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 15
+attack_bonus = 7
+strength_bonus = 5
+defence_bonus = 0
+
+[steel_scimitar]
+display_name = "Steel Scimitar"
+sprite = "steel_scimitar"
+description = "A polished steel scimitar. The curved edge bites deep."
+category = "equipment"
+max_stack = 1
+base_price = 2000
+sellable = true
+[steel_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 25
+attack_bonus = 11
+strength_bonus = 8
+defence_bonus = 0
+
+[mithril_scimitar]
+display_name = "Mithril Scimitar"
+sprite = "mithril_scimitar"
+description = "A feather-light mithril scimitar. Wickedly fast."
+category = "equipment"
+max_stack = 1
+base_price = 4500
+sellable = true
+[mithril_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 35
+attack_bonus = 14
+strength_bonus = 10
+defence_bonus = 0
+
+[adamant_scimitar]
+display_name = "Adamant Scimitar"
+sprite = "adamant_scimitar"
+description = "A heavy adamant scimitar. Its curved edge cleaves through defenses."
+category = "equipment"
+max_stack = 1
+base_price = 9000
+sellable = true
+[adamant_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 45
+attack_bonus = 19
+strength_bonus = 14
+defence_bonus = 0
+
+[rune_scimitar]
+display_name = "Rune Scimitar"
+sprite = "rune_scimitar"
+description = "A runite scimitar humming with power. The finest curved blade."
+category = "equipment"
+max_stack = 1
+base_price = 16000
+sellable = true
+[rune_scimitar.equipment]
+slot_type = "weapon"
+attack_level_required = 55
+attack_bonus = 23
+strength_bonus = 17
+defence_bonus = 0
+
+# =============================================================================
+# SCAVENGER SET (Craftable early-game gear)
+# =============================================================================
+
+[scavenger_tunic]
+display_name = "Scavenger Tunic"
+sprite = "scavenger_tunic"
+description = "Cobbled-together armor from forest creature scraps."
+category = "equipment"
+max_stack = 1
+base_price = 45
+sellable = true
+[scavenger_tunic.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 3
+
+[scavenger_tunic_female]
+display_name = "Scavenger Tunic (F)"
+sprite = "scavenger_tunic_female"
+description = "Cobbled-together armor from forest creature scraps."
+category = "equipment"
+max_stack = 1
+base_price = 45
+sellable = true
+[scavenger_tunic_female.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 3
+
+[scavenger_boots]
+display_name = "Scavenger Boots"
+sprite = "scavenger_boots"
+description = "Sturdy boots patched together from leather scraps."
+category = "equipment"
+max_stack = 1
+base_price = 25
+sellable = true
+[scavenger_boots.equipment]
+slot_type = "feet"
+defence_level_required = 20
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 6
+
+[bone_ring]
+display_name = "Bone Ring"
+sprite = "bone_ring"
+description = "A ring carved from creature bones."
+category = "equipment"
+max_stack = 1
+base_price = 35
+sellable = true
+[bone_ring.equipment]
+slot_type = "ring"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 1
+defence_bonus = 1
+
+[shell_pendant]
+display_name = "Shell Pendant"
+sprite = "shell_pendant"
+description = "A pendant made from polished shell plates."
+category = "equipment"
+max_stack = 1
+base_price = 40
+sellable = true
+[shell_pendant.equipment]
+slot_type = "necklace"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 2
+
+[spine_blade]
+display_name = "Spine Blade"
+sprite = "spine_blade"
+description = "A crude blade fashioned from hedgehog spines."
+category = "equipment"
+max_stack = 1
+base_price = 55
+sellable = true
+[spine_blade.equipment]
+slot_type = "weapon"
+attack_level_required = 1
+attack_bonus = 2
+strength_bonus = 2
+defence_bonus = 0
+
+[scavenger_bow]
+display_name = "Scavenger Bow"
+sprite = "scavenger_bow"
+description = "A makeshift bow cobbled together from springy materials."
+category = "equipment"
+max_stack = 1
+base_price = 65
+sellable = true
+[scavenger_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 4
+ranged_level_required = 1
+attack_bonus = 3
+strength_bonus = 2
+defence_bonus = 0
+
+# =============================================================================
+# AXES (Woodcutting requirement)
+# =============================================================================
+
+[bronze_axe]
+display_name = "Bronze Axe"
+sprite = "bronze_axe"
+description = "A basic bronze axe for chopping trees."
+category = "equipment"
+max_stack = 1
+base_price = 50
+sellable = true
+[bronze_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 1
+attack_bonus = 1
+strength_bonus = 1
+defence_bonus = 0
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.0
+
+[iron_axe]
+display_name = "Iron Axe"
+sprite = "iron_axe"
+description = "A sturdy iron axe. More effective than bronze."
+category = "equipment"
+max_stack = 1
+base_price = 150
+sellable = true
+[iron_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 6
+attack_bonus = 2
+strength_bonus = 2
+defence_bonus = 0
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.03
+
+[steel_axe]
+display_name = "Steel Axe"
+sprite = "steel_axe"
+description = "A sharp steel axe. Efficient for most trees."
+category = "equipment"
+max_stack = 1
+base_price = 400
+sellable = true
+[steel_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 11
+attack_bonus = 3
+strength_bonus = 2
+defence_bonus = 0
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.06
+
+[mithril_axe]
+display_name = "Mithril Axe"
+sprite = "mithril_axe"
+description = "A lightweight mithril axe. Swings with ease."
+category = "equipment"
+max_stack = 1
+base_price = 1000
+sellable = true
+[mithril_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 21
+attack_bonus = 6
+strength_bonus = 4
+defence_bonus = 0
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.09
+
+[adamant_axe]
+display_name = "Adamant Axe"
+sprite = "adamant_axe"
+description = "A powerful adamant axe. Cuts through hardwood."
+category = "equipment"
+max_stack = 1
+base_price = 2500
+sellable = true
+[adamant_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 31
+attack_bonus = 8
+strength_bonus = 6
+defence_bonus = 0
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.12
+
+[rune_axe]
+display_name = "Rune Axe"
+sprite = "rune_axe"
+description = "The finest axe money can buy. Incredibly effective."
+category = "equipment"
+max_stack = 1
+base_price = 7500
+sellable = true
+[rune_axe.equipment]
+slot_type = "weapon"
+woodcutting_level_required = 41
+attack_bonus = 10
+strength_bonus = 8
+defence_bonus = 0
+chop_speed_multiplier = 1.0
+chop_success_bonus = 0.16
+
+# =============================================================================
+# PICKAXES (Mining requirement)
+# =============================================================================
+
+[bronze_pickaxe]
+display_name = "Bronze Pickaxe"
+sprite = "bronze_pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 50
+[bronze_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 1
+mine_speed_multiplier = 1.0
+mine_success_bonus = 0.0
+
+[iron_pickaxe]
+display_name = "Iron Pickaxe"
+sprite = "iron_pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 150
+[iron_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 6
+mine_speed_multiplier = 1.0
+mine_success_bonus = 0.04
+
+[steel_pickaxe]
+display_name = "Steel Pickaxe"
+sprite = "steel_pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 500
+[steel_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 11
+mine_speed_multiplier = 1.0
+mine_success_bonus = 0.08
+
+[rune_pickaxe]
+display_name = "Rune Pickaxe"
+sprite = "adamant_pickaxe"
+category = "equipment"
+max_stack = 1
+base_price = 5000
+[rune_pickaxe.equipment]
+slot_type = "weapon"
+mining_level_required = 41
+mine_speed_multiplier = 1.0
+mine_success_bonus = 0.16
+
+# ============================================================================
+# Staves
+# ============================================================================
+
+[magic_staff]
+display_name = "Magic Staff"
+sprite = "magic_staff"
+description = "A staff imbued with magical energy. Enhances spell accuracy."
+category = "equipment"
+max_stack = 1
+base_price = 5000
+sellable = true
+[magic_staff.equipment]
+slot_type = "weapon"
+magic_level_required = 1
+magic_bonus = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 0
+
+[firewood_staff]
+display_name = "Firewood Staff"
+sprite = "firewood_staff"
+description = "A sturdy staff carved from enchanted firewood. Channels magic and packs a punch."
+category = "equipment"
+max_stack = 1
+base_price = 2000
+sellable = true
+[firewood_staff.equipment]
+slot_type = "weapon"
+magic_level_required = 15
+magic_bonus = 8
+attack_bonus = 6
+strength_bonus = 5
+defence_bonus = 0
+
+# =============================================================================
+# Fletching - Bows
+# =============================================================================
+
+[oak_bow]
+display_name = "Oak Bow"
+sprite = "oak_bow"
+description = "A sturdy bow carved from oak. Good for beginners."
+category = "equipment"
+max_stack = 1
+base_price = 40
+sellable = true
+[oak_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 4
+ranged_level_required = 1
+attack_bonus = 4
+strength_bonus = 3
+defence_bonus = 0
+
+[willow_bow]
+display_name = "Willow Bow"
+sprite = "willow_bow"
+description = "A flexible willow bow with good draw weight."
+category = "equipment"
+max_stack = 1
+base_price = 100
+sellable = true
+[willow_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 5
+ranged_level_required = 10
+attack_bonus = 8
+strength_bonus = 6
+defence_bonus = 0
+
+[maple_bow]
+display_name = "Maple Bow"
+sprite = "maple_bow"
+description = "A powerful maple bow favored by experienced archers."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[maple_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 6
+ranged_level_required = 20
+attack_bonus = 12
+strength_bonus = 9
+defence_bonus = 0
+
+[yew_bow]
+display_name = "Yew Bow"
+sprite = "yew_bow"
+description = "A masterfully crafted yew bow. Deadly in skilled hands."
+category = "equipment"
+max_stack = 1
+base_price = 400
+sellable = true
+[yew_bow.equipment]
+slot_type = "weapon"
+weapon_type = "ranged"
+range = 7
+ranged_level_required = 30
+attack_bonus = 16
+strength_bonus = 12
+defence_bonus = 0
+
+# =============================================================================
+# Leatherworking - Leather Armor
+# =============================================================================
+
+[leather_gloves]
+display_name = "Leather Gloves"
+sprite = "leather_gloves"
+description = "Light leather gloves. Favored by rangers."
+category = "equipment"
+max_stack = 1
+base_price = 30
+sellable = true
+[leather_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 0
+defence_bonus = 1
+
+[leather_boots]
+display_name = "Leather Boots"
+sprite = "leather_boots"
+description = "Supple leather boots. Light and quiet."
+category = "equipment"
+max_stack = 1
+base_price = 30
+sellable = true
+[leather_boots.equipment]
+slot_type = "feet"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 0
+defence_bonus = 1
+
+[leather_body]
+display_name = "Leather Body (M)"
+sprite = "leather_body"
+description = "A hardened leather chestpiece. Offers decent protection without slowing you down."
+category = "equipment"
+max_stack = 1
+base_price = 80
+sellable = true
+[leather_body.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 3
+
+[leather_body_female]
+display_name = "Leather Body (F)"
+sprite = "leather_armor_female"
+description = "A hardened leather chestpiece. Offers decent protection without slowing you down."
+category = "equipment"
+max_stack = 1
+base_price = 80
+sellable = true
+[leather_body_female.equipment]
+slot_type = "body"
+defence_level_required = 1
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 3
+
+[leather_hat]
+display_name = "Leather Hat"
+sprite = "leather_hat"
+description = "A leather hat that keeps you hidden. Light head protection."
+category = "equipment"
+max_stack = 1
+base_price = 50
+sellable = true
+[leather_hat.equipment]
+slot_type = "head"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 0
+defence_bonus = 2

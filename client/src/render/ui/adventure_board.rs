@@ -84,14 +84,40 @@ impl Renderer {
         } else {
             (Color::new(0.2, 0.1, 0.1, 1.0), FRAME_MID)
         };
-        draw_rectangle(close_btn_x, close_btn_y, close_btn_size, close_btn_size, close_border);
-        draw_rectangle(close_btn_x + 1.0, close_btn_y + 1.0, close_btn_size - 2.0, close_btn_size - 2.0, close_bg);
+        draw_rectangle(
+            close_btn_x,
+            close_btn_y,
+            close_btn_size,
+            close_btn_size,
+            close_border,
+        );
+        draw_rectangle(
+            close_btn_x + 1.0,
+            close_btn_y + 1.0,
+            close_btn_size - 2.0,
+            close_btn_size - 2.0,
+            close_bg,
+        );
         let cx = close_btn_x + close_btn_size / 2.0;
         let cy = close_btn_y + close_btn_size / 2.0;
         let cross = close_btn_size * 0.25;
         let cross_color = if close_hovered { TEXT_TITLE } else { TEXT_DIM };
-        draw_line(cx - cross, cy - cross, cx + cross, cy + cross, 2.0, cross_color);
-        draw_line(cx + cross, cy - cross, cx - cross, cy + cross, 2.0, cross_color);
+        draw_line(
+            cx - cross,
+            cy - cross,
+            cx + cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
+        draw_line(
+            cx + cross,
+            cy - cross,
+            cx - cross,
+            cy + cross,
+            2.0,
+            cross_color,
+        );
 
         // Daily info (right, before close button, vertically centered)
         let now_secs = miniquad::date::now() as u64;
@@ -120,7 +146,10 @@ impl Renderer {
         let tab_x_start = panel_x + 12.0 * s;
         let current_tab = state.ui_state.adventure_board_tab;
 
-        let tab_labels = [("CONTRACTS", UiElementId::AdventureBoardTabContracts), ("ORDERS", UiElementId::AdventureBoardTabOrders)];
+        let tab_labels = [
+            ("CONTRACTS", UiElementId::AdventureBoardTabContracts),
+            ("ORDERS", UiElementId::AdventureBoardTabOrders),
+        ];
         for (i, (label, element_id)) in tab_labels.iter().enumerate() {
             let tx = tab_x_start + i as f32 * (tab_w + tab_gap);
             let tab_rect = Rect::new(tx, tab_y, tab_w, tab_h);
@@ -143,7 +172,13 @@ impl Renderer {
             draw_rectangle(tx, tab_y, tab_w, tab_h, border);
             draw_rectangle(tx + 1.0, tab_y + 1.0, tab_w - 2.0, tab_h - 2.0, bg);
             if is_active {
-                draw_rectangle(tx + 2.0, tab_y + tab_h - 3.0, tab_w - 4.0, 2.0, FRAME_ACCENT);
+                draw_rectangle(
+                    tx + 2.0,
+                    tab_y + tab_h - 3.0,
+                    tab_w - 4.0,
+                    2.0,
+                    FRAME_ACCENT,
+                );
             }
             let label_w = self.measure_text_sharp(label, 16.0).width;
             self.draw_text_sharp(
@@ -156,9 +191,13 @@ impl Renderer {
         }
 
         if current_tab == 0 {
-            self.render_contracts_tab(state, board, hovered, layout, panel_x, panel_y, panel_w, panel_h, s, compact);
+            self.render_contracts_tab(
+                state, board, hovered, layout, panel_x, panel_y, panel_w, panel_h, s, compact,
+            );
         } else {
-            self.render_orders_tab(state, board, hovered, layout, panel_x, panel_y, panel_w, panel_h, s, compact);
+            self.render_orders_tab(
+                state, board, hovered, layout, panel_x, panel_y, panel_w, panel_h, s, compact,
+            );
         }
     }
 
@@ -831,7 +870,13 @@ impl Renderer {
             } else {
                 TEXT_TITLE
             };
-            self.draw_text_sharp(value, card_x + 8.0 * s, stats_y + 33.0 * s, 16.0, value_color);
+            self.draw_text_sharp(
+                value,
+                card_x + 8.0 * s,
+                stats_y + 33.0 * s,
+                16.0,
+                value_color,
+            );
         }
 
         // ===== LAYOUT =====
@@ -875,8 +920,7 @@ impl Renderer {
         let mut row_y = left_y + 8.0 * s;
         for (idx, order) in board.crafting_orders.iter().enumerate() {
             let is_selected = idx == selected_idx;
-            let hovered_card =
-                matches!(hovered, Some(UiElementId::CraftingOrder(i)) if *i == idx);
+            let hovered_card = matches!(hovered, Some(UiElementId::CraftingOrder(i)) if *i == idx);
             let accent = kind_accent(&order.skill);
             let is_masterwork = order.tier == "masterwork";
 
@@ -895,7 +939,13 @@ impl Renderer {
             } else {
                 SLOT_BORDER
             };
-            draw_rectangle(row_bounds.x, row_bounds.y, row_bounds.w, row_bounds.h, row_border);
+            draw_rectangle(
+                row_bounds.x,
+                row_bounds.y,
+                row_bounds.w,
+                row_bounds.h,
+                row_border,
+            );
             draw_rectangle(
                 row_bounds.x + 1.0,
                 row_bounds.y + 1.0,
@@ -905,7 +955,11 @@ impl Renderer {
             );
 
             // Accent bar on the left
-            let bar_color = if is_masterwork { masterwork_color } else { accent };
+            let bar_color = if is_masterwork {
+                masterwork_color
+            } else {
+                accent
+            };
             draw_rectangle(
                 row_bounds.x + 3.0,
                 row_bounds.y + 3.0,
@@ -932,7 +986,11 @@ impl Renderer {
                 if is_selected { TEXT_TITLE } else { TEXT_NORMAL },
             );
             // Tier on right
-            let tier_color = if is_masterwork { masterwork_color } else { TEXT_DIM };
+            let tier_color = if is_masterwork {
+                masterwork_color
+            } else {
+                TEXT_DIM
+            };
             self.draw_text_sharp(
                 &tier_text,
                 row_bounds.x + row_bounds.w - tier_w - 8.0 * s,
@@ -1014,7 +1072,11 @@ impl Renderer {
         if let Some(active) = board.crafting_order_active.as_ref() {
             // ===== ACTIVE ORDER =====
             let is_masterwork = active.tier == "masterwork";
-            let accent = if is_masterwork { masterwork_color } else { kind_accent(&active.skill) };
+            let accent = if is_masterwork {
+                masterwork_color
+            } else {
+                kind_accent(&active.skill)
+            };
 
             self.draw_text_sharp(
                 "ACTIVE ORDER",
@@ -1033,7 +1095,11 @@ impl Renderer {
                 accent,
             );
 
-            let title_text = format!("{} {} Order", active.tier.to_uppercase(), active.skill.to_uppercase());
+            let title_text = format!(
+                "{} {} Order",
+                active.tier.to_uppercase(),
+                active.skill.to_uppercase()
+            );
             let title_display = self.truncate_text_to_width(&title_text, text_area_w, 16.0);
             self.draw_text_sharp(
                 &title_display,
@@ -1048,13 +1114,7 @@ impl Renderer {
             for item in &active.items {
                 let item_text = format!("{}x {}", item.quantity, item.item_name);
                 let item_display = self.truncate_text_to_width(&item_text, text_area_w, 16.0);
-                self.draw_text_sharp(
-                    &item_display,
-                    right_x + 20.0 * s,
-                    item_y,
-                    16.0,
-                    TEXT_NORMAL,
-                );
+                self.draw_text_sharp(&item_display, right_x + 20.0 * s, item_y, 16.0, TEXT_NORMAL);
                 item_y += 18.0 * s;
             }
 
@@ -1095,16 +1155,30 @@ impl Renderer {
             // Claim button
             let can_claim = active.can_claim;
             let claim_border = if can_claim {
-                if claim_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID }
+                if claim_hovered {
+                    SLOT_SELECTED_BORDER
+                } else {
+                    FRAME_MID
+                }
             } else {
                 SLOT_BORDER
             };
             let claim_bg = if can_claim {
-                if claim_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY }
+                if claim_hovered {
+                    SLOT_HOVER_BG
+                } else {
+                    SLOT_BG_EMPTY
+                }
             } else {
                 Color::new(0.08, 0.08, 0.10, 1.0)
             };
-            draw_rectangle(claim_bounds.x, claim_bounds.y, claim_bounds.w, claim_bounds.h, claim_border);
+            draw_rectangle(
+                claim_bounds.x,
+                claim_bounds.y,
+                claim_bounds.w,
+                claim_bounds.h,
+                claim_border,
+            );
             draw_rectangle(
                 claim_bounds.x + 1.0,
                 claim_bounds.y + 1.0,
@@ -1120,7 +1194,11 @@ impl Renderer {
                 claim_bounds.y + btn_h * 0.67,
                 16.0,
                 if can_claim {
-                    if claim_hovered { TEXT_TITLE } else { TEXT_NORMAL }
+                    if claim_hovered {
+                        TEXT_TITLE
+                    } else {
+                        TEXT_NORMAL
+                    }
                 } else {
                     TEXT_DIM
                 },
@@ -1132,14 +1210,22 @@ impl Renderer {
                 abandon_bounds.y,
                 abandon_bounds.w,
                 abandon_bounds.h,
-                if abandon_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID },
+                if abandon_hovered {
+                    SLOT_SELECTED_BORDER
+                } else {
+                    FRAME_MID
+                },
             );
             draw_rectangle(
                 abandon_bounds.x + 1.0,
                 abandon_bounds.y + 1.0,
                 abandon_bounds.w - 2.0,
                 abandon_bounds.h - 2.0,
-                if abandon_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY },
+                if abandon_hovered {
+                    SLOT_HOVER_BG
+                } else {
+                    SLOT_BG_EMPTY
+                },
             );
             let abandon_label = "Abandon";
             let abandon_label_w = self.measure_text_sharp(abandon_label, 16.0).width;
@@ -1148,14 +1234,26 @@ impl Renderer {
                 abandon_bounds.x + (abandon_bounds.w - abandon_label_w) * 0.5,
                 abandon_bounds.y + btn_h * 0.67,
                 16.0,
-                if abandon_hovered { TEXT_TITLE } else { TEXT_NORMAL },
+                if abandon_hovered {
+                    TEXT_TITLE
+                } else {
+                    TEXT_NORMAL
+                },
             );
         } else if let Some(order) = selected_order {
             // ===== SELECTED ORDER DETAIL =====
             let is_masterwork = order.tier == "masterwork";
-            let accent = if is_masterwork { masterwork_color } else { kind_accent(&order.skill) };
+            let accent = if is_masterwork {
+                masterwork_color
+            } else {
+                kind_accent(&order.skill)
+            };
 
-            let header_text = format!("{} {} ORDER", order.tier.to_uppercase(), order.skill.to_uppercase());
+            let header_text = format!(
+                "{} {} ORDER",
+                order.tier.to_uppercase(),
+                order.skill.to_uppercase()
+            );
             let header_max_w = (right_w - 24.0 * s).max(40.0 * s);
             let header_display = self.truncate_text_to_width(&header_text, header_max_w, 16.0);
             self.draw_text_sharp(
@@ -1197,13 +1295,7 @@ impl Renderer {
             for item in &order.items {
                 let item_text = format!("{}x {}", item.quantity, item.item_name);
                 let item_display = self.truncate_text_to_width(&item_text, text_area_w, 16.0);
-                self.draw_text_sharp(
-                    &item_display,
-                    right_x + 20.0 * s,
-                    item_y,
-                    16.0,
-                    TEXT_NORMAL,
-                );
+                self.draw_text_sharp(&item_display, right_x + 20.0 * s, item_y, 16.0, TEXT_NORMAL);
                 item_y += 18.0 * s;
             }
 
@@ -1218,7 +1310,13 @@ impl Renderer {
                 HEADER_BORDER,
             );
             item_y += 8.0 * s;
-            self.draw_text_sharp("Rewards:", right_x + 12.0 * s, item_y + 4.0 * s, 16.0, TEXT_NORMAL);
+            self.draw_text_sharp(
+                "Rewards:",
+                right_x + 12.0 * s,
+                item_y + 4.0 * s,
+                16.0,
+                TEXT_NORMAL,
+            );
             item_y += 22.0 * s;
 
             if order.reward_gold > 0 {
@@ -1263,16 +1361,30 @@ impl Renderer {
             let available = !has_active;
 
             let accept_border = if available {
-                if accept_hovered { SLOT_SELECTED_BORDER } else { FRAME_MID }
+                if accept_hovered {
+                    SLOT_SELECTED_BORDER
+                } else {
+                    FRAME_MID
+                }
             } else {
                 SLOT_BORDER
             };
             let accept_bg = if available {
-                if accept_hovered { SLOT_HOVER_BG } else { SLOT_BG_EMPTY }
+                if accept_hovered {
+                    SLOT_HOVER_BG
+                } else {
+                    SLOT_BG_EMPTY
+                }
             } else {
                 Color::new(0.08, 0.08, 0.10, 1.0)
             };
-            draw_rectangle(accept_bounds.x, accept_bounds.y, accept_bounds.w, accept_bounds.h, accept_border);
+            draw_rectangle(
+                accept_bounds.x,
+                accept_bounds.y,
+                accept_bounds.w,
+                accept_bounds.h,
+                accept_border,
+            );
             draw_rectangle(
                 accept_bounds.x + 1.0,
                 accept_bounds.y + 1.0,
@@ -1280,7 +1392,11 @@ impl Renderer {
                 accept_bounds.h - 2.0,
                 accept_bg,
             );
-            let accept_label = if has_active { "Active order in progress" } else { "Accept Order" };
+            let accept_label = if has_active {
+                "Active order in progress"
+            } else {
+                "Accept Order"
+            };
             let accept_label_w = self.measure_text_sharp(accept_label, 16.0).width;
             self.draw_text_sharp(
                 accept_label,
@@ -1288,7 +1404,11 @@ impl Renderer {
                 accept_bounds.y + btn_h * 0.67,
                 16.0,
                 if available {
-                    if accept_hovered { TEXT_TITLE } else { Color::new(0.40, 0.80, 0.40, 1.0) }
+                    if accept_hovered {
+                        TEXT_TITLE
+                    } else {
+                        Color::new(0.40, 0.80, 0.40, 1.0)
+                    }
                 } else {
                     TEXT_DIM
                 },

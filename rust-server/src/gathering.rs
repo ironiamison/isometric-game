@@ -1,4 +1,3 @@
-
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -414,5 +413,4 @@ impl GatheringSystem {
             .map(|v| v.as_slice())
             .unwrap_or(&[])
     }
-
 }

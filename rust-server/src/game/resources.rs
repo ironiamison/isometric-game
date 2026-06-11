@@ -885,8 +885,6 @@ impl GameRoom {
             .await;
         }
 
-
-
         let tree_respawn_events = {
             let mut woodcutting = self.woodcutting.write().await;
             woodcutting.tick_respawns(current_time)

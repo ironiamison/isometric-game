@@ -205,4 +205,15 @@ count = 1
         assert_eq!(recipe.ingredients[0].item_id, "slime_core");
         assert_eq!(recipe.ingredients[0].count, 3);
     }
+
+    #[test]
+    fn loads_split_smithing_catalogs() {
+        let mut registry = CraftingRegistry::new();
+        registry
+            .load_from_directory(Path::new("data"))
+            .expect("production recipe catalogs should parse");
+
+        assert!(registry.contains("bronze_bar"));
+        assert!(registry.contains("scrap_leather"));
+    }
 }

@@ -81,7 +81,9 @@ impl GameRoom {
 
         for item in PRESTIGE_SHOP {
             let owned = match &item.item_type {
-                PrestigeItemType::Title(title_id) => unlocked_titles.contains(&title_id.to_string()),
+                PrestigeItemType::Title(title_id) => {
+                    unlocked_titles.contains(&title_id.to_string())
+                }
                 PrestigeItemType::Equipment(_) => false,
             };
 
@@ -151,7 +153,10 @@ impl GameRoom {
         }
 
         // Try to spend marks
-        match db.spend_commission_marks(character_id, shop_item.cost).await {
+        match db
+            .spend_commission_marks(character_id, shop_item.cost)
+            .await
+        {
             Ok(true) => {
                 // Purchase succeeded
                 match &shop_item.item_type {
@@ -180,9 +185,7 @@ impl GameRoom {
                         let inv_msg = {
                             let mut players = self.players.write().await;
                             if let Some(player) = players.get_mut(player_id) {
-                                player
-                                    .inventory
-                                    .add_item(item_id, 1, &self.item_registry);
+                                player.inventory.add_item(item_id, 1, &self.item_registry);
                                 Some(ServerMessage::InventoryUpdate {
                                     player_id: player_id.to_string(),
                                     slots: player.inventory.to_update(),

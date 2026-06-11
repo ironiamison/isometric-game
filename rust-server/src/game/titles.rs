@@ -7,18 +7,51 @@ pub struct TitleDef {
 
 pub const TITLES: &[TitleDef] = &[
     // Crafting titles (purchased with Commission Marks)
-    TitleDef { id: "artisan_apprentice", display: "Apprentice Artisan" },
-    TitleDef { id: "master_smith", display: "Master Smith" },
-    TitleDef { id: "master_alchemist", display: "Master Alchemist" },
-    TitleDef { id: "master_fletcher", display: "Master Fletcher" },
-    TitleDef { id: "master_chef", display: "Master Chef" },
-    TitleDef { id: "grandmaster_artisan", display: "Grandmaster Artisan" },
+    TitleDef {
+        id: "artisan_apprentice",
+        display: "Apprentice Artisan",
+    },
+    TitleDef {
+        id: "master_smith",
+        display: "Master Smith",
+    },
+    TitleDef {
+        id: "master_alchemist",
+        display: "Master Alchemist",
+    },
+    TitleDef {
+        id: "master_fletcher",
+        display: "Master Fletcher",
+    },
+    TitleDef {
+        id: "master_chef",
+        display: "Master Chef",
+    },
+    TitleDef {
+        id: "grandmaster_artisan",
+        display: "Grandmaster Artisan",
+    },
     // Arena titles (unlocked by milestones)
-    TitleDef { id: "arena_novice", display: "Brawler" },
-    TitleDef { id: "arena_fighter", display: "Fighter" },
-    TitleDef { id: "arena_veteran", display: "Veteran" },
-    TitleDef { id: "arena_champion", display: "Champion" },
-    TitleDef { id: "arena_legend", display: "Legend" },
+    TitleDef {
+        id: "arena_novice",
+        display: "Brawler",
+    },
+    TitleDef {
+        id: "arena_fighter",
+        display: "Fighter",
+    },
+    TitleDef {
+        id: "arena_veteran",
+        display: "Veteran",
+    },
+    TitleDef {
+        id: "arena_champion",
+        display: "Champion",
+    },
+    TitleDef {
+        id: "arena_legend",
+        display: "Legend",
+    },
 ];
 
 pub fn title_display(title_id: &str) -> Option<&'static str> {
@@ -59,11 +92,8 @@ impl GameRoom {
                         format!("  {} ({})", display, id)
                     })
                     .collect();
-                self.send_system_message(
-                    player_id,
-                    &format!("Your titles:\n{}", list.join("\n")),
-                )
-                .await;
+                self.send_system_message(player_id, &format!("Your titles:\n{}", list.join("\n")))
+                    .await;
             }
             "set" => {
                 let Some(title_id) = args.get(1) else {
@@ -77,7 +107,10 @@ impl GameRoom {
                 let Some(display) = title_display(&title_id) else {
                     self.send_system_message(
                         player_id,
-                        &format!("Unknown title: {}. Use /title list to see your titles.", title_id),
+                        &format!(
+                            "Unknown title: {}. Use /title list to see your titles.",
+                            title_id
+                        ),
                     )
                     .await;
                     return;
@@ -107,11 +140,8 @@ impl GameRoom {
                     }
                 }
 
-                self.send_system_message(
-                    player_id,
-                    &format!("Title set to: {}", display),
-                )
-                .await;
+                self.send_system_message(player_id, &format!("Title set to: {}", display))
+                    .await;
             }
             "clear" => {
                 if let Err(e) = db.set_active_title(character_id, None).await {
@@ -131,11 +161,8 @@ impl GameRoom {
                 self.send_system_message(player_id, "Title cleared.").await;
             }
             _ => {
-                self.send_system_message(
-                    player_id,
-                    "Usage: /title <list|set <title_id>|clear>",
-                )
-                .await;
+                self.send_system_message(player_id, "Usage: /title <list|set <title_id>|clear>")
+                    .await;
             }
         }
     }

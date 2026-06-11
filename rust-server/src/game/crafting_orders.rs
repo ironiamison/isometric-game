@@ -1,8 +1,8 @@
 use super::GameRoom;
 use crate::item;
 use crate::protocol::ServerMessage;
-use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::seq::SliceRandom;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -104,13 +104,7 @@ impl CraftingOrderRegistry {
         let eligible: Vec<&OrderTemplate> = self
             .orders
             .iter()
-            .filter(|o| {
-                player_skills
-                    .get(&o.skill)
-                    .copied()
-                    .unwrap_or(1)
-                    >= o.min_level
-            })
+            .filter(|o| player_skills.get(&o.skill).copied().unwrap_or(1) >= o.min_level)
             .collect();
 
         if eligible.is_empty() {
@@ -121,8 +115,11 @@ impl CraftingOrderRegistry {
         let has_masterwork_eligible_skill = player_skills.values().any(|&level| level >= 50);
 
         // Separate into regular and masterwork pools
-        let regular: Vec<&OrderTemplate> =
-            eligible.iter().filter(|o| o.tier == "regular").copied().collect();
+        let regular: Vec<&OrderTemplate> = eligible
+            .iter()
+            .filter(|o| o.tier == "regular")
+            .copied()
+            .collect();
         let masterwork: Vec<&OrderTemplate> = eligible
             .iter()
             .filter(|o| o.tier == "masterwork")
@@ -513,13 +510,7 @@ impl GameRoom {
                 if let Some((leveled_up, total_xp, level)) =
                     add_xp_to_skill(&mut player.skills, skill_name, xp_amount)
                 {
-                    xp_results.push((
-                        skill_name.clone(),
-                        xp_amount,
-                        total_xp,
-                        level,
-                        leveled_up,
-                    ));
+                    xp_results.push((skill_name.clone(), xp_amount, total_xp, level, leveled_up));
                 }
             }
 
@@ -540,7 +531,10 @@ impl GameRoom {
             }
             Err(_) => {
                 if let Err(e) = db.save_active_order(character_id, &active_order_id).await {
-                    tracing::error!("Failed to restore crafting order after missing player: {}", e);
+                    tracing::error!(
+                        "Failed to restore crafting order after missing player: {}",
+                        e
+                    );
                 }
                 return;
             }
@@ -566,8 +560,14 @@ impl GameRoom {
         }
 
         // 9. Remove active order and remove from available pool (prevent re-acceptance)
-        if let Err(e) = db.remove_available_order(character_id, &active_order_id).await {
-            tracing::warn!("Failed to remove completed order from available pool: {}", e);
+        if let Err(e) = db
+            .remove_available_order(character_id, &active_order_id)
+            .await
+        {
+            tracing::warn!(
+                "Failed to remove completed order from available pool: {}",
+                e
+            );
         }
 
         // Send inventory update

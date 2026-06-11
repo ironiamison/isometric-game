@@ -1079,10 +1079,7 @@ impl Renderer {
         self.draw_text_sharp("CONTRACT", x, y, 16.0, Color::from_rgba(180, 220, 130, 255));
         y += line_height;
 
-        let title = format!(
-            "{} ({})",
-            contract.task_text, contract.difficulty
-        );
+        let title = format!("{} ({})", contract.task_text, contract.difficulty);
         for line in self.wrap_text(&title, max_width, 16.0).iter().take(3) {
             self.draw_text_sharp(line, x, y, 16.0, WHITE);
             y += line_height;

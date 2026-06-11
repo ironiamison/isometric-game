@@ -765,7 +765,8 @@ impl GameRoom {
 
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
-            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, total_value) else {
+            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, total_value)
+            else {
                 drop(players);
                 self.send_shop_result(
                     player_id,

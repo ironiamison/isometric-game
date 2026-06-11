@@ -1,0 +1,876 @@
+# =============================================================================
+# BELTS (Defence requirement)
+# =============================================================================
+
+[used_belt]
+display_name = "Used Belt"
+sprite = "used_belt"
+description = "A worn leather belt. It's seen better days."
+category = "equipment"
+max_stack = 1
+base_price = 40
+sellable = true
+[used_belt.equipment]
+slot_type = "belt"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 1
+
+[leather_belt]
+display_name = "Leather Belt"
+sprite = "leather_belt"
+description = "A sturdy belt crafted from tanned leather. A survivalist staple."
+category = "equipment"
+max_stack = 1
+base_price = 50
+sellable = true
+[leather_belt.equipment]
+slot_type = "belt"
+defence_level_required = 1
+attack_bonus = 1
+strength_bonus = 1
+defence_bonus = 1
+
+[worn_belt]
+display_name = "Worn Belt"
+sprite = "worn_belt"
+description = "A simple belt showing signs of age."
+category = "equipment"
+max_stack = 1
+base_price = 60
+sellable = true
+[worn_belt.equipment]
+slot_type = "belt"
+defence_level_required = 5
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 2
+
+[stone_belt]
+display_name = "Stone Belt"
+sprite = "stone_belt"
+description = "A heavy belt made of connected stone links."
+category = "equipment"
+max_stack = 1
+base_price = 150
+sellable = true
+[stone_belt.equipment]
+slot_type = "belt"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+
+[runic_belt]
+display_name = "Runic Belt"
+sprite = "runic_belt"
+description = "A belt inscribed with powerful ancient runes."
+category = "equipment"
+max_stack = 1
+base_price = 250
+[runic_belt.equipment]
+slot_type = "belt"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 3
+defence_bonus = 5
+
+[ancient_belt]
+display_name = "Ancient Belt"
+sprite = "ancient_belt"
+description = "A belt of ancient craftsmanship, its runes pulse with ranged might."
+category = "equipment"
+max_stack = 1
+base_price = 350
+sellable = true
+[ancient_belt.equipment]
+slot_type = "belt"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 3
+defence_bonus = 5
+ranged_strength_bonus = 2
+
+[ancient_ring]
+display_name = "Ancient Ring"
+sprite = "ancient_ring"
+description = "A ring of forgotten origin, its runes pulse with ranged power."
+category = "equipment"
+max_stack = 1
+base_price = 800
+sellable = true
+[ancient_ring.equipment]
+slot_type = "ring"
+defence_level_required = 50
+attack_bonus = 3
+strength_bonus = 0
+defence_bonus = 6
+ranged_strength_bonus = 3
+
+# =============================================================================
+# GLOVES (Defence requirement)
+# =============================================================================
+
+[training_gloves]
+display_name = "Training Gloves"
+sprite = "training_gloves"
+description = "Basic gloves used for training."
+category = "equipment"
+max_stack = 1
+base_price = 150
+sellable = true
+[training_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 1
+
+[undead_gloves]
+display_name = "Undead Gloves"
+sprite = "undead_gloves"
+description = "Gloves crafted from skeletal remains."
+category = "equipment"
+max_stack = 1
+base_price = 400
+[undead_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 50
+attack_bonus = 0
+strength_bonus = 8
+defence_bonus = 10
+
+[death_gloves]
+display_name = "Death Gloves"
+sprite = "death_gloves"
+description = "Gloves that feel cold and carry the stench of the grave."
+category = "equipment"
+max_stack = 1
+base_price = 800
+[death_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 70
+attack_bonus = 0
+strength_bonus = 12
+defence_bonus = 8
+
+# =============================================================================
+# HEAD (Defence requirement)
+# =============================================================================
+
+[hood_black]
+display_name = "Black Hood"
+sprite = "hood_black"
+description = "A dark hood that conceals the wearer's face."
+category = "equipment"
+max_stack = 1
+base_price = 35
+sellable = true
+[hood_black.equipment]
+slot_type = "head"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 1
+
+[hood_brown]
+display_name = "Brown Hood"
+sprite = "hood_brown"
+description = "A simple brown hood worn by travelers."
+category = "equipment"
+max_stack = 1
+base_price = 25
+sellable = true
+[hood_brown.equipment]
+slot_type = "head"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 1
+
+[helmet_of_darkness]
+display_name = "Helmet of Darkness"
+sprite = "helmet_of_darkness"
+description = "A fearsome horned helmet imbued with dark power."
+category = "equipment"
+max_stack = 1
+base_price = 500
+sellable = true
+[helmet_of_darkness.equipment]
+slot_type = "head"
+defence_level_required = 40
+attack_bonus = 4
+strength_bonus = 6
+defence_bonus = 14
+
+[slayer_helmet]
+display_name = "Slayer Helmet"
+sprite = "slayer_helmet"
+description = "Provides a 15% damage boost against your current slayer task."
+category = "equipment"
+max_stack = 1
+base_price = 0
+sellable = false
+[slayer_helmet.equipment]
+slot_type = "head"
+defence_bonus = 6
+
+[shades]
+display_name = "Shades"
+sprite = "shades"
+description = "Cool-looking sunglasses that don't offer anything other than style."
+category = "equipment"
+max_stack = 1
+base_price = 60
+sellable = true
+[shades.equipment]
+slot_type = "head"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 0
+
+
+# =============================================================================
+# BACK (Defence requirement - quivers, capes, shields)
+# =============================================================================
+
+[backpack]
+display_name = "Backpack"
+sprite = "backpack"
+description = "A sturdy backpack - doesn't provide much protection but at least it's something."
+category = "equipment"
+max_stack = 1
+base_price = 40
+sellable = true
+[backpack.equipment]
+slot_type = "back"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 1
+
+[normal_quiver]
+display_name = "Quiver"
+sprite = "normal_quiver"
+description = "A leather quiver for holding arrows. Essential for any archer."
+category = "equipment"
+max_stack = 1
+base_price = 50
+sellable = true
+[normal_quiver.equipment]
+slot_type = "back"
+defence_level_required = 1
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 0
+
+[leather_attractor]
+display_name = "Leather Attractor"
+sprite = "leather_attractor"
+description = "A device that magnetically recovers arrows after firing. Saves arrows 60% of the time."
+category = "equipment"
+max_stack = 1
+base_price = 1000
+sellable = true
+[leather_attractor.equipment]
+slot_type = "back"
+ranged_level_required = 20
+attack_bonus = 2
+strength_bonus = 0
+defence_bonus = 0
+ammo_save_chance = 0.60
+ranged_strength_bonus = 2
+
+[improved_attractor]
+display_name = "Improved Attractor"
+sprite = "improved_attractor"
+description = "An enhanced attractor with stronger recovery. Saves arrows 72% of the time."
+category = "equipment"
+max_stack = 1
+base_price = 5000
+sellable = true
+[improved_attractor.equipment]
+slot_type = "back"
+ranged_level_required = 50
+attack_bonus = 4
+strength_bonus = 0
+defence_bonus = 0
+ammo_save_chance = 0.72
+ranged_strength_bonus = 4
+
+[royal_protector]
+display_name = "Royal Protector"
+sprite = "royal_protector"
+description = "An ornate shield bearing the royal crest. Provides excellent protection."
+category = "equipment"
+max_stack = 1
+base_price = 450
+sellable = true
+[royal_protector.equipment]
+slot_type = "back"
+defence_level_required = 30
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 12
+
+[artisan_cape]
+display_name = "Artisan's Cape"
+sprite = "artisan_cape"
+description = "A prestigious cape awarded to master artisans. It shimmers with the dedication of countless crafted works."
+category = "equipment"
+max_stack = 1
+base_price = 0
+sellable = false
+[artisan_cape.equipment]
+slot_type = "back"
+defence_level_required = 1
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 6
+
+# =============================================================================
+# METAL TIER SETS (Bronze / Iron / Steel / Ancient - Craftable at Blacksmith)
+# =============================================================================
+
+# --- Bronze Tier (Level 5) ---
+
+[bronze_body]
+display_name = "Bronze Platemail (M)"
+sprite = "bronze_platebody_male"
+description = "A sturdy chestplate hammered from bronze. Reliable protection for new adventurers."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[bronze_body.equipment]
+slot_type = "body"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+magic_bonus = -6
+
+[bronze_body_female]
+display_name = "Bronze Platemail (F)"
+sprite = "bronze_platebody_female"
+description = "A sturdy chestplate hammered from bronze. Reliable protection for new adventurers."
+category = "equipment"
+max_stack = 1
+base_price = 200
+sellable = true
+[bronze_body_female.equipment]
+slot_type = "body"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+magic_bonus = -6
+
+[bronze_boots]
+display_name = "Bronze Boots"
+sprite = "bronze_boots"
+description = "Heavy bronze boots. They clank with every step."
+category = "equipment"
+max_stack = 1
+base_price = 120
+sellable = true
+[bronze_boots.equipment]
+slot_type = "feet"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 2
+magic_bonus = -2
+
+[bronze_gloves]
+display_name = "Bronze Gloves"
+sprite = "bronze_gloves"
+description = "Gauntlets forged from bronze plates. Good for punching and blocking."
+category = "equipment"
+max_stack = 1
+base_price = 100
+sellable = true
+[bronze_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 5
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 1
+magic_bonus = -2
+
+[bronze_sword]
+display_name = "Bronze Sword"
+sprite = "bronze_sword"
+description = "A simple but dependable bronze blade."
+category = "equipment"
+max_stack = 1
+base_price = 250
+sellable = true
+[bronze_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 5
+attack_bonus = 3
+strength_bonus = 2
+defence_bonus = 0
+
+# --- Iron Tier (Level 15) ---
+
+[iron_body]
+display_name = "Iron Platemail (M)"
+sprite = "iron_platebody_male"
+description = "Solid iron armor that can withstand serious punishment."
+category = "equipment"
+max_stack = 1
+base_price = 600
+sellable = true
+[iron_body.equipment]
+slot_type = "body"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 8
+magic_bonus = -8
+
+[iron_body_female]
+display_name = "Iron Platemail (F)"
+sprite = "iron_platebody_female"
+description = "Solid iron armor that can withstand serious punishment."
+category = "equipment"
+max_stack = 1
+base_price = 600
+sellable = true
+[iron_body_female.equipment]
+slot_type = "body"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 8
+magic_bonus = -8
+
+[iron_boots]
+display_name = "Iron Boots"
+sprite = "iron_boots"
+description = "Iron-plated boots offering solid protection underfoot."
+category = "equipment"
+max_stack = 1
+base_price = 400
+sellable = true
+[iron_boots.equipment]
+slot_type = "feet"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 4
+magic_bonus = -4
+
+[iron_gloves]
+display_name = "Iron Gloves"
+sprite = "iron_gloves"
+description = "Iron gauntlets that pack a heavier punch."
+category = "equipment"
+max_stack = 1
+base_price = 350
+sellable = true
+[iron_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 15
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 2
+magic_bonus = -2
+
+[iron_sword]
+display_name = "Iron Sword"
+sprite = "iron_sword"
+description = "A well-forged iron blade. A warrior's reliable companion."
+category = "equipment"
+max_stack = 1
+base_price = 700
+sellable = true
+[iron_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 15
+attack_bonus = 6
+strength_bonus = 4
+defence_bonus = 0
+
+# --- Steel Tier (Level 25) ---
+# Note: steel_sword is defined in the WEAPONS section above
+
+[steel_body]
+display_name = "Steel Platemail (M)"
+sprite = "steel_platebody_male"
+description = "Gleaming steel armor. The standard of any serious fighter."
+category = "equipment"
+max_stack = 1
+base_price = 1500
+sellable = true
+[steel_body.equipment]
+slot_type = "body"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 12
+magic_bonus = -10
+
+[steel_body_female]
+display_name = "Steel Platemail (F)"
+sprite = "steel_platebody_female"
+description = "Gleaming steel armor. The standard of any serious fighter."
+category = "equipment"
+max_stack = 1
+base_price = 1500
+sellable = true
+[steel_body_female.equipment]
+slot_type = "body"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 12
+magic_bonus = -10
+
+[steel_boots]
+display_name = "Steel Boots"
+sprite = "steel_boots"
+description = "Polished steel boots built for war."
+category = "equipment"
+max_stack = 1
+base_price = 1000
+sellable = true
+[steel_boots.equipment]
+slot_type = "feet"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 7
+magic_bonus = -4
+
+[steel_gloves]
+display_name = "Steel Gloves"
+sprite = "steel_gloves"
+description = "Steel gauntlets that turn your fists into weapons."
+category = "equipment"
+max_stack = 1
+base_price = 900
+sellable = true
+[steel_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 25
+attack_bonus = 0
+strength_bonus = 3
+defence_bonus = 4
+magic_bonus = -4
+
+# --- Mithril Tier (Level 35) ---
+
+[mithril_body]
+display_name = "Mithril Platemail (M)"
+sprite = "mithril_platebody_male"
+description = "Lightweight mithril armor. Strong as steel but half the weight."
+category = "equipment"
+max_stack = 1
+base_price = 3500
+sellable = true
+[mithril_body.equipment]
+slot_type = "body"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 16
+magic_bonus = -12
+
+[mithril_body_female]
+display_name = "Mithril Platemail (F)"
+sprite = "mithril_platebody_female"
+description = "Lightweight mithril armor. Strong as steel but half the weight."
+category = "equipment"
+max_stack = 1
+base_price = 3500
+sellable = true
+[mithril_body_female.equipment]
+slot_type = "body"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 0
+defence_bonus = 16
+magic_bonus = -12
+
+[mithril_boots]
+display_name = "Mithril Boots"
+sprite = "mithril_boots"
+description = "Feather-light mithril boots. You barely feel them."
+category = "equipment"
+max_stack = 1
+base_price = 2200
+sellable = true
+[mithril_boots.equipment]
+slot_type = "feet"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 9
+magic_bonus = -6
+
+[mithril_gloves]
+display_name = "Mithril Gloves"
+sprite = "mithril_gloves"
+description = "Mithril gauntlets that move like a second skin."
+category = "equipment"
+max_stack = 1
+base_price = 1800
+sellable = true
+[mithril_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 35
+attack_bonus = 0
+strength_bonus = 4
+defence_bonus = 5
+magic_bonus = -4
+
+# --- Adamant Tier (Level 45) ---
+
+[adamant_body]
+display_name = "Adamant Platemail (M)"
+sprite = "adamant_platebody_male"
+description = "Dense adamant armor. Nearly impenetrable."
+category = "equipment"
+max_stack = 1
+base_price = 7000
+sellable = true
+[adamant_body.equipment]
+slot_type = "body"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 20
+magic_bonus = -14
+
+[adamant_body_female]
+display_name = "Adamant Platemail (F)"
+sprite = "adamant_platebody_female"
+description = "Dense adamant armor. Nearly impenetrable."
+category = "equipment"
+max_stack = 1
+base_price = 7000
+sellable = true
+[adamant_body_female.equipment]
+slot_type = "body"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 20
+magic_bonus = -14
+
+[adamant_boots]
+display_name = "Adamant Boots"
+sprite = "adamant_boots"
+description = "Adamant boots that could stop a blade."
+category = "equipment"
+max_stack = 1
+base_price = 4500
+sellable = true
+[adamant_boots.equipment]
+slot_type = "feet"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 1
+defence_bonus = 12
+magic_bonus = -6
+
+[adamant_gloves]
+display_name = "Adamant Gloves"
+sprite = "adamant_gloves"
+description = "Adamant gauntlets forged for war."
+category = "equipment"
+max_stack = 1
+base_price = 3500
+sellable = true
+[adamant_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 45
+attack_bonus = 0
+strength_bonus = 5
+defence_bonus = 7
+magic_bonus = -6
+
+# --- Rune Tier (Level 55) ---
+
+[rune_body]
+display_name = "Rune Platemail (M)"
+sprite = "rune_platebody_male"
+description = "Runite armor pulsing with magical energy. The finest protection gold can buy."
+category = "equipment"
+max_stack = 1
+base_price = 14000
+sellable = true
+[rune_body.equipment]
+slot_type = "body"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 25
+magic_bonus = -16
+
+[rune_body_female]
+display_name = "Rune Platemail (F)"
+sprite = "rune_platebody_female"
+description = "Runite armor pulsing with magical energy. The finest protection gold can buy."
+category = "equipment"
+max_stack = 1
+base_price = 14000
+sellable = true
+[rune_body_female.equipment]
+slot_type = "body"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 25
+magic_bonus = -16
+
+[rune_boots]
+display_name = "Rune Boots"
+sprite = "rune_boots"
+description = "Runite boots humming with power. Unmatched protection."
+category = "equipment"
+max_stack = 1
+base_price = 8000
+sellable = true
+[rune_boots.equipment]
+slot_type = "feet"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 2
+defence_bonus = 15
+magic_bonus = -8
+
+[rune_gloves]
+display_name = "Rune Gloves"
+sprite = "rune_gloves"
+description = "Runite gauntlets. The pinnacle of smithing craft."
+category = "equipment"
+max_stack = 1
+base_price = 6500
+sellable = true
+[rune_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 55
+attack_bonus = 0
+strength_bonus = 6
+defence_bonus = 9
+magic_bonus = -6
+
+# --- Ancient Tier (Level 40) ---
+# Note: ancient_boots is defined in the FEET section above (replaced from level 20 to tier 4)
+
+[ancient_body]
+display_name = "Ancient Platemail (M)"
+sprite = "ancient_platebody_male"
+description = "Armor from a lost age, reforged from fragments of immense power."
+category = "equipment"
+max_stack = 1
+base_price = 21000
+sellable = true
+[ancient_body.equipment]
+slot_type = "body"
+defence_level_required = 65
+attack_bonus = 0
+strength_bonus = 3
+defence_bonus = 31
+
+[ancient_body_female]
+display_name = "Ancient Platemail (F)"
+sprite = "ancient_platebody_female"
+description = "Armor from a lost age, reforged from fragments of immense power."
+category = "equipment"
+max_stack = 1
+base_price = 21000
+sellable = true
+[ancient_body_female.equipment]
+slot_type = "body"
+defence_level_required = 65
+attack_bonus = 0
+strength_bonus = 3
+defence_bonus = 31
+
+[ancient_gloves]
+display_name = "Ancient Gloves"
+sprite = "ancient_gloves"
+description = "Gauntlets humming with ancient energy. They feel alive."
+category = "equipment"
+max_stack = 1
+base_price = 10000
+sellable = true
+[ancient_gloves.equipment]
+slot_type = "gloves"
+defence_level_required = 65
+attack_bonus = 0
+strength_bonus = 8
+defence_bonus = 11
+
+[ancient_sword]
+display_name = "Ancient Sword"
+sprite = "ancient_sword"
+description = "A blade from a forgotten era. Its edge never dulls."
+category = "equipment"
+max_stack = 1
+base_price = 20000
+sellable = true
+[ancient_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 65
+attack_bonus = 28
+strength_bonus = 20
+defence_bonus = 0
+
+# --- Mithril Tier (Level 35) ---
+
+[mithril_sword]
+display_name = "Mithril Sword"
+sprite = "mithril_sword"
+description = "A lightweight mithril blade. Cuts through armor with ease."
+category = "equipment"
+max_stack = 1
+base_price = 4000
+sellable = true
+[mithril_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 35
+attack_bonus = 13
+strength_bonus = 9
+defence_bonus = 0
+
+# --- Adamant Tier (Level 45) ---
+
+[adamant_sword]
+display_name = "Adamant Sword"
+sprite = "adamant_sword"
+description = "A dense adamant blade. Heavy but devastatingly powerful."
+category = "equipment"
+max_stack = 1
+base_price = 8000
+sellable = true
+[adamant_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 45
+attack_bonus = 18
+strength_bonus = 13
+defence_bonus = 0
+
+# --- Rune Tier (Level 55) ---
+
+[rune_sword]
+display_name = "Rune Sword"
+sprite = "rune_sword"
+description = "A runite blade pulsing with magical energy. The pinnacle of smithing."
+category = "equipment"
+max_stack = 1
+base_price = 15000
+sellable = true
+[rune_sword.equipment]
+slot_type = "weapon"
+attack_level_required = 55
+attack_bonus = 22
+strength_bonus = 16
+defence_bonus = 0

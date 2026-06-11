@@ -136,11 +136,18 @@ impl GameRoom {
 
                 // Special case: commission marks (not an inventory item)
                 if item_id == "commission_marks" {
-                    if let (Some(db), Some(character_id)) = (&self.db, Self::parse_character_id(player_id)) {
+                    if let (Some(db), Some(character_id)) =
+                        (&self.db, Self::parse_character_id(player_id))
+                    {
                         if let Err(e) = db.add_commission_marks(character_id, quantity).await {
-                            self.send_system_message(player_id, &format!("Failed: {}", e)).await;
+                            self.send_system_message(player_id, &format!("Failed: {}", e))
+                                .await;
                         } else {
-                            self.send_system_message(player_id, &format!("Gave {} commission marks.", quantity)).await;
+                            self.send_system_message(
+                                player_id,
+                                &format!("Gave {} commission marks.", quantity),
+                            )
+                            .await;
                         }
                     }
                     return;

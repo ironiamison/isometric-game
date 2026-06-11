@@ -21,7 +21,9 @@ pub fn checked_gold_credit(balance: i32, amount: i32) -> Option<i32> {
     if balance < 0 || amount < 0 {
         return None;
     }
-    balance.checked_add(amount).filter(|total| *total <= MAX_GOLD)
+    balance
+        .checked_add(amount)
+        .filter(|total| *total <= MAX_GOLD)
 }
 
 pub fn checked_gold_debit(balance: i32, amount: i32) -> Option<i32> {

@@ -207,3 +207,20 @@ impl Default for ItemRegistry {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_split_equipment_catalogs() {
+        let mut registry = ItemRegistry::new();
+        registry
+            .load_from_directory(Path::new("data"))
+            .expect("production item catalogs should parse");
+
+        assert!(registry.contains("training_boots"));
+        assert!(registry.contains("used_belt"));
+        assert!(registry.contains("bronze_scimitar"));
+    }
+}

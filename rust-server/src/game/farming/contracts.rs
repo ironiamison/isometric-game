@@ -290,12 +290,14 @@ impl GameRoom {
                 return;
             };
 
-            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, gold_reward) else {
+            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, gold_reward)
+            else {
                 drop(players);
                 drop(farming);
                 let mut farming = self.farming.write().await;
                 farming.insert_contract(player_id, contract);
-                self.send_system_message(player_id, "Gold limit reached.").await;
+                self.send_system_message(player_id, "Gold limit reached.")
+                    .await;
                 return;
             };
             player.inventory.gold = new_gold;

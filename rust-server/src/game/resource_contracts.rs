@@ -303,7 +303,9 @@ impl GameRoom {
 
             let order_ids = if already_generated {
                 // Orders were already generated today — return whatever remains (may be empty)
-                db.get_available_orders(char_id, &today).await.unwrap_or_default()
+                db.get_available_orders(char_id, &today)
+                    .await
+                    .unwrap_or_default()
             } else {
                 // New day or first time — generate fresh orders
                 let new_ids = self
@@ -337,8 +339,12 @@ impl GameRoom {
                             }
                         })
                         .collect();
-                    let reward_xp: Vec<(String, i64)> =
-                        template.rewards.xp.iter().map(|(k, v)| (k.clone(), *v)).collect();
+                    let reward_xp: Vec<(String, i64)> = template
+                        .rewards
+                        .xp
+                        .iter()
+                        .map(|(k, v)| (k.clone(), *v))
+                        .collect();
                     crafting_orders.push(CraftingOrderOfferData {
                         order_id: template.id.clone(),
                         tier: template.tier.clone(),
@@ -413,7 +419,9 @@ impl GameRoom {
         // Get daily contract count
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let daily_contracts_completed = if let Some(ref db) = self.db {
-            db.get_daily_contracts_completed(player_id, &today).await.unwrap_or(0)
+            db.get_daily_contracts_completed(player_id, &today)
+                .await
+                .unwrap_or(0)
         } else {
             0
         };
@@ -719,7 +727,10 @@ impl GameRoom {
                 if daily_count >= DAILY_CONTRACT_LIMIT {
                     self.send_system_message(
                         player_id,
-                        &format!("You've reached your daily contract limit ({}/{}).", daily_count, DAILY_CONTRACT_LIMIT),
+                        &format!(
+                            "You've reached your daily contract limit ({}/{}).",
+                            daily_count, DAILY_CONTRACT_LIMIT
+                        ),
                     )
                     .await;
                     return;
@@ -856,7 +867,10 @@ impl GameRoom {
                 if daily_count >= DAILY_CONTRACT_LIMIT {
                     self.send_system_message(
                         player_id,
-                        &format!("You've reached your daily contract limit ({}/{}).", daily_count, DAILY_CONTRACT_LIMIT),
+                        &format!(
+                            "You've reached your daily contract limit ({}/{}).",
+                            daily_count, DAILY_CONTRACT_LIMIT
+                        ),
                     )
                     .await;
                     return;
@@ -1006,11 +1020,13 @@ impl GameRoom {
                 return;
             };
 
-            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, gold_reward) else {
+            let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, gold_reward)
+            else {
                 drop(players);
                 let mut resource_contracts = self.resource_contracts.write().await;
                 resource_contracts.insert_contract(contract.clone());
-                self.send_system_message(player_id, "Gold limit reached.").await;
+                self.send_system_message(player_id, "Gold limit reached.")
+                    .await;
                 return;
             };
             player.inventory.gold = new_gold;
