@@ -49,9 +49,10 @@ tools.
 client/             Macroquad game client for desktop, WASM, and Android
 rust-server/        Authoritative game server and persistent game data
 mapper/             World mapper, content studio, and its local Express API
-web-stats/          Public player profiles, leaderboards, and world statistics
+site/               Unified SvelteKit site (homepage, /world/ stats, /play/ shell)
 launcher/           Desktop installer/updater
-homepage/           Static public website
+web-stats/          (deprecated — ported to site/)
+homepage/           (deprecated — ported to site/)
 tools/              Client and launcher packaging utilities
 docs/               Design notes, plans, and historical implementation records
 .github/workflows/  Deployment and release workflows
@@ -128,13 +129,15 @@ Open `http://localhost:5173/mapper/`. The mapper API reads and writes repository
 content, including maps, TOML files, and generated atlases. Treat it as a local
 development tool and do not expose it to an untrusted network.
 
-### 4. Start The Public Stats Site
+### 4. Start The Public Site (homepage + world stats)
 
 ```bash
-cd web-stats
+cd site
 npm install
 npm run dev
 ```
+
+World stats live at `http://localhost:5173/world/`. See `site/DEPLOYMENT.md` for VPS setup.
 
 ### 5. Start The Launcher
 
@@ -192,7 +195,7 @@ Run these checks before opening a pull request:
 (cd launcher && cargo check --all-targets)
 (cd mapper/server && npm run build)
 (cd mapper && npm run build && npm run lint)
-(cd web-stats && npm run build && npm run lint)
+(cd site && npm run build && npm run check)
 ```
 
 The 128-player release-mode server budget test is ignored during normal test

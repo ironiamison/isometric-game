@@ -3,8 +3,7 @@ set -e
 source "$HOME/.cargo/env" 2>/dev/null || true
 
 REPO_DIR="/root/isometric-game"
-WEB_STATS_BASE_PATH="${WEB_STATS_BASE_PATH:-/players/}"
-WEB_STATS_DEPLOY_DIR="${WEB_STATS_DEPLOY_DIR:-/var/www/aeven/players}"
+SITE_DEPLOY_DIR="${SITE_DEPLOY_DIR:-/var/www/aeven}"
 cd "$REPO_DIR"
 
 # Get current commit before pull
@@ -24,30 +23,56 @@ fi
 # Check what changed
 CLIENT_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- client/ | head -1)
 SERVER_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- rust-server/ | head -1)
-WEB_STATS_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- web-stats/ | head -1)
+SITE_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- site/ homepage/ | head -1)
 
-if [ -n "$CLIENT_CHANGED" ]; then
-    echo "Client changes detected, rebuilding WASM..."
+deploy_site() {
+    if ! command -v npm >/dev/null 2>&1; then
+        echo "ERROR: npm not found. Install Node.js/npm on the VPS."
+        exit 1
+    fi
+
+    PLAY_DIR="$REPO_DIR/site/static/play"
+    mkdir -p "$PLAY_DIR"
+
+    echo "Building WASM client..."
     cd "$REPO_DIR/client"
     rustup target add wasm32-unknown-unknown 2>/dev/null || true
     cargo build --target wasm32-unknown-unknown --profile release-wasm
-    # Copy WASM artifact to web directory
     WASM_DIR="$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm"
     if [ -f "$WASM_DIR/isometric_client.wasm" ]; then
-        cp "$WASM_DIR/isometric_client.wasm" "$REPO_DIR/client/web/"
-        echo "Copied isometric_client.wasm"
+        cp "$WASM_DIR/isometric_client.wasm" "$PLAY_DIR/"
     elif [ -f "$WASM_DIR/libisometric_client.wasm" ]; then
-        cp "$WASM_DIR/libisometric_client.wasm" "$REPO_DIR/client/web/isometric_client.wasm"
-        echo "Copied libisometric_client.wasm"
+        cp "$WASM_DIR/libisometric_client.wasm" "$PLAY_DIR/isometric_client.wasm"
     elif [ -f "$WASM_DIR/isometric-client.wasm" ]; then
-        cp "$WASM_DIR/isometric-client.wasm" "$REPO_DIR/client/web/isometric_client.wasm"
-        echo "Copied isometric-client.wasm"
+        cp "$WASM_DIR/isometric-client.wasm" "$PLAY_DIR/isometric_client.wasm"
     else
         echo "ERROR: No WASM artifact found in $WASM_DIR"
-        ls -la "$WASM_DIR"/*.wasm 2>/dev/null || echo "No .wasm files found"
         exit 1
     fi
-    echo "WASM build complete."
+
+    cp "$REPO_DIR/client/web/"*.js "$PLAY_DIR/" 2>/dev/null || true
+    cp "$REPO_DIR/client/web/index.html" "$PLAY_DIR/"
+    echo "Copying game assets..."
+    rm -rf "$PLAY_DIR/assets"
+    rsync -a "$REPO_DIR/client/assets/" "$PLAY_DIR/assets/"
+
+    echo "Building unified site..."
+    cd "$REPO_DIR/site"
+    npm ci
+    npm run build
+
+    mkdir -p "$SITE_DEPLOY_DIR"
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -av --delete "$REPO_DIR/site/build/" "$SITE_DEPLOY_DIR/"
+    else
+        rm -rf "$SITE_DEPLOY_DIR"/*
+        cp -R "$REPO_DIR/site/build/." "$SITE_DEPLOY_DIR/"
+    fi
+    echo "Site deployed to $SITE_DEPLOY_DIR"
+}
+
+if [ -n "$CLIENT_CHANGED" ] || [ -n "$SITE_CHANGED" ]; then
+    deploy_site
 fi
 
 if [ -n "$SERVER_CHANGED" ]; then
@@ -57,27 +82,6 @@ if [ -n "$SERVER_CHANGED" ]; then
     echo "Restarting game server..."
     systemctl restart isometric-server
     echo "Server restarted."
-fi
-
-if [ -n "$WEB_STATS_CHANGED" ]; then
-    echo "Web stats changes detected, building and deploying /players..."
-    if ! command -v npm >/dev/null 2>&1; then
-        echo "ERROR: npm not found. Install Node.js/npm on the VPS."
-        exit 1
-    fi
-
-    cd "$REPO_DIR/web-stats"
-    npm ci
-    WEB_STATS_BASE="$WEB_STATS_BASE_PATH" npm run build
-
-    mkdir -p "$WEB_STATS_DEPLOY_DIR"
-    if command -v rsync >/dev/null 2>&1; then
-        rsync -av --delete "$REPO_DIR/web-stats/dist/" "$WEB_STATS_DEPLOY_DIR/"
-    else
-        rm -rf "$WEB_STATS_DEPLOY_DIR"/*
-        cp -R "$REPO_DIR/web-stats/dist/." "$WEB_STATS_DEPLOY_DIR/"
-    fi
-    echo "Web stats deployed to $WEB_STATS_DEPLOY_DIR (base: $WEB_STATS_BASE_PATH)"
 fi
 
 echo "Deploy complete."
