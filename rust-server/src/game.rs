@@ -97,6 +97,25 @@ const VIEW_DISTANCE: i32 = 40;
 // Keep some sender queue headroom so StateSync doesn't starve lower-frequency critical updates.
 const STATE_SYNC_MIN_QUEUE_CAPACITY: usize = 8;
 
+fn is_within_view(source_x: i32, source_y: i32, target_x: i32, target_y: i32) -> bool {
+    (source_x - target_x)
+        .abs()
+        .max((source_y - target_y).abs())
+        <= VIEW_DISTANCE
+}
+
+fn is_visible_event_recipient(
+    source_instance: Option<&str>,
+    source_x: i32,
+    source_y: i32,
+    recipient_instance: Option<&str>,
+    recipient_x: i32,
+    recipient_y: i32,
+) -> bool {
+    source_instance == recipient_instance
+        && is_within_view(source_x, source_y, recipient_x, recipient_y)
+}
+
 // World spawn point (chunk 0,0) - where players respawn after death
 pub const WORLD_SPAWN_X: i32 = 15;
 pub const WORLD_SPAWN_Y: i32 = 4;
@@ -1280,7 +1299,10 @@ mod sync_state_tests {
 
 #[cfg(test)]
 mod interaction_security_tests {
-    use super::{DialogueGrant, consume_dialogue_choice, same_interaction_context};
+    use super::{
+        DialogueGrant, VIEW_DISTANCE, consume_dialogue_choice, is_visible_event_recipient,
+        is_within_view, same_interaction_context,
+    };
     use std::collections::HashSet;
 
     #[test]
@@ -1327,6 +1349,41 @@ mod interaction_security_tests {
         assert!(!same_interaction_context(
             Some(&instance_a),
             Some(&instance_b)
+        ));
+    }
+
+    #[test]
+    fn positional_visibility_uses_the_state_sync_view_boundary() {
+        assert!(is_within_view(10, 10, 10 + VIEW_DISTANCE, 10));
+        assert!(is_within_view(
+            10,
+            10,
+            10 + VIEW_DISTANCE,
+            10 - VIEW_DISTANCE
+        ));
+        assert!(!is_within_view(10, 10, 11 + VIEW_DISTANCE, 10));
+    }
+
+    #[test]
+    fn positional_visibility_rejects_other_instances_and_distant_players() {
+        assert!(is_visible_event_recipient(
+            None, 10, 10, None, 10, 10
+        ));
+        assert!(!is_visible_event_recipient(
+            None,
+            10,
+            10,
+            None,
+            11 + VIEW_DISTANCE,
+            10
+        ));
+        assert!(!is_visible_event_recipient(
+            Some("instance-a"),
+            10,
+            10,
+            Some("instance-b"),
+            10,
+            10
         ));
     }
 }
@@ -1377,6 +1434,8 @@ pub struct GameRoom {
     players: RwLock<HashMap<String, Player>>,
     npcs: RwLock<HashMap<String, Npc>>,
     ground_items: RwLock<HashMap<String, GroundItem>>,
+    /// Ground item ids currently known by each client for visibility reconciliation.
+    visible_ground_items: RwLock<HashMap<String, HashSet<String>>>,
     world: Arc<World>,
     /// Entity prototype registry for spawning and loot
     entity_registry: Arc<EntityRegistry>,
@@ -2087,6 +2146,7 @@ impl GameRoom {
             players: RwLock::new(HashMap::new()),
             npcs: RwLock::new(npcs),
             ground_items: RwLock::new(ground_items),
+            visible_ground_items: RwLock::new(HashMap::new()),
             world,
             entity_registry,
             quest_registry,
@@ -2246,11 +2306,14 @@ impl GameRoom {
 
     /// Broadcast a SkillLevelUp and check if it changes the top total level players.
     pub async fn broadcast_skill_level_up(&self, player_id: &str, skill: &str, new_level: i32) {
-        self.broadcast(ServerMessage::SkillLevelUp {
-            player_id: player_id.to_string(),
-            skill: skill.to_string(),
-            new_level,
-        })
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::SkillLevelUp {
+                player_id: player_id.to_string(),
+                skill: skill.to_string(),
+                new_level,
+            },
+        )
         .await;
 
         // Check if this level-up changes the rankings (skip admins — they're excluded from rankings)
@@ -2303,62 +2366,148 @@ impl GameRoom {
         }
     }
 
-    /// Broadcast a message only to players in the same zone as the given player
-    /// (same instance, or all overworld players if player is in overworld)
+    /// Broadcast a positional event to players who can currently see the source player.
     pub async fn broadcast_to_zone(&self, source_player_id: &str, msg: ServerMessage) {
+        self.broadcast_to_zone_except(source_player_id, msg, None)
+            .await;
+    }
+
+    pub async fn broadcast_to_zone_except(
+        &self,
+        source_player_id: &str,
+        msg: ServerMessage,
+        exclude: Option<&str>,
+    ) {
+        let (source_x, source_y) = {
+            let players = self.players.read().await;
+            let Some(source) = players.get(source_player_id) else {
+                return;
+            };
+            (source.x, source.y)
+        };
         let source_instance = self
             .player_instances
             .read()
             .await
             .get(source_player_id)
             .cloned();
-        let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
+        let recipients: Vec<(String, mpsc::Sender<Vec<u8>>)> = {
             let player_instances = self.player_instances.read().await;
+            let players = self.players.read().await;
             let senders = self.player_senders.read().await;
             senders
                 .iter()
                 .filter(|(player_id, _)| {
-                    player_instances.get(*player_id).cloned() == source_instance
+                    exclude != Some(player_id.as_str())
+                        && players.get(*player_id).is_some_and(|player| {
+                            player.active
+                                && is_visible_event_recipient(
+                                    source_instance.as_deref(),
+                                    source_x,
+                                    source_y,
+                                    player_instances.get(*player_id).map(String::as_str),
+                                    player.x,
+                                    player.y,
+                                )
+                        })
                 })
-                .map(|(_, sender)| sender.clone())
+                .map(|(player_id, sender)| (player_id.clone(), sender.clone()))
                 .collect()
         };
 
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-            for sender in recipients {
+            for (_, sender) in &recipients {
                 let _ = sender.try_send(bytes.clone());
             }
         }
+        self.record_ground_item_visibility(
+            &msg,
+            recipients.iter().map(|(player_id, _)| player_id.as_str()),
+        )
+        .await;
     }
 
-    /// Broadcast a message to all players in the given zone (instance_id).
-    /// None = overworld, Some(id) = that specific instance.
-    pub async fn broadcast_to_zone_by_instance(
+    /// Broadcast a positional event around coordinates in an instance or the overworld.
+    pub async fn broadcast_to_area(
         &self,
         instance_id: Option<&str>,
+        source_x: i32,
+        source_y: i32,
         msg: ServerMessage,
     ) {
-        let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
+        let recipients: Vec<(String, mpsc::Sender<Vec<u8>>)> = {
             let player_instances = self.player_instances.read().await;
+            let players = self.players.read().await;
             let senders = self.player_senders.read().await;
             senders
                 .iter()
                 .filter(|(player_id, _)| {
-                    player_instances.get(*player_id).map(String::as_str) == instance_id
+                    players.get(*player_id).is_some_and(|player| {
+                        player.active
+                            && is_visible_event_recipient(
+                                instance_id,
+                                source_x,
+                                source_y,
+                                player_instances.get(*player_id).map(String::as_str),
+                                player.x,
+                                player.y,
+                            )
+                    })
                 })
-                .map(|(_, sender)| sender.clone())
+                .map(|(player_id, sender)| (player_id.clone(), sender.clone()))
                 .collect()
         };
 
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-            for sender in recipients {
+            for (_, sender) in &recipients {
                 let _ = sender.try_send(bytes.clone());
+            }
+        }
+        self.record_ground_item_visibility(
+            &msg,
+            recipients.iter().map(|(player_id, _)| player_id.as_str()),
+        )
+        .await;
+    }
+
+    async fn record_ground_item_visibility<'a>(
+        &self,
+        msg: &ServerMessage,
+        recipients: impl Iterator<Item = &'a str>,
+    ) {
+        let (item_id, visible) = match msg {
+            ServerMessage::ItemDropped { id, .. } => (id, true),
+            ServerMessage::ItemPickedUp { item_id, .. }
+            | ServerMessage::ItemDespawned { item_id } => (item_id, false),
+            _ => return,
+        };
+        let mut visibility = self.visible_ground_items.write().await;
+        for player_id in recipients {
+            let known = visibility.entry(player_id.to_string()).or_default();
+            if visible {
+                known.insert(item_id.clone());
+            } else {
+                known.remove(item_id);
             }
         }
     }
 
     /// Send a message to all overworld players (those not in any instance), optionally excluding one player
     pub async fn send_to_overworld_players(&self, msg: ServerMessage, exclude: Option<&str>) {
+        let positional_source = match &msg {
+            ServerMessage::PlayerJoined { id, .. } | ServerMessage::PlayerLeft { id } => {
+                Some(id.clone())
+            }
+            _ => None,
+        };
+        if let Some(source_player_id) = positional_source {
+            if self.players.read().await.contains_key(&source_player_id) {
+                self.broadcast_to_zone_except(&source_player_id, msg, exclude)
+                    .await;
+                return;
+            }
+        }
+
         let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
             let player_instances = self.player_instances.read().await;
             let senders = self.player_senders.read().await;
@@ -2980,6 +3129,7 @@ impl GameRoom {
             let mut chunks = self.player_chunks.write().await;
             chunks.remove(player_id);
         }
+        self.visible_ground_items.write().await.remove(player_id);
 
         // Clean up player quest states
         {
@@ -3684,21 +3834,65 @@ impl GameRoom {
         players.get(player_id).map(|p| p.name.clone())
     }
 
-    /// Get all ground items in a specific instance (or overworld if None)
-    pub async fn get_ground_items_in_instance(
-        &self,
-        instance_id: Option<&str>,
-    ) -> Vec<ServerMessage> {
+    pub async fn get_visible_players(&self, player_id: &str) -> Vec<Player> {
+        let players = self.players.read().await;
+        let Some(source) = players.get(player_id) else {
+            return Vec::new();
+        };
+        let instances = self.player_instances.read().await;
+        let source_instance = instances.get(player_id).map(String::as_str);
+        players
+            .values()
+            .filter(|player| {
+                player.id != player_id
+                    && player.active
+                    && is_visible_event_recipient(
+                        source_instance,
+                        source.x,
+                        source.y,
+                        instances.get(&player.id).map(String::as_str),
+                        player.x,
+                        player.y,
+                    )
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Get ground items currently visible to a player.
+    pub async fn get_visible_ground_items(&self, player_id: &str) -> Vec<ServerMessage> {
+        let (player_x, player_y) = {
+            let players = self.players.read().await;
+            let Some(player) = players.get(player_id) else {
+                return Vec::new();
+            };
+            (player.x, player.y)
+        };
+        let instance_id = self.player_instances.read().await.get(player_id).cloned();
         let items = self.ground_items.read().await;
-        items
+        let visible_items: Vec<&GroundItem> = items
             .values()
             .filter(|item| {
-                match (&item.instance_id, instance_id) {
+                let same_instance = match (&item.instance_id, instance_id.as_ref()) {
                     (None, None) => true,         // Both overworld
                     (Some(a), Some(b)) => a == b, // Same instance
                     _ => false,                   // Different zones
-                }
+                };
+                same_instance
+                    && is_within_view(
+                        player_x,
+                        player_y,
+                        item.x.floor() as i32,
+                        item.y.floor() as i32,
+                    )
             })
+            .collect();
+        self.visible_ground_items.write().await.insert(
+            player_id.to_string(),
+            visible_items.iter().map(|item| item.id.clone()).collect(),
+        );
+        visible_items
+            .into_iter()
             .map(|item| ServerMessage::ItemDropped {
                 id: item.id.clone(),
                 item_id: item.item_id.clone(),
@@ -3707,6 +3901,60 @@ impl GameRoom {
                 quantity: item.quantity,
             })
             .collect()
+    }
+
+    async fn sync_ground_item_visibility(&self) {
+        let players = self.players.read().await;
+        let instances = self.player_instances.read().await;
+        let items = self.ground_items.read().await;
+        let senders = self.player_senders.read().await;
+        let mut visibility = self.visible_ground_items.write().await;
+
+        for (player_id, sender) in senders.iter() {
+            let Some(player) = players.get(player_id) else {
+                continue;
+            };
+            let player_instance = instances.get(player_id);
+            let current: HashSet<String> = items
+                .values()
+                .filter(|item| {
+                    is_visible_event_recipient(
+                        item.instance_id.as_deref(),
+                        item.x.floor() as i32,
+                        item.y.floor() as i32,
+                        player_instance.map(String::as_str),
+                        player.x,
+                        player.y,
+                    )
+                })
+                .map(|item| item.id.clone())
+                .collect();
+            let known = visibility.entry(player_id.clone()).or_default();
+
+            for item_id in current.difference(known) {
+                if let Some(item) = items.get(item_id) {
+                    let msg = ServerMessage::ItemDropped {
+                        id: item.id.clone(),
+                        item_id: item.item_id.clone(),
+                        x: item.x,
+                        y: item.y,
+                        quantity: item.quantity,
+                    };
+                    if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+                        let _ = sender.try_send(bytes);
+                    }
+                }
+            }
+            for item_id in known.difference(&current) {
+                let msg = ServerMessage::ItemDespawned {
+                    item_id: item_id.clone(),
+                };
+                if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
+                    let _ = sender.try_send(bytes);
+                }
+            }
+            *known = current;
+        }
     }
 
     /// Get the initial inventory update message for a player (used on connection)
@@ -4464,16 +4712,19 @@ impl GameRoom {
             }
         }
 
-        // Broadcast attack animation to all clients (plays even if no target hit)
+        // Broadcast attack animation to nearby clients (plays even if no target hit)
         let attack_type = match weapon_type {
             WeaponType::Ranged => "ranged",
             WeaponType::Melee => "melee",
         };
-        self.broadcast(ServerMessage::PlayerAttack {
-            player_id: player_id.to_string(),
-            attack_type: attack_type.to_string(),
-            direction: attacker_dir as u8,
-        })
+        self.broadcast_to_zone(
+            player_id,
+            ServerMessage::PlayerAttack {
+                player_id: player_id.to_string(),
+                attack_type: attack_type.to_string(),
+                direction: attacker_dir as u8,
+            },
+        )
         .await;
 
         // Update attacker's last attack time and stop movement BEFORE target scan.
@@ -5041,7 +5292,7 @@ impl GameRoom {
             success: true,
             reason: None,
         };
-        self.broadcast(result_msg).await;
+        self.send_to_player(player_id, result_msg).await;
 
         // Award combat XP on every successful hit (OSRS style: XP per damage dealt)
         if actual_damage > 0 {
@@ -5452,7 +5703,7 @@ impl GameRoom {
                         id: target_id.clone(),
                         killer_id: player_id.to_string(),
                     };
-                    self.broadcast(death_msg).await;
+                    self.broadcast_to_zone(player_id, death_msg).await;
 
                     self.clear_auto_action(&target_id, "player_died").await;
 
@@ -5554,13 +5805,13 @@ impl GameRoom {
                 player.target_id = new_target.clone();
                 tracing::info!("{} now targeting {:?}", player.name, new_target);
 
-                // Broadcast target change to all clients
+                // Broadcast target change to nearby clients.
                 let msg = ServerMessage::TargetChanged {
                     player_id: player_id.to_string(),
                     target_id: new_target,
                 };
                 drop(players); // Release lock before broadcast
-                self.broadcast(msg).await;
+                self.broadcast_to_zone(player_id, msg).await;
             }
         }
     }
@@ -6784,10 +7035,13 @@ impl GameRoom {
                     )
                     .await;
 
-                    self.broadcast(ServerMessage::TargetChanged {
-                        player_id: target_id.clone(),
-                        target_id: Some(npc_id.clone()),
-                    })
+                    self.broadcast_to_zone(
+                        &target_id,
+                        ServerMessage::TargetChanged {
+                            player_id: target_id.clone(),
+                            target_id: Some(npc_id.clone()),
+                        },
+                    )
                     .await;
                 }
             }
@@ -6795,10 +7049,13 @@ impl GameRoom {
             // Handle player death
             if died {
                 tracing::info!("NPC {} killed player {}", npc_id, target_id);
-                self.broadcast(ServerMessage::PlayerDied {
-                    id: target_id.clone(),
-                    killer_id: npc_id.clone(),
-                })
+                self.broadcast_to_zone(
+                    &target_id,
+                    ServerMessage::PlayerDied {
+                        id: target_id.clone(),
+                        killer_id: npc_id.clone(),
+                    },
+                )
                 .await;
 
                 self.clear_auto_action(&target_id, "player_died").await;
@@ -6829,7 +7086,7 @@ impl GameRoom {
 
         // Broadcast respawns
         for (id, x, y) in respawned_npcs {
-            self.broadcast(ServerMessage::NpcRespawned { id, x, y })
+            self.broadcast_to_area(None, x, y, ServerMessage::NpcRespawned { id, x, y })
                 .await;
         }
 
@@ -7215,13 +7472,18 @@ impl GameRoom {
                 .collect()
         };
 
-        // Remove and broadcast despawned items
+        // Remove and notify only players who could see the item.
         for item_id in expired_items {
             let mut items = self.ground_items.write().await;
-            if items.remove(&item_id).is_some() {
+            if let Some(item) = items.remove(&item_id) {
                 drop(items);
-                self.broadcast(ServerMessage::ItemDespawned { item_id })
-                    .await;
+                self.broadcast_to_area(
+                    item.instance_id.as_deref(),
+                    item.x.floor() as i32,
+                    item.y.floor() as i32,
+                    ServerMessage::ItemDespawned { item_id },
+                )
+                .await;
             }
         }
 
@@ -7252,17 +7514,31 @@ impl GameRoom {
                     );
                     {
                         let mut items = self.ground_items.write().await;
-                        items.insert(ground_item_id.clone(), ground_item);
+                        items.insert(ground_item_id.clone(), ground_item.clone());
                     }
                     {
                         let mut gsm = self.ground_spawn_manager.write().await;
                         gsm.set_active_ground_item(&spawn_id, ground_item_id);
                     }
+                    self.broadcast_to_area(
+                        ground_item.instance_id.as_deref(),
+                        ground_item.x.floor() as i32,
+                        ground_item.y.floor() as i32,
+                        ServerMessage::ItemDropped {
+                            id: ground_item.id,
+                            item_id: ground_item.item_id,
+                            x: ground_item.x,
+                            y: ground_item.y,
+                            quantity: ground_item.quantity,
+                        },
+                    )
+                    .await;
                     tracing::debug!("Respawned persistent ground item: {}", spawn_id);
                 }
             }
         }
 
+        self.sync_ground_item_visibility().await;
         self.process_resource_ticks(current_time).await;
 
         let farming_growth_ms = self
@@ -9128,10 +9404,13 @@ impl GameRoom {
                 };
 
                 // Broadcast NPC death
-                self.broadcast(ServerMessage::NpcDied {
-                    id: target_id.clone(),
-                    killer_id: player_id.to_string(),
-                })
+                self.broadcast_to_zone(
+                    player_id,
+                    ServerMessage::NpcDied {
+                        id: target_id.clone(),
+                        killer_id: player_id.to_string(),
+                    },
+                )
                 .await;
 
                 // Persist monster kill count for stats leaderboards.
@@ -9422,10 +9701,13 @@ impl GameRoom {
                     }
                 } else {
                     // Normal player death
-                    self.broadcast(ServerMessage::PlayerDied {
-                        id: target_id.clone(),
-                        killer_id: player_id.to_string(),
-                    })
+                    self.broadcast_to_zone(
+                        player_id,
+                        ServerMessage::PlayerDied {
+                            id: target_id.clone(),
+                            killer_id: player_id.to_string(),
+                        },
+                    )
                     .await;
 
                     // Send prayer state update to dying player (prayers cleared on death)

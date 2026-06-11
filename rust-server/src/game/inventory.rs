@@ -857,7 +857,7 @@ impl GameRoom {
         )
         .await;
 
-        self.broadcast(equipment_update_message(player_id, equipment))
+        self.broadcast_to_zone(player_id, equipment_update_message(player_id, equipment))
             .await;
     }
 
@@ -1029,7 +1029,7 @@ impl GameRoom {
         )
         .await;
 
-        self.broadcast(equipment_update_message(player_id, equipment))
+        self.broadcast_to_zone(player_id, equipment_update_message(player_id, equipment))
             .await;
     }
 
@@ -1113,22 +1113,22 @@ impl GameRoom {
             item_id
         );
 
+        {
+            let mut ground_items = self.ground_items.write().await;
+            ground_items.insert(ground_item.id.clone(), ground_item.clone());
+        }
+
         self.broadcast_to_zone(
             player_id,
             ServerMessage::ItemDropped {
-                id: ground_item.id.clone(),
-                item_id: item_id.clone(),
+                id: ground_item.id,
+                item_id,
                 x: drop_x as f32,
                 y: drop_y as f32,
                 quantity: quantity_to_drop,
             },
         )
         .await;
-
-        {
-            let mut ground_items = self.ground_items.write().await;
-            ground_items.insert(ground_item.id.clone(), ground_item);
-        }
 
         self.send_to_player(
             player_id,
@@ -1193,10 +1193,15 @@ impl GameRoom {
             amount
         );
 
+        {
+            let mut ground_items = self.ground_items.write().await;
+            ground_items.insert(ground_item.id.clone(), ground_item.clone());
+        }
+
         self.broadcast_to_zone(
             player_id,
             ServerMessage::ItemDropped {
-                id: ground_item.id.clone(),
+                id: ground_item.id,
                 item_id: GOLD_ITEM_ID.to_string(),
                 x: player_x as f32,
                 y: player_y as f32,
@@ -1204,11 +1209,6 @@ impl GameRoom {
             },
         )
         .await;
-
-        {
-            let mut ground_items = self.ground_items.write().await;
-            ground_items.insert(ground_item.id.clone(), ground_item);
-        }
 
         self.send_to_player(
             player_id,

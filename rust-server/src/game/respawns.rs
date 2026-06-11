@@ -157,7 +157,8 @@ impl GameRoom {
                 player.x,
                 player.y
             );
-            self.broadcast(respawn_broadcast_message(&player)).await;
+            self.broadcast_to_zone(&player.id, respawn_broadcast_message(&player))
+                .await;
             self.send_to_player(&player.id, respawn_prayer_state_message(&player))
                 .await;
         }

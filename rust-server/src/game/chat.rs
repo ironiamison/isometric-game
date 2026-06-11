@@ -676,10 +676,13 @@ impl GameRoom {
                                 .await;
                             }
                         } else {
-                            self.broadcast(ServerMessage::PlayerDied {
-                                id: target_id,
-                                killer_id: player_id.to_string(),
-                            })
+                            self.broadcast_to_zone(
+                                &target_id,
+                                ServerMessage::PlayerDied {
+                                    id: target_id.clone(),
+                                    killer_id: player_id.to_string(),
+                                },
+                            )
                             .await;
                         }
                     }

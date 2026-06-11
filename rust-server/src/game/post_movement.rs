@@ -53,13 +53,13 @@ impl GameRoom {
             drop(gathering);
 
             for id in stopped {
-                self.broadcast(gathering_stopped_message(&id, "moved"))
+                self.broadcast_to_zone(&id, gathering_stopped_message(&id, "moved"))
                     .await;
             }
         }
 
         for id in woodcutting_stopped {
-            self.broadcast(woodcutting_stopped_message(&id, "moved"))
+            self.broadcast_to_zone(&id, woodcutting_stopped_message(&id, "moved"))
                 .await;
         }
 

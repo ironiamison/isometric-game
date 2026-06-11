@@ -637,10 +637,15 @@ impl GameRoom {
                                     current_time,
                                 );
 
+                                {
+                                    let mut items = self.ground_items.write().await;
+                                    items.insert(ground_item.id.clone(), ground_item.clone());
+                                }
+
                                 self.broadcast_to_zone(
                                     player_id,
                                     ServerMessage::ItemDropped {
-                                        id: ground_item.id.clone(),
+                                        id: ground_item.id,
                                         item_id: gem_id.clone(),
                                         x: player_x as f32,
                                         y: player_y as f32,
@@ -648,11 +653,6 @@ impl GameRoom {
                                     },
                                 )
                                 .await;
-
-                                {
-                                    let mut items = self.ground_items.write().await;
-                                    items.insert(ground_item.id.clone(), ground_item);
-                                }
 
                                 self.send_system_message(
                                     player_id,
@@ -892,8 +892,10 @@ impl GameRoom {
             woodcutting.tick_respawns(current_time)
         };
         for event in tree_respawn_events {
-            self.broadcast_to_zone_by_instance(
+            self.broadcast_to_area(
                 event.instance_id.as_deref(),
+                event.x,
+                event.y,
                 ServerMessage::TreeRespawned {
                     x: event.x,
                     y: event.y,
@@ -908,8 +910,10 @@ impl GameRoom {
             mining.tick_respawns(current_time)
         };
         for event in rock_respawn_events {
-            self.broadcast_to_zone_by_instance(
+            self.broadcast_to_area(
                 event.instance_id.as_deref(),
+                event.x,
+                event.y,
                 ServerMessage::RockRespawned {
                     x: event.x,
                     y: event.y,

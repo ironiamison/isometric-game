@@ -2805,35 +2805,30 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                     }
                                 }
 
-                                // Send existing players (only overworld, not instanced)
+                                // Send only players inside the same visibility area.
                                 {
-                                    let instanced_players =
-                                        recv_state.player_instances.read().await;
-                                    for existing_player in recv_room.get_all_players().await {
-                                        if existing_player.id != player_id
-                                            && !instanced_players.contains_key(&existing_player.id)
-                                        {
-                                            let msg = ServerMessage::PlayerJoined {
-                                                id: existing_player.id.clone(),
-                                                name: existing_player.name.clone(),
-                                                x: existing_player.x,
-                                                y: existing_player.y,
-                                                gender: existing_player.gender.clone(),
-                                                skin: existing_player.skin.clone(),
-                                                hair_style: existing_player.hair_style,
-                                                hair_color: existing_player.hair_color,
-                                            };
-                                            if let Ok(bytes) = protocol::encode_server_message(&msg)
-                                            {
-                                                let _ = recv_tx.send(bytes).await;
-                                            }
+                                    for existing_player in
+                                        recv_room.get_visible_players(&player_id).await
+                                    {
+                                        let msg = ServerMessage::PlayerJoined {
+                                            id: existing_player.id.clone(),
+                                            name: existing_player.name.clone(),
+                                            x: existing_player.x,
+                                            y: existing_player.y,
+                                            gender: existing_player.gender.clone(),
+                                            skin: existing_player.skin.clone(),
+                                            hair_style: existing_player.hair_style,
+                                            hair_color: existing_player.hair_color,
+                                        };
+                                        if let Ok(bytes) = protocol::encode_server_message(&msg) {
+                                            let _ = recv_tx.send(bytes).await;
                                         }
                                     }
                                 }
 
                                 // Send existing overworld ground items
                                 let ground_items =
-                                    recv_room.get_ground_items_in_instance(None).await;
+                                    recv_room.get_visible_ground_items(&player_id).await;
                                 for item_msg in ground_items {
                                     if let Ok(bytes) = protocol::encode_server_message(&item_msg) {
                                         let _ = recv_tx.send(bytes).await;
@@ -3682,32 +3677,27 @@ async fn handle_socket(
             }
         }
 
-        // Send existing players to this client (only overworld players, not those in instances)
+        // Send existing players inside this client's visibility area.
         {
-            let instanced_players = state.player_instances.read().await;
-            for existing_player in room.get_all_players().await {
-                if existing_player.id != player_id
-                    && !instanced_players.contains_key(&existing_player.id)
-                {
-                    let msg = ServerMessage::PlayerJoined {
-                        id: existing_player.id.clone(),
-                        name: existing_player.name.clone(),
-                        x: existing_player.x,
-                        y: existing_player.y,
-                        gender: existing_player.gender.clone(),
-                        skin: existing_player.skin.clone(),
-                        hair_style: existing_player.hair_style,
-                        hair_color: existing_player.hair_color,
-                    };
-                    if let Ok(bytes) = protocol::encode_server_message(&msg) {
-                        let _ = sender.send(Message::Binary(bytes)).await;
-                    }
+            for existing_player in room.get_visible_players(&player_id).await {
+                let msg = ServerMessage::PlayerJoined {
+                    id: existing_player.id.clone(),
+                    name: existing_player.name.clone(),
+                    x: existing_player.x,
+                    y: existing_player.y,
+                    gender: existing_player.gender.clone(),
+                    skin: existing_player.skin.clone(),
+                    hair_style: existing_player.hair_style,
+                    hair_color: existing_player.hair_color,
+                };
+                if let Ok(bytes) = protocol::encode_server_message(&msg) {
+                    let _ = sender.send(Message::Binary(bytes)).await;
                 }
             }
         }
 
         // Send existing overworld ground items to this client
-        let ground_items = room.get_ground_items_in_instance(None).await;
+        let ground_items = room.get_visible_ground_items(&player_id).await;
         for item_msg in ground_items {
             if let Ok(bytes) = protocol::encode_server_message(&item_msg) {
                 let _ = sender.send(Message::Binary(bytes)).await;
@@ -4526,7 +4516,7 @@ async fn auto_enter_instance(
     .await;
 
     // Send ground items
-    let ground_items = room.get_ground_items_in_instance(Some(&instance.id)).await;
+    let ground_items = room.get_visible_ground_items(player_id).await;
     for item_msg in ground_items {
         room.send_to_player(player_id, item_msg).await;
     }
@@ -4730,7 +4720,7 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
                         .await;
 
                     // Send overworld ground items
-                    for item_msg in room.get_ground_items_in_instance(None).await {
+                    for item_msg in room.get_visible_ground_items(player_id).await {
                         room.send_to_player(player_id, item_msg).await;
                     }
 
@@ -5237,7 +5227,7 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
     .await;
 
     // Send existing ground items in this instance
-    let ground_items = room.get_ground_items_in_instance(Some(&instance.id)).await;
+    let ground_items = room.get_visible_ground_items(player_id).await;
     for item_msg in ground_items {
         room.send_to_player(player_id, item_msg).await;
     }

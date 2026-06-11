@@ -232,16 +232,21 @@ impl GameRoom {
 
                             if let Some((target_hp, died)) = result {
                                 if died {
-                                    self.broadcast(ServerMessage::PlayerDied {
-                                        id: target_id.clone(),
-                                        killer_id: "pharaoh_boss".to_string(),
-                                    })
+                                    self.broadcast_to_zone(
+                                        &target_id,
+                                        ServerMessage::PlayerDied {
+                                            id: target_id.clone(),
+                                            killer_id: "pharaoh_boss".to_string(),
+                                        },
+                                    )
                                     .await;
                                 }
 
                                 // Send DamageEvent with projectile visual
-                                self.send_to_instance(
-                                    &instance_id,
+                                self.broadcast_to_area(
+                                    Some(&instance_id),
+                                    target_x,
+                                    target_y,
                                     ServerMessage::DamageEvent {
                                         source_id: String::new(),
                                         target_id: target_id.clone(),
@@ -256,8 +261,12 @@ impl GameRoom {
                             }
                         }
                     } else {
-                        self.send_to_instance(
-                            &instance_id,
+                        let (effect_x, effect_y) =
+                            tiles.first().copied().unwrap_or_default();
+                        self.broadcast_to_area(
+                            Some(&instance_id),
+                            effect_x,
+                            effect_y,
                             ServerMessage::AoeWarning {
                                 tiles,
                                 delay_ms,
@@ -307,37 +316,51 @@ impl GameRoom {
 
                     // Send PlayerDied for any players killed by AOE
                     for pid in &died_players {
-                        self.broadcast(ServerMessage::PlayerDied {
-                            id: pid.clone(),
-                            killer_id: "desert_wurm".to_string(),
-                        })
+                        self.broadcast_to_zone(
+                            pid,
+                            ServerMessage::PlayerDied {
+                                id: pid.clone(),
+                                killer_id: "desert_wurm".to_string(),
+                            },
+                        )
                         .await;
                     }
 
                     // Send floating damage numbers for each hit player
-                    {
+                    let hit_updates = {
                         let players = self.players.read().await;
-                        for pid in &hit_players {
-                            if let Some(player) = players.get(pid) {
-                                self.send_to_instance(
-                                    &instance_id,
-                                    ServerMessage::DamageEvent {
-                                        source_id: String::new(),
-                                        target_id: pid.clone(),
-                                        damage,
-                                        target_hp: player.hp,
-                                        target_x: player.x as f32,
-                                        target_y: player.y as f32,
-                                        projectile: None,
-                                    },
-                                )
-                                .await;
-                            }
-                        }
+                        hit_players
+                            .iter()
+                            .filter_map(|pid| {
+                                players
+                                    .get(pid)
+                                    .map(|player| (pid.clone(), player.hp, player.x, player.y))
+                            })
+                            .collect::<Vec<_>>()
+                    };
+                    for (pid, hp, x, y) in hit_updates {
+                        self.broadcast_to_area(
+                            Some(&instance_id),
+                            x,
+                            y,
+                            ServerMessage::DamageEvent {
+                                source_id: String::new(),
+                                target_id: pid,
+                                damage,
+                                target_hp: hp,
+                                target_x: x as f32,
+                                target_y: y as f32,
+                                projectile: None,
+                            },
+                        )
+                        .await;
                     }
 
-                    self.send_to_instance(
-                        &instance_id,
+                    let (effect_x, effect_y) = tiles.first().copied().unwrap_or_default();
+                    self.broadcast_to_area(
+                        Some(&instance_id),
+                        effect_x,
+                        effect_y,
                         ServerMessage::AoeDamage {
                             tiles,
                             damage,
@@ -385,33 +408,44 @@ impl GameRoom {
 
                     // Send PlayerDied for any players killed by explosion
                     for pid in &died_players {
-                        self.broadcast(ServerMessage::PlayerDied {
-                            id: pid.clone(),
-                            killer_id: "exploding_rock".to_string(),
-                        })
+                        self.broadcast_to_zone(
+                            pid,
+                            ServerMessage::PlayerDied {
+                                id: pid.clone(),
+                                killer_id: "exploding_rock".to_string(),
+                            },
+                        )
                         .await;
                     }
 
                     // Send floating damage numbers for explosion hits
-                    {
+                    let hit_updates = {
                         let players = self.players.read().await;
-                        for pid in &hit_players {
-                            if let Some(player) = players.get(pid) {
-                                self.send_to_instance(
-                                    &instance_id,
-                                    ServerMessage::DamageEvent {
-                                        source_id: String::new(),
-                                        target_id: pid.clone(),
-                                        damage,
-                                        target_hp: player.hp,
-                                        target_x: player.x as f32,
-                                        target_y: player.y as f32,
-                                        projectile: None,
-                                    },
-                                )
-                                .await;
-                            }
-                        }
+                        hit_players
+                            .iter()
+                            .filter_map(|pid| {
+                                players
+                                    .get(pid)
+                                    .map(|player| (pid.clone(), player.hp, player.x, player.y))
+                            })
+                            .collect::<Vec<_>>()
+                    };
+                    for (pid, hp, x, y) in hit_updates {
+                        self.broadcast_to_area(
+                            Some(&instance_id),
+                            x,
+                            y,
+                            ServerMessage::DamageEvent {
+                                source_id: String::new(),
+                                target_id: pid,
+                                damage,
+                                target_hp: hp,
+                                target_x: x as f32,
+                                target_y: y as f32,
+                                projectile: None,
+                            },
+                        )
+                        .await;
                     }
 
                     // Damage boss if any of its occupied tiles are in blast zone
@@ -443,8 +477,10 @@ impl GameRoom {
                                 };
                                 // Show damage number on boss
                                 if let Some(hp) = boss_hp_after {
-                                    self.send_to_instance(
-                                        &instance_id,
+                                    self.broadcast_to_area(
+                                        Some(&instance_id),
+                                        bx,
+                                        by,
                                         ServerMessage::DamageEvent {
                                             source_id: String::new(),
                                             target_id: npc_id.clone(),
@@ -508,8 +544,10 @@ impl GameRoom {
                         }
                     }
 
-                    self.send_to_instance(
-                        &instance_id,
+                    self.broadcast_to_area(
+                        Some(&instance_id),
+                        x,
+                        y,
                         ServerMessage::Explosion {
                             x,
                             y,
@@ -900,7 +938,7 @@ impl GameRoom {
                             .await;
 
                         // Send overworld ground items
-                        for item_msg in self.get_ground_items_in_instance(None).await {
+                        for item_msg in self.get_visible_ground_items(&pid).await {
                             self.send_to_player(&pid, item_msg).await;
                         }
 

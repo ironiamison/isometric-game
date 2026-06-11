@@ -1568,6 +1568,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
 
                 log::debug!("Item {} picked up by {}", item_id, player_id);
                 state.ground_items.remove(&item_id);
+                state
+                    .pending_ground_items
+                    .retain(|(item, _)| item.id != item_id);
             }
         }
 
@@ -1576,6 +1579,9 @@ pub fn handle_room_data(msg_type: &str, data: Option<&rmpv::Value>, state: &mut 
                 let item_id = extract_string(value, "item_id").unwrap_or_default();
                 log::debug!("Item {} despawned", item_id);
                 state.ground_items.remove(&item_id);
+                state
+                    .pending_ground_items
+                    .retain(|(item, _)| item.id != item_id);
             }
         }
 
