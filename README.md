@@ -1,76 +1,116 @@
 # Aeven
 
-An isometric pixel-art MMORPG inspired by classic RuneScape, built with Rust.
-<img width="1026" height="753" alt="image" src="https://github.com/user-attachments/assets/8e0a588f-64a4-43fc-86bf-a0dfd8fbded4" />
+An isometric pixel-art MMORPG with a server-authoritative Rust backend, native and
+web clients, persistent characters, data-driven content, and custom world-building
+tools.
 
+<img width="1026" height="753" alt="Aeven gameplay" src="https://github.com/user-attachments/assets/8e0a588f-64a4-43fc-86bf-a0dfd8fbded4" />
 
-## About
+**Play at [aeven.xyz](https://aeven.xyz).**
 
-Aeven is a multiplayer online RPG featuring grid-based movement, real-time combat, skill progression, quests, crafting, and a chunk-streamed open world — all rendered in an isometric 2.5D pixel-art style.
+## What Is In The Game
 
-**Play now at [aeven.xyz](https://aeven.xyz)**
+- A persistent, chunk-streamed overworld with private and shared interiors
+- Server-authoritative movement, collision, combat, inventory, drops, trading,
+  shops, quests, skilling, and progression
+- Melee, ranged, and magic combat with equipment bonuses, prayers, spells,
+  status effects, bosses, PvP zones, arena matches, and King of the Hill
+- RuneScape-style experience and levels for Hitpoints, Attack, Strength,
+  Defence, Ranged, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting,
+  Alchemy, Mining, Slayer, and Survivalist
+- TOML-defined items, entities, loot tables, shops, recipes, gathering nodes,
+  prayers, spells, Slayer content, contracts, and world objects
+- Lua-scripted quests with dialogue, objectives, rewards, and persistent state
+- Banking, equipment, chests, ground items, player trading, collection logs,
+  crafting orders, titles, waystones, chairs, and player stalls
+- Native desktop, browser/WASM, and Android client targets
+- A React map editor and content studio for chunks, interiors, assets, balance,
+  and cross-content validation
+- A public React stats site and a self-updating desktop launcher
 
-## Features
+## Technology
 
-- **Multiplayer** — WebSocket-based real-time networking with server-authoritative gameplay at 20 Hz tick rate
-- **Combat** — Click-to-target melee and ranged combat with hit rolls, damage numbers, and health bars
-- **Skills** — RuneScape-style XP and leveling system (Hitpoints, Combat, Fishing)
-- **Quests** — Lua-scripted quest system with dialogue, objectives, and rewards
-- **Items & Equipment** — Inventory management, loot drops, equipment with combat bonuses
-- **Shops & Crafting** — NPC merchants and recipe-based crafting
-- **World** — Chunk-based world streaming with Tiled map editor support
-- **NPCs** — AI state machine with idle, wander, chase, attack, and return behaviors
-- **Cross-platform** — Native desktop and WASM (web) builds
+| Area | Technology |
+| --- | --- |
+| Game server | Rust, Tokio, Axum, SQLite, SQLx |
+| Game client | Rust, Macroquad |
+| Realtime protocol | MessagePack over WebSocket |
+| HTTP APIs | JSON over HTTP |
+| Quest scripting | Lua 5.4 through `mlua` |
+| Content | TOML, JSON map chunks, Lua |
+| Mapper/content studio | React 19, TypeScript, Zustand, Express |
+| Public stats | React 19, TypeScript, TanStack Query |
+| Launcher | Rust, eframe/egui |
+| Releases | GitHub Actions, Python packaging tools, Cloudflare R2 |
 
-## Tech Stack
+## Repository Layout
 
-| Component | Technology |
-|-----------|-----------|
-| Server | Rust, Axum, Tokio, SQLite |
-| Client | Rust, Macroquad |
-| Protocol | MessagePack over WebSocket |
-| Quest scripting | Lua |
-| Game data | TOML configs |
-| Map editor | React + TypeScript (Tiled-compatible) |
-
-## Project Structure
-
+```text
+client/             Macroquad game client for desktop, WASM, and Android
+rust-server/        Authoritative game server and persistent game data
+mapper/             World mapper, content studio, and its local Express API
+web-stats/          Public player profiles, leaderboards, and world statistics
+launcher/           Desktop installer/updater
+homepage/           Static public website
+tools/              Client and launcher packaging utilities
+docs/               Design notes, plans, and historical implementation records
+.github/workflows/  Deployment and release workflows
 ```
-client/          Rust game client (Macroquad)
-rust-server/     Rust game server (Axum + WebSocket)
-mapper/          React-based map editor
-docs/            Design documents
-```
 
-## Building
+See [ARCHITECTURE.md](ARCHITECTURE.md) for runtime flows, ownership boundaries,
+extension points, known risks, and the modernization plan. See
+[CONTRIBUTING.md](CONTRIBUTING.md) before changing code, data, maps, schemas, or
+the wire protocol.
 
-### Server
+## Local Development
+
+### Prerequisites
+
+- Rust 1.88 or newer with Cargo
+- Node.js 20.19 or newer and npm
+- Python 3.11 or newer for packaging tools
+- Platform libraries required by Macroquad and eframe
+
+The repository does not yet pin Rust or Node versions. Until it does, the
+versions above match the current CI and frontend toolchains.
+
+### 1. Start The Server
+
+The server resolves `data/`, `maps/`, and the SQLite database relative to
+`rust-server/`, so run it from that directory:
 
 ```bash
 cd rust-server
 cargo run --release
 ```
 
-Starts on `http://localhost:2567`.
+The default listener is `http://localhost:2567`. On first boot, the server
+creates its SQLite database and loads world maps and gameplay registries.
 
-### Client
+Useful endpoints:
+
+- `GET /health`
+- `POST /api/register`
+- `POST /api/login`
+- `POST /matchmake/joinOrCreate/:room`
+- `GET /api/stats/overview`
+- `GET /api/perf`
+
+### 2. Start The Desktop Client
 
 ```bash
 cd client
-cargo run --release
+cargo run --release --bin new-aeven
 ```
 
-### WASM
+The current development source defaults to `http://localhost:2567` and
+`ws://localhost:2567`. Production client builds must use the production HTTP
+and WebSocket endpoints; see the release blocker in
+[ARCHITECTURE.md](ARCHITECTURE.md#p0-release-and-security-blockers).
 
-```bash
-cd client
-rustup target add wasm32-unknown-unknown
-cargo build --target wasm32-unknown-unknown --profile release-wasm
-```
+### 3. Start The Mapper And Content Studio
 
-### Mapper and Content Studio
-
-Run the mapper API and frontend in separate terminals:
+Run the API and frontend in separate terminals:
 
 ```bash
 cd mapper/server
@@ -84,12 +124,120 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173/mapper/`, then select **Content Studio**. It provides:
+Open `http://localhost:5173/mapper/`. The mapper API reads and writes repository
+content, including maps, TOML files, and generated atlases. Treat it as a local
+development tool and do not expose it to an untrusted network.
 
-- Structured item, enemy, and attack/spell editors backed by the server TOML files
-- Balance tables using the game's combat formulas
-- Cross-file item, loot, entity-spawn, and map validation
-- A chunk-region generator for solid, checker, or noise-pattern terrain
+### 4. Start The Public Stats Site
+
+```bash
+cd web-stats
+npm install
+npm run dev
+```
+
+### 5. Start The Launcher
+
+```bash
+cd launcher
+cargo run
+```
+
+Launcher settings live in `launcher/launcher-config.toml`. Release artifacts and
+the update manifest are generated by the scripts in `tools/`.
+
+## Other Client Targets
+
+### WebAssembly
+
+```bash
+rustup target add wasm32-unknown-unknown
+cd client
+cargo build --target wasm32-unknown-unknown --profile release-wasm
+```
+
+The web shell and JavaScript bridges are in `client/web/`. Building the Rust
+target alone does not package or deploy the complete browser client.
+
+### Android
+
+Android project files and platform bindings live in `client/android/` and
+`client/src/android.rs`. Android builds require a configured Android SDK/NDK and
+the platform-specific native library packaging step.
+
+## Content Workflow
+
+Authoritative content lives with the server:
+
+```text
+rust-server/data/             Items, entities, recipes, shops, skills, and systems
+rust-server/data/quests/      Quest definitions
+rust-server/data/scripts/     Lua quest scripts
+rust-server/maps/world_0/     32x32 overworld chunk JSON files
+rust-server/maps/interiors/   Interior map JSON files
+```
+
+The mapper keeps editable working data in `mapper-data/` and provides explicit
+sync/deploy operations. Review generated diffs before committing them. Content
+that parses successfully can still be invalid as a game graph, so run the
+content studio validation as well as server tests.
+
+## Validation
+
+Run these checks before opening a pull request:
+
+```bash
+(cd rust-server && cargo fmt --check && cargo test --all-targets)
+(cd client && cargo fmt --check && cargo test --all-targets)
+(cd launcher && cargo check --all-targets)
+(cd mapper/server && npm run build)
+(cd mapper && npm run build && npm run lint)
+(cd web-stats && npm run build && npm run lint)
+```
+
+The 128-player release-mode server budget test is ignored during normal test
+runs:
+
+```bash
+cd rust-server
+cargo test --release \
+  game::load_test::full_tick_stays_within_budget_for_128_players \
+  -- --ignored --nocapture
+```
+
+As of June 11, 2026, Rust tests, formatting, all builds, web-stats lint, and the
+capacity test pass. Mapper lint has an existing baseline of 28 errors and 3
+warnings that must be removed before lint can become a reliable merge gate.
+
+## Deployment
+
+- `.github/workflows/deploy.yml` SSH-deploys the server and web client after
+  matching changes land on `master`.
+- `.github/workflows/client-release.yml` builds desktop clients and an updater
+  manifest.
+- `.github/workflows/launcher-release.yml` packages launchers for Windows,
+  macOS, and Linux.
+- `deploy.sh` and the force-deploy scripts contain the current host deployment
+  procedure.
+
+Deployment currently has no required test, lint, or server build gate. Do not
+consider a successful deployment workflow equivalent to a validated release.
+
+## Current Engineering Priorities
+
+1. Remove the production endpoint regression and introduce typed build-time
+   client configuration.
+2. Secure the mapper mutation API and operational server endpoints.
+3. Replace duplicated client/server protocol code with a shared, versioned
+   contract and compatibility tests.
+4. Consolidate desktop, WASM, and Android onto one application runtime.
+5. Break `GameRoom`, client `GameState`, and the mapper store into explicit
+   domain-owned services and state slices.
+6. Introduce versioned database migrations, fail-fast content validation, and
+   comprehensive CI quality gates.
+
+The full rationale and recommended sequence are in
+[ARCHITECTURE.md](ARCHITECTURE.md#architecture-audit-and-modernization-plan).
 
 ## License
 
