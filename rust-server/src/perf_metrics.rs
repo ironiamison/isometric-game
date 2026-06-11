@@ -34,6 +34,7 @@ struct PerfState {
     ws_send_ms: VecDeque<f64>,
     per_room: HashMap<String, RoomSamples>,
     counters: PerfCounters,
+    current_load: PerfLoad,
     recent_spikes: VecDeque<PerfSpike>,
 }
 
@@ -103,6 +104,7 @@ pub struct RoomPerfSummary {
 pub struct PerfSnapshot {
     pub timestamp: String,
     pub uptime_seconds: u64,
+    pub current_load: PerfLoad,
     pub thresholds_ms: PerfThresholds,
     pub counters: PerfCounters,
     pub derived_rates: PerfDerivedRates,
@@ -115,6 +117,15 @@ pub struct PerfSnapshot {
     pub ws_send_ms: SampleSummary,
     pub top_rooms: Vec<RoomPerfSummary>,
     pub recent_spikes: Vec<PerfSpike>,
+}
+
+#[derive(Clone, Copy, Default, Serialize)]
+pub struct PerfLoad {
+    pub rooms: usize,
+    pub connected_players: usize,
+    pub overworld_players: usize,
+    pub instance_players: usize,
+    pub spectators: usize,
 }
 
 #[derive(Clone, Serialize)]
@@ -158,6 +169,7 @@ impl PerfMetrics {
                 ws_send_ms: VecDeque::with_capacity(WS_SEND_SAMPLE_CAP),
                 per_room: HashMap::new(),
                 counters: PerfCounters::default(),
+                current_load: PerfLoad::default(),
                 recent_spikes: VecDeque::with_capacity(SPIKE_SAMPLE_CAP),
             })),
         }
@@ -182,7 +194,7 @@ impl PerfMetrics {
         }
     }
 
-    pub fn record_room_tick(&self, room_name: &str, duration_ms: f64) {
+    pub fn record_room_tick(&self, room_name: &str, duration_ms: f64, context: Option<String>) {
         let mut inner = self.inner.lock().unwrap();
         push_capped(&mut inner.room_tick_ms, duration_ms, ROOM_TICK_SAMPLE_CAP);
 
@@ -207,11 +219,18 @@ impl PerfMetrics {
                     timestamp: now_rfc3339(),
                     metric: "room_tick".to_string(),
                     value_ms: duration_ms,
-                    context: format!("room={}", room_name),
+                    context: match context {
+                        Some(context) => format!("room={} {}", room_name, context),
+                        None => format!("room={}", room_name),
+                    },
                 },
                 SPIKE_SAMPLE_CAP,
             );
         }
+    }
+
+    pub fn record_load(&self, load: PerfLoad) {
+        self.inner.lock().unwrap().current_load = load;
     }
 
     pub fn record_autosave(
@@ -413,6 +432,7 @@ impl PerfMetrics {
         PerfSnapshot {
             timestamp: now_rfc3339(),
             uptime_seconds: self.started_at.elapsed().as_secs(),
+            current_load: inner.current_load,
             thresholds_ms: PerfThresholds {
                 tick_slow: TICK_SLOW_THRESHOLD_MS,
                 autosave_slow: AUTOSAVE_SLOW_THRESHOLD_MS,
@@ -564,7 +584,7 @@ fn percent(num: u64, den: u64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::summarize;
+    use super::{PerfLoad, PerfMetrics, summarize};
     use std::collections::VecDeque;
 
     #[test]
@@ -580,5 +600,28 @@ mod tests {
         assert_eq!(summary.p95_ms, 95.0);
         assert_eq!(summary.max_ms, 100.0);
         assert_eq!(summary.latest_ms, 100.0);
+    }
+
+    #[test]
+    fn snapshot_reports_current_load_and_slow_tick_context() {
+        let metrics = PerfMetrics::new();
+        metrics.record_load(PerfLoad {
+            rooms: 1,
+            connected_players: 3,
+            overworld_players: 1,
+            instance_players: 2,
+            spectators: 1,
+        });
+        metrics.record_room_tick(
+            "game_room",
+            75.0,
+            Some("players=3 phases_ms=sync:60".to_string()),
+        );
+
+        let snapshot = metrics.snapshot(1, 1);
+        assert_eq!(snapshot.current_load.connected_players, 3);
+        assert_eq!(snapshot.current_load.instance_players, 2);
+        assert_eq!(snapshot.recent_spikes.len(), 1);
+        assert!(snapshot.recent_spikes[0].context.contains("sync:60"));
     }
 }

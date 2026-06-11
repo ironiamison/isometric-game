@@ -5680,13 +5680,38 @@ async fn main() {
             interval.tick().await;
             let loop_start = std::time::Instant::now();
             let room_count = tick_state.rooms.len();
+            let mut load = perf_metrics::PerfLoad {
+                rooms: room_count,
+                ..perf_metrics::PerfLoad::default()
+            };
             for room in tick_state.rooms.iter() {
                 let room_start = std::time::Instant::now();
                 let tick_telemetry = room.tick().await;
                 let room_ms = room_start.elapsed().as_secs_f64() * 1000.0;
+                load.connected_players += tick_telemetry.active_players;
+                load.overworld_players += tick_telemetry.overworld_players;
+                load.instance_players += tick_telemetry.instance_players;
+                load.spectators += tick_telemetry.spectators;
+                let slow_context = (room_ms > 50.0).then(|| {
+                    format!(
+                        "players={} overworld={} instance_players={} spectators={} phases_ms=pre_npc:{} npc_world:{} sync:{} arena:{} chunk_unload:{} prayer:{} farming:{} restock:{}",
+                        tick_telemetry.active_players,
+                        tick_telemetry.overworld_players,
+                        tick_telemetry.instance_players,
+                        tick_telemetry.spectators,
+                        tick_telemetry.pre_npc_ms,
+                        tick_telemetry.npc_world_ms,
+                        tick_telemetry.state_sync_ms,
+                        tick_telemetry.arena_ms,
+                        tick_telemetry.chunk_unload_ms,
+                        tick_telemetry.prayer_drain_ms,
+                        tick_telemetry.farming_growth_ms,
+                        tick_telemetry.restock_ms,
+                    )
+                });
                 tick_state
                     .perf_metrics
-                    .record_room_tick(&room.name, room_ms);
+                    .record_room_tick(&room.name, room_ms, slow_context);
                 tick_state.perf_metrics.record_movement(
                     tick_telemetry.pending_moves,
                     tick_telemetry.rejected_moves,
@@ -5713,6 +5738,7 @@ async fn main() {
                     tick_telemetry.state_sync_bytes_sent,
                 );
             }
+            tick_state.perf_metrics.record_load(load);
             let loop_ms = loop_start.elapsed().as_secs_f64() * 1000.0;
             tick_state
                 .perf_metrics
@@ -5954,8 +5980,13 @@ async fn main() {
             perf_state.matchmake_rate_limiter.prune_expired();
             let perf = perf_state.perf_metrics.snapshot(3, 0);
             info!(
-                "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%), stale_packets={}({}%) seq_gaps={}({}%) input_gaps={}({}%) stale_intent_clears={}({}%)) state_sync(drop_rate={}%, skip_rate={}%, attempts={}, capacity_skips={}, drops={}, full={}({}%), delta={}({}%), fallback_self={}, raw_bytes={}, wire_bytes={}, wire_vs_raw={}%) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
+                "[PERF] uptime={}s load(rooms={} players={} overworld={} instance={} spectators={}) tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%), stale_packets={}({}%) seq_gaps={}({}%) input_gaps={}({}%) stale_intent_clears={}({}%)) state_sync(drop_rate={}%, skip_rate={}%, attempts={}, capacity_skips={}, drops={}, full={}({}%), delta={}({}%), fallback_self={}, raw_bytes={}, wire_bytes={}, wire_vs_raw={}%) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
                 perf.uptime_seconds,
+                perf.current_load.rooms,
+                perf.current_load.connected_players,
+                perf.current_load.overworld_players,
+                perf.current_load.instance_players,
+                perf.current_load.spectators,
                 perf.tick_loop_ms.p95_ms,
                 perf.tick_loop_ms.p99_ms,
                 perf.tick_loop_ms.max_ms,

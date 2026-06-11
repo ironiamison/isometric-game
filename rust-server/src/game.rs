@@ -1153,6 +1153,10 @@ pub struct PlayerUpdate {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TickTelemetry {
+    pub active_players: usize,
+    pub overworld_players: usize,
+    pub instance_players: usize,
+    pub spectators: usize,
     pub pending_moves: usize,
     pub rejected_moves: usize,
     pub rejected_tile_blocked: usize,
@@ -1172,6 +1176,14 @@ pub struct TickTelemetry {
     pub movement_seq_gap_events: usize,
     pub movement_input_gap_events: usize,
     pub movement_stale_intent_clears: usize,
+    pub pre_npc_ms: u64,
+    pub npc_world_ms: u64,
+    pub state_sync_ms: u64,
+    pub arena_ms: u64,
+    pub chunk_unload_ms: u64,
+    pub prayer_drain_ms: u64,
+    pub farming_growth_ms: u64,
+    pub restock_ms: u64,
 }
 
 #[derive(Default)]
@@ -1211,6 +1223,7 @@ struct ChairConfigEntry {
 const FULL_SYNC_INTERVAL: u64 = 20; // Force full sync every 20 ticks (1 second at 20Hz)
 
 struct PlayerSyncState {
+    context_id: String,
     last_players: HashMap<String, PlayerUpdate>,
     last_npcs: HashMap<String, NpcUpdate>,
     last_full_sync_tick: u64,
@@ -1220,10 +1233,18 @@ struct PlayerSyncState {
 impl PlayerSyncState {
     fn new() -> Self {
         Self {
+            context_id: String::new(),
             last_players: HashMap::new(),
             last_npcs: HashMap::new(),
             last_full_sync_tick: 0,
             next_full_sync_tick: 0,
+        }
+    }
+
+    fn ensure_context(&mut self, context_id: &str) {
+        if self.context_id != context_id {
+            *self = Self::new();
+            self.context_id = context_id.to_string();
         }
     }
 }
@@ -1232,6 +1253,29 @@ fn full_sync_offset(player_id: &str) -> u64 {
     player_id.bytes().fold(0u64, |hash, byte| {
         hash.wrapping_mul(31).wrapping_add(byte as u64)
     }) % FULL_SYNC_INTERVAL
+}
+
+#[cfg(test)]
+mod sync_state_tests {
+    use super::PlayerSyncState;
+
+    #[test]
+    fn context_change_forces_a_new_full_sync() {
+        let mut state = PlayerSyncState::new();
+        state.ensure_context("instance-a");
+        state.last_full_sync_tick = 10;
+        state.next_full_sync_tick = 30;
+
+        state.ensure_context("instance-a");
+        assert_eq!(state.last_full_sync_tick, 10);
+
+        state.ensure_context("");
+        assert_eq!(state.context_id, "");
+        assert_eq!(state.last_full_sync_tick, 0);
+        assert_eq!(state.next_full_sync_tick, 0);
+        assert!(state.last_players.is_empty());
+        assert!(state.last_npcs.is_empty());
+    }
 }
 
 // ============================================================================
@@ -7119,6 +7163,8 @@ impl GameRoom {
             }
         }
 
+        let current_tick = tick;
+
         // Instance groups: per-player encode because quest turn-in indicators are player-specific.
         for (inst_id, group_senders) in &instance_groups {
             let mut active_receivers: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = Vec::new();
@@ -7136,10 +7182,6 @@ impl GameRoom {
                 .get(inst_id)
                 .cloned()
                 .unwrap_or_default();
-            let player_values: Vec<rmpv::Value> = players_in_instance
-                .iter()
-                .map(|p| crate::protocol::player_update_to_value(p))
-                .collect();
             let player_map_in_instance: HashMap<&str, &PlayerUpdate> = players_in_instance
                 .iter()
                 .map(|p| (p.id.as_str(), *p))
@@ -7155,7 +7197,11 @@ impl GameRoom {
             for (pid, sender) in active_receivers {
                 let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(pid.as_str());
                 let done_npcs = all_npc_quests_done_by_player.get(pid.as_str());
-                let npc_values: Vec<rmpv::Value> = instance_npcs
+                let current_players: HashMap<String, PlayerUpdate> = players_in_instance
+                    .iter()
+                    .map(|player| (player.id.clone(), (*player).clone()))
+                    .collect();
+                let current_npcs: HashMap<String, NpcUpdate> = instance_npcs
                     .iter()
                     .map(|n| {
                         let mut n_for_player = n.clone();
@@ -7172,26 +7218,108 @@ impl GameRoom {
                             && ready_turnin_npcs
                                 .map(|set| set.contains(n_for_player.prototype_id.as_str()))
                                 .unwrap_or(false);
-                        crate::protocol::npc_update_to_value(&n_for_player)
+                        (n_for_player.id.clone(), n_for_player)
                     })
                     .collect();
 
-                if let Ok(raw) = crate::protocol::encode_state_sync_from_values(
-                    tick,
-                    player_values.clone(),
-                    npc_values,
-                    inst_id,
-                ) {
-                    let raw_len = raw.len();
-                    let bytes = crate::protocol::maybe_compress(raw);
-                    let bytes_len = bytes.len();
-                    tick_telemetry.state_sync_send_attempts += 1;
-                    tick_telemetry.state_sync_full_sends += 1;
-                    tick_telemetry.state_sync_raw_bytes += raw_len;
-                    tick_telemetry.state_sync_bytes_sent += bytes_len;
-                    if let Err(e) = sender.try_send(bytes) {
-                        tick_telemetry.state_sync_try_send_drops += 1;
-                        tracing::debug!("StateSync drop for {}: {}", pid, e);
+                let Some(mut sync_state) = self.sync_states.get_mut(pid.as_str()) else {
+                    continue;
+                };
+                sync_state.ensure_context(inst_id);
+                let needs_full = sync_state.last_full_sync_tick == 0
+                    || current_tick >= sync_state.next_full_sync_tick;
+
+                if needs_full {
+                    let player_values = current_players
+                        .values()
+                        .map(crate::protocol::player_update_to_value)
+                        .collect();
+                    let npc_values = current_npcs
+                        .values()
+                        .map(crate::protocol::npc_update_to_value)
+                        .collect();
+
+                    if let Ok(raw) = crate::protocol::encode_state_sync_from_values(
+                        tick,
+                        player_values,
+                        npc_values,
+                        inst_id,
+                    ) {
+                        let raw_len = raw.len();
+                        let bytes = crate::protocol::maybe_compress(raw);
+                        let bytes_len = bytes.len();
+                        tick_telemetry.state_sync_send_attempts += 1;
+                        tick_telemetry.state_sync_full_sends += 1;
+                        tick_telemetry.state_sync_raw_bytes += raw_len;
+                        tick_telemetry.state_sync_bytes_sent += bytes_len;
+                        if let Err(e) = sender.try_send(bytes) {
+                            tick_telemetry.state_sync_try_send_drops += 1;
+                            tracing::debug!("StateSync drop for {}: {}", pid, e);
+                        } else {
+                            let initial_offset = if sync_state.last_full_sync_tick == 0 {
+                                full_sync_offset(pid)
+                            } else {
+                                0
+                            };
+                            sync_state.last_full_sync_tick = current_tick;
+                            sync_state.next_full_sync_tick =
+                                current_tick + FULL_SYNC_INTERVAL + initial_offset;
+                            sync_state.last_players = current_players;
+                            sync_state.last_npcs = current_npcs;
+                        }
+                    }
+                } else {
+                    let changed_players = current_players
+                        .iter()
+                        .filter(|(id, update)| {
+                            id.as_str() == pid.as_str()
+                                || sync_state.last_players.get(id.as_str()) != Some(*update)
+                        })
+                        .map(|(_, update)| crate::protocol::player_update_to_value(update))
+                        .collect();
+                    let changed_npcs = current_npcs
+                        .iter()
+                        .filter(|(id, update)| {
+                            sync_state.last_npcs.get(id.as_str()) != Some(*update)
+                        })
+                        .map(|(_, update)| crate::protocol::npc_update_to_value(update))
+                        .collect();
+                    let removed_players: Vec<String> = sync_state
+                        .last_players
+                        .keys()
+                        .filter(|id| !current_players.contains_key(id.as_str()))
+                        .cloned()
+                        .collect();
+                    let removed_npcs: Vec<String> = sync_state
+                        .last_npcs
+                        .keys()
+                        .filter(|id| !current_npcs.contains_key(id.as_str()))
+                        .cloned()
+                        .collect();
+
+                    if let Ok(raw) = crate::protocol::encode_delta_state_sync(
+                        tick,
+                        changed_players,
+                        changed_npcs,
+                        inst_id,
+                        false,
+                        &removed_players,
+                        &removed_npcs,
+                    ) {
+                        let raw_len = raw.len();
+                        let bytes = crate::protocol::maybe_compress(raw);
+                        let bytes_len = bytes.len();
+                        tick_telemetry.state_sync_send_attempts += 1;
+                        tick_telemetry.state_sync_delta_sends += 1;
+                        tick_telemetry.state_sync_raw_bytes += raw_len;
+                        tick_telemetry.state_sync_bytes_sent += bytes_len;
+                        if let Err(e) = sender.try_send(bytes) {
+                            tick_telemetry.state_sync_try_send_drops += 1;
+                            tracing::debug!("StateSync delta drop for {}: {}", pid, e);
+                        } else {
+                            sync_state.last_players = current_players;
+                            sync_state.last_npcs = current_npcs;
+                        }
                     }
                 }
             }
@@ -7264,8 +7392,6 @@ impl GameRoom {
             }
         }
         let sync_chunk_radius = (VIEW_DISTANCE + CHUNK_SIZE as i32 - 1) / CHUNK_SIZE as i32;
-
-        let current_tick = tick;
 
         for (player_id, sender) in &overworld_senders {
             if sender.capacity() < STATE_SYNC_MIN_QUEUE_CAPACITY {
@@ -7360,6 +7486,7 @@ impl GameRoom {
             let Some(mut sync_state) = self.sync_states.get_mut(player_id.as_str()) else {
                 continue;
             };
+            sync_state.ensure_context("");
             let needs_full = sync_state.last_full_sync_tick == 0
                 || current_tick >= sync_state.next_full_sync_tick;
 
@@ -7483,6 +7610,7 @@ impl GameRoom {
         // Spectators are read-only observers so we skip quest turn-in icons and delta
         // compression — one full encode shared across every spectator connection.
         let spectator_senders = self.spectator_senders.read().await;
+        let spectator_count = spectator_senders.len();
         if !spectator_senders.is_empty() {
             // Gather players near spawn with VIEW_DISTANCE culling
             let mut spectator_player_values: Vec<rmpv::Value> = Vec::new();
@@ -7612,6 +7740,20 @@ impl GameRoom {
         let arena_start = std::time::Instant::now();
         self.arena_tick(current_time).await;
         let arena_ms = arena_start.elapsed().as_millis();
+
+        tick_telemetry.active_players = senders_snapshot.len();
+        tick_telemetry.overworld_players = overworld_senders.len();
+        tick_telemetry.instance_players =
+            instance_groups.values().map(|senders| senders.len()).sum();
+        tick_telemetry.spectators = spectator_count;
+        tick_telemetry.pre_npc_ms = pre_npc_ms as u64;
+        tick_telemetry.npc_world_ms = npc_world_ms as u64;
+        tick_telemetry.state_sync_ms = state_sync_ms as u64;
+        tick_telemetry.arena_ms = arena_ms as u64;
+        tick_telemetry.chunk_unload_ms = chunk_unload_ms as u64;
+        tick_telemetry.prayer_drain_ms = prayer_drain_ms as u64;
+        tick_telemetry.farming_growth_ms = farming_growth_ms as u64;
+        tick_telemetry.restock_ms = restock_ms as u64;
 
         // Log slow ticks for debugging latency spikes
         let tick_duration = tick_start.elapsed();
