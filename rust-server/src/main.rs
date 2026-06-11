@@ -22,7 +22,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::{Mutex, RwLock, mpsc, watch};
+use tokio::sync::{Mutex, OwnedRwLockReadGuard, RwLock, mpsc, watch};
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -85,14 +85,15 @@ use quest::{ObjectiveType, QuestRegistry};
 struct GameSession {
     room_id: String,
     player_id: String,
-    character_name: String,      // Character name for display
-    character_id: i64,           // Database character ID
-    account_id: i64,             // Database account ID
-    auth_token: String,          // Token used for this session (for validation)
-    current_map: Option<String>, // Interior map ID to auto-enter on connect (None = overworld)
-    entrance_x: Option<f32>,     // Overworld X where player entered interior
-    entrance_y: Option<f32>,     // Overworld Y where player entered interior
-    is_new_character: bool,      // True if played_time == 0 (for tutorial)
+    character_name: String,          // Character name for display
+    character_id: i64,               // Database character ID
+    account_id: i64,                 // Database account ID
+    auth_token: String,              // Token used for this session (for validation)
+    current_map: Option<String>,     // Interior map ID to auto-enter on connect (None = overworld)
+    entrance_x: Option<f32>,         // Overworld X where player entered interior
+    entrance_y: Option<f32>,         // Overworld Y where player entered interior
+    is_new_character: bool,          // True if played_time == 0 (for tutorial)
+    command_gate: Arc<RwLock<bool>>, // True while this session may mutate player state
 }
 
 #[derive(Clone)]
@@ -127,6 +128,8 @@ struct AppState {
     play_time_anchors: Arc<DashMap<i64, std::time::Instant>>,
     /// Character IDs currently online (prevents duplicate sessions)
     online_characters: Arc<DashSet<i64>>,
+    /// Serializes matchmaking and takeover for the same character.
+    character_session_locks: Arc<DashMap<i64, Arc<Mutex<()>>>>,
     /// In-memory log buffer for /api/logs endpoint
     log_buffer: log_buffer::LogBuffer,
     /// In-memory rolling performance metrics for /api/perf endpoint
@@ -255,6 +258,7 @@ impl AppState {
             player_entrance_positions: Arc::new(RwLock::new(HashMap::new())),
             play_time_anchors: Arc::new(DashMap::new()),
             online_characters: Arc::new(DashSet::new()),
+            character_session_locks: Arc::new(DashMap::new()),
             log_buffer,
             perf_metrics: perf_metrics::PerfMetrics::new(),
             leaderboard_cache: Arc::new(RwLock::new(LeaderboardCache::default())),
@@ -307,6 +311,108 @@ const GAME_ROOM_NAME: &str = "game_room";
 
 /// Auth sessions: token -> (account_id, username)
 type AuthSessions = Arc<DashMap<String, (i64, String)>>;
+
+struct SessionLease {
+    _command_guard: OwnedRwLockReadGuard<bool>,
+}
+
+async fn acquire_session_lease(
+    sessions: &DashMap<String, GameSession>,
+    auth_sessions: &DashMap<String, (i64, String)>,
+    session_id: &str,
+    room_id: &str,
+    player_id: &str,
+) -> Option<SessionLease> {
+    let session = sessions.get(session_id).map(|entry| entry.clone())?;
+    if session.room_id != room_id || session.player_id != player_id {
+        return None;
+    }
+
+    let command_guard = session.command_gate.clone().read_owned().await;
+    if !*command_guard {
+        return None;
+    }
+
+    let current_session = sessions.get(session_id)?;
+    if current_session.player_id != player_id
+        || !Arc::ptr_eq(&current_session.command_gate, &session.command_gate)
+    {
+        return None;
+    }
+
+    let auth_session = auth_sessions.get(&session.auth_token)?;
+    if auth_session.value().0 != session.account_id {
+        return None;
+    }
+
+    Some(SessionLease {
+        _command_guard: command_guard,
+    })
+}
+
+#[cfg(test)]
+mod session_lease_tests {
+    use super::*;
+
+    fn test_session(command_gate: Arc<RwLock<bool>>) -> GameSession {
+        GameSession {
+            room_id: "room".to_string(),
+            player_id: "char_42".to_string(),
+            character_name: "Test".to_string(),
+            character_id: 42,
+            account_id: 7,
+            auth_token: "auth".to_string(),
+            current_map: None,
+            entrance_x: None,
+            entrance_y: None,
+            is_new_character: false,
+            command_gate,
+        }
+    }
+
+    #[tokio::test]
+    async fn takeover_waits_for_in_flight_command_and_rejects_stale_session() {
+        let sessions = DashMap::new();
+        let auth_sessions = DashMap::new();
+        auth_sessions.insert("auth".to_string(), (7, "tester".to_string()));
+
+        let old_gate = Arc::new(RwLock::new(true));
+        sessions.insert("old".to_string(), test_session(old_gate.clone()));
+
+        let old_lease = acquire_session_lease(&sessions, &auth_sessions, "old", "room", "char_42")
+            .await
+            .expect("old session should initially own the player");
+
+        let invalidation = tokio::spawn(async move {
+            let mut active = old_gate.write().await;
+            *active = false;
+        });
+        tokio::task::yield_now().await;
+        assert!(
+            !invalidation.is_finished(),
+            "takeover must wait for the in-flight command"
+        );
+
+        drop(old_lease);
+        invalidation.await.unwrap();
+        sessions.remove("old");
+
+        assert!(
+            acquire_session_lease(&sessions, &auth_sessions, "old", "room", "char_42")
+                .await
+                .is_none(),
+            "the stale socket must not receive another command lease"
+        );
+
+        sessions.insert("new".to_string(), test_session(Arc::new(RwLock::new(true))));
+        assert!(
+            acquire_session_lease(&sessions, &auth_sessions, "new", "room", "char_42")
+                .await
+                .is_some(),
+            "the replacement session should own the player"
+        );
+    }
+}
 
 /// Rate limiter entry: (request_count, window_start_time)
 type RateLimitEntry = (u32, std::time::Instant);
@@ -701,6 +807,16 @@ async fn logout_account(
     if let Some(auth) = headers.get("Authorization") {
         if let Ok(auth_str) = auth.to_str() {
             if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                let command_gates: Vec<Arc<RwLock<bool>>> = state
+                    .sessions
+                    .iter()
+                    .filter(|session| session.auth_token == token)
+                    .map(|session| session.command_gate.clone())
+                    .collect();
+                for command_gate in command_gates {
+                    let mut active = command_gate.write().await;
+                    *active = false;
+                }
                 state.auth_sessions.remove(token);
             }
         }
@@ -1271,8 +1387,19 @@ async fn matchmake_join_or_create(
         }
     };
 
+    let character_session_lock = state
+        .character_session_locks
+        .entry(character_id)
+        .or_insert_with(|| Arc::new(Mutex::new(())))
+        .clone();
+    let _character_session_guard = character_session_lock.lock().await;
+
     // Check if character is already online — attempt session takeover
-    if state.online_characters.contains(&character_id) {
+    let has_reserved_session = state
+        .sessions
+        .iter()
+        .any(|session| session.character_id == character_id);
+    if state.online_characters.contains(&character_id) || has_reserved_session {
         // Find the old session for this character
         let old_session_id = state
             .sessions
@@ -1281,6 +1408,13 @@ async fn matchmake_join_or_create(
             .map(|entry| entry.key().clone());
 
         if let Some(old_sid) = old_session_id {
+            // Stop new commands and wait for any in-flight command to finish
+            // before saving or replacing the shared player entity.
+            if let Some(old_session) = state.sessions.get(&old_sid).map(|entry| entry.clone()) {
+                let mut command_gate = old_session.command_gate.write().await;
+                *command_gate = false;
+            }
+
             // Atomically remove old session — whoever removes it owns cleanup
             if let Some((_, old_sess)) = state.sessions.remove(&old_sid) {
                 warn!(
@@ -1531,6 +1665,7 @@ async fn matchmake_join_or_create(
             entrance_x: character_data.entrance_x,
             entrance_y: character_data.entrance_y,
             is_new_character: character_data.played_time == 0,
+            command_gate: Arc::new(RwLock::new(true)),
         },
     );
 
@@ -2893,15 +3028,25 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                                     if let Err(e) = handle_client_message(
                                                         &recv_state,
                                                         &recv_room,
+                                                        &session_id,
                                                         &player_id,
                                                         &data,
                                                     )
                                                     .await
                                                     {
-                                                        warn!(
-                                                            "Error handling message from upgraded player {}: {}",
-                                                            player_id, e
-                                                        );
+                                                        match e {
+                                                            ClientMessageError::SessionSuperseded => {
+                                                                warn!(
+                                                                    "Closing superseded upgraded session {} for player {}",
+                                                                    session_id, player_id
+                                                                );
+                                                                break;
+                                                            }
+                                                            _ => warn!(
+                                                                "Error handling message from upgraded player {}: {}",
+                                                                player_id, e
+                                                            ),
+                                                        }
                                                     }
                                                 }
                                                 Message::Close(_) => break,
@@ -3778,6 +3923,7 @@ async fn handle_socket(
     // Handle incoming messages
     let room_clone = room.clone();
     let player_id_clone = player_id.clone();
+    let session_id_clone = session_id.clone();
     let state_clone = state.clone();
     let mut recv_task = tokio::spawn(async move {
         let mut last_app_msg = std::time::Instant::now();
@@ -3789,12 +3935,22 @@ async fn handle_socket(
                         if let Err(e) = handle_client_message(
                             &state_clone,
                             &room_clone,
+                            &session_id_clone,
                             &player_id_clone,
                             &data,
                         )
                         .await
                         {
-                            warn!("Error handling message: {}", e);
+                            match e {
+                                ClientMessageError::SessionSuperseded => {
+                                    warn!(
+                                        "Closing superseded session {} for player {}",
+                                        session_id_clone, player_id_clone
+                                    );
+                                    break;
+                                }
+                                _ => warn!("Error handling message: {}", e),
+                            }
                         }
                     }
                     Message::Close(_) => break,
@@ -5099,13 +5255,41 @@ async fn handle_enter_portal(state: &AppState, room: &GameRoom, player_id: &str,
     room.send_to_player(player_id, chest_msg).await;
 }
 
+#[derive(Debug)]
+enum ClientMessageError {
+    Decode(String),
+    SessionSuperseded,
+}
+
+impl std::fmt::Display for ClientMessageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Decode(error) => write!(f, "{error}"),
+            Self::SessionSuperseded => write!(f, "session is no longer active"),
+        }
+    }
+}
+
 async fn handle_client_message(
     state: &AppState,
     room: &GameRoom,
+    session_id: &str,
     player_id: &str,
     data: &[u8],
-) -> Result<(), String> {
-    let msg = protocol::decode_client_message(data)?;
+) -> Result<(), ClientMessageError> {
+    // Keep the command gate read-locked through execution. Session takeover and
+    // logout wait for in-flight commands, while later stale commands are rejected.
+    let _session_lease = acquire_session_lease(
+        &state.sessions,
+        &state.auth_sessions,
+        session_id,
+        &room.id,
+        player_id,
+    )
+    .await
+    .ok_or(ClientMessageError::SessionSuperseded)?;
+
+    let msg = protocol::decode_client_message(data).map_err(ClientMessageError::Decode)?;
     let handler_start = std::time::Instant::now();
     let msg_name = msg.name();
 
