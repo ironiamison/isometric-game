@@ -1,3 +1,4 @@
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{
@@ -7,7 +8,7 @@ use std::sync::{
 use tokio::sync::{RwLock, broadcast, mpsc};
 use uuid::Uuid;
 
-use crate::chunk::ChunkCoord;
+use crate::chunk::{CHUNK_SIZE, ChunkCoord};
 use crate::data::ItemRegistry;
 use crate::data::item_def::WeaponType;
 use crate::entity::EntityRegistry;
@@ -32,6 +33,8 @@ mod farming;
 mod instance_npc_tick;
 mod inventory;
 pub(crate) mod koth_tick;
+#[cfg(test)]
+mod load_test;
 mod movement_tick;
 mod npc_speech;
 mod npc_tick;
@@ -1211,6 +1214,7 @@ struct PlayerSyncState {
     last_players: HashMap<String, PlayerUpdate>,
     last_npcs: HashMap<String, NpcUpdate>,
     last_full_sync_tick: u64,
+    next_full_sync_tick: u64,
 }
 
 impl PlayerSyncState {
@@ -1219,8 +1223,15 @@ impl PlayerSyncState {
             last_players: HashMap::new(),
             last_npcs: HashMap::new(),
             last_full_sync_tick: 0,
+            next_full_sync_tick: 0,
         }
     }
+}
+
+fn full_sync_offset(player_id: &str) -> u64 {
+    player_id.bytes().fold(0u64, |hash, byte| {
+        hash.wrapping_mul(31).wrapping_add(byte as u64)
+    }) % FULL_SYNC_INTERVAL
 }
 
 // ============================================================================
@@ -1270,7 +1281,7 @@ pub struct GameRoom {
     /// Per-player message senders for unicast (SECURITY: private inventory updates)
     player_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
     /// Per-player delta sync state for bandwidth optimization
-    sync_states: RwLock<HashMap<String, PlayerSyncState>>,
+    sync_states: DashMap<String, PlayerSyncState>,
     /// Tracks which instance each player is currently in (None = overworld)
     player_instances: Arc<RwLock<HashMap<String, String>>>,
     /// Instance manager for looking up instance NPCs
@@ -1964,7 +1975,7 @@ impl GameRoom {
             tick: RwLock::new(0),
             broadcast_tx: tx,
             player_senders: RwLock::new(HashMap::new()),
-            sync_states: RwLock::new(HashMap::new()),
+            sync_states: DashMap::new(),
             player_instances,
             instance_manager,
             arena_manager: RwLock::new(crate::arena::ArenaManager::new(
@@ -2167,17 +2178,27 @@ impl GameRoom {
     /// Broadcast a message only to players in the same zone as the given player
     /// (same instance, or all overworld players if player is in overworld)
     pub async fn broadcast_to_zone(&self, source_player_id: &str, msg: ServerMessage) {
-        let player_instances = self.player_instances.read().await;
-        let source_instance = player_instances.get(source_player_id).cloned();
-        let senders = self.player_senders.read().await;
+        let source_instance = self
+            .player_instances
+            .read()
+            .await
+            .get(source_player_id)
+            .cloned();
+        let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
+            let player_instances = self.player_instances.read().await;
+            let senders = self.player_senders.read().await;
+            senders
+                .iter()
+                .filter(|(player_id, _)| {
+                    player_instances.get(*player_id).cloned() == source_instance
+                })
+                .map(|(_, sender)| sender.clone())
+                .collect()
+        };
 
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-            for (player_id, sender) in senders.iter() {
-                let target_instance = player_instances.get(player_id).cloned();
-                // Send if both in same instance or both in overworld (None)
-                if source_instance == target_instance {
-                    let _ = sender.try_send(bytes.clone());
-                }
+            for sender in recipients {
+                let _ = sender.try_send(bytes.clone());
             }
         }
     }
@@ -2189,35 +2210,43 @@ impl GameRoom {
         instance_id: Option<&str>,
         msg: ServerMessage,
     ) {
-        let player_instances = self.player_instances.read().await;
-        let senders = self.player_senders.read().await;
+        let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
+            let player_instances = self.player_instances.read().await;
+            let senders = self.player_senders.read().await;
+            senders
+                .iter()
+                .filter(|(player_id, _)| {
+                    player_instances.get(*player_id).map(String::as_str) == instance_id
+                })
+                .map(|(_, sender)| sender.clone())
+                .collect()
+        };
 
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-            for (player_id, sender) in senders.iter() {
-                let target_instance = player_instances.get(player_id).map(|id| id.as_str());
-                if target_instance == instance_id {
-                    let _ = sender.try_send(bytes.clone());
-                }
+            for sender in recipients {
+                let _ = sender.try_send(bytes.clone());
             }
         }
     }
 
     /// Send a message to all overworld players (those not in any instance), optionally excluding one player
     pub async fn send_to_overworld_players(&self, msg: ServerMessage, exclude: Option<&str>) {
-        let player_instances = self.player_instances.read().await;
-        let senders = self.player_senders.read().await;
+        let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
+            let player_instances = self.player_instances.read().await;
+            let senders = self.player_senders.read().await;
+            senders
+                .iter()
+                .filter(|(player_id, _)| {
+                    exclude != Some(player_id.as_str())
+                        && !player_instances.contains_key(*player_id)
+                })
+                .map(|(_, sender)| sender.clone())
+                .collect()
+        };
 
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-            for (player_id, sender) in senders.iter() {
-                if let Some(excluded) = exclude {
-                    if player_id == excluded {
-                        continue;
-                    }
-                }
-                // Only send to players NOT in any instance
-                if !player_instances.contains_key(player_id) {
-                    let _ = sender.try_send(bytes.clone());
-                }
+            for sender in recipients {
+                let _ = sender.try_send(bytes.clone());
             }
         }
     }
@@ -2227,8 +2256,6 @@ impl GameRoom {
         let mut senders = self.player_senders.write().await;
         senders.insert(player_id.to_string(), sender);
         self.sync_states
-            .write()
-            .await
             .insert(player_id.to_string(), PlayerSyncState::new());
         tracing::debug!("Registered sender for player {}", player_id);
     }
@@ -2237,14 +2264,14 @@ impl GameRoom {
     pub async fn unregister_player_sender(&self, player_id: &str) {
         let mut senders = self.player_senders.write().await;
         senders.remove(player_id);
-        self.sync_states.write().await.remove(player_id);
+        self.sync_states.remove(player_id);
         tracing::debug!("Unregistered sender for player {}", player_id);
     }
 
     /// Reset a player's delta sync state (forces full sync on next tick).
     /// Call on instance transitions so stale entity state doesn't carry over.
     pub async fn reset_sync_state(&self, player_id: &str) {
-        if let Some(state) = self.sync_states.write().await.get_mut(player_id) {
+        if let Some(mut state) = self.sync_states.get_mut(player_id) {
             *state = PlayerSyncState::new();
         }
     }
@@ -2254,13 +2281,16 @@ impl GameRoom {
         use crate::chunk::CHUNK_SIZE;
         use tracing::{debug, trace};
 
-        let players = self.players.read().await;
-        let player = players.get(player_id)?;
-        let coord = ChunkCoord::from_world(player.x, player.y);
+        let (player_x, player_y) = {
+            let players = self.players.read().await;
+            let player = players.get(player_id)?;
+            (player.x, player.y)
+        };
+        let coord = ChunkCoord::from_world(player_x, player_y);
 
         debug!(
             "Looking for portal at player {} position ({}, {}), chunk ({}, {})",
-            player_id, player.x, player.y, coord.x, coord.y
+            player_id, player_x, player_y, coord.x, coord.y
         );
 
         let chunk = self.world.get_or_load_chunk(coord).await?;
@@ -2293,10 +2323,10 @@ impl GameRoom {
             .find(|p| {
                 let world_x = chunk_base_x + p.x;
                 let world_y = chunk_base_y + p.y;
-                let in_portal = player.x >= world_x
-                    && player.x < world_x + p.width
-                    && player.y >= world_y
-                    && player.y < world_y + p.height;
+                let in_portal = player_x >= world_x
+                    && player_x < world_x + p.width
+                    && player_y >= world_y
+                    && player_y < world_y + p.height;
                 if in_portal {
                     debug!("Player {} is inside portal '{}'", player_id, p.id);
                 }
@@ -2310,8 +2340,8 @@ impl GameRoom {
     pub async fn send_to_player(&self, player_id: &str, msg: ServerMessage) {
         use crate::protocol::encode_server_message;
 
-        let senders = self.player_senders.read().await;
-        if let Some(sender) = senders.get(player_id) {
+        let sender = self.player_senders.read().await.get(player_id).cloned();
+        if let Some(sender) = sender {
             if let Ok(bytes) = encode_server_message(&msg) {
                 if let Err(e) = sender.try_send(bytes) {
                     match e {
@@ -7207,11 +7237,35 @@ impl GameRoom {
             .iter()
             .map(|p| (p.id.as_str(), *p))
             .collect();
-        let npc_map: HashMap<&str, &NpcUpdate> =
-            npc_updates.iter().map(|n| (n.id.as_str(), n)).collect();
+        let mut overworld_players_by_chunk: HashMap<(i32, i32), Vec<&PlayerUpdate>> =
+            HashMap::new();
+        for player in &overworld_players {
+            overworld_players_by_chunk
+                .entry((
+                    player.x.div_euclid(CHUNK_SIZE as i32),
+                    player.y.div_euclid(CHUNK_SIZE as i32),
+                ))
+                .or_default()
+                .push(*player);
+        }
+        let mut npcs_by_chunk: HashMap<(i32, i32), Vec<&NpcUpdate>> = HashMap::new();
+        for npc in &npc_updates {
+            let min_chunk_x = npc.x.div_euclid(CHUNK_SIZE as i32);
+            let min_chunk_y = npc.y.div_euclid(CHUNK_SIZE as i32);
+            let max_chunk_x = (npc.x + npc.size.max(1) - 1).div_euclid(CHUNK_SIZE as i32);
+            let max_chunk_y = (npc.y + npc.size.max(1) - 1).div_euclid(CHUNK_SIZE as i32);
+            for chunk_x in min_chunk_x..=max_chunk_x {
+                for chunk_y in min_chunk_y..=max_chunk_y {
+                    npcs_by_chunk
+                        .entry((chunk_x, chunk_y))
+                        .or_default()
+                        .push(npc);
+                }
+            }
+        }
+        let sync_chunk_radius = (VIEW_DISTANCE + CHUNK_SIZE as i32 - 1) / CHUNK_SIZE as i32;
 
         let current_tick = tick;
-        let mut sync_states = self.sync_states.write().await;
 
         for (player_id, sender) in &overworld_senders {
             if sender.capacity() < STATE_SYNC_MIN_QUEUE_CAPACITY {
@@ -7253,44 +7307,61 @@ impl GameRoom {
             };
 
             // Filter nearby entities by view distance
-            let nearby_players: HashMap<String, &PlayerUpdate> = overworld_player_map
-                .iter()
-                .filter(|(_, p)| (p.x - px).abs().max((p.y - py).abs()) <= VIEW_DISTANCE)
-                .map(|(_, p)| (p.id.clone(), *p))
-                .collect();
-            let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(player_id.as_str());
-            let done_npcs = all_npc_quests_done_by_player.get(player_id.as_str());
-            let nearby_npcs: HashMap<String, NpcUpdate> = npc_map
-                .iter()
-                .filter(|(_, n)| {
-                    let closest_x = px.clamp(n.x, n.x + n.size.max(1) - 1);
-                    let closest_y = py.clamp(n.y, n.y + n.size.max(1) - 1);
-                    (closest_x - px).abs().max((closest_y - py).abs()) <= VIEW_DISTANCE
-                })
-                .map(|(_, n)| {
-                    let mut n_for_player = (*n).clone();
-                    // Hide quest giver icon for merchant NPCs whose quests are all done
-                    if n_for_player.is_quest_giver && n_for_player.is_merchant {
-                        if done_npcs
-                            .map(|set| set.contains(n_for_player.prototype_id.as_str()))
-                            .unwrap_or(false)
-                        {
-                            n_for_player.is_quest_giver = false;
+            let center_chunk_x = px.div_euclid(CHUNK_SIZE as i32);
+            let center_chunk_y = py.div_euclid(CHUNK_SIZE as i32);
+            let mut nearby_players: HashMap<String, &PlayerUpdate> = HashMap::new();
+            let mut nearby_npcs: HashMap<String, NpcUpdate> = HashMap::new();
+
+            for chunk_x in
+                (center_chunk_x - sync_chunk_radius)..=(center_chunk_x + sync_chunk_radius)
+            {
+                for chunk_y in
+                    (center_chunk_y - sync_chunk_radius)..=(center_chunk_y + sync_chunk_radius)
+                {
+                    if let Some(players) = overworld_players_by_chunk.get(&(chunk_x, chunk_y)) {
+                        for player in players {
+                            if (player.x - px).abs().max((player.y - py).abs()) <= VIEW_DISTANCE {
+                                nearby_players.insert(player.id.clone(), *player);
+                            }
                         }
                     }
-                    n_for_player.can_turn_in_quest = n_for_player.is_quest_giver
-                        && ready_turnin_npcs
-                            .map(|set| set.contains(n_for_player.prototype_id.as_str()))
-                            .unwrap_or(false);
-                    (n_for_player.id.clone(), n_for_player)
-                })
-                .collect();
 
-            let sync_state = sync_states
-                .entry(player_id.to_string())
-                .or_insert_with(PlayerSyncState::new);
+                    if let Some(npcs) = npcs_by_chunk.get(&(chunk_x, chunk_y)) {
+                        for npc in npcs {
+                            let closest_x = px.clamp(npc.x, npc.x + npc.size.max(1) - 1);
+                            let closest_y = py.clamp(npc.y, npc.y + npc.size.max(1) - 1);
+                            if (closest_x - px).abs().max((closest_y - py).abs()) <= VIEW_DISTANCE {
+                                nearby_npcs
+                                    .entry(npc.id.clone())
+                                    .or_insert_with(|| (*npc).clone());
+                            }
+                        }
+                    }
+                }
+            }
+
+            let ready_turnin_npcs = ready_turnin_npc_types_by_player.get(player_id.as_str());
+            let done_npcs = all_npc_quests_done_by_player.get(player_id.as_str());
+            for npc in nearby_npcs.values_mut() {
+                if npc.is_quest_giver
+                    && npc.is_merchant
+                    && done_npcs
+                        .map(|set| set.contains(npc.prototype_id.as_str()))
+                        .unwrap_or(false)
+                {
+                    npc.is_quest_giver = false;
+                }
+                npc.can_turn_in_quest = npc.is_quest_giver
+                    && ready_turnin_npcs
+                        .map(|set| set.contains(npc.prototype_id.as_str()))
+                        .unwrap_or(false);
+            }
+
+            let Some(mut sync_state) = self.sync_states.get_mut(player_id.as_str()) else {
+                continue;
+            };
             let needs_full = sync_state.last_full_sync_tick == 0
-                || (current_tick - sync_state.last_full_sync_tick) >= FULL_SYNC_INTERVAL;
+                || current_tick >= sync_state.next_full_sync_tick;
 
             if needs_full {
                 // Full sync: encode all nearby entities
@@ -7321,7 +7392,14 @@ impl GameRoom {
                         tracing::debug!("StateSync drop for {}: {}", player_id, e);
                     } else {
                         // Only update sync state if send succeeded
+                        let initial_offset = if sync_state.last_full_sync_tick == 0 {
+                            full_sync_offset(player_id)
+                        } else {
+                            0
+                        };
                         sync_state.last_full_sync_tick = current_tick;
+                        sync_state.next_full_sync_tick =
+                            current_tick + FULL_SYNC_INTERVAL + initial_offset;
                         sync_state.last_players = nearby_players
                             .into_iter()
                             .map(|(id, p)| (id, p.clone()))
@@ -7399,7 +7477,6 @@ impl GameRoom {
                 }
             }
         }
-        drop(sync_states);
 
         // === Spectator StateSync ===
         // Generate a single StateSync for all spectators, centered on world spawn.
@@ -7451,29 +7528,29 @@ impl GameRoom {
                 trades.keys().cloned().collect()
             };
             for trade_id in trade_ids {
-                let should_cancel = {
+                let participants = {
                     let trades = self.trades.read().await;
-                    if let Some(session) = trades.get(&trade_id) {
-                        let players = self.players.read().await;
-                        match (
-                            players.get(&session.player_a),
-                            players.get(&session.player_b),
-                        ) {
-                            (Some(a), Some(b)) => {
-                                let dx = (a.x - b.x).abs();
-                                let dy = (a.y - b.y).abs();
-                                dx > TRADE_MAX_DISTANCE
-                                    || dy > TRADE_MAX_DISTANCE
-                                    || a.is_dead
-                                    || b.is_dead
-                                    || !a.active
-                                    || !b.active
-                            }
-                            _ => true,
+                    trades
+                        .get(&trade_id)
+                        .map(|session| (session.player_a.clone(), session.player_b.clone()))
+                };
+                let should_cancel = if let Some((player_a, player_b)) = participants {
+                    let players = self.players.read().await;
+                    match (players.get(&player_a), players.get(&player_b)) {
+                        (Some(a), Some(b)) => {
+                            let dx = (a.x - b.x).abs();
+                            let dy = (a.y - b.y).abs();
+                            dx > TRADE_MAX_DISTANCE
+                                || dy > TRADE_MAX_DISTANCE
+                                || a.is_dead
+                                || b.is_dead
+                                || !a.active
+                                || !b.active
                         }
-                    } else {
-                        false
+                        _ => true,
                     }
+                } else {
+                    false
                 };
                 if should_cancel {
                     let session = {
@@ -7582,39 +7659,52 @@ impl GameRoom {
     async fn arena_tick(&self, current_time: u64) {
         // Auto-queue/dequeue players based on position in queue zone
         let mut queue_errors: Vec<(String, String)> = Vec::new();
-        {
-            let players = self.players.read().await;
+        let arena_player_ids: HashSet<String> = {
             let player_instances = self.player_instances.read().await;
+            player_instances
+                .iter()
+                .filter(|(_, instance_id)| instance_id.starts_with("pub_duel_arena"))
+                .map(|(player_id, _)| player_id.clone())
+                .collect()
+        };
+        let arena_players: Vec<(String, String, i32, i32, i32)> = {
+            let players = self.players.read().await;
+            arena_player_ids
+                .iter()
+                .filter_map(|player_id| {
+                    let player = players.get(player_id)?;
+                    if player.is_dead || !player.active {
+                        return None;
+                    }
+                    Some((
+                        player_id.clone(),
+                        player.name.clone(),
+                        player.x,
+                        player.y,
+                        player.inventory.gold,
+                    ))
+                })
+                .collect()
+        };
+        {
             let mut arena = self.arena_manager.write().await;
 
-            for (player_id, instance_id) in player_instances.iter() {
-                if !instance_id.starts_with("pub_duel_arena") {
-                    continue;
-                }
-                if let Some(player) = players.get(player_id) {
-                    if player.is_dead || !player.active {
-                        continue;
-                    }
+            for (player_id, player_name, player_x, player_y, player_gold) in arena_players {
+                let in_queue_zone = arena.is_in_queue_zone(player_x, player_y);
+                let is_queued = arena.queued_players.contains(&player_id);
 
-                    let in_queue_zone = arena.is_in_queue_zone(player.x, player.y);
-                    let is_queued = arena.queued_players.contains(&player_id.to_string());
-
-                    if in_queue_zone && !is_queued && arena.state == crate::arena::ArenaState::Idle
-                    {
-                        if !arena.queue_rejected.contains(player_id) {
-                            if let Err(e) =
-                                arena.queue_player(player_id, &player.name, player.inventory.gold)
-                            {
-                                arena.queue_rejected.insert(player_id.clone());
-                                queue_errors.push((player_id.clone(), e));
-                            }
+                if in_queue_zone && !is_queued && arena.state == crate::arena::ArenaState::Idle {
+                    if !arena.queue_rejected.contains(&player_id) {
+                        if let Err(e) = arena.queue_player(&player_id, &player_name, player_gold) {
+                            arena.queue_rejected.insert(player_id.clone());
+                            queue_errors.push((player_id, e));
                         }
-                    } else if !in_queue_zone {
-                        if is_queued && arena.state == crate::arena::ArenaState::Idle {
-                            arena.dequeue_player(player_id);
-                        }
-                        arena.queue_rejected.remove(player_id);
                     }
+                } else if !in_queue_zone {
+                    if is_queued && arena.state == crate::arena::ArenaState::Idle {
+                        arena.dequeue_player(&player_id);
+                    }
+                    arena.queue_rejected.remove(&player_id);
                 }
             }
         }
@@ -7778,16 +7868,19 @@ impl GameRoom {
 
     /// Broadcast a message to all players in the fight_pit arena instance
     async fn broadcast_to_arena(&self, msg: ServerMessage) {
-        let player_instances = self.player_instances.read().await;
-        let senders = self.player_senders.read().await;
+        let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
+            let player_instances = self.player_instances.read().await;
+            let senders = self.player_senders.read().await;
+            player_instances
+                .iter()
+                .filter(|(_, instance_id)| instance_id.starts_with("pub_duel_arena"))
+                .filter_map(|(player_id, _)| senders.get(player_id).cloned())
+                .collect()
+        };
 
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-            for (player_id, instance_id) in player_instances.iter() {
-                if instance_id.starts_with("pub_duel_arena") {
-                    if let Some(sender) = senders.get(player_id) {
-                        let _ = sender.try_send(bytes.clone());
-                    }
-                }
+            for sender in recipients {
+                let _ = sender.try_send(bytes.clone());
             }
         }
     }

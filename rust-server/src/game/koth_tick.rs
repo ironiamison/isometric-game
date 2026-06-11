@@ -10,23 +10,28 @@ pub const KOTH_MAP_ID: &str = "koth_arena";
 impl GameRoom {
     /// Process all active KOTH sessions each tick
     pub(in crate::game) async fn process_koth_tick(&self, current_time: u64) {
-        let mut koth_states = self.koth_states.write().await;
-        let mut finished_instances: Vec<String> = Vec::new();
-
-        // Collect player levels for wave scaling
+        let koth_player_ids: Vec<String> = {
+            let states = self.koth_states.read().await;
+            states
+                .values()
+                .map(|state| state.player_id.clone())
+                .collect()
+        };
         let player_levels: std::collections::HashMap<String, i32> = {
             let players = self.players.read().await;
-            koth_states
-                .values()
-                .filter_map(|ks| {
-                    players.get(&ks.player_id).map(|p| {
+            koth_player_ids
+                .iter()
+                .filter_map(|player_id| {
+                    players.get(player_id).map(|p| {
                         let combat_level = p.combat_level();
-                        (ks.player_id.clone(), combat_level)
+                        (player_id.clone(), combat_level)
                     })
                 })
                 .collect()
         };
 
+        let mut koth_states = self.koth_states.write().await;
+        let mut finished_instances: Vec<String> = Vec::new();
         let mut all_events: Vec<KothEvent> = Vec::new();
 
         for (instance_id, koth) in koth_states.iter_mut() {
@@ -509,8 +514,7 @@ impl GameRoom {
         if total_gold > 0 {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                if let Some(new_gold) =
-                    item::checked_gold_credit(player.inventory.gold, total_gold)
+                if let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, total_gold)
                 {
                     player.inventory.gold = new_gold;
                 } else {

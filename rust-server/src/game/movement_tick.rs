@@ -102,8 +102,8 @@ impl GameRoom {
                 }
             }
 
-            let mut players = self.players.write().await;
             let chunks_guard = self.world.chunks_read().await;
+            let mut players = self.players.write().await;
             for player in players.values_mut().filter(|p| p.active && !p.is_dead) {
                 let ground_height_fn = |px: i32, py: i32| -> i32 {
                     if let Some(Some(inst_id)) = gravity_instance_map.get(&player.id) {

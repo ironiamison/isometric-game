@@ -82,24 +82,30 @@ impl GameRoom {
             return;
         }
 
-        let chest_manager = self.chest_manager.read().await;
-        for chest_key in &respawned_chests {
-            if let Some(chest) = chest_manager.get(chest_key) {
-                if chest.viewers.is_empty() {
-                    continue;
-                }
+        let updates: Vec<(Vec<String>, ServerMessage)> = {
+            let chest_manager = self.chest_manager.read().await;
+            respawned_chests
+                .iter()
+                .filter_map(|chest_key| {
+                    let chest = chest_manager.get(chest_key)?;
+                    if chest.viewers.is_empty() {
+                        return None;
+                    }
+                    Some((
+                        chest.viewers.iter().cloned().collect(),
+                        ServerMessage::ChestUpdate {
+                            chest_id: chest_key.clone(),
+                            slots: chest_slot_updates(chest, &self.item_registry),
+                            total_value: chest.total_value(&self.item_registry),
+                        },
+                    ))
+                })
+                .collect()
+        };
 
-                let slots = chest_slot_updates(chest, &self.item_registry);
-                let total_value = chest.total_value(&self.item_registry);
-                let viewer_ids: Vec<String> = chest.viewers.iter().cloned().collect();
-                let msg = ServerMessage::ChestUpdate {
-                    chest_id: chest_key.clone(),
-                    slots,
-                    total_value,
-                };
-                for viewer_id in &viewer_ids {
-                    self.send_to_player(viewer_id, msg.clone()).await;
-                }
+        for (viewer_ids, msg) in updates {
+            for viewer_id in viewer_ids {
+                self.send_to_player(&viewer_id, msg.clone()).await;
             }
         }
     }
@@ -237,13 +243,12 @@ impl GameRoom {
             }
         };
 
-        let mut chest_manager = self.chest_manager.write().await;
-        let chest = match chest_manager.get_mut(chest_id) {
-            Some(chest) => chest,
-            None => return,
-        };
-
         if !add_success {
+            let mut chest_manager = self.chest_manager.write().await;
+            let chest = match chest_manager.get_mut(chest_id) {
+                Some(chest) => chest,
+                None => return,
+            };
             let slot_idx = slot as usize;
             if slot_idx < chest.slots.len() {
                 chest.slots[slot_idx] = Some(taken_item);
@@ -254,27 +259,36 @@ impl GameRoom {
         self.process_quest_item_collect(player_id, &taken_item.item_id, taken_item.quantity)
             .await;
 
-        if let Some(definition) = self.chest_registry.get(&chest.chest_def_id) {
-            if definition
-                .spawn_items
-                .iter()
-                .any(|spawn| spawn.slot == slot)
-            {
-                chest.spawn_timers.insert(slot, std::time::Instant::now());
-            }
-        }
+        let update = {
+            let mut chest_manager = self.chest_manager.write().await;
+            let chest = match chest_manager.get_mut(chest_id) {
+                Some(chest) => chest,
+                None => return,
+            };
 
-        let slots = chest_slot_updates(chest, &self.item_registry);
-        let total_value = chest.total_value(&self.item_registry);
-        let viewer_ids: Vec<String> = chest.viewers.iter().cloned().collect();
-        let msg = ServerMessage::ChestUpdate {
-            chest_id: chest_id.to_string(),
-            slots,
-            total_value,
+            if let Some(definition) = self.chest_registry.get(&chest.chest_def_id) {
+                if definition
+                    .spawn_items
+                    .iter()
+                    .any(|spawn| spawn.slot == slot)
+                {
+                    chest.spawn_timers.insert(slot, std::time::Instant::now());
+                }
+            }
+
+            (
+                chest.viewers.iter().cloned().collect::<Vec<String>>(),
+                ServerMessage::ChestUpdate {
+                    chest_id: chest_id.to_string(),
+                    slots: chest_slot_updates(chest, &self.item_registry),
+                    total_value: chest.total_value(&self.item_registry),
+                },
+            )
         };
-        drop(chest_manager);
-        for viewer_id in &viewer_ids {
-            self.send_to_player(viewer_id, msg.clone()).await;
+
+        let (viewer_ids, msg) = update;
+        for viewer_id in viewer_ids {
+            self.send_to_player(&viewer_id, msg.clone()).await;
         }
     }
 

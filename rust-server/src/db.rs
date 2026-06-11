@@ -5,8 +5,11 @@ use argon2::{
 };
 use chrono::{DateTime, Utc};
 use sqlx::Row;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
-use std::collections::HashMap;
+use sqlx::sqlite::{
+    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
+};
+use std::collections::{HashMap, HashSet};
+use std::time::Duration;
 
 /// Account data - separate from character data
 #[derive(Debug, Clone)]
@@ -92,10 +95,14 @@ impl Database {
     pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
         let options: SqliteConnectOptions = database_url
             .parse::<SqliteConnectOptions>()?
-            .journal_mode(SqliteJournalMode::Wal);
+            .journal_mode(SqliteJournalMode::Wal)
+            .synchronous(SqliteSynchronous::Normal)
+            .busy_timeout(Duration::from_secs(5))
+            .foreign_keys(true);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
+            .acquire_timeout(Duration::from_secs(5))
             .connect_with(options)
             .await?;
 
@@ -486,10 +493,12 @@ impl Database {
             .execute(pool)
             .await
             .ok();
-        sqlx::query("ALTER TABLE resource_contract_stats ADD COLUMN daily_date TEXT NOT NULL DEFAULT ''")
-            .execute(pool)
-            .await
-            .ok();
+        sqlx::query(
+            "ALTER TABLE resource_contract_stats ADD COLUMN daily_date TEXT NOT NULL DEFAULT ''",
+        )
+        .execute(pool)
+        .await
+        .ok();
 
         // Friendships table - for friend system
         sqlx::query(
@@ -1064,13 +1073,16 @@ impl Database {
 
     /// Create a new account (no character created)
     pub async fn create_account(&self, username: &str, password: &str) -> Result<i64, String> {
-        // Hash the password with Argon2
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        let password_hash = argon2
-            .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| format!("Failed to hash password: {}", e))?
-            .to_string();
+        let password = password.to_owned();
+        let password_hash = tokio::task::spawn_blocking(move || {
+            let salt = SaltString::generate(&mut OsRng);
+            Argon2::default()
+                .hash_password(password.as_bytes(), &salt)
+                .map(|hash| hash.to_string())
+                .map_err(|e| format!("Failed to hash password: {}", e))
+        })
+        .await
+        .map_err(|e| format!("Password hashing task failed: {}", e))??;
 
         let result = sqlx::query("INSERT INTO accounts (username, password_hash) VALUES (?, ?)")
             .bind(username)
@@ -1112,20 +1124,26 @@ impl Database {
             last_login: row.get("last_login"),
         };
 
-        // Verify password
-        if let Ok(parsed_hash) = PasswordHash::new(&account.password_hash) {
-            if Argon2::default()
-                .verify_password(password.as_bytes(), &parsed_hash)
-                .is_ok()
-            {
-                // Update last login time
-                let _ =
-                    sqlx::query("UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?")
-                        .bind(account.id)
-                        .execute(&self.pool)
-                        .await;
-                return Some(account);
-            }
+        let password = password.to_owned();
+        let password_hash = account.password_hash.clone();
+        let verified = tokio::task::spawn_blocking(move || {
+            PasswordHash::new(&password_hash)
+                .ok()
+                .is_some_and(|parsed_hash| {
+                    Argon2::default()
+                        .verify_password(password.as_bytes(), &parsed_hash)
+                        .is_ok()
+                })
+        })
+        .await
+        .unwrap_or(false);
+
+        if verified {
+            let _ = sqlx::query("UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?")
+                .bind(account.id)
+                .execute(&self.pool)
+                .await;
+            return Some(account);
         }
         None
     }
@@ -1716,6 +1734,8 @@ impl Database {
         character_id: i64,
         state: &PlayerQuestState,
     ) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
         // Save active quests
         for (quest_id, progress) in &state.active_quests {
             let objectives_json = progress.objectives_to_json();
@@ -1737,7 +1757,7 @@ impl Database {
             .bind(&objectives_json)
             .bind(&started_at)
             .bind(&completed_at)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
@@ -1752,7 +1772,7 @@ impl Database {
             )
             .bind(character_id)
             .bind(quest_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
@@ -1764,7 +1784,7 @@ impl Database {
             )
             .bind(character_id)
             .bind(quest_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
@@ -1779,9 +1799,11 @@ impl Database {
             .bind(character_id)
             .bind(flag_name)
             .bind(flag_value)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
+
+        tx.commit().await?;
 
         tracing::debug!(
             "Saved quest state for character {}: {} active, {} completed",
@@ -2256,6 +2278,32 @@ impl Database {
         Ok(())
     }
 
+    pub async fn save_discovered_recipes(
+        &self,
+        character_id: i64,
+        recipe_ids: &HashSet<String>,
+    ) -> Result<(), sqlx::Error> {
+        if recipe_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.pool.begin().await?;
+        for recipe_id in recipe_ids {
+            sqlx::query(
+                r#"
+                INSERT OR IGNORE INTO discovered_recipes (character_id, recipe_id)
+                VALUES (?, ?)
+                "#,
+            )
+            .bind(character_id)
+            .bind(recipe_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
     // =========================================================================
     // Unlocked Spells Functions
     // =========================================================================
@@ -2290,6 +2338,32 @@ impl Database {
         .bind(spell_id)
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+
+    pub async fn save_unlocked_spells(
+        &self,
+        character_id: i64,
+        spell_ids: &HashSet<String>,
+    ) -> Result<(), sqlx::Error> {
+        if spell_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.pool.begin().await?;
+        for spell_id in spell_ids {
+            sqlx::query(
+                r#"
+                INSERT OR IGNORE INTO character_unlocked_spells (character_id, spell_id)
+                VALUES (?, ?)
+                "#,
+            )
+            .bind(character_id)
+            .bind(spell_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
         Ok(())
     }
 
@@ -2587,9 +2661,18 @@ impl Database {
         &self,
         chests: &HashMap<String, String>,
     ) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
         for (key, json) in chests {
-            self.save_chest(key, json).await?;
+            sqlx::query(
+                r#"INSERT INTO chests (chest_key, slots_json) VALUES (?, ?)
+                   ON CONFLICT(chest_key) DO UPDATE SET slots_json = excluded.slots_json"#,
+            )
+            .bind(key)
+            .bind(json)
+            .execute(&mut *tx)
+            .await?;
         }
+        tx.commit().await?;
         Ok(())
     }
 
@@ -2750,11 +2833,7 @@ impl Database {
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
 
-    pub async fn unlock_title(
-        &self,
-        character_id: i64,
-        title_id: &str,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn unlock_title(&self, character_id: i64, title_id: &str) -> Result<(), sqlx::Error> {
         sqlx::query("INSERT OR IGNORE INTO player_titles (character_id, title_id) VALUES (?, ?)")
             .bind(character_id)
             .bind(title_id)
@@ -2763,10 +2842,7 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_active_title(
-        &self,
-        character_id: i64,
-    ) -> Result<Option<String>, sqlx::Error> {
+    pub async fn get_active_title(&self, character_id: i64) -> Result<Option<String>, sqlx::Error> {
         let row: Option<(Option<String>,)> =
             sqlx::query_as("SELECT active_title FROM characters WHERE id = ?")
                 .bind(character_id)
@@ -2793,11 +2869,10 @@ impl Database {
     // =========================================================================
 
     pub async fn get_commission_marks(&self, character_id: i64) -> Result<i32, sqlx::Error> {
-        let row: (i32,) =
-            sqlx::query_as("SELECT commission_marks FROM characters WHERE id = ?")
-                .bind(character_id)
-                .fetch_one(&self.pool)
-                .await?;
+        let row: (i32,) = sqlx::query_as("SELECT commission_marks FROM characters WHERE id = ?")
+            .bind(character_id)
+            .fetch_one(&self.pool)
+            .await?;
         Ok(row.0)
     }
 
@@ -2917,10 +2992,7 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_active_order(
-        &self,
-        character_id: i64,
-    ) -> Result<Option<String>, sqlx::Error> {
+    pub async fn get_active_order(&self, character_id: i64) -> Result<Option<String>, sqlx::Error> {
         let row: Option<(String,)> =
             sqlx::query_as("SELECT order_id FROM crafting_orders_active WHERE character_id = ?")
                 .bind(character_id)

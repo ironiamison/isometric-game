@@ -22,7 +22,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::{RwLock, broadcast, mpsc, watch};
+use tokio::sync::{Mutex, RwLock, mpsc, watch};
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -98,6 +98,7 @@ struct GameSession {
 #[derive(Clone)]
 struct AppState {
     rooms: Arc<DashMap<String, Arc<GameRoom>>>,
+    room_creation_lock: Arc<Mutex<()>>,
     // Session ID -> GameSession
     sessions: Arc<DashMap<String, GameSession>>,
     // Auth token -> (Username, Player DB ID)
@@ -230,6 +231,7 @@ impl AppState {
 
         Self {
             rooms: Arc::new(DashMap::new()),
+            room_creation_lock: Arc::new(Mutex::new(())),
             sessions: Arc::new(DashMap::new()),
             auth_sessions: Arc::new(DashMap::new()),
             db: Arc::new(db),
@@ -260,7 +262,14 @@ impl AppState {
     }
 
     async fn get_or_create_room(&self, room_name: &str) -> Arc<GameRoom> {
-        // Check if a room with this name already exists
+        for room in self.rooms.iter() {
+            if room.name == room_name {
+                return room.clone();
+            }
+        }
+
+        let _creation_guard = self.room_creation_lock.lock().await;
+
         for room in self.rooms.iter() {
             if room.name == room_name {
                 return room.clone();
@@ -289,6 +298,8 @@ impl AppState {
         room
     }
 }
+
+const GAME_ROOM_NAME: &str = "game_room";
 
 // ============================================================================
 // HTTP Handlers - Authentication
@@ -451,6 +462,12 @@ impl RateLimiter {
         let (count, _) = entry.value_mut();
         // Add extra penalty for failures
         *count = (*count).saturating_add(2);
+    }
+
+    fn prune_expired(&self) {
+        let now = std::time::Instant::now();
+        self.entries
+            .retain(|_, (_, started)| now.duration_since(*started) <= self.window_duration);
     }
 }
 
@@ -1139,6 +1156,14 @@ async fn matchmake_join_or_create(
 ) -> impl IntoResponse {
     let client_ip = addr.ip().to_string();
 
+    if room_name != GAME_ROOM_NAME {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Unknown game room" })),
+        )
+            .into_response();
+    }
+
     if !state.matchmake_rate_limiter.check(&client_ip) {
         warn!("Rate limit exceeded for matchmaking from {}", client_ip);
         return (
@@ -1279,8 +1304,7 @@ async fn matchmake_join_or_create(
                         old_room_ref.get_player_save_data(&old_player_id).await
                     {
                         if save_data.current_map.is_some() {
-                            let entrance_positions =
-                                state.player_entrance_positions.read().await;
+                            let entrance_positions = state.player_entrance_positions.read().await;
                             if let Some(&(ex, ey)) = entrance_positions.get(&old_player_id) {
                                 save_data.entrance_x = Some(ex as f32);
                                 save_data.entrance_y = Some(ey as f32);
@@ -1353,36 +1377,30 @@ async fn matchmake_join_or_create(
                         let discovered = old_room_ref
                             .get_player_discovered_recipes(&old_player_id)
                             .await;
-                        for recipe_id in &discovered {
-                            if let Err(e) = state
-                                .db
-                                .save_discovered_recipe(character_id, recipe_id)
-                                .await
-                            {
-                                error!(
-                                    "Session takeover: failed to save recipe {} for {}: {}",
-                                    recipe_id, old_sess.character_name, e
-                                );
-                            }
+                        if let Err(e) = state
+                            .db
+                            .save_discovered_recipes(character_id, &discovered)
+                            .await
+                        {
+                            error!(
+                                "Session takeover: failed to save recipes for {}: {}",
+                                old_sess.character_name, e
+                            );
                         }
 
                         let unlocked = old_room_ref
                             .get_player_unlocked_spells(&old_player_id)
                             .await;
-                        for spell_id in &unlocked {
-                            if let Err(e) =
-                                state.db.save_unlocked_spell(character_id, spell_id).await
-                            {
-                                error!(
-                                    "Session takeover: failed to save spell {} for {}: {}",
-                                    spell_id, old_sess.character_name, e
-                                );
-                            }
+                        if let Err(e) = state.db.save_unlocked_spells(character_id, &unlocked).await
+                        {
+                            error!(
+                                "Session takeover: failed to save spells for {}: {}",
+                                old_sess.character_name, e
+                            );
                         }
 
-                        let slayer_state = old_room_ref
-                            .get_player_slayer_state(&old_player_id)
-                            .await;
+                        let slayer_state =
+                            old_room_ref.get_player_slayer_state(&old_player_id).await;
                         if slayer_state.current_task.is_some()
                             || slayer_state.tasks_completed > 0
                             || slayer_state.points > 0
@@ -3060,17 +3078,15 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 if character_id > 0 {
                                     let discovered =
                                         recv_room.get_player_discovered_recipes(&player_id).await;
-                                    for recipe_id in &discovered {
-                                        if let Err(e) = recv_state
-                                            .db
-                                            .save_discovered_recipe(character_id, recipe_id)
-                                            .await
-                                        {
-                                            error!(
-                                                "Failed to save discovered recipe {} for {}: {}",
-                                                recipe_id, character_name, e
-                                            );
-                                        }
+                                    if let Err(e) = recv_state
+                                        .db
+                                        .save_discovered_recipes(character_id, &discovered)
+                                        .await
+                                    {
+                                        error!(
+                                            "Failed to save discovered recipes for {}: {}",
+                                            character_name, e
+                                        );
                                     }
                                     if !discovered.is_empty() {
                                         info!(
@@ -3085,17 +3101,15 @@ async fn handle_spectator(socket: WebSocket, state: AppState, room: Arc<GameRoom
                                 if character_id > 0 {
                                     let unlocked =
                                         recv_room.get_player_unlocked_spells(&player_id).await;
-                                    for spell_id in &unlocked {
-                                        if let Err(e) = recv_state
-                                            .db
-                                            .save_unlocked_spell(character_id, spell_id)
-                                            .await
-                                        {
-                                            error!(
-                                                "Failed to save unlocked spell {} for {}: {}",
-                                                spell_id, character_name, e
-                                            );
-                                        }
+                                    if let Err(e) = recv_state
+                                        .db
+                                        .save_unlocked_spells(character_id, &unlocked)
+                                        .await
+                                    {
+                                        error!(
+                                            "Failed to save unlocked spells for {}: {}",
+                                            character_name, e
+                                        );
                                     }
                                 }
 
@@ -3931,17 +3945,15 @@ async fn handle_socket(
         // Save discovered recipes to database
         if character_id > 0 {
             let discovered = room.get_player_discovered_recipes(&player_id).await;
-            for recipe_id in &discovered {
-                if let Err(e) = state
-                    .db
-                    .save_discovered_recipe(character_id, recipe_id)
-                    .await
-                {
-                    error!(
-                        "Failed to save discovered recipe {} for {}: {}",
-                        recipe_id, character_name, e
-                    );
-                }
+            if let Err(e) = state
+                .db
+                .save_discovered_recipes(character_id, &discovered)
+                .await
+            {
+                error!(
+                    "Failed to save discovered recipes for {}: {}",
+                    character_name, e
+                );
             }
             if !discovered.is_empty() {
                 info!(
@@ -3955,13 +3967,11 @@ async fn handle_socket(
         // Save unlocked spells to database
         if character_id > 0 {
             let unlocked = room.get_player_unlocked_spells(&player_id).await;
-            for spell_id in &unlocked {
-                if let Err(e) = state.db.save_unlocked_spell(character_id, spell_id).await {
-                    error!(
-                        "Failed to save unlocked spell {} for {}: {}",
-                        spell_id, character_name, e
-                    );
-                }
+            if let Err(e) = state.db.save_unlocked_spells(character_id, &unlocked).await {
+                error!(
+                    "Failed to save unlocked spells for {}: {}",
+                    character_name, e
+                );
             }
         }
 
@@ -5581,14 +5591,8 @@ async fn handle_client_message(
             quantity,
             expected_price,
         } => {
-            room.handle_stall_buy(
-                player_id,
-                &seller_id,
-                stall_slot,
-                quantity,
-                expected_price,
-            )
-            .await;
+            room.handle_stall_buy(player_id, &seller_id, stall_slot, quantity, expected_price)
+                .await;
         }
         ClientMessage::SetCombatStyle { style } => {
             if let Some(combat_style) = crate::game::CombatStyle::from_str(&style) {
@@ -5658,6 +5662,12 @@ async fn main() {
     }
 
     let state = AppState::new(log_buffer).await;
+    let room_load_start = std::time::Instant::now();
+    state.get_or_create_room(GAME_ROOM_NAME).await;
+    info!(
+        "Preloaded game room in {}ms",
+        room_load_start.elapsed().as_millis()
+    );
 
     // Spawn game tick loop
     let tick_state = state.clone();
@@ -5716,12 +5726,13 @@ async fn main() {
         }
     });
 
-    // Spawn auto-save loop (every 30 seconds)
-    // Snapshots all player data quickly under locks, then spawns DB writes
-    // concurrently so they don't block the game tick loop.
+    // Spawn auto-save loop (every 30 seconds). SQLite has one writer, so writes
+    // are intentionally serialized instead of creating a task stampede.
     let save_state = state.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        interval.tick().await;
         loop {
             interval.tick().await;
             let cycle_start = std::time::Instant::now();
@@ -5808,11 +5819,10 @@ async fn main() {
             let snapshot_count = snapshots.len();
             let mut write_phase_ms = 0u128;
 
-            // Phase 2: Write all snapshots to DB concurrently (no locks held)
+            // Phase 2: Write snapshots without holding gameplay locks.
             if !snapshots.is_empty() {
                 let write_phase_start = std::time::Instant::now();
-                let save_count = snapshots.len();
-                let mut save_tasks = Vec::with_capacity(save_count);
+                let mut saved_count = 0;
 
                 for (
                     character_id,
@@ -5825,74 +5835,73 @@ async fn main() {
                     unlocked_spells,
                 ) in snapshots
                 {
-                    let db = save_state.db.clone();
-                    save_tasks.push(tokio::spawn(async move {
-                        if let Err(e) = db
-                            .save_character(
-                                character_id,
-                                save_data.x,
-                                save_data.y,
-                                save_data.z,
-                                save_data.hp,
-                                save_data.prayer_points,
-                                save_data.mp,
-                                &save_data.skills,
-                                save_data.gold,
-                                &save_data.inventory_json,
-                                save_data.equipped_head.as_deref(),
-                                save_data.equipped_body.as_deref(),
-                                save_data.equipped_weapon.as_deref(),
-                                save_data.equipped_back.as_deref(),
-                                save_data.equipped_feet.as_deref(),
-                                save_data.equipped_ring.as_deref(),
-                                save_data.equipped_gloves.as_deref(),
-                                save_data.equipped_necklace.as_deref(),
-                                save_data.equipped_belt.as_deref(),
-                                played_time_delta,
-                                save_data.current_map.as_deref(),
-                                save_data.sitting_at_x,
-                                save_data.sitting_at_y,
-                                save_data.entrance_x,
-                                save_data.entrance_y,
-                                &save_data.bank_json,
-                                save_data.bank_gold,
-                                save_data.bank_max_slots,
-                                &save_data.combat_style_prefs,
-                            )
+                    match save_state
+                        .db
+                        .save_character(
+                            character_id,
+                            save_data.x,
+                            save_data.y,
+                            save_data.z,
+                            save_data.hp,
+                            save_data.prayer_points,
+                            save_data.mp,
+                            &save_data.skills,
+                            save_data.gold,
+                            &save_data.inventory_json,
+                            save_data.equipped_head.as_deref(),
+                            save_data.equipped_body.as_deref(),
+                            save_data.equipped_weapon.as_deref(),
+                            save_data.equipped_back.as_deref(),
+                            save_data.equipped_feet.as_deref(),
+                            save_data.equipped_ring.as_deref(),
+                            save_data.equipped_gloves.as_deref(),
+                            save_data.equipped_necklace.as_deref(),
+                            save_data.equipped_belt.as_deref(),
+                            played_time_delta,
+                            save_data.current_map.as_deref(),
+                            save_data.sitting_at_x,
+                            save_data.sitting_at_y,
+                            save_data.entrance_x,
+                            save_data.entrance_y,
+                            &save_data.bank_json,
+                            save_data.bank_gold,
+                            save_data.bank_max_slots,
+                            &save_data.combat_style_prefs,
+                        )
+                        .await
+                    {
+                        Ok(()) => saved_count += 1,
+                        Err(e) => {
+                            warn!("Auto-save failed for character {}: {}", character_name, e)
+                        }
+                    }
+
+                    if let Some(quest_state) = quest_state {
+                        if let Err(e) = save_state
+                            .db
+                            .save_character_quest_state(character_id, &quest_state)
                             .await
                         {
-                            warn!("Auto-save failed for character {}: {}", character_name, e);
+                            warn!("Quest auto-save failed for {}: {}", character_name, e);
                         }
-
-                        if let Some(quest_state) = quest_state {
-                            let _ = db
-                                .save_character_quest_state(character_id, &quest_state)
-                                .await;
-                        }
-
-                        // Save discovered recipes
-                        for recipe_id in &discovered_recipes {
-                            let _ = db.save_discovered_recipe(character_id, recipe_id).await;
-                        }
-
-                        // Save slayer state
-                        if let Some(ref slayer) = slayer_state {
-                            let _ = db.save_character_slayer_state(character_id, slayer).await;
-                        }
-
-                        // Save unlocked spells
-                        for spell_id in &unlocked_spells {
-                            let _ = db.save_unlocked_spell(character_id, spell_id).await;
-                        }
-                    }));
-                }
-
-                // Wait for all saves to finish (they run concurrently)
-                let mut saved_count = 0;
-                for task in save_tasks {
-                    if task.await.is_ok() {
-                        saved_count += 1;
                     }
+
+                    let _ = save_state
+                        .db
+                        .save_discovered_recipes(character_id, &discovered_recipes)
+                        .await;
+
+                    if let Some(ref slayer) = slayer_state {
+                        let _ = save_state
+                            .db
+                            .save_character_slayer_state(character_id, slayer)
+                            .await;
+                    }
+
+                    let _ = save_state
+                        .db
+                        .save_unlocked_spells(character_id, &unlocked_spells)
+                        .await;
                 }
 
                 write_phase_ms = write_phase_start.elapsed().as_millis();
@@ -5941,6 +5950,8 @@ async fn main() {
         let mut interval = tokio::time::interval(Duration::from_secs(60));
         loop {
             interval.tick().await;
+            perf_state.auth_rate_limiter.prune_expired();
+            perf_state.matchmake_rate_limiter.prune_expired();
             let perf = perf_state.perf_metrics.snapshot(3, 0);
             info!(
                 "[PERF] uptime={}s tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%), stale_packets={}({}%) seq_gaps={}({}%) input_gaps={}({}%) stale_intent_clears={}({}%)) state_sync(drop_rate={}%, skip_rate={}%, attempts={}, capacity_skips={}, drops={}, full={}({}%), delta={}({}%), fallback_self={}, raw_bytes={}, wire_bytes={}, wire_vs_raw={}%) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
@@ -6149,12 +6160,10 @@ async fn main() {
                         .await;
                 }
 
-                for recipe_id in &discovered_recipes {
-                    let _ = shutdown_state
-                        .db
-                        .save_discovered_recipe(character_id, recipe_id)
-                        .await;
-                }
+                let _ = shutdown_state
+                    .db
+                    .save_discovered_recipes(character_id, &discovered_recipes)
+                    .await;
 
                 if let Some(ref slayer) = slayer_state {
                     let _ = shutdown_state
@@ -6163,12 +6172,10 @@ async fn main() {
                         .await;
                 }
 
-                for spell_id in &unlocked_spells {
-                    let _ = shutdown_state
-                        .db
-                        .save_unlocked_spell(character_id, spell_id)
-                        .await;
-                }
+                let _ = shutdown_state
+                    .db
+                    .save_unlocked_spells(character_id, &unlocked_spells)
+                    .await;
             }
         }
 

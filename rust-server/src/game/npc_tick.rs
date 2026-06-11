@@ -58,8 +58,8 @@ impl GameRoom {
         let mut npc_speech_events = Vec::new();
 
         {
-            let mut npcs = self.npcs.write().await;
             let chunks_guard = self.world.chunks_read().await;
+            let mut npcs = self.npcs.write().await;
             let walkable_check = |wx: i32, wy: i32| -> bool {
                 let coord = ChunkCoord::from_world(wx, wy);
                 if let Some(chunk) = chunks_guard.get(&coord) {

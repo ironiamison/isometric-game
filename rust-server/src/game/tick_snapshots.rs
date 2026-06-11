@@ -132,16 +132,22 @@ impl GameRoom {
     pub(in crate::game) async fn collect_overworld_visibility_snapshot(
         &self,
     ) -> OverworldVisibilitySnapshot {
+        let instance_players: HashSet<String> = {
+            let instances = self.player_instances.read().await;
+            instances.keys().cloned().collect()
+        };
+        let gathering_players = {
+            let gathering = self.gathering.read().await;
+            gathering.gathering_player_ids()
+        };
         let player_positions: Vec<PlayerPosition> = {
             let players = self.players.read().await;
-            let gathering = self.gathering.read().await;
-            let instances = self.player_instances.read().await;
 
             players
                 .values()
                 .filter(|player| player.active && player.is_alive())
-                .filter(|player| !instances.contains_key(&player.id))
-                .filter(|player| !gathering.is_gathering(&player.id))
+                .filter(|player| !instance_players.contains(&player.id))
+                .filter(|player| !gathering_players.contains(&player.id))
                 .map(|player| (player.id.clone(), player.x, player.y, player.hp))
                 .collect()
         };

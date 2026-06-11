@@ -57,29 +57,15 @@ impl GameRoom {
                 let player_instance = self.player_instances.read().await.get(player_id).cloned();
                 if let Some(instance_id) = player_instance.as_ref() {
                     if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
-                        let npcs = instance.npcs.read().await;
-                        if let Some(npc) = npcs.get(target_id) {
-                            if !npc.is_alive() {
-                                self.send_to_player(
-                                    player_id,
-                                    auto_action_stopped_message("target_dead"),
-                                )
-                                .await;
-                                return;
-                            }
-                            if action_type == AutoActionType::Attack && !npc.is_attackable() {
-                                return;
-                            }
-                        } else {
+                        let target_state = {
+                            let npcs = instance.npcs.read().await;
+                            npcs.get(target_id)
+                                .map(|npc| (npc.is_alive(), npc.is_attackable()))
+                        };
+                        let Some((is_alive, is_attackable)) = target_state else {
                             return;
-                        }
-                    } else {
-                        return;
-                    }
-                } else {
-                    let npcs = self.npcs.read().await;
-                    if let Some(npc) = npcs.get(target_id) {
-                        if !npc.is_alive() {
+                        };
+                        if !is_alive {
                             self.send_to_player(
                                 player_id,
                                 auto_action_stopped_message("target_dead"),
@@ -87,10 +73,27 @@ impl GameRoom {
                             .await;
                             return;
                         }
-                        if action_type == AutoActionType::Attack && !npc.is_attackable() {
+                        if action_type == AutoActionType::Attack && !is_attackable {
                             return;
                         }
                     } else {
+                        return;
+                    }
+                } else {
+                    let target_state = {
+                        let npcs = self.npcs.read().await;
+                        npcs.get(target_id)
+                            .map(|npc| (npc.is_alive(), npc.is_attackable()))
+                    };
+                    let Some((is_alive, is_attackable)) = target_state else {
+                        return;
+                    };
+                    if !is_alive {
+                        self.send_to_player(player_id, auto_action_stopped_message("target_dead"))
+                            .await;
+                        return;
+                    }
+                    if action_type == AutoActionType::Attack && !is_attackable {
                         return;
                     }
                 }

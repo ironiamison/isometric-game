@@ -12,6 +12,24 @@ pub const PHARAOH_BOSS_MAP_ID: &str = "pyramid_tomb";
 impl GameRoom {
     /// Process all active boss fight sessions each tick
     pub(in crate::game) async fn process_boss_tick(&self, current_time: u64) {
+        let boss_npc_ids: Vec<(String, String)> = {
+            let states = self.boss_states.read().await;
+            states
+                .iter()
+                .map(|(instance_id, boss)| (instance_id.clone(), boss.boss_npc_id.clone()))
+                .collect()
+        };
+        let mut npc_snapshots = std::collections::HashMap::new();
+        for (instance_id, npc_id) in boss_npc_ids {
+            if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                let npcs = instance.npcs.read().await;
+                if let Some(npc) = npcs.get(&npc_id) {
+                    npc_snapshots
+                        .insert(instance_id, (npc.hp, npc.x, npc.y, npc.target_id.clone()));
+                }
+            }
+        }
+
         let mut boss_states = self.boss_states.write().await;
         let mut finished_instances: Vec<String> = Vec::new();
 
@@ -51,23 +69,20 @@ impl GameRoom {
             }
 
             // Sync boss HP from the actual NPC so combat damage is reflected
-            if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
-                let npcs = instance.npcs.read().await;
-                if let Some(npc) = npcs.get(&boss.boss_npc_id) {
-                    boss.boss_hp = npc.hp;
-                    boss.boss_x = npc.x;
-                    boss.boss_y = npc.y;
+            if let Some((npc_hp, npc_x, npc_y, target_id)) = npc_snapshots.get(instance_id) {
+                boss.boss_hp = *npc_hp;
+                boss.boss_x = *npc_x;
+                boss.boss_y = *npc_y;
 
-                    // Detect boss death from combat damage
-                    if npc.hp <= 0 && boss.wurm_state != crate::boss::WurmState::Dead {
-                        tracing::info!("Boss NPC killed via combat, triggering BossDied");
-                        boss.wurm_state = crate::boss::WurmState::Dead;
-                        all_events.push(BossEvent::BossDied {
-                            instance_id: instance_id.clone(),
-                            killer_id: npc.target_id.clone(),
-                        });
-                        continue;
-                    }
+                // Detect boss death from combat damage
+                if *npc_hp <= 0 && boss.wurm_state != crate::boss::WurmState::Dead {
+                    tracing::info!("Boss NPC killed via combat, triggering BossDied");
+                    boss.wurm_state = crate::boss::WurmState::Dead;
+                    all_events.push(BossEvent::BossDied {
+                        instance_id: instance_id.clone(),
+                        killer_id: target_id.clone(),
+                    });
+                    continue;
                 }
             }
 
@@ -1202,8 +1217,7 @@ impl GameRoom {
         if total_gold > 0 {
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                if let Some(new_gold) =
-                    item::checked_gold_credit(player.inventory.gold, total_gold)
+                if let Some(new_gold) = item::checked_gold_credit(player.inventory.gold, total_gold)
                 {
                     player.inventory.gold = new_gold;
                 } else {
@@ -1355,6 +1369,24 @@ impl GameRoom {
 
     /// Process all active pharaoh boss fight sessions each tick
     pub(in crate::game) async fn process_pharaoh_boss_tick(&self, current_time: u64) {
+        let boss_npc_ids: Vec<(String, String)> = {
+            let states = self.pharaoh_boss_states.read().await;
+            states
+                .iter()
+                .map(|(instance_id, boss)| (instance_id.clone(), boss.boss_npc_id.clone()))
+                .collect()
+        };
+        let mut npc_snapshots = std::collections::HashMap::new();
+        for (instance_id, npc_id) in boss_npc_ids {
+            if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                let npcs = instance.npcs.read().await;
+                if let Some(npc) = npcs.get(&npc_id) {
+                    npc_snapshots
+                        .insert(instance_id, (npc.hp, npc.x, npc.y, npc.target_id.clone()));
+                }
+            }
+        }
+
         let mut pharaoh_states = self.pharaoh_boss_states.write().await;
         let mut finished_instances: Vec<String> = Vec::new();
         let mut all_events: Vec<BossEvent> = Vec::new();
@@ -1391,23 +1423,20 @@ impl GameRoom {
             }
 
             // Sync boss HP from the actual NPC so combat damage is reflected
-            if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
-                let npcs = instance.npcs.read().await;
-                if let Some(npc) = npcs.get(&boss.boss_npc_id) {
-                    boss.boss_hp = npc.hp;
-                    boss.boss_x = npc.x;
-                    boss.boss_y = npc.y;
+            if let Some((npc_hp, npc_x, npc_y, target_id)) = npc_snapshots.get(instance_id) {
+                boss.boss_hp = *npc_hp;
+                boss.boss_x = *npc_x;
+                boss.boss_y = *npc_y;
 
-                    // Detect boss death from combat damage
-                    if npc.hp <= 0 && !boss.is_dead() {
-                        tracing::info!("Pharaoh boss NPC killed via combat, triggering BossDied");
-                        boss.state = crate::pharaoh_boss::PharaohState::Dead;
-                        all_events.push(BossEvent::BossDied {
-                            instance_id: instance_id.clone(),
-                            killer_id: npc.target_id.clone(),
-                        });
-                        continue;
-                    }
+                // Detect boss death from combat damage
+                if *npc_hp <= 0 && !boss.is_dead() {
+                    tracing::info!("Pharaoh boss NPC killed via combat, triggering BossDied");
+                    boss.state = crate::pharaoh_boss::PharaohState::Dead;
+                    all_events.push(BossEvent::BossDied {
+                        instance_id: instance_id.clone(),
+                        killer_id: target_id.clone(),
+                    });
+                    continue;
                 }
             }
 
