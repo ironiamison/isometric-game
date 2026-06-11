@@ -1278,6 +1278,59 @@ mod sync_state_tests {
     }
 }
 
+#[cfg(test)]
+mod interaction_security_tests {
+    use super::{DialogueGrant, consume_dialogue_choice, same_interaction_context};
+    use std::collections::HashSet;
+
+    #[test]
+    fn dialogue_choices_require_the_exact_server_grant_and_are_single_use() {
+        let mut grant = DialogueGrant {
+            quest_id: "banker:npc_1".to_string(),
+            npc_interaction: None,
+            choices: HashSet::from(["open_bank".to_string()]),
+        };
+
+        assert!(!consume_dialogue_choice(
+            &mut grant,
+            "resource_contract_master:npc_370:lumberjack_pete",
+            "contracts"
+        ));
+        assert!(!consume_dialogue_choice(
+            &mut grant,
+            "banker:npc_1",
+            "upgrade"
+        ));
+        assert!(consume_dialogue_choice(
+            &mut grant,
+            "banker:npc_1",
+            "open_bank"
+        ));
+        assert!(!consume_dialogue_choice(
+            &mut grant,
+            "banker:npc_1",
+            "open_bank"
+        ));
+    }
+
+    #[test]
+    fn interaction_context_rejects_different_instances() {
+        let instance_a = "instance-a".to_string();
+        let instance_b = "instance-b".to_string();
+
+        assert!(same_interaction_context(None, None));
+        assert!(same_interaction_context(
+            Some(&instance_a),
+            Some(&instance_a)
+        ));
+        assert!(!same_interaction_context(None, Some(&instance_a)));
+        assert!(!same_interaction_context(
+            Some(&instance_a),
+            Some(&instance_b)
+        ));
+    }
+}
+
 // ============================================================================
 // Quest Locations (reach_location objectives)
 // ============================================================================
@@ -1287,6 +1340,31 @@ struct QuestLocation {
     x: i32,
     y: i32,
     radius: i32,
+}
+
+#[derive(Debug, Clone)]
+struct NpcInteractionGrant {
+    npc_id: String,
+    instance_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct DialogueGrant {
+    quest_id: String,
+    npc_interaction: Option<NpcInteractionGrant>,
+    choices: HashSet<String>,
+}
+
+fn consume_dialogue_choice(grant: &mut DialogueGrant, quest_id: &str, choice_id: &str) -> bool {
+    if grant.quest_id != quest_id || !grant.choices.contains(choice_id) {
+        return false;
+    }
+    grant.choices.clear();
+    true
+}
+
+fn same_interaction_context(first: Option<&String>, second: Option<&String>) -> bool {
+    first == second
 }
 
 // ============================================================================
@@ -1328,6 +1406,10 @@ pub struct GameRoom {
     sync_states: DashMap<String, PlayerSyncState>,
     /// Tracks which instance each player is currently in (None = overworld)
     player_instances: Arc<RwLock<HashMap<String, String>>>,
+    /// Last server-validated NPC interaction for each player.
+    npc_interaction_grants: RwLock<HashMap<String, NpcInteractionGrant>>,
+    /// Dialogues and choices actually displayed by the server.
+    dialogue_grants: RwLock<HashMap<String, DialogueGrant>>,
     /// Instance manager for looking up instance NPCs
     instance_manager: Arc<crate::instance::InstanceManager>,
     /// Arena duel manager (active when players are in duel_arena instance)
@@ -2021,6 +2103,8 @@ impl GameRoom {
             player_senders: RwLock::new(HashMap::new()),
             sync_states: DashMap::new(),
             player_instances,
+            npc_interaction_grants: RwLock::new(HashMap::new()),
+            dialogue_grants: RwLock::new(HashMap::new()),
             instance_manager,
             arena_manager: RwLock::new(crate::arena::ArenaManager::new(
                 crate::arena::ArenaConfig::default(),
@@ -2384,6 +2468,47 @@ impl GameRoom {
     pub async fn send_to_player(&self, player_id: &str, msg: ServerMessage) {
         use crate::protocol::encode_server_message;
 
+        match &msg {
+            ServerMessage::ShowDialogue {
+                quest_id,
+                npc_id,
+                choices,
+                ..
+            } => {
+                let inherited_interaction = {
+                    let grants = self.dialogue_grants.read().await;
+                    grants
+                        .get(player_id)
+                        .filter(|grant| grant.choices.is_empty())
+                        .and_then(|grant| grant.npc_interaction.clone())
+                };
+                let current_interaction = {
+                    let grants = self.npc_interaction_grants.read().await;
+                    grants
+                        .get(player_id)
+                        .filter(|grant| grant.npc_id == *npc_id)
+                        .cloned()
+                };
+                let npc_interaction = if npc_id.is_empty() {
+                    None
+                } else {
+                    current_interaction.or(inherited_interaction)
+                };
+                self.dialogue_grants.write().await.insert(
+                    player_id.to_string(),
+                    DialogueGrant {
+                        quest_id: quest_id.clone(),
+                        npc_interaction,
+                        choices: choices.iter().map(|choice| choice.id.clone()).collect(),
+                    },
+                );
+            }
+            ServerMessage::DialogueClosed => {
+                self.dialogue_grants.write().await.remove(player_id);
+            }
+            _ => {}
+        }
+
         let sender = self.player_senders.read().await.get(player_id).cloned();
         if let Some(sender) = sender {
             if let Ok(bytes) = encode_server_message(&msg) {
@@ -2407,6 +2532,127 @@ impl GameRoom {
         } else {
             tracing::debug!("No sender registered for player {}", player_id);
         }
+    }
+
+    async fn npc_context_for_player(
+        &self,
+        player_id: &str,
+        npc_id: &str,
+    ) -> Option<(String, f32, bool, Option<String>)> {
+        let (player_x, player_y) = {
+            let players = self.players.read().await;
+            match players.get(player_id) {
+                Some(player) if player.active && !player.is_dead => (player.x, player.y),
+                _ => return None,
+            }
+        };
+        let instance_id = self.player_instances.read().await.get(player_id).cloned();
+
+        let npc_data = if let Some(instance_id) = instance_id.as_ref() {
+            let instance = self.instance_manager.get_by_instance_id(instance_id)?;
+            let npcs = instance.npcs.read().await;
+            npcs.get(npc_id)
+                .map(|npc| (npc.prototype_id.clone(), npc.x, npc.y, npc.is_alive()))
+        } else {
+            let npcs = self.npcs.read().await;
+            npcs.get(npc_id)
+                .map(|npc| (npc.prototype_id.clone(), npc.x, npc.y, npc.is_alive()))
+        }?;
+
+        let dx = (npc_data.1 - player_x) as f32;
+        let dy = (npc_data.2 - player_y) as f32;
+        Some((
+            npc_data.0,
+            (dx * dx + dy * dy).sqrt(),
+            npc_data.3,
+            instance_id,
+        ))
+    }
+
+    async fn validate_npc_grant(
+        &self,
+        player_id: &str,
+        grant: &NpcInteractionGrant,
+        max_distance: f32,
+    ) -> Option<String> {
+        let (prototype_id, distance, alive, instance_id) = self
+            .npc_context_for_player(player_id, &grant.npc_id)
+            .await?;
+        if instance_id != grant.instance_id || distance > max_distance || !alive {
+            return None;
+        }
+        Some(prototype_id)
+    }
+
+    pub(in crate::game) async fn validate_active_npc_interaction(
+        &self,
+        player_id: &str,
+        max_distance: f32,
+    ) -> Option<(String, String)> {
+        let grant = self
+            .npc_interaction_grants
+            .read()
+            .await
+            .get(player_id)
+            .cloned()?;
+        let prototype_id = self
+            .validate_npc_grant(player_id, &grant, max_distance)
+            .await?;
+        Some((grant.npc_id, prototype_id))
+    }
+
+    async fn authorize_dialogue_choice(
+        &self,
+        player_id: &str,
+        quest_id: &str,
+        choice_id: &str,
+    ) -> bool {
+        let grant = {
+            let mut grants = self.dialogue_grants.write().await;
+            let Some(grant) = grants.get_mut(player_id) else {
+                return false;
+            };
+            if !consume_dialogue_choice(grant, quest_id, choice_id) {
+                return false;
+            }
+            grant.clone()
+        };
+
+        if let Some(npc_grant) = grant.npc_interaction.as_ref() {
+            if self
+                .validate_npc_grant(player_id, npc_grant, 2.5)
+                .await
+                .is_none()
+            {
+                self.dialogue_grants.write().await.remove(player_id);
+                return false;
+            }
+        }
+        true
+    }
+
+    pub(in crate::game) async fn players_share_interaction_context(
+        &self,
+        first_id: &str,
+        second_id: &str,
+        max_distance: i32,
+    ) -> bool {
+        let instances = self.player_instances.read().await;
+        if !same_interaction_context(instances.get(first_id), instances.get(second_id)) {
+            return false;
+        }
+        drop(instances);
+
+        let players = self.players.read().await;
+        let (Some(first), Some(second)) = (players.get(first_id), players.get(second_id)) else {
+            return false;
+        };
+        first.active
+            && second.active
+            && !first.is_dead
+            && !second.is_dead
+            && (first.x - second.x).abs() <= max_distance
+            && (first.y - second.y).abs() <= max_distance
     }
 
     pub async fn reserve_player(
@@ -2740,6 +2986,8 @@ impl GameRoom {
             let mut quest_states = self.player_quest_states.write().await;
             quest_states.remove(player_id);
         }
+        self.npc_interaction_grants.write().await.remove(player_id);
+        self.dialogue_grants.write().await.remove(player_id);
 
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
@@ -5331,12 +5579,21 @@ impl GameRoom {
                 _ => return, // Player not found, inactive, or dead
             }
         };
+        let player_instance = self.player_instances.read().await.get(player_id).cloned();
 
         // Check if item exists and can be picked up
         let (item_info, protection_remaining) = {
             let items = self.ground_items.read().await;
             match items.get(item_id) {
                 Some(item) => {
+                    if item.instance_id != player_instance {
+                        tracing::warn!(
+                            "Rejected cross-instance pickup from {} for {}",
+                            player_id,
+                            item_id
+                        );
+                        return;
+                    }
                     let dx = item.x - player_x;
                     let dy = item.y - player_y;
                     let distance = (dx * dx + dy * dy).sqrt();
@@ -5522,6 +5779,14 @@ impl GameRoom {
             );
             return;
         }
+
+        self.npc_interaction_grants.write().await.insert(
+            player_id.to_string(),
+            NpcInteractionGrant {
+                npc_id: npc_id.to_string(),
+                instance_id,
+            },
+        );
 
         // Arena leaderboard interaction
         if entity_type == "arena_board" {
@@ -5812,6 +6077,19 @@ impl GameRoom {
 
     /// Handle dialogue choice from player
     pub async fn handle_dialogue_choice(&self, player_id: &str, quest_id: &str, choice_id: &str) {
+        if !self
+            .authorize_dialogue_choice(player_id, quest_id, choice_id)
+            .await
+        {
+            tracing::warn!(
+                "Rejected unauthorized dialogue choice from {}: quest={}, choice={}",
+                player_id,
+                quest_id,
+                choice_id
+            );
+            return;
+        }
+
         // Non-quest dialogues (e.g. leaderboard) just close
         if quest_id.is_empty() {
             self.send_to_player(player_id, ServerMessage::DialogueClosed)
@@ -7663,12 +7941,17 @@ impl GameRoom {
                         .map(|session| (session.player_a.clone(), session.player_b.clone()))
                 };
                 let should_cancel = if let Some((player_a, player_b)) = participants {
+                    let same_instance = {
+                        let instances = self.player_instances.read().await;
+                        instances.get(&player_a) == instances.get(&player_b)
+                    };
                     let players = self.players.read().await;
                     match (players.get(&player_a), players.get(&player_b)) {
                         (Some(a), Some(b)) => {
                             let dx = (a.x - b.x).abs();
                             let dy = (a.y - b.y).abs();
-                            dx > TRADE_MAX_DISTANCE
+                            !same_instance
+                                || dx > TRADE_MAX_DISTANCE
                                 || dy > TRADE_MAX_DISTANCE
                                 || a.is_dead
                                 || b.is_dead

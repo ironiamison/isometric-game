@@ -128,6 +128,28 @@ fn add_crafting_xp(
 }
 
 impl GameRoom {
+    async fn can_use_recipe_station(&self, player_id: &str, recipe: &RecipeDefinition) -> bool {
+        let Some(required_station) = recipe.station.as_deref() else {
+            return true;
+        };
+        let Some((_npc_id, prototype_id)) =
+            self.validate_active_npc_interaction(player_id, 2.5).await
+        else {
+            return false;
+        };
+        self.entity_registry
+            .get(&prototype_id)
+            .is_some_and(|prototype| {
+                prototype.behaviors.station_type.as_deref() == Some(required_station)
+                    || prototype.merchant.as_ref().is_some_and(|merchant| {
+                        merchant
+                            .crafting_stations
+                            .iter()
+                            .any(|station| station == required_station)
+                    })
+            })
+    }
+
     async fn send_crafting_xp_updates(&self, player_id: &str, xp_results: Vec<CraftXpUpdate>) {
         let mut any_leveled = false;
         for (skill_type, xp_amount, total_xp, level, leveled_up) in xp_results {
@@ -270,6 +292,14 @@ impl GameRoom {
                 return;
             }
         };
+        if !self.can_use_recipe_station(player_id, &recipe).await {
+            tracing::warn!(
+                "Rejected remote crafting action from {} for recipe {}",
+                player_id,
+                recipe_id
+            );
+            return;
+        }
 
         let (items_gained, inv_msg, xp_results, burned) = {
             let mut players = self.players.write().await;
@@ -457,6 +487,14 @@ impl GameRoom {
                 return;
             }
         };
+        if !self.can_use_recipe_station(player_id, &recipe).await {
+            tracing::warn!(
+                "Rejected remote crafting action from {} for recipe {}",
+                player_id,
+                recipe_id
+            );
+            return;
+        }
 
         let mut players = self.players.write().await;
         let player = match players.get_mut(player_id) {
@@ -879,6 +917,14 @@ impl GameRoom {
                 return;
             }
         };
+        if !self.can_use_recipe_station(player_id, &recipe).await {
+            tracing::warn!(
+                "Rejected remote crafting action from {} for recipe {}",
+                player_id,
+                recipe_id
+            );
+            return;
+        }
 
         let mut players = self.players.write().await;
         let player = match players.get_mut(player_id) {

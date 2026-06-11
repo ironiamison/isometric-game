@@ -3,7 +3,7 @@ use crate::entity::prototype::MerchantConfig;
 use crate::protocol::{ShopData, ShopStockItemData};
 use crate::shop::ShopDefinition;
 
-const SHOP_INTERACTION_DISTANCE: f32 = 10.0;
+const SHOP_INTERACTION_DISTANCE: f32 = 2.5;
 
 fn shop_price(base_price: i32, multiplier: f32) -> i32 {
     (base_price as f32 * multiplier).max(1.0) as i32
@@ -66,6 +66,40 @@ fn expand_stock_updates(
 }
 
 impl GameRoom {
+    async fn player_can_use_merchant(&self, player_id: &str, entity_type: &str) -> bool {
+        let Some(prototype) = self.entity_registry.get(entity_type) else {
+            return false;
+        };
+        let Some(merchant) = prototype.merchant.as_ref() else {
+            return false;
+        };
+        let quests = if prototype.behaviors.quest_giver {
+            self.quest_registry.get_quests_for_npc(entity_type).await
+        } else {
+            Vec::new()
+        };
+        let quest_states = self.player_quest_states.read().await;
+        let quest_state = quest_states.get(player_id);
+        if merchant.required_quest.as_ref().is_some_and(|quest_id| {
+            !quest_state.is_some_and(|state| state.is_quest_completed(quest_id))
+        }) {
+            return false;
+        }
+
+        if prototype.behaviors.quest_giver {
+            if !quests.is_empty()
+                && !quest_state.is_some_and(|state| {
+                    quests
+                        .iter()
+                        .all(|quest| state.is_quest_completed(&quest.id))
+                })
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     pub(super) async fn try_open_merchant_shop(
         &self,
         player_id: &str,
@@ -343,6 +377,19 @@ impl GameRoom {
                 return;
             }
         };
+        if !self.player_can_use_merchant(player_id, &prototype_id).await {
+            self.send_shop_result(
+                player_id,
+                false,
+                "buy",
+                item_id,
+                0,
+                0,
+                Some("Merchant access is locked"),
+            )
+            .await;
+            return;
+        }
 
         let mut shop_registry = self.shop_registry.write().await;
         let shop = match shop_registry.get_mut(&merchant_config.shop_id) {
@@ -632,6 +679,19 @@ impl GameRoom {
                 return;
             }
         };
+        if !self.player_can_use_merchant(player_id, &prototype_id).await {
+            self.send_shop_result(
+                player_id,
+                false,
+                "sell",
+                item_id,
+                0,
+                0,
+                Some("Merchant access is locked"),
+            )
+            .await;
+            return;
+        }
 
         let item_def = match self.item_registry.get(item_id) {
             Some(def) => def.clone(),

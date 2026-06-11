@@ -34,6 +34,16 @@ fn waystone_prompt_message(
 }
 
 impl GameRoom {
+    async fn is_near_world_position(&self, player_id: &str, x: i32, y: i32) -> bool {
+        let players = self.players.read().await;
+        players.get(player_id).is_some_and(|player| {
+            player.active
+                && !player.is_dead
+                && (player.x - x).abs() <= 2
+                && (player.y - y).abs() <= 2
+        })
+    }
+
     /// Handle player interacting with a world map object (obelisk, etc.)
     pub async fn handle_interact_object(&self, player_id: &str, x: i32, y: i32) {
         tracing::debug!(
@@ -42,6 +52,15 @@ impl GameRoom {
             x,
             y
         );
+        if !self.is_near_world_position(player_id, x, y).await {
+            tracing::warn!(
+                "Rejected remote object interaction from {} at ({}, {})",
+                player_id,
+                x,
+                y
+            );
+            return;
+        }
 
         if self.handle_obelisk_quest_interaction(player_id, x, y).await {
             tracing::debug!("handle_interact_object: handled by quest interaction");
@@ -200,10 +219,31 @@ impl GameRoom {
 
     /// Teleport a player to the destination of a waystone
     pub(in crate::game) async fn teleport_to_waystone(&self, player_id: &str, waystone_id: &str) {
-        let destination = {
+        let (source, destination) = {
             let waystones = self.waystone_manager.read().await;
-            waystones.get_destination(waystone_id).cloned()
+            (
+                waystones
+                    .iter()
+                    .find(|waystone| waystone.id == waystone_id)
+                    .cloned(),
+                waystones.get_destination(waystone_id).cloned(),
+            )
         };
+        let Some(source) = source else {
+            return;
+        };
+        if self.player_instances.read().await.contains_key(player_id)
+            || !self
+                .is_near_world_position(player_id, source.x, source.y)
+                .await
+        {
+            tracing::warn!(
+                "Rejected remote waystone teleport from {} via {}",
+                player_id,
+                waystone_id
+            );
+            return;
+        }
 
         if let Some(destination) = destination {
             let mut players = self.players.write().await;
@@ -228,6 +268,17 @@ impl GameRoom {
 
     /// Handle direct waystone teleport (right-click Teleport, no dialogue)
     pub async fn handle_use_waystone(&self, player_id: &str, x: i32, y: i32) {
+        if self.player_instances.read().await.contains_key(player_id)
+            || !self.is_near_world_position(player_id, x, y).await
+        {
+            tracing::warn!(
+                "Rejected remote waystone use from {} at ({}, {})",
+                player_id,
+                x,
+                y
+            );
+            return;
+        }
         let waystone = {
             let waystones = self.waystone_manager.read().await;
             waystones.get_at(x, y).cloned()

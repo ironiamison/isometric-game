@@ -346,6 +346,14 @@ impl GameRoom {
     }
 
     pub async fn handle_stall_browse(&self, player_id: &str, seller_id: &str) {
+        if !self
+            .players_share_interaction_context(player_id, seller_id, TRADE_MAX_DISTANCE)
+            .await
+        {
+            self.send_system_message(player_id, "Too far away from that shop.")
+                .await;
+            return;
+        }
         let players = self.players.read().await;
         let seller = match players.get(seller_id) {
             Some(p) if p.active && p.stall.as_ref().is_some_and(|s| s.active) => p,
@@ -384,6 +392,23 @@ impl GameRoom {
         expected_price: i32,
     ) {
         if quantity <= 0 || buyer_id == seller_id {
+            return;
+        }
+        if !self
+            .players_share_interaction_context(buyer_id, seller_id, TRADE_MAX_DISTANCE)
+            .await
+        {
+            self.send_to_player(
+                buyer_id,
+                ServerMessage::StallBuyResult {
+                    success: false,
+                    item_id: String::new(),
+                    quantity: 0,
+                    total_price: 0,
+                    error: Some("Too far away from that shop.".to_string()),
+                },
+            )
+            .await;
             return;
         }
 

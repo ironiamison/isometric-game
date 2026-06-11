@@ -2,7 +2,41 @@ use super::*;
 use crate::protocol::{DialogueChoice, FarmingPatchData, TileOverride};
 
 impl GameRoom {
+    async fn can_interact_with_farming_patch(&self, player_id: &str, patch_id: &str) -> bool {
+        if self.player_instances.read().await.contains_key(player_id) {
+            return false;
+        }
+        let patch_position = {
+            let farming = self.farming.read().await;
+            farming
+                .patches
+                .get(patch_id)
+                .map(|patch| (patch.x, patch.y))
+        };
+        let Some((patch_x, patch_y)) = patch_position else {
+            return false;
+        };
+        let players = self.players.read().await;
+        players.get(player_id).is_some_and(|player| {
+            player.active
+                && !player.is_dead
+                && (player.x - patch_x).abs() <= 2
+                && (player.y - patch_y).abs() <= 2
+        })
+    }
+
     pub async fn handle_plant_seed(&self, player_id: &str, patch_id: &str, item_id: &str) {
+        if !self
+            .can_interact_with_farming_patch(player_id, patch_id)
+            .await
+        {
+            tracing::warn!(
+                "Rejected remote farming action from {} for patch {}",
+                player_id,
+                patch_id
+            );
+            return;
+        }
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -95,6 +129,17 @@ impl GameRoom {
     }
 
     pub async fn handle_harvest_crop(&self, player_id: &str, patch_id: &str) {
+        if !self
+            .can_interact_with_farming_patch(player_id, patch_id)
+            .await
+        {
+            tracing::warn!(
+                "Rejected remote farming action from {} for patch {}",
+                player_id,
+                patch_id
+            );
+            return;
+        }
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

@@ -124,6 +124,25 @@ fn apply_reward_purchase(
 }
 
 impl GameRoom {
+    async fn require_slayer_master_access(
+        &self,
+        player_id: &str,
+        expected_master_id: Option<&str>,
+    ) -> bool {
+        let Some((_npc_id, prototype_id)) =
+            self.validate_active_npc_interaction(player_id, 2.5).await
+        else {
+            return false;
+        };
+        let Some(master) = self.slayer_registry.get_master_by_prototype(&prototype_id) else {
+            return false;
+        };
+        match expected_master_id {
+            Some(expected) => expected == master.id,
+            None => true,
+        }
+    }
+
     pub async fn handle_slayer_master_interact(&self, player_id: &str, npc_prototype_id: &str) {
         let master = match self
             .slayer_registry
@@ -159,6 +178,13 @@ impl GameRoom {
     }
 
     pub async fn handle_slayer_get_task(&self, player_id: &str, master_id: &str) {
+        if !self
+            .require_slayer_master_access(player_id, Some(master_id))
+            .await
+        {
+            tracing::warn!("Rejected remote slayer action from {}", player_id);
+            return;
+        }
         let master = match self.slayer_registry.get_master(master_id) {
             Some(master) => master,
             None => {
@@ -286,6 +312,10 @@ impl GameRoom {
     }
 
     pub async fn handle_slayer_cancel_task(&self, player_id: &str) {
+        if !self.require_slayer_master_access(player_id, None).await {
+            tracing::warn!("Rejected remote slayer action from {}", player_id);
+            return;
+        }
         let mut state = self.get_player_slayer_state(player_id).await;
 
         if state.current_task.is_none() {
@@ -426,6 +456,10 @@ impl GameRoom {
         reward_id: &str,
         target_monster_id: Option<String>,
     ) {
+        if !self.require_slayer_master_access(player_id, None).await {
+            tracing::warn!("Rejected remote slayer action from {}", player_id);
+            return;
+        }
         let reward = match self.slayer_registry.get_reward(reward_id) {
             Some(reward) => reward.clone(),
             None => {
@@ -527,6 +561,10 @@ impl GameRoom {
     }
 
     pub async fn handle_slayer_remove_block(&self, player_id: &str, monster_id: &str) {
+        if !self.require_slayer_master_access(player_id, None).await {
+            tracing::warn!("Rejected remote slayer action from {}", player_id);
+            return;
+        }
         let mut state = self.get_player_slayer_state(player_id).await;
 
         if let Some(pos) = state

@@ -57,7 +57,53 @@ fn chest_slot_updates(
         .collect()
 }
 
+fn chest_key_position(chest_key: &str) -> Option<(i32, i32)> {
+    let mut parts = chest_key.rsplitn(3, '_');
+    let y = parts.next()?.parse().ok()?;
+    let x = parts.next()?.parse().ok()?;
+    Some((x, y))
+}
+
 impl GameRoom {
+    async fn player_near_chest_position(&self, player_id: &str, x: i32, y: i32) -> bool {
+        let players = self.players.read().await;
+        players.get(player_id).is_some_and(|player| {
+            player.active
+                && !player.is_dead
+                && (player.x - x).abs() <= 2
+                && (player.y - y).abs() <= 2
+        })
+    }
+
+    async fn can_access_open_chest(&self, player_id: &str, chest_id: &str) -> bool {
+        let has_matching_open_chest = self
+            .player_open_chests
+            .read()
+            .await
+            .get(player_id)
+            .is_some_and(|open_id| open_id == chest_id);
+        if !has_matching_open_chest {
+            return false;
+        }
+        let Some((x, y)) = chest_key_position(chest_id) else {
+            return false;
+        };
+        if !self.player_near_chest_position(player_id, x, y).await {
+            return false;
+        }
+
+        let instance_id = self.player_instances.read().await.get(player_id).cloned();
+        let expected_key = if let Some(instance_id) = instance_id {
+            let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) else {
+                return false;
+            };
+            crate::chest::ChestManager::interior_key(&instance.map_id, x, y)
+        } else {
+            crate::chest::ChestManager::overworld_key(x, y)
+        };
+        expected_key == chest_id
+    }
+
     pub async fn get_chest_positions_message(&self, interior_id: Option<&str>) -> ServerMessage {
         let chest_manager = self.chest_manager.read().await;
         let all_keys: Vec<&String> = chest_manager.chests.keys().collect();
@@ -142,6 +188,16 @@ impl GameRoom {
     }
 
     pub async fn handle_open_chest(&self, player_id: &str, x: i32, y: i32) {
+        if !self.player_near_chest_position(player_id, x, y).await {
+            tracing::warn!(
+                "Rejected remote chest open from {} at ({}, {})",
+                player_id,
+                x,
+                y
+            );
+            return;
+        }
+        self.close_player_chest(player_id).await;
         let instance_id = {
             let player_instances = self.player_instances.read().await;
             player_instances.get(player_id).cloned()
@@ -191,6 +247,15 @@ impl GameRoom {
             chest_id,
             slot
         );
+        if !self.can_access_open_chest(player_id, chest_id).await {
+            tracing::warn!(
+                "Rejected remote chest take from {} for {}",
+                player_id,
+                chest_id
+            );
+            self.close_player_chest(player_id).await;
+            return;
+        }
 
         let taken_item = {
             let mut chest_manager = self.chest_manager.write().await;
@@ -299,6 +364,15 @@ impl GameRoom {
             chest_id,
             inventory_slot
         );
+        if !self.can_access_open_chest(player_id, chest_id).await {
+            tracing::warn!(
+                "Rejected remote chest deposit from {} for {}",
+                player_id,
+                chest_id
+            );
+            self.close_player_chest(player_id).await;
+            return;
+        }
 
         let taken_item = {
             let mut players = self.players.write().await;
@@ -413,6 +487,16 @@ mod tests {
     use crate::item::InventorySlot;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn chest_key_position_handles_overworld_and_nested_interior_ids() {
+        assert_eq!(chest_key_position("ow_-12_34"), Some((-12, 34)));
+        assert_eq!(
+            chest_key_position("int_ancient_ruins_level_2_-5_-9"),
+            Some((-5, -9))
+        );
+        assert_eq!(chest_key_position("invalid"), None);
+    }
 
     fn temp_items_dir() -> std::path::PathBuf {
         let suffix = SystemTime::now()

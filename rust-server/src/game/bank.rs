@@ -79,8 +79,33 @@ fn sort_bank_slots(
 }
 
 impl GameRoom {
+    async fn has_bank_access(&self, player_id: &str) -> bool {
+        let Some((_npc_id, prototype_id)) =
+            self.validate_active_npc_interaction(player_id, 2.5).await
+        else {
+            return false;
+        };
+        self.entity_registry
+            .get(&prototype_id)
+            .is_some_and(|prototype| prototype.behaviors.banker)
+    }
+
+    async fn require_bank_access(&self, player_id: &str) -> bool {
+        if self.has_bank_access(player_id).await {
+            true
+        } else {
+            tracing::warn!("Rejected remote bank action from {}", player_id);
+            self.send_system_message(player_id, "You are too far from the bank.")
+                .await;
+            false
+        }
+    }
+
     /// Send full bank contents to the player
     pub async fn handle_bank_open(&self, player_id: &str) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         let players = self.players.read().await;
         let player = match players.get(player_id) {
             Some(p) if p.active && !p.is_dead => p,
@@ -153,6 +178,9 @@ impl GameRoom {
 
     /// Handle bank slot upgrade purchase
     pub(super) async fn handle_bank_upgrade(&self, player_id: &str, npc_id: &str) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         let mut players = self.players.write().await;
         let player = match players.get_mut(player_id) {
             Some(p) if p.active && !p.is_dead => p,
@@ -202,6 +230,9 @@ impl GameRoom {
 
     /// Deposit an item from inventory into bank
     pub async fn handle_bank_deposit(&self, player_id: &str, item_id: &str, quantity: i32) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         if quantity <= 0 {
             return;
         }
@@ -249,6 +280,9 @@ impl GameRoom {
 
     /// Withdraw an item from bank into inventory
     pub async fn handle_bank_withdraw(&self, player_id: &str, item_id: &str, quantity: i32) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         if quantity <= 0 {
             return;
         }
@@ -303,6 +337,9 @@ impl GameRoom {
 
     /// Deposit gold from inventory into bank
     pub async fn handle_bank_deposit_gold(&self, player_id: &str, amount: i32) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         if amount <= 0 {
             return;
         }
@@ -350,6 +387,9 @@ impl GameRoom {
 
     /// Withdraw gold from bank into inventory
     pub async fn handle_bank_withdraw_gold(&self, player_id: &str, amount: i32) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         if amount <= 0 {
             return;
         }
@@ -397,6 +437,9 @@ impl GameRoom {
 
     /// Deposit all inventory items into bank
     pub async fn handle_bank_deposit_all(&self, player_id: &str) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         let mut players = self.players.write().await;
         let player = match players.get_mut(player_id) {
             Some(p) if p.active && !p.is_dead => p,
@@ -435,6 +478,9 @@ impl GameRoom {
 
     /// Swap two bank slots. If both contain the same item, merge stacks.
     pub async fn handle_bank_swap_slots(&self, player_id: &str, slot_a: u32, slot_b: u32) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         if slot_a == slot_b {
             return;
         }
@@ -461,6 +507,9 @@ impl GameRoom {
 
     /// Sort bank by item category then alphabetically by display name.
     pub async fn handle_bank_sort(&self, player_id: &str) {
+        if !self.require_bank_access(player_id).await {
+            return;
+        }
         let mut players = self.players.write().await;
         let player = match players.get_mut(player_id) {
             Some(p) if p.active && !p.is_dead => p,

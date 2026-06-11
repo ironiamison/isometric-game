@@ -3932,7 +3932,10 @@ impl InputHandler {
                                                         state,
                                                         &mut commands,
                                                         &npc_id,
-                                                        |state, _commands, npc_id| {
+                                                        |state, commands, npc_id| {
+                                                            commands.push(InputCommand::Interact {
+                                                                npc_id: npc_id.to_string(),
+                                                            });
                                                             if let Some(npc) =
                                                                 state.npcs.get(npc_id)
                                                             {

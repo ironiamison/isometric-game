@@ -59,6 +59,14 @@ impl GameRoom {
     }
 
     pub async fn handle_trade_request(&self, player_id: &str, target_id: &str) {
+        if !self
+            .players_share_interaction_context(player_id, target_id, TRADE_MAX_DISTANCE)
+            .await
+        {
+            self.send_system_message(player_id, "Too far away to trade.")
+                .await;
+            return;
+        }
         let (requester_name, valid) = {
             let players = self.players.read().await;
             let requester = match players.get(player_id) {
@@ -71,11 +79,6 @@ impl GameRoom {
                     return;
                 }
             };
-            let dx = (requester.x - target.x).abs();
-            let dy = (requester.y - target.y).abs();
-            if dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE {
-                return;
-            }
             let name = requester.name.clone();
             if target.stall.as_ref().is_some_and(|s| s.active) {
                 drop(players);
@@ -153,6 +156,15 @@ impl GameRoom {
             }
         }
 
+        if !self
+            .players_share_interaction_context(player_id, requester_id, TRADE_MAX_DISTANCE)
+            .await
+        {
+            self.send_system_message(player_id, "Too far away to trade.")
+                .await;
+            return;
+        }
+
         let (name_a, name_b) = {
             let players = self.players.read().await;
             let pa = match players.get(requester_id) {
@@ -163,13 +175,6 @@ impl GameRoom {
                 Some(p) if p.active && !p.is_dead => p,
                 _ => return,
             };
-            let dx = (pa.x - pb.x).abs();
-            let dy = (pa.y - pb.y).abs();
-            if dx > TRADE_MAX_DISTANCE || dy > TRADE_MAX_DISTANCE {
-                self.send_system_message(player_id, "Too far away to trade.")
-                    .await;
-                return;
-            }
             (pa.name.clone(), pb.name.clone())
         };
 
@@ -459,6 +464,28 @@ impl GameRoom {
             }
         };
 
+        let partner = {
+            let trades = self.trades.read().await;
+            trades.get(&trade_id).map(|session| {
+                if session.player_a == player_id {
+                    session.player_b.clone()
+                } else {
+                    session.player_a.clone()
+                }
+            })
+        };
+        let Some(partner) = partner else {
+            return;
+        };
+        if !self
+            .players_share_interaction_context(player_id, &partner, TRADE_MAX_DISTANCE)
+            .await
+        {
+            self.cancel_trade_for_player(player_id, "Players moved too far apart.")
+                .await;
+            return;
+        }
+
         let should_complete;
         let partner_id;
         {
@@ -538,6 +565,24 @@ impl GameRoom {
     }
 
     async fn execute_trade(&self, trade_id: &str) {
+        let participants = {
+            let trades = self.trades.read().await;
+            trades
+                .get(trade_id)
+                .map(|session| (session.player_a.clone(), session.player_b.clone()))
+        };
+        let Some((player_a, player_b)) = participants else {
+            return;
+        };
+        if !self
+            .players_share_interaction_context(&player_a, &player_b, TRADE_MAX_DISTANCE)
+            .await
+        {
+            self.cancel_trade_for_player(&player_a, "Players moved too far apart.")
+                .await;
+            return;
+        }
+
         let session = {
             let mut trades = self.trades.write().await;
             match trades.remove(trade_id) {
