@@ -9,67 +9,8 @@ use crate::gameplay::run_game_frame;
 use crate::input::InputHandler;
 use crate::network::NetworkClient;
 use crate::render::Renderer;
+use crate::spectator::SpectatorState;
 use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
-use crate::{game, network};
-
-/// Spectator state for login/character select screens — streams the world behind the UI.
-#[cfg(not(target_arch = "wasm32"))]
-struct SpectatorState {
-    game_state: GameState,
-    network: NetworkClient,
-    camera: game::SpectatorCamera,
-    crossfade_alpha: f32, // 0.0 = stars fully visible, 1.0 = world fully visible
-    world_ready: bool,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl SpectatorState {
-    fn new() -> Self {
-        let mut game_state = GameState::new();
-        game_state.spectator_mode = true;
-        let network = NetworkClient::new_spectator(WS_URL);
-        Self {
-            game_state,
-            network,
-            camera: game::SpectatorCamera::new(),
-            crossfade_alpha: 0.0,
-            world_ready: false,
-        }
-    }
-
-    fn update(&mut self, dt: f32) {
-        // Poll network messages into game state
-        self.network.poll(&mut self.game_state);
-
-        // Update spectator camera
-        let (cx, cy) = self.camera.update(dt);
-        self.game_state.camera.x = cx;
-        self.game_state.camera.y = cy;
-        self.game_state.camera.zoom = 1.0;
-        self.game_state.camera.initialized = true;
-
-        // Request chunks around camera position (spectator has no local player)
-        let chunks_to_request = self.game_state.chunk_manager.update_player_position(cx, cy);
-        for coord in chunks_to_request {
-            self.network
-                .send(&network::messages::ClientMessage::RequestChunk {
-                    chunk_x: coord.x,
-                    chunk_y: coord.y,
-                });
-        }
-        self.game_state.chunk_manager.unload_distant_chunks();
-
-        // Check world readiness and drive crossfade
-        if !self.world_ready && self.game_state.is_world_ready() {
-            self.world_ready = true;
-        }
-
-        if self.world_ready {
-            // Fade in over ~1.5 seconds
-            self.crossfade_alpha = (self.crossfade_alpha + dt / 1.5).min(1.0);
-        }
-    }
-}
 
 /// Application state for native builds
 #[cfg(not(target_arch = "wasm32"))]

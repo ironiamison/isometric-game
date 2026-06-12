@@ -34,6 +34,7 @@ pub struct NetworkClient {
     character_id: Option<i64>,
     reconnect_attempts: u32,
     was_connected: bool,
+    spectator_mode: bool,
 }
 
 const MAX_RECONNECT_ATTEMPTS: u32 = 3;
@@ -54,6 +55,7 @@ impl NetworkClient {
             character_id: None,
             reconnect_attempts: 0,
             was_connected: false,
+            spectator_mode: false,
         };
         client.start_matchmaking();
         client
@@ -70,6 +72,7 @@ impl NetworkClient {
             character_id: Some(character_id),
             reconnect_attempts: 0,
             was_connected: false,
+            spectator_mode: false,
         };
         client.start_matchmaking();
         client
@@ -86,9 +89,49 @@ impl NetworkClient {
             character_id: None,
             reconnect_attempts: 0,
             was_connected: false,
+            spectator_mode: false,
         };
         client.start_matchmaking();
         client
+    }
+
+    /// Create a spectator client that connects to /spectate for login screen world view.
+    /// No auth needed. Connection is read-only until upgraded.
+    pub fn new_spectator(base_url: &str) -> Self {
+        let mut client = Self {
+            base_url: base_url.to_string(),
+            connection_state: ConnectionState::Disconnected,
+            reconnect_timer: 0.0,
+            room_id: None,
+            session_token: None,
+            auth_token: None,
+            character_id: None,
+            reconnect_attempts: 0,
+            was_connected: false,
+            spectator_mode: true,
+        };
+        client.connect_spectator();
+        client
+    }
+
+    fn connect_spectator(&mut self) {
+        let ws_url = format!("{}/spectate", self.base_url);
+        log::info!("WASM: Connecting spectator WebSocket: {}", ws_url);
+        self.connection_state = ConnectionState::Connecting;
+        unsafe {
+            ws_connect(JsObject::string(&ws_url));
+        }
+    }
+
+    /// Send upgrade message to transition from spectator to authenticated player.
+    /// Reuses the existing spectator socket (and its already-loaded chunks).
+    pub fn send_spectator_upgrade(&mut self, session_token: &str) {
+        let msg = ClientMessage::SpectatorUpgrade {
+            session_token: session_token.to_string(),
+        };
+        self.send(&msg);
+        self.spectator_mode = false;
+        log::info!("WASM: Sent spectator upgrade message");
     }
 
     fn start_matchmaking(&mut self) {
@@ -135,6 +178,15 @@ impl NetworkClient {
     pub fn poll(&mut self, state: &mut GameState) {
         match self.connection_state {
             ConnectionState::Disconnected => {
+                if self.spectator_mode {
+                    // Spectator reconnection - retry /spectate, no matchmaking
+                    self.reconnect_timer += 1.0 / 60.0;
+                    if self.reconnect_timer > 3.0 {
+                        self.reconnect_timer = 0.0;
+                        self.connect_spectator();
+                    }
+                    return;
+                }
                 if self.was_connected {
                     if self.reconnect_attempts >= MAX_RECONNECT_ATTEMPTS {
                         log::error!(

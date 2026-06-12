@@ -23,6 +23,7 @@ pub mod input;
 pub mod network;
 pub mod render;
 pub mod settings;
+mod spectator;
 pub mod ui;
 
 pub use app::window_conf;
@@ -45,6 +46,8 @@ use input::InputHandler;
 use network::NetworkClient;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use render::Renderer;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use spectator::SpectatorState;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
@@ -334,12 +337,31 @@ async fn async_main() {
             },
         }
 
+        // Live world preview streamed behind the login/character screens. Upgraded in
+        // place to a full player session when the game starts (matches native).
+        let mut spectator: Option<SpectatorState> = Some(SpectatorState::new());
         let mut app_state = WasmAppState::Login(login_screen);
 
         loop {
             match &mut app_state {
                 WasmAppState::Login(screen) => {
+                    let dt = get_frame_time();
+
+                    // Update spectator world view behind login screen
+                    if let Some(spec) = spectator.as_mut() {
+                        spec.update(dt);
+                        screen.set_stars_alpha(1.0 - spec.crossfade_alpha);
+                    }
+
                     let result = screen.update(&audio);
+
+                    // Render: world backdrop first (if spectator ready), then login on top
+                    if let Some(spec) = spectator.as_mut() {
+                        if spec.world_ready {
+                            clear_background(Color::from_rgba(30, 30, 40, 255));
+                            renderer.render(&spec.game_state);
+                        }
+                    }
                     screen.render();
 
                     match result {
@@ -356,6 +378,10 @@ async fn async_main() {
                             app_state = WasmAppState::CharacterSelect(char_screen);
                         }
                         ScreenState::StartGuestMode => {
+                            // Disconnect spectator if active
+                            if let Some(mut spec) = spectator.take() {
+                                spec.network.disconnect();
+                            }
                             let game_state = app::new_game_state(&audio, None);
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
@@ -374,9 +400,30 @@ async fn async_main() {
                 }
 
                 WasmAppState::CharacterSelect(screen) => {
+                    let dt = get_frame_time();
+
+                    // Update spectator world view behind character select
+                    if let Some(spec) = spectator.as_mut() {
+                        spec.update(dt);
+                    }
+
                     let result = screen.update(&audio);
-                    screen.render();
                     screen.load_equipment_if_needed().await;
+
+                    // Render: world backdrop first (if spectator ready), then screen on top
+                    let has_backdrop = if let Some(spec) = spectator.as_mut() {
+                        if spec.world_ready {
+                            clear_background(Color::from_rgba(30, 30, 40, 255));
+                            renderer.render(&spec.game_state);
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                    screen.has_spectator_backdrop = has_backdrop;
+                    screen.render();
 
                     match result {
                         ScreenState::StartGame {
@@ -414,7 +461,22 @@ async fn async_main() {
                 }
 
                 WasmAppState::CharacterCreate(screen) => {
+                    let dt = get_frame_time();
+
+                    // Update spectator world view behind character create
+                    if let Some(spec) = spectator.as_mut() {
+                        spec.update(dt);
+                    }
+
                     let result = screen.update(&audio);
+
+                    // Render: world backdrop first (if spectator ready), then screen on top
+                    if let Some(spec) = spectator.as_mut() {
+                        if spec.world_ready {
+                            clear_background(Color::from_rgba(30, 30, 40, 255));
+                            renderer.render(&spec.game_state);
+                        }
+                    }
                     screen.render();
 
                     match result {
@@ -438,8 +500,30 @@ async fn async_main() {
                     session,
                     character_name,
                 } => {
-                    // Draw a simple "Connecting..." screen
-                    clear_background(Color::from_rgba(25, 25, 35, 255));
+                    let dt = get_frame_time();
+
+                    // Keep streaming the world so chunks are ready for a seamless upgrade
+                    if let Some(spec) = spectator.as_mut() {
+                        spec.update(dt);
+                    }
+
+                    // Render: live world backdrop if ready, else a solid background
+                    let world_shown = if let Some(spec) = spectator.as_mut() {
+                        if spec.world_ready {
+                            clear_background(Color::from_rgba(30, 30, 40, 255));
+                            renderer.render(&spec.game_state);
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                    if !world_shown {
+                        clear_background(Color::from_rgba(25, 25, 35, 255));
+                    }
+
+                    // "Connecting..." overlay
                     let (sw, sh) = (screen_width(), screen_height());
                     let dot_count = ((macroquad::time::get_time() * 3.0) as usize % 4) as usize;
                     let dots = &"..."[..dot_count];
@@ -453,29 +537,56 @@ async fn async_main() {
                     if let Some(result) = auth_client.poll() {
                         match result {
                             AuthResult::Matchmake(Ok((room_id, session_token))) => {
-                                let game_state =
-                                    app::new_game_state(&audio, Some(character_name.clone()));
-
-                                // Store matchmaking results in localStorage for WASM network client
+                                // Store matchmaking results in localStorage so the network
+                                // client can reconnect to the correct room if dropped.
                                 {
                                     let storage = &mut quad_storage::STORAGE.lock().unwrap();
                                     storage.set("roomId", &room_id);
                                     storage.set("sessionToken", &session_token);
                                 }
 
-                                // NetworkClient::new_authenticated will read roomId/sessionToken from localStorage
-                                let network =
-                                    NetworkClient::new_authenticated(WS_URL, &session.token, 0);
                                 let mut input_handler = InputHandler::new();
                                 input_handler.load_touch_icons().await;
 
-                                audio.play_music("assets/audio/start.ogg").await;
+                                if let Some(mut spec) = spectator.take() {
+                                    // Upgrade the existing spectator socket in place, reusing
+                                    // the chunks it has already streamed for a smooth transition.
+                                    spec.network.send_spectator_upgrade(&session_token);
 
-                                app_state = WasmAppState::Playing {
-                                    game_state,
-                                    network,
-                                    input_handler,
-                                };
+                                    let (cam_x, cam_y) = spec.camera.position();
+                                    let mut game_state = spec.game_state;
+                                    game_state.camera.transition_from = Some((cam_x, cam_y));
+                                    game_state.camera.transition_progress = 0.0;
+                                    game_state.spectator_mode = false;
+                                    app::configure_game_state(
+                                        &mut game_state,
+                                        &audio,
+                                        Some(character_name.clone()),
+                                    );
+
+                                    audio.play_music("assets/audio/start.ogg").await;
+
+                                    app_state = WasmAppState::Playing {
+                                        game_state,
+                                        network: spec.network,
+                                        input_handler,
+                                    };
+                                } else {
+                                    // Fallback: fresh connection (no spectator available).
+                                    // new_authenticated reads roomId/sessionToken from localStorage.
+                                    let game_state =
+                                        app::new_game_state(&audio, Some(character_name.clone()));
+                                    let network =
+                                        NetworkClient::new_authenticated(WS_URL, &session.token, 0);
+
+                                    audio.play_music("assets/audio/start.ogg").await;
+
+                                    app_state = WasmAppState::Playing {
+                                        game_state,
+                                        network,
+                                        input_handler,
+                                    };
+                                }
                             }
                             AuthResult::Matchmake(Err(e)) => {
                                 log::error!("Matchmaking failed: {}", e);
@@ -515,6 +626,7 @@ async fn async_main() {
                         let mut login_screen = LoginScreen::new(SERVER_URL);
                         login_screen.use_renderer_font(renderer.font().clone());
                         login_screen.load_font().await;
+                        spectator = Some(SpectatorState::new());
                         app_state = WasmAppState::Login(login_screen);
                     }
                 }
