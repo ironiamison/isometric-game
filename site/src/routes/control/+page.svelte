@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { control, tokenStore, UnauthorizedError } from '$lib/control';
-  import type { PerfSnapshot, AdminRoomSummary, AdminPlayer } from '$lib/control';
+  import type { PerfSnapshot, AdminRoomSummary, AdminPlayer, AdminRoomEntities } from '$lib/control';
   import { Lock, LogIn, RefreshCw, Activity } from 'lucide-svelte';
 
   let token = $state<string | null>(null);
@@ -93,6 +93,19 @@
       (p.ip_address ?? '').includes(playerFilter),
     ),
   );
+
+  // Entities tab state + loaders.
+  let entities = $state<AdminRoomEntities | null>(null);
+  $effect(() => {
+    if (!token || tab !== 'entities' || !selectedRoom) return;
+    tick;
+    load(() => control.roomEntities(token!, selectedRoom), (v) => (entities = v));
+  });
+  // Ensure the room picker has options when entering the tab directly.
+  $effect(() => {
+    if (!token || tab !== 'entities' || rooms.length) return;
+    load(() => control.rooms(token!), (v) => (rooms = v));
+  });
 </script>
 
 <svelte:head><title>Control Panel</title></svelte:head>
@@ -208,6 +221,46 @@
             </tbody>
           </table>
         </div>
+      {:else if tab === 'entities'}
+        <div class="mb-3 flex items-center gap-2">
+          <label class="text-sm text-neutral-400">Room</label>
+          <select bind:value={selectedRoom} class="rounded bg-neutral-800 px-2 py-1 text-sm">
+            <option value="" disabled>Select a room…</option>
+            {#each rooms as r}<option value={r.room_id}>{r.room_id}</option>{/each}
+          </select>
+        </div>
+        {#if entities}
+          <h2 class="text-sm font-semibold text-neutral-300 mb-1">NPCs ({entities.npcs.length})</h2>
+          <div class="overflow-x-auto mb-4">
+            <table class="w-full text-sm">
+              <thead class="text-left text-neutral-400">
+                <tr><th class="py-1">Name</th><th>Proto</th><th>Pos</th><th>HP</th><th>Lv</th><th>State</th><th>Target</th></tr>
+              </thead>
+              <tbody>
+                {#each entities.npcs as n}
+                  <tr class="border-t border-neutral-800 {n.hidden ? 'opacity-50' : ''}">
+                    <td class="py-1">{n.display_name}</td>
+                    <td class="font-mono text-xs">{n.prototype_id}</td>
+                    <td class="font-mono text-xs">{n.x},{n.y},{n.z}</td>
+                    <td>{n.hp}/{n.max_hp}</td><td>{n.level}</td>
+                    <td>{n.state}{n.invulnerable ? ' 🛡' : ''}</td>
+                    <td class="font-mono text-xs">{n.target_id ?? '—'}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+          <h2 class="text-sm font-semibold text-neutral-300 mb-1">Players ({entities.players.length})</h2>
+          <ul class="text-sm space-y-0.5">
+            {#each entities.players as p}
+              <li class="font-mono text-xs">{p.name} @ {p.x},{p.y},{p.z} — {p.hp}/{p.max_hp} hp</li>
+            {/each}
+          </ul>
+        {:else if selectedRoom}
+          <p class="text-neutral-500">Loading…</p>
+        {:else}
+          <p class="text-neutral-500">Pick a room to inspect.</p>
+        {/if}
       {/if}
     </main>
   </div>
