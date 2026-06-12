@@ -94,7 +94,8 @@ impl Renderer {
                            is_hovered: bool,
                            renderer: &Self| {
             let (bg_color, border_color) = if is_selected {
-                (Color::new(0.180, 0.200, 0.145, 1.0), FRAME_ACCENT)
+                // Gold-tinted fill + gold border = the single "active" language
+                (Color::new(0.224, 0.190, 0.118, 1.0), FRAME_ACCENT) // gold-tinted (active)
             } else if is_hovered {
                 (SLOT_HOVER_BG, SLOT_BORDER)
             } else {
@@ -134,16 +135,11 @@ impl Renderer {
                 && mouse_y <= bounds.y + bounds.h
         };
 
-        // ===== ZOOM ROW =====
-        let zoom_btn_w = (inner_width - 12.0 * s) / 3.0;
-        let zoom_05x_bounds = Rect::new(content_x, y, zoom_btn_w, btn_height);
-        let zoom_1x_bounds = Rect::new(content_x + zoom_btn_w + 6.0 * s, y, zoom_btn_w, btn_height);
-        let zoom_2x_bounds = Rect::new(
-            content_x + (zoom_btn_w + 6.0 * s) * 2.0,
-            y,
-            zoom_btn_w,
-            btn_height,
-        );
+        // ===== ZOOM ROW (segmented selector) =====
+        let zoom_seg_w = inner_width / 3.0;
+        let zoom_05x_bounds = Rect::new(content_x, y, zoom_seg_w, btn_height);
+        let zoom_1x_bounds = Rect::new(content_x + zoom_seg_w, y, zoom_seg_w, btn_height);
+        let zoom_2x_bounds = Rect::new(content_x + zoom_seg_w * 2.0, y, zoom_seg_w, btn_height);
         layout.add(UiElementId::EscapeMenuZoom05x, zoom_05x_bounds);
         layout.add(UiElementId::EscapeMenuZoom1x, zoom_1x_bounds);
         layout.add(UiElementId::EscapeMenuZoom2x, zoom_2x_bounds);
@@ -151,35 +147,16 @@ impl Renderer {
         let is_05x_selected = (state.camera.zoom - 0.5).abs() < 0.1;
         let is_1x_selected = (state.camera.zoom - 1.0).abs() < 0.1;
         let is_2x_selected = (state.camera.zoom - 2.0).abs() < 0.1;
-        draw_button(
-            zoom_05x_bounds.x,
-            zoom_05x_bounds.y,
-            zoom_btn_w,
+        self.draw_segmented_control(
+            content_x,
+            y,
+            inner_width,
             btn_height,
-            "0.5x",
-            is_05x_selected,
-            is_hovered(zoom_05x_bounds),
-            self,
-        );
-        draw_button(
-            zoom_1x_bounds.x,
-            zoom_1x_bounds.y,
-            zoom_btn_w,
-            btn_height,
-            "1x",
-            is_1x_selected,
-            is_hovered(zoom_1x_bounds),
-            self,
-        );
-        draw_button(
-            zoom_2x_bounds.x,
-            zoom_2x_bounds.y,
-            zoom_btn_w,
-            btn_height,
-            "2x",
-            is_2x_selected,
-            is_hovered(zoom_2x_bounds),
-            self,
+            &[
+                ("0.5x", is_05x_selected, is_hovered(zoom_05x_bounds)),
+                ("1x", is_1x_selected, is_hovered(zoom_1x_bounds)),
+                ("2x", is_2x_selected, is_hovered(zoom_2x_bounds)),
+            ],
         );
         y += row_height + 4.0 * s;
 
@@ -386,9 +363,9 @@ impl Renderer {
         // Row: Control Scheme (Modern / Classic) - desktop only
         #[cfg(not(target_os = "android"))]
         {
-            let ctrl_modern_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-            let ctrl_classic_bounds =
-                Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
+            let ctrl_half = inner_width / 2.0;
+            let ctrl_modern_bounds = Rect::new(content_x, y, ctrl_half, btn_height);
+            let ctrl_classic_bounds = Rect::new(content_x + ctrl_half, y, ctrl_half, btn_height);
             layout.add(
                 UiElementId::EscapeMenuControlSchemeToggle,
                 ctrl_modern_bounds,
@@ -398,25 +375,16 @@ impl Renderer {
                 ctrl_classic_bounds,
             );
 
-            draw_button(
-                ctrl_modern_bounds.x,
-                ctrl_modern_bounds.y,
-                toggle_w,
+            let classic = state.ui_state.classic_controls;
+            self.draw_segmented_control(
+                content_x,
+                y,
+                inner_width,
                 btn_height,
-                "Modern",
-                !state.ui_state.classic_controls,
-                is_hovered(ctrl_modern_bounds),
-                self,
-            );
-            draw_button(
-                ctrl_classic_bounds.x,
-                ctrl_classic_bounds.y,
-                toggle_w,
-                btn_height,
-                "Classic",
-                state.ui_state.classic_controls,
-                is_hovered(ctrl_classic_bounds),
-                self,
+                &[
+                    ("Modern", !classic, is_hovered(ctrl_modern_bounds)),
+                    ("Classic", classic, is_hovered(ctrl_classic_bounds)),
+                ],
             );
             y += row_height;
         }
@@ -424,30 +392,22 @@ impl Renderer {
         // Row: Graphics Quality (High / Low) - desktop only
         #[cfg(not(target_os = "android"))]
         {
-            let gfx_high_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-            let gfx_low_bounds = Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
+            let gfx_half = inner_width / 2.0;
+            let gfx_high_bounds = Rect::new(content_x, y, gfx_half, btn_height);
+            let gfx_low_bounds = Rect::new(content_x + gfx_half, y, gfx_half, btn_height);
             layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_high_bounds);
             layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_low_bounds);
 
-            draw_button(
-                gfx_high_bounds.x,
-                gfx_high_bounds.y,
-                toggle_w,
+            let gfx_low = state.ui_state.graphics_low;
+            self.draw_segmented_control(
+                content_x,
+                y,
+                inner_width,
                 btn_height,
-                "GFX High",
-                !state.ui_state.graphics_low,
-                is_hovered(gfx_high_bounds),
-                self,
-            );
-            draw_button(
-                gfx_low_bounds.x,
-                gfx_low_bounds.y,
-                toggle_w,
-                btn_height,
-                "GFX Low",
-                state.ui_state.graphics_low,
-                is_hovered(gfx_low_bounds),
-                self,
+                &[
+                    ("GFX High", !gfx_low, is_hovered(gfx_high_bounds)),
+                    ("GFX Low", gfx_low, is_hovered(gfx_low_bounds)),
+                ],
             );
             y += row_height;
         }
@@ -515,6 +475,79 @@ impl Renderer {
             16.0,
             disconnect_text_color,
         );
+    }
+
+    /// Draw a segmented selector: N mutually-exclusive options sharing one track
+    /// with internal dividers (the 0.5x/1x/2x pattern). Visually distinguishes
+    /// "pick one" controls from the independent on/off toggle buttons.
+    /// Each segment is `(label, is_active, is_hovered)`.
+    fn draw_segmented_control(
+        &self,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        segments: &[(&str, bool, bool)],
+    ) {
+        let n = segments.len();
+        if n == 0 {
+            return;
+        }
+
+        // Outer border (single track edge for the whole control).
+        draw_rectangle(x, y, w, h, FRAME_MID);
+
+        let inner_x = x + 1.0;
+        let inner_y = y + 1.0;
+        let inner_w = w - 2.0;
+        let inner_h = h - 2.0;
+        let seg_w = inner_w / n as f32;
+
+        for (i, (label, is_active, is_hovered)) in segments.iter().enumerate() {
+            let sx = inner_x + i as f32 * seg_w;
+
+            let bg = if *is_active {
+                Color::new(0.224, 0.190, 0.118, 1.0) // gold-tinted (active)
+            } else if *is_hovered {
+                SLOT_HOVER_BG
+            } else {
+                SLOT_BG_EMPTY
+            };
+            draw_rectangle(sx, inner_y, seg_w, inner_h, bg);
+
+            if *is_active {
+                // Gold top highlight = the shared "active" language.
+                draw_line(
+                    sx + 1.0,
+                    inner_y + 1.0,
+                    sx + seg_w - 1.0,
+                    inner_y + 1.0,
+                    1.0,
+                    FRAME_ACCENT,
+                );
+            }
+
+            // Divider between segments (makes it read as one connected control).
+            if i > 0 {
+                draw_line(sx, inner_y, sx, inner_y + inner_h, 1.0, FRAME_OUTER);
+            }
+
+            let label_w = self.measure_text_sharp(label, 16.0).width;
+            let text_color = if *is_active {
+                TEXT_TITLE
+            } else if *is_hovered {
+                TEXT_NORMAL
+            } else {
+                TEXT_DIM
+            };
+            self.draw_text_sharp(
+                label,
+                (sx + (seg_w - label_w) / 2.0).floor(),
+                (inner_y + inner_h * 0.71).floor(),
+                16.0,
+                text_color,
+            );
+        }
     }
 
     /// Draw a compact slider with label on left

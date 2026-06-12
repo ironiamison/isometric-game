@@ -45,6 +45,9 @@ impl Renderer {
         let slots_start_x = base_x + left_controls_w;
         let slots_start_y = sh - EXP_BAR_GAP * scale - slot_size;
 
+        // No tray behind the hotbar — elements float, each slot carries its own
+        // menu-button-style box (matching the action-bar buttons).
+
         // --- Settings Cog ---
         let cog_x = base_x;
         let cog_y = slots_start_y + (slot_size - cog_size) / 2.0;
@@ -162,16 +165,23 @@ impl Renderer {
             layout.add(UiElementId::QuickSlot(i), bounds);
 
             let is_hovered = matches!(hovered, Some(UiElementId::QuickSlot(idx)) if *idx == i);
-            let slot_state = if is_hovered {
-                SlotState::Hovered
+
+            // Slot background: identical to the menu buttons (1px outer border rect +
+            // 0.85-alpha fill + inner top/left shadow). Same color states as the buttons.
+            let (bg_color, border_color) = if is_hovered {
+                (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
             } else {
-                SlotState::Normal
+                (SLOT_BG_EMPTY, SLOT_BORDER)
             };
+            draw_rectangle(x - 1.0, y - 1.0, slot_size + 2.0, slot_size + 2.0,
+                Color::new(border_color.r, border_color.g, border_color.b, 0.9));
+            draw_rectangle(x, y, slot_size, slot_size,
+                Color::new(bg_color.r, bg_color.g, bg_color.b, 0.85));
+            draw_rectangle(x, y, slot_size, 2.0, SLOT_INNER_SHADOW);
+            draw_rectangle(x, y, 2.0, slot_size, SLOT_INNER_SHADOW);
 
             match &active_preset.slots[i] {
-                HotkeySlotBinding::Empty => {
-                    self.draw_inventory_slot(x, y, slot_size, false, slot_state);
-                }
+                HotkeySlotBinding::Empty => {}
                 HotkeySlotBinding::Item { item_id } => {
                     // Look up item in inventory
                     let inv_slot = state.inventory.find_slot_by_item_id(item_id);
@@ -185,8 +195,6 @@ impl Renderer {
                     });
                     let has_item = quantity.is_some();
                     let is_ghost = !has_item; // Depleted — show at 30% opacity
-
-                    self.draw_inventory_slot(x, y, slot_size, has_item || is_ghost, slot_state);
 
                     // Draw item icon (ghost = 30% opacity via tint)
                     if is_ghost {
@@ -238,8 +246,6 @@ impl Renderer {
                             });
 
                     if let Some((id, name, spell_type, mana_cost)) = spell_info {
-                        self.draw_inventory_slot(x, y, slot_size, true, slot_state);
-
                         // Spell icon
                         if let Some((texture, source_rect)) = self.spell_icons.get(id) {
                             let icon_size = slot_size - 8.0;
@@ -347,8 +353,7 @@ impl Renderer {
                             );
                         }
                     } else {
-                        // Unknown spell — draw as empty
-                        self.draw_inventory_slot(x, y, slot_size, false, slot_state);
+                        // Unknown spell — slot background already drawn above
                     }
                 }
             }

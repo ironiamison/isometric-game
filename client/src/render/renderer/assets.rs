@@ -1077,6 +1077,30 @@ impl Renderer {
             }
         };
 
+        // HUD stat-bar icons (16x16)
+        let load_stat_icon = |tex: Result<Texture2D, macroquad::Error>, name: &str| match tex {
+            Ok(t) => {
+                t.set_filter(FilterMode::Nearest);
+                Some(t)
+            }
+            Err(e) => {
+                log::warn!("Failed to load {} icon: {}", name, e);
+                None
+            }
+        };
+        let health_stat_icon = load_stat_icon(
+            load_texture(&asset_path("assets/ui/health_stat_icon.png")).await,
+            "health_stat",
+        );
+        let magic_stat_icon = load_stat_icon(
+            load_texture(&asset_path("assets/ui/magic_stat_icon.png")).await,
+            "magic_stat",
+        );
+        let prayer_stat_icon = load_stat_icon(
+            load_texture(&asset_path("assets/ui/prayer_stat_icon.png")).await,
+            "prayer_stat",
+        );
+
         let destination_flag =
             match load_texture(&asset_path("assets/ui/destination_flag.png")).await {
                 Ok(tex) => {
@@ -1436,6 +1460,9 @@ impl Renderer {
             fishing_skill_icon,
             chat_small_icon,
             coin_small_icon,
+            health_stat_icon,
+            magic_stat_icon,
+            prayer_stat_icon,
             destination_flag,
             click_walk_texture,
             click_attack_texture,

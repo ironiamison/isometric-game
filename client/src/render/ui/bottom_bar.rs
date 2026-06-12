@@ -284,6 +284,16 @@ impl Renderer {
                 num_buttons as f32 * button_size + (num_buttons - 1) as f32 * button_spacing;
             let start_x = (screen_w - total_width - 8.0).floor();
 
+            // Shared tray behind the action bar (sibling to the hotbar tray).
+            let tray_pad = 4.0 * scale;
+            self.draw_hud_tray(
+                start_x - tray_pad,
+                button_y - tray_pad,
+                total_width + tray_pad * 2.0,
+                button_size + tray_pad * 2.0,
+                true,
+            );
+
             for (i, (element_id, icon_frame, is_active)) in buttons.iter().enumerate() {
                 let x = start_x + i as f32 * (button_size + button_spacing);
                 let y = button_y;

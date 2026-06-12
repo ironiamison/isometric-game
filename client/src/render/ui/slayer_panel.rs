@@ -80,6 +80,10 @@ impl Renderer {
 
     /// Render a small HUD chip showing the player's active combat style.
     /// Returns `(chip_width, chip_height)` so the caller can position adjacent chips.
+    /// Legacy floating combat-style HUD chip. The desktop HUD now embeds an
+    /// interactive style selector in the stat cluster, so this is retained only for
+    /// potential reuse (e.g. a future compact mode).
+    #[allow(dead_code)]
     pub(crate) fn render_combat_style_chip(&self, state: &GameState, x: f32, y: f32) -> (f32, f32) {
         let style_raw = match state.get_local_player() {
             Some(p) => p.combat_style.clone(),

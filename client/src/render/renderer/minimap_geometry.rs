@@ -34,7 +34,12 @@ impl Renderer {
         }
         #[cfg(not(target_os = "android"))]
         {
-            (10.0, 10.0)
+            // Inset the content so the unified cluster frame (drawn around the name
+            // tag + stat bars) lands a few px from the screen corner. Keep in sync
+            // with the `cpad` used when drawing the frame in ui_frame.rs.
+            let s = self.font_scale.get();
+            let inset = FRAME_THICKNESS + 4.0 * s;
+            (6.0 + inset, 6.0 + inset)
         }
     }
 
@@ -46,45 +51,98 @@ impl Renderer {
         let _ = bar_width;
         let s = self.font_scale.get();
         let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
-        (
-            name_tag_x.floor(),
-            (name_tag_y + 22.0 * s + 4.0 * s).floor(),
-        )
+        // Desktop reserves a taller header (portrait + name + level) before the bars;
+        // android keeps the original compact single-line name tag.
+        #[cfg(target_os = "android")]
+        let header_block = 22.0 * s + 4.0 * s;
+        #[cfg(not(target_os = "android"))]
+        let header_block = 26.0 * s + 4.0 * s;
+        (name_tag_x.floor(), (name_tag_y + header_block).floor())
+    }
+
+    /// Width of the top-left HUD stat bars / cluster. Driven by the name+level text
+    /// so longer names widen the cluster. Shared by the draw pass and the hit-test
+    /// registration so they never drift apart.
+    pub(super) fn hud_bar_width(&self, state: &GameState) -> f32 {
+        let s = self.font_scale.get();
+        let font_size = 16.0;
+        let padding = 6.0;
+        if let Some(player) = state.get_local_player() {
+            let name_w = self.measure_text_sharp(&player.name, font_size).width;
+            let level_text = format!(" Lv.{}", player.skills.total_level());
+            let level_w = self.measure_text_sharp(&level_text, font_size).width;
+            // Wider HUD cluster so the bars + style row read long and roomy.
+            (name_w + level_w + padding * 2.0).max(200.0 * s)
+        } else {
+            200.0 * s
+        }
+    }
+
+    /// Extra vertical space the desktop stat cluster reserves below the bars for the
+    /// embedded combat-style selector + the frame's bottom padding. Transient HUD
+    /// indicators (gathering/stall/dash/chips/trackers) anchor below this. Zero on
+    /// android (no embedded selector / cluster frame).
+    pub(super) fn hud_below_bars_offset(&self) -> f32 {
+        if cfg!(target_os = "android") {
+            0.0
+        } else {
+            let s = self.font_scale.get();
+            // Just the cluster's bottom frame padding (cpad=4 + FRAME_THICKNESS).
+            4.0 * s + FRAME_THICKNESS
+        }
     }
 
     pub(super) fn draw_minimap_preview_frame(&self, x: f32, y: f32, w: f32, h: f32) {
-        // Low-profile frame: subtle shadow + thin bezel.
+        // Match the side panels' gold/bronze frame so the minimap reads as part of
+        // the same UI family. Multi-layer bevel + header strip + gold corner accents.
+        let s = self.font_scale.get();
+
+        // Outer drop shadow for depth from the world behind it.
+        draw_rectangle(x - 2.0, y - 2.0, w + 4.0, h + 4.0, Color::new(0.0, 0.0, 0.0, 0.30));
+
+        // Bronze frame layers (outer -> mid), matching draw_panel_frame.
+        draw_rectangle(x, y, w, h, FRAME_OUTER);
+        draw_rectangle(x + 2.0, y + 2.0, w - 4.0, h - 4.0, FRAME_MID);
+
+        // Recessed interior fill (canonical opaque panel navy, matching the stat cluster).
         draw_rectangle(
-            x - 1.0,
-            y - 1.0,
-            w + 2.0,
-            h + 2.0,
-            Color::new(0.0, 0.0, 0.0, 0.25),
+            x + FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
+            w - FRAME_THICKNESS * 2.0,
+            h - FRAME_THICKNESS * 2.0,
+            PANEL_BG_MID,
         );
-        draw_rectangle(x, y, w, h, Color::new(0.22, 0.18, 0.12, 0.90));
+
+        // Header strip behind the "Minimap [M]" title.
+        let header_h = 22.0 * s;
         draw_rectangle(
-            x + 1.0,
-            y + 1.0,
-            w - 2.0,
-            h - 2.0,
-            Color::new(0.09, 0.11, 0.13, 0.95),
+            x + FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
+            w - FRAME_THICKNESS * 2.0,
+            header_h,
+            HEADER_BG,
         );
         draw_line(
-            x + 2.0,
-            y + 2.0,
-            x + w - 2.0,
-            y + 2.0,
+            x + FRAME_THICKNESS,
+            y + FRAME_THICKNESS + header_h,
+            x + w - FRAME_THICKNESS,
+            y + FRAME_THICKNESS + header_h,
             1.0,
-            Color::new(0.62, 0.53, 0.37, 0.25),
+            HEADER_BORDER,
         );
+
+        // Inner top/left highlight for the bevel.
         draw_line(
-            x + 2.0,
-            y + 2.0,
-            x + 2.0,
-            y + h - 2.0,
+            x + FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
+            x + w - FRAME_THICKNESS,
+            y + FRAME_THICKNESS,
             1.0,
-            Color::new(0.62, 0.53, 0.37, 0.20),
+            FRAME_INNER,
         );
+
+        // Gold corner accents (same L-shapes as the panels).
+        self.draw_corner_accents(x, y, w, h);
     }
 
     pub(super) fn minimap_bounds(&self, state: &GameState) -> Option<MinimapBounds> {

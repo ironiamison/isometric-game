@@ -6,7 +6,7 @@ use macroquad::prelude::Color;
 // UI Color Palette - Medieval Fantasy Theme
 // ============================================================================
 
-// Panel backgrounds (darker to lighter for depth)
+// Panel backgrounds (neutral dark gray, darker to lighter for depth)
 pub const PANEL_BG_DARK: Color = Color::new(0.071, 0.071, 0.094, 0.961); // rgba(18, 18, 24, 245)
 pub const PANEL_BG_MID: Color = Color::new(0.110, 0.110, 0.149, 1.0); // rgba(28, 28, 38, 255)
 

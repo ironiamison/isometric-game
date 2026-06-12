@@ -240,6 +240,9 @@ def pack_ui_misc_icons():
         "down_arrow.png",
         "left_arrow.png",
         "right_arrow.png",
+        "health_stat_icon.png",
+        "magic_stat_icon.png",
+        "prayer_stat_icon.png",
     ]
 
     sprites = {}

@@ -129,15 +129,34 @@ const WALLS_FIRSTGID: u32 = 1;
 // Inventory UI Color Palette - Medieval Fantasy Theme
 // ============================================================================
 
-// Panel backgrounds (darker to lighter for depth)
+// Panel backgrounds (neutral dark gray, darker to lighter for depth)
 const PANEL_BG_DARK: Color = Color::new(0.071, 0.071, 0.094, 0.961); // rgba(18, 18, 24, 245)
 const PANEL_BG_MID: Color = Color::new(0.110, 0.110, 0.149, 1.0); // rgba(28, 28, 38, 255)
+// Over-world HUD containers. The bottom bars use a near-solid dark fill so the gaps
+// between buttons read as one cohesive unit; the chat box stays translucent. Bordered
+// with a dark muted bronze (see draw_hud_tray).
+const HUD_FILL_SOLID: Color = Color::new(0.071, 0.071, 0.094, 0.94);
+const HUD_FILL_TRANSLUCENT: Color = Color::new(0.094, 0.094, 0.122, 0.62);
+const HUD_BORDER: Color = Color::new(0.36, 0.27, 0.17, 1.0); // dark muted bronze
 
 // Frame/Border colors (bronze/gold medieval theme)
 const FRAME_OUTER: Color = Color::new(0.322, 0.243, 0.165, 1.0); // rgba(82, 62, 42, 255)
 const FRAME_MID: Color = Color::new(0.557, 0.424, 0.267, 1.0); // rgba(142, 108, 68, 255)
 const FRAME_INNER: Color = Color::new(0.729, 0.580, 0.361, 1.0); // rgba(186, 148, 92, 255)
 const FRAME_ACCENT: Color = Color::new(0.855, 0.698, 0.424, 1.0); // rgba(218, 178, 108, 255)
+
+// Header strip (matches ui::common) — used by the HUD stat cluster + minimap frame
+const HEADER_BG: Color = Color::new(0.141, 0.125, 0.165, 1.0); // rgba(36, 32, 42, 255)
+const HEADER_BORDER: Color = Color::new(0.463, 0.384, 0.267, 1.0); // rgba(118, 98, 68, 255)
+
+// HUD stat bar fills - two-tone: the lighter MAIN tone fills most of the bar with a
+// thin darker band along the bottom edge (a filled-vessel look).
+const STAT_HP_MAIN: Color = Color::new(0.42, 0.66, 0.38, 1.0);
+const STAT_HP_DARK: Color = Color::new(0.25, 0.46, 0.26, 1.0);
+const STAT_MP_MAIN: Color = Color::new(0.49, 0.40, 0.78, 1.0);
+const STAT_MP_DARK: Color = Color::new(0.31, 0.25, 0.56, 1.0);
+const STAT_PRAYER_MAIN: Color = Color::new(0.37, 0.62, 0.68, 1.0);
+const STAT_PRAYER_DARK: Color = Color::new(0.23, 0.45, 0.52, 1.0);
 
 // Slot colors
 const SLOT_BG_EMPTY: Color = Color::new(0.086, 0.086, 0.118, 1.0); // rgba(22, 22, 30, 255)
@@ -392,6 +411,10 @@ pub struct Renderer {
     pub(crate) fishing_skill_icon: Option<Texture2D>,
     /// Small coin icon for merchant name tags
     pub(crate) coin_small_icon: Option<Texture2D>,
+    /// HUD stat-bar icons (16x16): health / magic / prayer
+    pub(crate) health_stat_icon: Option<Texture2D>,
+    pub(crate) magic_stat_icon: Option<Texture2D>,
+    pub(crate) prayer_stat_icon: Option<Texture2D>,
     /// Farming crop sprite sheets by crop name (e.g., "potato" -> Texture2D)
     farming_sprites: SpritesheetStore,
     /// Prayer icons by prayer id (e.g., "clarity" -> Texture2D or atlas rect)

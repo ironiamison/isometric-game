@@ -123,9 +123,9 @@ impl Renderer {
             let clip_y = bg_bottom - clip_h;
 
             let tab_h = 18.0 * scale;
-            let num_tabs = 3.0f32;
-            let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;
+            let clip_x = chat_x - bg_padding;
+            let tab_rects = self.chat_tab_rects(clip_x + 2.0, tab_bar_y, tab_h);
 
             let tab_ids = [
                 UiElementId::ChatTabLocal,
@@ -133,11 +133,7 @@ impl Renderer {
                 UiElementId::ChatTabSystem,
             ];
             for (i, tab_id) in tab_ids.iter().enumerate() {
-                let tx = chat_x + i as f32 * tab_w;
-                layout.add(
-                    tab_id.clone(),
-                    macroquad::prelude::Rect::new(tx, tab_bar_y, tab_w, tab_h),
-                );
+                layout.add(tab_id.clone(), tab_rects[i]);
             }
 
             // Register scrollbar for chat log drag interaction
@@ -188,7 +184,11 @@ impl Renderer {
             } else {
                 0.0
             };
-            let contract_y = stats_y + 3.0 * (18.0 + 4.0) * s + 14.0 * s + slayer_offset;
+            let contract_y = stats_y
+                + 3.0 * (18.0 + 4.0) * s
+                + 14.0 * s
+                + slayer_offset
+                + self.hud_below_bars_offset();
             self.render_resource_contract_tracker(state, bar_x, contract_y, 240.0);
         }
 
@@ -214,6 +214,7 @@ impl Renderer {
                 let has_dash_bar = state.dash_cooldown_end > current_time;
                 let chip_y = prayer_bar_y
                     + bar_height
+                    + self.hud_below_bars_offset()
                     + 4.0 * s
                     + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
                     + if has_stall_bar {
@@ -424,6 +425,250 @@ impl Renderer {
             1.0,
             shadow,
         );
+    }
+
+    /// Draw text with a 1px black stroke for legibility over colored bars.
+    pub(crate) fn draw_text_outlined(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
+        let outline = Color::new(0.0, 0.0, 0.0, 0.9);
+        for ox in [-1.0, 1.0] {
+            for oy in [-1.0, 1.0] {
+                self.draw_text_sharp(text, x + ox, y + oy, size, outline);
+            }
+        }
+        self.draw_text_sharp(text, x, y, size, color);
+    }
+
+    /// Draw a HUD stat bar: recessed background + two-tone fill (lighter MAIN tone on
+    /// top, a thin darker band along the bottom). `border` lets the prayer bar pulse.
+    pub(crate) fn draw_hud_stat_bar_fill(
+        &self,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        ratio: f32,
+        border: Color,
+        main: Color,
+        dark: Color,
+    ) {
+        draw_rectangle(x, y, w, h, border);
+        draw_rectangle(x + 1.0, y + 1.0, w - 2.0, h - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+        let fill_w = (w - 4.0) * ratio;
+        if fill_w > 0.0 {
+            // Lighter main tone fills the whole inner height...
+            draw_rectangle(x + 2.0, y + 2.0, fill_w, h - 4.0, main);
+            // ...with a thin darker band along the bottom edge.
+            let dark_h = ((h - 4.0) * 0.34).max(2.0).floor();
+            draw_rectangle(x + 2.0, y + h - 2.0 - dark_h, fill_w, dark_h, dark);
+        }
+    }
+
+    /// Draw a live head portrait of the player (base head + hair), cropped to the head
+    /// and rendered at the UI scale (pixel-perfect) inside the gold portrait box. Falls
+    /// back to the generic silhouette if the player's base sprite isn't loaded.
+    pub(crate) fn draw_player_head_portrait(&self, player: &Player, x: f32, y: f32, size: f32) {
+        // No frame — the head sits directly on the cluster's panel fill (keeps the
+        // cluster compact). Base player sprite (front idle); bail to silhouette if missing.
+        let key = format!("{}_{}", player.gender, player.skin);
+        let Some((base_tex, base_off)) = self.player_sprites.get(&key) else {
+            self.draw_hud_portrait(x, y, size);
+            return;
+        };
+        let (patlas_x, patlas_y) = base_off.unwrap_or((0.0, 0.0));
+
+        // Front-facing sprite-sheet dimensions.
+        const SW: f32 = 34.0;
+        const SH: f32 = 78.0;
+        const HAIRW: f32 = 28.0;
+        const HAIRH: f32 = 54.0;
+
+        let inner = size;
+        let ix = x;
+        let iy = y;
+
+        // Draw pixel art at an INTEGER magnification (per the codebase convention for
+        // pixel-art icons) so texels stay uniform — fractional UI scales otherwise make
+        // the sprite look slightly stretched. Center horizontally on the sprite and crop
+        // lower (sprite y ~13) so the head fills the square.
+        let scale = self.font_scale.get().round().max(1.0);
+        let ox = (ix + inner / 2.0 - 17.0 * scale).floor();
+        let oy = (iy + inner / 2.0 - 13.0 * scale).floor();
+
+        // Clip to the recessed interior so only the head shows.
+        let (vw, vh) = virtual_screen_size();
+        let sx = macroquad::window::screen_width() / vw;
+        let sy = macroquad::window::screen_height() / vh;
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(Some((
+                (ix * sx) as i32,
+                (iy * sy) as i32,
+                (inner * sx) as i32,
+                (inner * sy) as i32,
+            )));
+        }
+
+        // 1. Base body (head shows at the top).
+        draw_texture_ex(
+            base_tex,
+            ox,
+            oy,
+            WHITE,
+            DrawTextureParams {
+                source: Some(Rect::new(patlas_x, patlas_y, SW, SH)),
+                dest_size: Some(Vec2::new(SW * scale, SH * scale)),
+                ..Default::default()
+            },
+        );
+
+        // 2. Hair (front frame = color * 2).
+        if let Some(style) = player.hair_style {
+            let hair_key = format!("{}_{}", player.gender, style);
+            if let Some((hair_tex, hair_off)) = self.hair_sprites.get(&hair_key) {
+                let (hatlas_x, hatlas_y) = hair_off.unwrap_or((0.0, 0.0));
+                let color = player.hair_color.unwrap_or(0).max(0);
+                let hair_src_x = hatlas_x + (color * 2) as f32 * HAIRW;
+                draw_texture_ex(
+                    hair_tex,
+                    ox + 2.0 * scale,
+                    oy - 3.0 * scale,
+                    WHITE,
+                    DrawTextureParams {
+                        source: Some(Rect::new(hair_src_x, hatlas_y, HAIRW, HAIRH)),
+                        dest_size: Some(Vec2::new(HAIRW * scale, HAIRH * scale)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        // Clear the clip.
+        {
+            let mut gl = unsafe { get_internal_gl() };
+            gl.flush();
+            gl.quad_gl.scissor(None);
+        }
+    }
+
+    /// Draw the fallback HUD portrait: a simple person silhouette (no frame), used when
+    /// the player's base sprite isn't loaded. Matches the borderless real-head portrait.
+    pub(crate) fn draw_hud_portrait(&self, x: f32, y: f32, size: f32) {
+        // Person silhouette (head + shoulders) in a soft steel-blue.
+        let c = Color::new(0.52, 0.60, 0.72, 1.0);
+        let cx = x + size / 2.0;
+        let head_r = size * 0.15;
+        draw_circle(cx, y + size * 0.37, head_r, c);
+        let by = y + size * 0.52;
+        let bottom = y + size * 0.80;
+        let top_half = size * 0.16;
+        let bot_half = size * 0.30;
+        draw_triangle(
+            Vec2::new(cx - bot_half, bottom),
+            Vec2::new(cx + bot_half, bottom),
+            Vec2::new(cx - top_half, by),
+            c,
+        );
+        draw_triangle(
+            Vec2::new(cx + bot_half, bottom),
+            Vec2::new(cx - top_half, by),
+            Vec2::new(cx + top_half, by),
+            c,
+        );
+    }
+
+    /// Heart glyph (HP icon) drawn at center (cx, cy).
+    pub(crate) fn draw_hud_heart(&self, cx: f32, cy: f32, r: f32, color: Color) {
+        draw_circle(cx - r * 0.45, cy - r * 0.25, r * 0.55, color);
+        draw_circle(cx + r * 0.45, cy - r * 0.25, r * 0.55, color);
+        draw_triangle(
+            Vec2::new(cx - r, cy + r * 0.02),
+            Vec2::new(cx + r, cy + r * 0.02),
+            Vec2::new(cx, cy + r * 1.05),
+            color,
+        );
+    }
+
+    /// Flask/potion glyph (MP icon) drawn at center (cx, cy).
+    pub(crate) fn draw_hud_flask(&self, cx: f32, cy: f32, r: f32, color: Color) {
+        // Neck.
+        draw_rectangle(cx - r * 0.28, cy - r * 0.95, r * 0.56, r * 0.7, color);
+        // Body.
+        draw_circle(cx, cy + r * 0.3, r * 0.75, color);
+        // Cork.
+        draw_rectangle(
+            cx - r * 0.34,
+            cy - r * 1.15,
+            r * 0.68,
+            r * 0.28,
+            Color::new(color.r * 0.7, color.g * 0.7, color.b * 0.7, color.a),
+        );
+    }
+
+    /// Draw a 16x16 HUD stat icon centered at (cx, cy), at integer UI scale (crisp).
+    pub(crate) fn draw_hud_stat_icon(&self, tex: &Texture2D, cx: f32, cy: f32) {
+        let scale = self.font_scale.get().round().max(1.0);
+        let size = 16.0 * scale;
+        draw_texture_ex(
+            tex,
+            (cx - size / 2.0).floor(),
+            (cy - size / 2.0).floor(),
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(Vec2::new(size, size)),
+                ..Default::default()
+            },
+        );
+    }
+
+    /// Lightning-bolt glyph (Prayer icon) drawn at center (cx, cy).
+    pub(crate) fn draw_hud_bolt(&self, cx: f32, cy: f32, r: f32, color: Color) {
+        draw_triangle(
+            Vec2::new(cx + r * 0.25, cy - r),
+            Vec2::new(cx - r * 0.55, cy + r * 0.15),
+            Vec2::new(cx + r * 0.05, cy + r * 0.1),
+            color,
+        );
+        draw_triangle(
+            Vec2::new(cx - r * 0.05, cy - r * 0.1),
+            Vec2::new(cx + r * 0.55, cy - r * 0.15),
+            Vec2::new(cx - r * 0.25, cy + r),
+            color,
+        );
+    }
+
+    /// Draw a shared over-world HUD container: a clean 2px bronze bevel + the shared
+    /// translucent navy fill (no gold corner brackets — distinguishable but not flashy).
+    /// Used by the chat backing and both bottom bars so they read as one family with the
+    /// framed panels while staying lighter over the world.
+    /// `solid`: bottom bars pass `true` (near-opaque, cohesive); the chat box passes
+    /// `false` (translucent, world shows through).
+    pub(crate) fn draw_hud_tray(&self, x: f32, y: f32, w: f32, h: f32, solid: bool) {
+        let fill = if solid {
+            HUD_FILL_SOLID
+        } else {
+            HUD_FILL_TRANSLUCENT
+        };
+        draw_rectangle(x, y, w, h, fill);
+    }
+
+    /// Compact, left-packed chat tab rects (Public / Global / System), each sized to its
+    /// own label so they fill only the top-left instead of stretching. Shared by the
+    /// renderer (draw) and the input layout (hit-test) so they stay in sync.
+    pub(crate) fn chat_tab_rects(&self, chat_x: f32, tab_bar_y: f32, tab_h: f32) -> [Rect; 3] {
+        let s = self.font_scale.get();
+        let names = ["Public", "Global", "System"];
+        let pad = 12.0 * s;
+        let gap = 4.0 * s;
+        let mut x = chat_x;
+        let mut out = [Rect::new(0.0, 0.0, 0.0, 0.0); 3];
+        for (i, name) in names.iter().enumerate() {
+            let tw = self.measure_text_sharp(name, 16.0).width;
+            let w = (tw + pad * 2.0).floor();
+            out[i] = Rect::new(x.floor(), tab_bar_y, w, tab_h);
+            x += w + gap;
+        }
+        out
     }
 
     /// Draw decorative corner accents (gold L-shapes at corners)

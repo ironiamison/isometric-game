@@ -106,15 +106,11 @@ impl Renderer {
             let chat_area_h = max_visible_lines as f32 * line_height;
 
             // BG rectangle positioned from the hotkey bar bottom edge
-            let chat_input_open = state.ui_state.chat_open
-                && !matches!(state.ui_state.chat_active_tab, ChatChannel::System);
             let bg_bottom = chat_sh - EXP_BAR_GAP * scale;
-            // When input bar is open, shrink visible area so messages don't render behind it
-            let effective_bottom = if chat_input_open {
-                bg_bottom - 28.0 * scale
-            } else {
-                bg_bottom
-            };
+            // Always reserve a row at the bottom for the input hint ("Press Enter to chat…")
+            // so the chat reads as a complete framed element.
+            let input_row_h = 24.0 * scale;
+            let effective_bottom = bg_bottom - input_row_h;
             let clip_h = chat_area_h + bg_padding * 2.0;
             let clip_x = chat_x - bg_padding;
             let clip_y = bg_bottom - clip_h;
@@ -128,8 +124,6 @@ impl Renderer {
             let tab_h = 18.0 * scale;
             let tab_names = ["Public", "Global", "System"];
             let tab_channels = [ChatChannel::Local, ChatChannel::Global, ChatChannel::System];
-            let num_tabs = 3.0f32;
-            let tab_w = (max_chat_width / num_tabs).floor();
             let tab_bar_y = clip_y - tab_h;
             let latest_local_ts = state
                 .ui_state
@@ -144,8 +138,39 @@ impl Renderer {
                 .chat_messages
                 .latest_timestamp(&ChatChannel::System);
 
+            // ===== Framed container: semi-opaque backing =====
+            // No top inset — the active tab box must align exactly with the hover/hit
+            // boundary (which starts at tab_bar_y), so the gold tab isn't taller than its
+            // clickable area.
+            let top_inset = 0.0;
+            let cont_x = clip_x;
+            let cont_y = tab_bar_y - top_inset;
+            let cont_w = clip_w;
+            let _cont_h = (clip_y + clip_h) - cont_y;
+
+            // Compute tab rects first so we can size the tab-strip fill to match.
+            let tab_rects = self.chat_tab_rects(clip_x + 2.0, tab_bar_y, tab_h);
+            let tabs_right = tab_rects[2].x + tab_rects[2].w;
+
+            if state.ui_state.chat_log_background {
+                // Tab-strip fill: only as wide as the three tabs (so empty space above the
+                // content area doesn't show a floating background).
+                let tab_strip_h = clip_y - cont_y; // top_inset + tab_h
+                draw_rectangle(cont_x, cont_y, tabs_right - cont_x, tab_strip_h, HUD_FILL_TRANSLUCENT);
+                // Content body fill: full width from the divider down.
+                draw_rectangle(cont_x, clip_y, cont_w, clip_h, HUD_FILL_TRANSLUCENT);
+                // Divider below the tab row (full width).
+                draw_line(
+                    cont_x,
+                    tab_bar_y + tab_h,
+                    cont_x + cont_w,
+                    tab_bar_y + tab_h,
+                    1.0,
+                    HEADER_BORDER,
+                );
+            }
             for i in 0..3 {
-                let tx = chat_x + i as f32 * tab_w;
+                let r = tab_rects[i];
                 let is_active = std::mem::discriminant(&state.ui_state.chat_active_tab)
                     == std::mem::discriminant(&tab_channels[i]);
                 let is_hovered = state.ui_state.hovered_element.as_ref()
@@ -162,51 +187,35 @@ impl Renderer {
                     ChatChannel::System => latest_system_ts > state.ui_state.chat_last_seen_system,
                 };
 
-                let bg = if is_active {
-                    Color::new(0.15, 0.15, 0.2, 0.85)
-                } else if is_hovered {
-                    Color::new(0.1, 0.1, 0.15, 0.7)
-                } else {
-                    Color::new(0.05, 0.05, 0.08, 0.65)
-                };
-
-                draw_rectangle(tx, tab_bar_y, tab_w, tab_h, bg);
-
                 if is_active {
-                    // Gold underline for active tab
-                    draw_rectangle(
-                        tx + 2.0,
-                        tab_bar_y + tab_h - 2.0,
-                        tab_w - 4.0,
-                        2.0,
-                        Color::new(0.76, 0.60, 0.23, 1.0),
-                    );
+                    // Gold-lit active tab — extends from the container top down to the divider.
+                    let a_top = cont_y;
+                    let a_h = (tab_bar_y + tab_h) - a_top;
+                    // First tab: pull the left edge flush to the container edge (no clearance).
+                    let a_left = if i == 0 { cont_x } else { r.x };
+                    let a_w = (r.x + r.w) - a_left;
+                    draw_rectangle(a_left, a_top, a_w, a_h, Color::new(0.180, 0.165, 0.110, 0.92));
+                    draw_rectangle(a_left, a_top, a_w, 1.0, FRAME_ACCENT);
+                    draw_rectangle(a_left, a_top, 1.0, a_h, FRAME_ACCENT);
+                    draw_rectangle(a_left + a_w - 1.0, a_top, 1.0, a_h, FRAME_ACCENT);
+                } else if is_hovered {
+                    draw_rectangle(r.x, r.y, r.w, r.h, Color::new(0.0, 0.0, 0.0, 0.22));
                 }
 
                 let label_size: f32 = 16.0;
                 let tw = self.measure_text_sharp(tab_names[i], label_size).width;
                 self.draw_text_sharp(
                     tab_names[i],
-                    (tx + (tab_w - tw) / 2.0).floor(),
-                    (tab_bar_y + tab_h / 2.0 + label_size * 0.35).floor(),
+                    (r.x + (r.w - tw) / 2.0).floor(),
+                    (r.y + r.h / 2.0 + label_size * 0.28).floor(),
                     label_size,
                     if is_active {
-                        WHITE
+                        Color::new(1.0, 0.86, 0.45, 1.0) // gold-lit
                     } else if has_unread {
                         Color::new(0.92, 0.92, 0.92, 1.0)
                     } else {
                         Color::new(0.6, 0.6, 0.6, 1.0)
                     },
-                );
-            }
-
-            if state.ui_state.chat_log_background {
-                draw_rectangle(
-                    clip_x,
-                    clip_y,
-                    clip_w,
-                    clip_h,
-                    Color::new(0.0, 0.0, 0.0, 0.45),
                 );
             }
 
@@ -352,6 +361,34 @@ impl Renderer {
                     thumb_color,
                 );
             }
+
+            // ===== Input hint row (bottom of the framed container) =====
+            if state.ui_state.chat_log_background && !state.ui_state.chat_open {
+                let row_y = bg_bottom - input_row_h;
+                draw_line(cont_x, row_y, cont_x + cont_w, row_y, 1.0, HEADER_BORDER);
+                let icon_size = 14.0 * scale;
+                let icon_x = cont_x + 8.0 * scale;
+                let icon_y = row_y + (input_row_h - icon_size) / 2.0;
+                if let Some(ref tex) = self.chat_small_icon {
+                    draw_texture_ex(
+                        tex,
+                        icon_x.floor(),
+                        icon_y.floor(),
+                        TEXT_DIM,
+                        DrawTextureParams {
+                            dest_size: Some(Vec2::new(icon_size, icon_size)),
+                            ..Default::default()
+                        },
+                    );
+                }
+                self.draw_text_sharp(
+                    "Press Enter to chat...",
+                    (icon_x + icon_size + 6.0 * scale).floor(),
+                    (row_y + input_row_h * 0.66).floor(),
+                    font_size,
+                    TEXT_DIM,
+                );
+            }
         }
 
         // Top HUD: minimap on right, local name/stats on left.
@@ -368,9 +405,10 @@ impl Renderer {
             let total_text_w = name_w + level_w;
 
             // Both bars use same width (at least 120, or text width + padding)
-            let mut bar_width = (total_text_w + padding * 2.0).max(120.0 * s);
-            let tag_height = 22.0 * s;
+            let mut bar_width = self.hud_bar_width(state);
             let mut bar_height = 18.0 * s;
+            // Extra space the desktop cluster reserves below the bars (style row + frame).
+            let hud_below = self.hud_below_bars_offset();
 
             if !cfg!(target_os = "android") && self.minimap_preview_enabled(state) {
                 self.render_minimap_preview(state);
@@ -530,75 +568,94 @@ impl Renderer {
                 bar_height = compact_h;
                 prayer_bar_y = hud_y;
             } else {
-                // ===== DESKTOP: Vertical stacked bars (top-left) =====
+                // ===== DESKTOP: portrait + name header, icon-prefixed bars, style row =====
                 let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
-                draw_rectangle(
-                    name_tag_x,
-                    name_tag_y,
-                    bar_width,
-                    tag_height,
-                    Color::new(0.0, 0.0, 0.0, 0.45),
-                );
 
-                let text_x = name_tag_x + (bar_width - total_text_w) / 2.0;
-                let text_y = (name_tag_y + tag_height * 0.73).floor();
-                self.draw_text_sharp(name, text_x, text_y, font_size, TEXT_TITLE);
-                self.draw_text_sharp(&level_text, text_x + name_w, text_y, font_size, TEXT_DIM);
+                // Unified cluster frame (same gold/bronze panel treatment as the side
+                // panels). Encloses the header, the 3 stat bars, and the style row.
+                // `cpad` must match the inset baked into local_name_tag_position().
+                let cpad = 4.0 * s;
+                // header(26) + gap(4) + 3 bars(18*3) + 2 gaps(4*2) = 92
+                let cluster_h = 92.0 * s;
+                let frame_x = name_tag_x - FRAME_THICKNESS - cpad;
+                let frame_y = name_tag_y - FRAME_THICKNESS - cpad;
+                let frame_w = bar_width + 2.0 * (FRAME_THICKNESS + cpad);
+                let frame_h = cluster_h + 2.0 * (FRAME_THICKNESS + cpad);
+                self.draw_panel_frame(frame_x, frame_y, frame_w, frame_h);
+                self.draw_corner_accents(frame_x, frame_y, frame_w, frame_h);
+
+                // Live head portrait (base + hair, no frame). A 26-wide box centered on
+                // the bar icon column (icon_col/2 = 9) lands at name_tag_x - 4, i.e. flush
+                // to the frame's inner edge — so the head sits directly above the icons and
+                // fills the left margin. The crop centers the face, so the visible head
+                // lines up with the icon column.
+                let portrait_size = 26.0 * s;
+                let portrait_x = name_tag_x - 4.0 * s;
+                self.draw_player_head_portrait(player, portrait_x, name_tag_y, portrait_size);
+                // Name + level: name top ~aligns with the portrait top, level base with its bottom.
+                let txt_x = portrait_x + portrait_size + 6.0 * s;
+                self.draw_text_sharp(
+                    name,
+                    txt_x,
+                    (name_tag_y + 13.0 * s).floor(),
+                    16.0,
+                    TEXT_NORMAL,
+                );
+                let level_label = format!("Level {}", player.skills.total_level());
+                self.draw_text_sharp(
+                    &level_label,
+                    txt_x,
+                    (name_tag_y + 25.0 * s).floor(),
+                    14.0,
+                    TEXT_DIM,
+                );
 
                 let (bx, stats_y) = self.minimap_stats_stack_position(state, bar_width);
                 bar_x = bx;
 
+                // Bars are inset to leave an icon gutter on the left (heart/flask/bolt).
+                let icon_col = 18.0 * s;
+                let bar_rx = bar_x + icon_col;
+                let bar_rw = bar_width - icon_col;
+                let icon_cx = bar_x + icon_col * 0.5;
+                let icon_r = 6.0 * s;
+
                 // ===== HP BAR =====
-                let hp_bar_x = bar_x;
                 let hp_bar_y = stats_y;
                 let hp_ratio = player.hp as f32 / player.max_hp.max(1) as f32;
-
-                draw_rectangle(hp_bar_x, hp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
-                draw_rectangle(
-                    hp_bar_x + 1.0,
-                    hp_bar_y + 1.0,
-                    bar_width - 2.0,
-                    bar_height - 2.0,
-                    Color::new(0.08, 0.08, 0.10, 1.0),
+                let (hp_main, hp_dark) = if hp_ratio > 0.5 {
+                    (STAT_HP_MAIN, STAT_HP_DARK)
+                } else if hp_ratio > 0.25 {
+                    (Color::new(0.85, 0.65, 0.20, 1.0), Color::new(0.58, 0.42, 0.10, 1.0))
+                } else {
+                    (Color::new(0.80, 0.32, 0.32, 1.0), Color::new(0.54, 0.17, 0.17, 1.0))
+                };
+                self.draw_hud_stat_bar_fill(
+                    bar_rx,
+                    hp_bar_y,
+                    bar_rw,
+                    bar_height,
+                    hp_ratio,
+                    SLOT_INNER_SHADOW,
+                    hp_main,
+                    hp_dark,
                 );
-
-                let hp_fill_w = (bar_width - 4.0) * hp_ratio;
-                if hp_fill_w > 0.0 {
-                    let hp_color = if hp_ratio > 0.5 {
-                        Color::new(0.2, 0.7, 0.3, 1.0)
-                    } else if hp_ratio > 0.25 {
-                        Color::new(0.8, 0.6, 0.1, 1.0)
-                    } else {
-                        Color::new(0.8, 0.2, 0.2, 1.0)
-                    };
-                    draw_rectangle(
-                        hp_bar_x + 2.0,
-                        hp_bar_y + 2.0,
-                        hp_fill_w,
-                        bar_height - 4.0,
-                        hp_color,
-                    );
-                    draw_rectangle(
-                        hp_bar_x + 2.0,
-                        hp_bar_y + 2.0,
-                        hp_fill_w,
-                        (bar_height - 4.0) / 2.0,
-                        Color::new(1.0, 1.0, 1.0, 0.25),
-                    );
+                if let Some(tex) = &self.health_stat_icon {
+                    self.draw_hud_stat_icon(tex, icon_cx, hp_bar_y + bar_height * 0.5);
+                } else {
+                    self.draw_hud_heart(icon_cx, hp_bar_y + bar_height * 0.5, icon_r, STAT_HP_MAIN);
                 }
-
-                let hp_text = format!("{}/{}", player.hp, player.max_hp);
+                let hp_text = format!("{} / {}", player.hp, player.max_hp);
                 let hp_text_w = self.measure_text_sharp(&hp_text, font_size).width;
-                self.draw_text_sharp(
+                self.draw_text_outlined(
                     &hp_text,
-                    (hp_bar_x + (bar_width - hp_text_w) / 2.0).floor(),
+                    (bar_rx + (bar_rw - hp_text_w) / 2.0).floor(),
                     (hp_bar_y + bar_height * 0.78).floor(),
                     font_size,
-                    TEXT_NORMAL,
+                    WHITE,
                 );
 
                 // ===== MP BAR =====
-                let mp_bar_x = bar_x;
                 let mp_bar_y = hp_bar_y + bar_height + 4.0 * s;
                 let (mp, max_mp) = state
                     .get_local_player()
@@ -609,47 +666,32 @@ impl Renderer {
                 } else {
                     0.0
                 };
-
-                draw_rectangle(mp_bar_x, mp_bar_y, bar_width, bar_height, SLOT_INNER_SHADOW);
-                draw_rectangle(
-                    mp_bar_x + 1.0,
-                    mp_bar_y + 1.0,
-                    bar_width - 2.0,
-                    bar_height - 2.0,
-                    Color::new(0.08, 0.08, 0.10, 1.0),
+                self.draw_hud_stat_bar_fill(
+                    bar_rx,
+                    mp_bar_y,
+                    bar_rw,
+                    bar_height,
+                    mp_ratio,
+                    SLOT_INNER_SHADOW,
+                    STAT_MP_MAIN,
+                    STAT_MP_DARK,
                 );
-
-                let mp_fill_w = (bar_width - 4.0) * mp_ratio;
-                if mp_fill_w > 0.0 {
-                    let mp_color = Color::new(0.3, 0.2, 0.8, 1.0);
-                    draw_rectangle(
-                        mp_bar_x + 2.0,
-                        mp_bar_y + 2.0,
-                        mp_fill_w,
-                        bar_height - 4.0,
-                        mp_color,
-                    );
-                    draw_rectangle(
-                        mp_bar_x + 2.0,
-                        mp_bar_y + 2.0,
-                        mp_fill_w,
-                        (bar_height - 4.0) / 2.0,
-                        Color::new(0.5, 0.4, 0.95, 1.0),
-                    );
+                if let Some(tex) = &self.magic_stat_icon {
+                    self.draw_hud_stat_icon(tex, icon_cx, mp_bar_y + bar_height * 0.5);
+                } else {
+                    self.draw_hud_flask(icon_cx, mp_bar_y + bar_height * 0.5, icon_r, STAT_MP_MAIN);
                 }
-
-                let mp_text = format!("{}/{}", mp, max_mp);
+                let mp_text = format!("{} / {}", mp, max_mp);
                 let mp_text_w = self.measure_text_sharp(&mp_text, font_size).width;
-                self.draw_text_sharp(
+                self.draw_text_outlined(
                     &mp_text,
-                    (mp_bar_x + (bar_width - mp_text_w) / 2.0).floor(),
+                    (bar_rx + (bar_rw - mp_text_w) / 2.0).floor(),
                     (mp_bar_y + bar_height * 0.78).floor(),
                     font_size,
-                    TEXT_NORMAL,
+                    WHITE,
                 );
 
                 // ===== PRAYER BAR =====
-                let prayer_bar_x = bar_x;
                 prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
                 let prayer_ratio = if state.max_prayer_points > 0 {
                     state.prayer_points as f32 / state.max_prayer_points as f32
@@ -657,68 +699,52 @@ impl Renderer {
                     0.0
                 };
                 let prayer_low = prayer_ratio < 0.2 && state.max_prayer_points > 0;
-
-                let border_color = if prayer_low {
+                let prayer_border = if prayer_low {
                     let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.3 + 0.7) as f32;
                     Color::new(0.4 * flash + 0.2, 0.15, 0.15, 1.0)
                 } else {
                     SLOT_INNER_SHADOW
                 };
-                draw_rectangle(
-                    prayer_bar_x,
+                self.draw_hud_stat_bar_fill(
+                    bar_rx,
                     prayer_bar_y,
-                    bar_width,
+                    bar_rw,
                     bar_height,
-                    border_color,
+                    prayer_ratio,
+                    prayer_border,
+                    STAT_PRAYER_MAIN,
+                    STAT_PRAYER_DARK,
                 );
-                draw_rectangle(
-                    prayer_bar_x + 1.0,
-                    prayer_bar_y + 1.0,
-                    bar_width - 2.0,
-                    bar_height - 2.0,
-                    Color::new(0.08, 0.08, 0.10, 1.0),
-                );
-
-                let prayer_fill_w = (bar_width - 4.0) * prayer_ratio;
-                if prayer_fill_w > 0.0 {
-                    let prayer_color = Color::new(0.2, 0.7, 0.85, 1.0);
-                    draw_rectangle(
-                        prayer_bar_x + 2.0,
-                        prayer_bar_y + 2.0,
-                        prayer_fill_w,
-                        bar_height - 4.0,
-                        prayer_color,
-                    );
-                    draw_rectangle(
-                        prayer_bar_x + 2.0,
-                        prayer_bar_y + 2.0,
-                        prayer_fill_w,
-                        (bar_height - 4.0) / 2.0,
-                        Color::new(1.0, 1.0, 1.0, 0.25),
+                if let Some(tex) = &self.prayer_stat_icon {
+                    self.draw_hud_stat_icon(tex, icon_cx, prayer_bar_y + bar_height * 0.5);
+                } else {
+                    self.draw_hud_bolt(
+                        icon_cx,
+                        prayer_bar_y + bar_height * 0.5,
+                        icon_r,
+                        STAT_PRAYER_MAIN,
                     );
                 }
-
-                let prayer_text = format!("{}/{}", state.prayer_points, state.max_prayer_points);
+                let prayer_text = format!("{} / {}", state.prayer_points, state.max_prayer_points);
                 let prayer_text_w = self.measure_text_sharp(&prayer_text, font_size).width;
-                let prayer_text_color = if prayer_low {
-                    let flash = ((macroquad::time::get_time() * 2.0).sin() * 0.15 + 0.85) as f32;
-                    Color::new(1.0, 0.7 + 0.3 * flash, 0.7 + 0.3 * flash, 1.0)
-                } else {
-                    TEXT_NORMAL
-                };
-                self.draw_text_sharp(
+                self.draw_text_outlined(
                     &prayer_text,
-                    (prayer_bar_x + (bar_width - prayer_text_w) / 2.0).floor(),
+                    (bar_rx + (bar_rw - prayer_text_w) / 2.0).floor(),
                     (prayer_bar_y + bar_height * 0.78).floor(),
                     font_size,
-                    prayer_text_color,
+                    WHITE,
                 );
             }
 
-            // ===== Gathering/Woodcutting status indicator (below prayer bar) =====
+            // Bottom of the stat cluster: where transient HUD indicators begin. On
+            // desktop this clears the embedded style row + cluster frame; on android
+            // hud_below is 0 so this matches the old prayer-bar-bottom anchor.
+            let stack_bottom = prayer_bar_y + bar_height + hud_below;
+
+            // ===== Gathering/Woodcutting status indicator (below the cluster) =====
             let is_skilling = state.is_gathering || state.is_woodcutting;
             if is_skilling {
-                let gather_y = prayer_bar_y + bar_height + 4.0 * s;
+                let gather_y = stack_bottom + 4.0 * s;
                 let gather_h = 22.0 * s;
                 // Semi-transparent background (blue for fishing, brown for woodcutting)
                 let (bg_color, border_color, text_color, action_name) = if state.is_woodcutting {
@@ -755,8 +781,7 @@ impl Renderer {
             // ===== Store Open status indicator (below gathering status or prayer bar) =====
             let has_stall_bar = state.ui_state.stall_active;
             if has_stall_bar {
-                let stall_bar_y = prayer_bar_y
-                    + bar_height
+                let stall_bar_y = stack_bottom
                     + 4.0 * s
                     + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 };
                 let stall_h = 22.0 * s;
@@ -783,7 +808,7 @@ impl Renderer {
                 } else {
                     0.0
                 };
-            let dash_bar_y = prayer_bar_y + bar_height + 4.0 * s + status_bars_offset;
+            let dash_bar_y = stack_bottom + 4.0 * s + status_bars_offset;
             let current_time = macroquad::time::get_time();
             if state.dash_cooldown_end > current_time {
                 let remaining = (state.dash_cooldown_end - current_time) as f32;
@@ -837,8 +862,7 @@ impl Renderer {
             let chip_row_h: f32;
 
             if !cfg!(target_os = "android") {
-                let chip_row_y = prayer_bar_y
-                    + bar_height
+                let chip_row_y = stack_bottom
                     + 4.0 * s
                     + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
                     + if has_stall_bar {
@@ -877,14 +901,11 @@ impl Renderer {
                     }
                 }
 
-                // Combat style chip (after potion buffs)
-                let (combat_w, combat_h) =
-                    self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
-                if combat_w > 0.0 {
-                    crh = crh.max(combat_h);
-                }
+                // Combat style now lives in the stat cluster's embedded style row,
+                // so it's no longer drawn as a floating chip here.
+                let _ = chip_cursor_x;
 
-                has_any_chip = combat_w > 0.0 || has_slayer_chip || has_buff_chip;
+                has_any_chip = has_slayer_chip || has_buff_chip;
                 chip_row_h = crh;
             } else {
                 has_any_chip = false;
@@ -901,8 +922,8 @@ impl Renderer {
                 } else {
                     0.0
                 };
-            let drop_start_y = prayer_bar_y + bar_height + extra_offset + 145.0;
-            self.xp_drop_pos.set(Some((10.0, drop_start_y)));
+            let drop_start_y = stack_bottom + extra_offset + 145.0;
+            self.xp_drop_pos.set(Some((bar_x, drop_start_y)));
         }
 
         // Note: Interactive UI (inventory, crafting, dialogue, quick slots) is rendered
@@ -920,44 +941,75 @@ impl Renderer {
             && !matches!(state.ui_state.chat_active_tab, ChatChannel::System)
         {
             let (_, input_sh) = virtual_screen_size();
-            let input_x = 10.0;
             let scale = state.ui_state.ui_scale;
-            let input_y = input_sh - EXP_BAR_GAP * scale - 24.0 * scale - 4.0 * scale;
-            let input_width = 360.0 * scale;
-            let input_height = 24.0 * scale;
-            let text_padding = 5.0 * scale;
+            // Sit in the same spot as the "Press Enter to chat…" hint row, inside the chat box.
+            let chat_x = 10.0;
+            let bg_padding = 6.0 * scale;
+            let max_chat_width = if scale >= 2.0 {
+                400.0 * scale - 260.0
+            } else {
+                360.0 * scale
+            };
+            let clip_x = chat_x - bg_padding;
+            let clip_w = max_chat_width + bg_padding * 2.0;
+            let bg_bottom = input_sh - EXP_BAR_GAP * scale;
+            let input_row_h = 24.0 * scale;
+            // Shared row anchor — identical to the hint row so border/icon/text align
+            // pixel-for-pixel whether the input is open or hidden.
+            let row_y = bg_bottom - input_row_h;
+            // Align the input box flush to the container edges (below the divider, down to
+            // the container bottom).
+            let input_x = clip_x;
+            let input_y = row_y + 1.0;
+            let input_width = clip_w;
+            let input_height = input_row_h - 1.0;
             let font_size: f32 = 16.0;
 
             // Channel indicator
             let (indicator, indicator_color) = match state.ui_state.chat_active_tab {
-                ChatChannel::Local => ("[Public] ", WHITE),
-                ChatChannel::Global => ("[Global] ", SKYBLUE),
-                ChatChannel::System => ("[System] ", YELLOW),
+                ChatChannel::Local => ("[P] ", WHITE),
+                ChatChannel::Global => ("[G] ", SKYBLUE),
+                ChatChannel::System => ("[S] ", YELLOW),
             };
             let indicator_w = self.measure_text_sharp(indicator, font_size).width;
-            let text_area_width = input_width - text_padding * 2.0 - 12.0 * scale - indicator_w; // Extra margin for scroll indicators + indicator
 
-            // Background
+            // Icon + text positions anchored to row_y, matching the hint row exactly.
+            let icon_size = 14.0 * scale;
+            let icon_x = (clip_x + 8.0 * scale).floor();
+            let icon_y = (row_y + (input_row_h - icon_size) / 2.0).floor();
+            let text_y = (row_y + input_row_h * 0.66).floor();
+            let indicator_start_x = (icon_x + icon_size + 6.0 * scale).floor();
+            let text_start_x = indicator_start_x + indicator_w;
+            let text_area_width = (input_x + input_width) - text_start_x - 12.0 * scale;
+
+            // Divider — identical draw_line call as the hint row so they render the same pixel.
+            draw_line(clip_x, row_y, clip_x + clip_w, row_y, 1.0, HEADER_BORDER);
             draw_rectangle(
                 input_x,
                 input_y,
                 input_width,
                 input_height,
-                Color::from_rgba(0, 0, 0, 180),
+                Color::new(0.055, 0.055, 0.075, 0.82),
             );
+
+            // Chat bubble icon — same position as the hint row.
+            if let Some(ref tex) = self.chat_small_icon {
+                draw_texture_ex(
+                    tex,
+                    icon_x,
+                    icon_y,
+                    TEXT_NORMAL,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(icon_size, icon_size)),
+                        ..Default::default()
+                    },
+                );
+            }
 
             let input_text = &state.ui_state.chat_input;
             let cursor_pos = state.ui_state.chat_cursor;
-            // Draw channel indicator and visible text
-            let text_y_offset = 17.0 * scale;
-            let text_start_x = input_x + text_padding + indicator_w;
-            self.draw_text_sharp(
-                indicator,
-                input_x + text_padding,
-                input_y + text_y_offset,
-                font_size,
-                indicator_color,
-            );
+            // Indicator text at same baseline as hint row text.
+            self.draw_text_sharp(indicator, indicator_start_x, text_y, font_size, indicator_color);
 
             if input_text.is_empty() {
                 // Fast path for idle chat input (common case in classic mode).
@@ -1033,7 +1085,7 @@ impl Renderer {
                 self.draw_text_sharp(
                     &visible_text,
                     text_start_x,
-                    input_y + text_y_offset,
+                    text_y,
                     font_size,
                     WHITE,
                 );
@@ -1043,7 +1095,7 @@ impl Renderer {
                     self.draw_text_sharp(
                         "<",
                         text_start_x - 8.0 * scale,
-                        input_y + text_y_offset,
+                        text_y,
                         font_size,
                         GRAY,
                     );
@@ -1052,7 +1104,7 @@ impl Renderer {
                     self.draw_text_sharp(
                         ">",
                         input_x + input_width - 10.0 * scale,
-                        input_y + text_y_offset,
+                        text_y,
                         font_size,
                         GRAY,
                     );
@@ -1075,6 +1127,35 @@ impl Renderer {
                         1.0,
                         WHITE,
                     );
+                }
+            }
+
+            // Re-draw the scrollbar on top of the input box so it stays visible.
+            // The chat_log_visible block draws it earlier; this reinstates it after the input.
+            let total_lines_sc = self.chat_lines_cache.borrow().lines.len();
+            let line_height_sc = 18.0 * scale;
+            let max_vis_sc: usize = if scale >= 2.0 { 6 } else { 7 };
+            let chat_area_h_sc = max_vis_sc as f32 * line_height_sc;
+            let bg_pad_sc = 6.0 * scale;
+            let clip_h_sc = chat_area_h_sc + bg_pad_sc * 2.0;
+            let clip_y_sc = bg_bottom - clip_h_sc;
+            let total_content_sc = total_lines_sc as f32 * line_height_sc;
+            let max_scroll_sc = (total_content_sc - chat_area_h_sc).max(0.0);
+            if max_scroll_sc > 0.0 {
+                let scroll_sc = state.ui_state.chat_message_scroll.min(max_scroll_sc);
+                let sb_w = 6.0 * scale;
+                let sb_x = clip_x + clip_w - sb_w;
+                // Redraw track over the input row area only (row_y..bg_bottom).
+                draw_rectangle(sb_x, row_y, sb_w, bg_bottom - row_y, Color::new(0.1, 0.09, 0.12, 0.6));
+                let visible_ratio_sc = (chat_area_h_sc / total_content_sc).min(1.0);
+                let thumb_h_sc = (clip_h_sc * visible_ratio_sc).max(12.0 * scale);
+                let thumb_y_sc = clip_y_sc + (clip_h_sc - thumb_h_sc) * (1.0 - scroll_sc / max_scroll_sc);
+                let is_drag = state.ui_state.chat_scroll_drag.dragging;
+                let thumb_c = if is_drag { Color::new(1.0, 1.0, 1.0, 0.6) } else { Color::new(1.0, 1.0, 1.0, 0.35) };
+                if thumb_y_sc + thumb_h_sc > row_y {
+                    let vt = thumb_y_sc.max(row_y);
+                    let vh = (thumb_y_sc + thumb_h_sc - vt).max(0.0);
+                    draw_rectangle(sb_x + 1.0, vt, sb_w - 2.0, vh, thumb_c);
                 }
             }
         }

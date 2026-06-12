@@ -293,7 +293,11 @@ impl Renderer {
             } else {
                 SLOT_BG_EMPTY
             };
-            let ar_border = if ar_hovered {
+            // Enabled = gold-lit border (matches the "active = gold" convention used
+            // everywhere else); hover brightens; off is the plain slot border.
+            let ar_border = if ar_enabled {
+                SLOT_SELECTED_BORDER
+            } else if ar_hovered {
                 SLOT_HOVER_BORDER
             } else {
                 SLOT_BORDER
@@ -319,15 +323,14 @@ impl Renderer {
                 );
             }
 
-            // Label text below icon
-            let ar_text_color = if ar_enabled {
-                Color::new(0.2, 0.9, 0.2, 1.0)
+            // Label: "Retaliate" caption + an unmistakable ON / OFF state word.
+            let line1 = "Retaliate";
+            let line2 = if ar_enabled { "ON" } else { "OFF" };
+            let state_color = if ar_enabled {
+                Color::new(0.35, 0.92, 0.4, 1.0)
             } else {
-                Color::new(0.8, 0.3, 0.3, 1.0)
+                Color::new(0.85, 0.38, 0.38, 1.0)
             };
-
-            let line1 = "auto";
-            let line2 = "retaliate";
             let l1w = self.measure_text_sharp(line1, 14.0).width;
             let l2w = self.measure_text_sharp(line2, 14.0).width;
             let text_start = ar_y + 4.0 * scale + 24.0 * scale + 2.0 * scale;
@@ -336,14 +339,14 @@ impl Renderer {
                 ar_x + (ar_w - l1w) / 2.0,
                 text_start + 10.0 * scale,
                 14.0,
-                ar_text_color,
+                TEXT_NORMAL,
             );
             self.draw_text_sharp(
                 line2,
                 ar_x + (ar_w - l2w) / 2.0,
                 text_start + 22.0 * scale,
                 14.0,
-                ar_text_color,
+                state_color,
             );
         }
 
