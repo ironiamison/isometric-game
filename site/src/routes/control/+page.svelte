@@ -235,8 +235,8 @@
         </div>
       {:else if tab === 'entities'}
         <div class="mb-3 flex items-center gap-2">
-          <label class="text-sm text-neutral-400">Room</label>
-          <select bind:value={selectedRoom} class="rounded bg-neutral-800 px-2 py-1 text-sm">
+          <label class="text-sm text-neutral-400" for="room-select">Room</label>
+          <select id="room-select" bind:value={selectedRoom} class="rounded bg-neutral-800 px-2 py-1 text-sm">
             <option value="" disabled>Select a room…</option>
             {#each rooms as r}<option value={r.room_id}>{r.room_id}</option>{/each}
           </select>
