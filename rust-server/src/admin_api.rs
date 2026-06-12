@@ -148,6 +148,26 @@ pub(super) async fn api_admin_rooms(
     Json(out).into_response()
 }
 
+pub(super) async fn api_admin_players(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> axum::response::Response {
+    if !stats_api::is_admin_request(&state, &headers) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let instances = state.player_instances.read().await.clone();
+    let mut out = Vec::new();
+    for entry in state.rooms.iter() {
+        let room = entry.value();
+        let room_id = room.id.clone();
+        for p in room.get_all_players().await {
+            let instance_id = instances.get(&p.id).cloned();
+            out.push(admin_player_from(&p, &room_id, instance_id));
+        }
+    }
+    Json(out).into_response()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

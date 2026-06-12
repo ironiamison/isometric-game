@@ -630,7 +630,8 @@ async fn main() {
         app = app
             .route("/api/perf", get(api_perf))
             .route("/api/logs", get(api_logs))
-            .route("/api/admin/rooms", get(admin_api::api_admin_rooms));
+            .route("/api/admin/rooms", get(admin_api::api_admin_rooms))
+            .route("/api/admin/players", get(admin_api::api_admin_players));
         info!("Authenticated operational endpoints enabled");
     } else {
         info!("Operational endpoints disabled; set AEVEN_ADMIN_API_TOKEN to enable them");
