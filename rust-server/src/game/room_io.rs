@@ -408,33 +408,29 @@ impl GameRoom {
                 choices,
                 ..
             } => {
-                let inherited_interaction = {
-                    let grants = self.dialogue_grants.read().await;
-                    grants
-                        .get(player_id)
-                        .filter(|grant| grant.choices.is_empty())
-                        .and_then(|grant| grant.npc_interaction.clone())
-                };
-                let current_interaction = {
-                    let grants = self.npc_interaction_grants.read().await;
-                    grants
-                        .get(player_id)
-                        .filter(|grant| grant.npc_id == *npc_id)
-                        .cloned()
-                };
-                let npc_interaction = if npc_id.is_empty() {
-                    None
-                } else {
-                    current_interaction.or(inherited_interaction)
-                };
-                self.dialogue_grants.write().await.insert(
-                    player_id.to_string(),
-                    DialogueGrant {
-                        quest_id: quest_id.clone(),
-                        npc_interaction,
-                        choices: choices.iter().map(|choice| choice.id.clone()).collect(),
-                    },
+                let allowed = choices.iter().map(|choice| choice.id.clone()).collect();
+                self.register_dialogue_grant(player_id, quest_id, npc_id, allowed)
+                    .await;
+            }
+            ServerMessage::AdventureBoardState {
+                npc_id,
+                offers,
+                active_contract,
+                crafting_orders,
+                crafting_order_active,
+                ..
+            } => {
+                // The board is a bespoke panel rather than a ShowDialogue, so derive its valid
+                // choice set explicitly — otherwise every board action fails authorization.
+                let allowed = super::resource_contracts::adventure_board_choice_ids(
+                    offers,
+                    active_contract,
+                    crafting_orders,
+                    crafting_order_active,
                 );
+                let quest_id = format!("adventure_board:{}", npc_id);
+                self.register_dialogue_grant(player_id, &quest_id, npc_id, allowed)
+                    .await;
             }
             ServerMessage::DialogueClosed => {
                 self.dialogue_grants.write().await.remove(player_id);
@@ -526,6 +522,45 @@ impl GameRoom {
             .validate_npc_grant(player_id, &grant, max_distance)
             .await?;
         Some((grant.npc_id, prototype_id))
+    }
+
+    /// Record the set of dialogue choices a player is allowed to send back for the panel we just
+    /// sent them, carrying over the originating NPC interaction so proximity can be re-validated
+    /// when the choice arrives. Shared by `ShowDialogue` and the bespoke `AdventureBoardState`.
+    async fn register_dialogue_grant(
+        &self,
+        player_id: &str,
+        quest_id: &str,
+        npc_id: &str,
+        choices: std::collections::HashSet<String>,
+    ) {
+        let inherited_interaction = {
+            let grants = self.dialogue_grants.read().await;
+            grants
+                .get(player_id)
+                .filter(|grant| grant.choices.is_empty())
+                .and_then(|grant| grant.npc_interaction.clone())
+        };
+        let current_interaction = {
+            let grants = self.npc_interaction_grants.read().await;
+            grants
+                .get(player_id)
+                .filter(|grant| grant.npc_id == *npc_id)
+                .cloned()
+        };
+        let npc_interaction = if npc_id.is_empty() {
+            None
+        } else {
+            current_interaction.or(inherited_interaction)
+        };
+        self.dialogue_grants.write().await.insert(
+            player_id.to_string(),
+            DialogueGrant {
+                quest_id: quest_id.to_string(),
+                npc_interaction,
+                choices,
+            },
+        );
     }
 
     pub(super) async fn authorize_dialogue_choice(

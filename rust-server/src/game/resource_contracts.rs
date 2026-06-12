@@ -7,10 +7,47 @@ use crate::protocol::{
 };
 use crate::resource_contracts::{ContractDifficulty, ResourceContract, ResourceContractKind};
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const ADVENTURE_BOARD_NAME: &str = "Adventure Board";
 const DAILY_CONTRACT_LIMIT: i32 = 5;
+
+/// The set of dialogue choice IDs a client is allowed to send back in response to an
+/// `AdventureBoardState` message. The board is a bespoke panel (not a `ShowDialogue`), so
+/// `send_to_player`'s grant machinery can't infer its choices from `DialogueChoice` ids the way
+/// it does for ordinary dialogues — we derive them from the panel contents here instead.
+pub(in crate::game) fn adventure_board_choice_ids(
+    offers: &[AdventureBoardOfferData],
+    active_contract: &Option<AdventureBoardActiveContractData>,
+    crafting_orders: &[CraftingOrderOfferData],
+    crafting_order_active: &Option<CraftingOrderActiveData>,
+) -> HashSet<String> {
+    let mut choices = HashSet::new();
+    for offer in offers {
+        // Category drill-down (opens the per-kind ShowDialogue sub-menu).
+        choices.insert(format!("board_{}", offer.kind_id));
+        for difficulty in &offer.difficulties {
+            // Every difficulty button is granted, locked or not; the accept handler still
+            // enforces level/daily-limit server-side and replies with a proper message.
+            choices.insert(format!(
+                "board_accept:{}:{}",
+                offer.kind_id, difficulty.difficulty_id
+            ));
+        }
+    }
+    if active_contract.is_some() {
+        choices.insert("board_claim".to_string());
+        choices.insert("board_abandon".to_string());
+    }
+    for order in crafting_orders {
+        choices.insert(format!("order_accept:{}", order.order_id));
+    }
+    if crafting_order_active.is_some() {
+        choices.insert("order_claim".to_string());
+        choices.insert("order_abandon".to_string());
+    }
+    choices
+}
 
 enum ClaimContractStatus {
     Ready {
@@ -1475,5 +1512,67 @@ impl GameRoom {
             .get(item_id)
             .map(|item| item.display_name.clone())
             .unwrap_or_else(|| item_id.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn offer(kind_id: &str, difficulties: &[&str]) -> AdventureBoardOfferData {
+        AdventureBoardOfferData {
+            kind_id: kind_id.to_string(),
+            kind_name: kind_id.to_string(),
+            description: String::new(),
+            skill_level: 1,
+            difficulties: difficulties
+                .iter()
+                .map(|d| AdventureBoardDifficultyData {
+                    difficulty_id: d.to_string(),
+                    difficulty_name: d.to_string(),
+                    level_required: 1,
+                    unlocked: true,
+                    reward_xp: 0,
+                    reward_gold: 0,
+                })
+                .collect(),
+        }
+    }
+
+    fn active_contract() -> AdventureBoardActiveContractData {
+        AdventureBoardActiveContractData {
+            kind_id: "fishing".to_string(),
+            kind_name: "Fishing".to_string(),
+            difficulty_name: "Easy".to_string(),
+            task_text: String::new(),
+            progress_label: String::new(),
+            amount_required: 1,
+            amount_completed: 0,
+            giver_name: String::new(),
+            reward_xp: 0,
+            reward_gold: 0,
+            bonus_item_text: String::new(),
+            can_claim: false,
+        }
+    }
+
+    #[test]
+    fn adventure_board_grant_covers_panel_actions_but_nothing_more() {
+        let offers = vec![offer("fishing", &["easy", "medium"]), offer("mining", &["easy"])];
+
+        // No active contract / no orders: only the offer choices are granted.
+        let ids = adventure_board_choice_ids(&offers, &None, &[], &None);
+        assert!(ids.contains("board_accept:fishing:easy"));
+        assert!(ids.contains("board_accept:fishing:medium"));
+        assert!(ids.contains("board_accept:mining:easy"));
+        assert!(ids.contains("board_fishing"));
+        assert!(!ids.contains("board_accept:fishing:hard")); // not offered → forged
+        assert!(!ids.contains("board_claim")); // no active contract
+        assert!(!ids.contains("order_claim")); // no active order
+
+        // With an active contract the claim/abandon actions become valid.
+        let ids = adventure_board_choice_ids(&offers, &Some(active_contract()), &[], &None);
+        assert!(ids.contains("board_claim"));
+        assert!(ids.contains("board_abandon"));
     }
 }
