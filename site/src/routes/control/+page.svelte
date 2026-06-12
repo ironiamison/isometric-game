@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { control, tokenStore, UnauthorizedError } from '$lib/control';
-  import type { PerfSnapshot, AdminRoomSummary, AdminPlayer, AdminRoomEntities } from '$lib/control';
+  import type { PerfSnapshot, AdminRoomSummary, AdminPlayer, AdminRoomEntities, LogEntry } from '$lib/control';
   import { Lock, LogIn, RefreshCw, Activity } from 'lucide-svelte';
 
   let token = $state<string | null>(null);
@@ -105,6 +105,18 @@
   $effect(() => {
     if (!token || tab !== 'entities' || rooms.length) return;
     load(() => control.rooms(token!), (v) => (rooms = v));
+  });
+
+  // Logs tab state + loader.
+  let logs = $state<LogEntry[]>([]);
+  let logLevel = $state('');         // '' = all
+  let logImportant = $state(false);
+  let logCount = $state(200);
+  $effect(() => {
+    if (!token || tab !== 'logs') return;
+    tick;
+    const opts = { count: logCount, level: logLevel || undefined, important: logImportant };
+    load(() => control.logs(token!, opts), (v) => (logs = v));
   });
 </script>
 
@@ -261,6 +273,29 @@
         {:else}
           <p class="text-neutral-500">Pick a room to inspect.</p>
         {/if}
+      {:else if tab === 'logs'}
+        <div class="mb-3 flex flex-wrap items-center gap-3 text-sm">
+          <select bind:value={logLevel} class="rounded bg-neutral-800 px-2 py-1">
+            <option value="">All levels</option>
+            <option value="ERROR">Error</option>
+            <option value="WARN">Warn</option>
+            <option value="INFO">Info</option>
+          </select>
+          <label class="flex items-center gap-1 text-neutral-400">
+            <input type="checkbox" bind:checked={logImportant} /> Important only
+          </label>
+          <select bind:value={logCount} class="rounded bg-neutral-800 px-2 py-1">
+            {#each [100, 200, 500, 1000] as c}<option value={c}>{c} lines</option>{/each}
+          </select>
+        </div>
+        <div class="font-mono text-xs space-y-0.5 max-h-[70vh] overflow-y-auto">
+          {#each logs as l}
+            <div class="{l.level === 'ERROR' ? 'text-red-400' : l.level === 'WARN' ? 'text-amber-400' : 'text-neutral-300'}">
+              <span class="text-neutral-500">{l.timestamp ?? ''}</span>
+              <span class="font-bold">[{l.level}]</span> {l.message}
+            </div>
+          {/each}
+        </div>
       {/if}
     </main>
   </div>
