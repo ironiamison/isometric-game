@@ -30,6 +30,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 mod app_state;
+mod admin_api;
 mod arena;
 mod boss;
 mod characters;

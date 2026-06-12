@@ -557,7 +557,7 @@ pub(super) async fn api_perf(
     Json(state.perf_metrics.snapshot(top_rooms, recent_spikes)).into_response()
 }
 
-fn is_admin_request(state: &AppState, headers: &axum::http::HeaderMap) -> bool {
+pub(super) fn is_admin_request(state: &AppState, headers: &axum::http::HeaderMap) -> bool {
     let Some(expected) = state.config.admin_api_token.as_deref() else {
         return false;
     };
