@@ -36,34 +36,65 @@ pub struct DigSiteManager {
 
 impl DigSiteManager {
     /// Load dig site definitions from `data_dir/dig_sites.toml`
-    pub fn load(data_dir: &Path) -> Self {
+    pub fn load(data_dir: &Path) -> Result<Self, String> {
         let path = data_dir.join("dig_sites.toml");
-        let sites = if path.exists() {
-            match std::fs::read_to_string(&path) {
-                Ok(contents) => match toml::from_str::<DigSiteFile>(&contents) {
-                    Ok(file) => {
-                        tracing::info!("Loaded {} dig site(s) from {:?}", file.sites.len(), path);
-                        file.sites
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to parse dig_sites.toml: {}", e);
-                        Vec::new()
-                    }
-                },
-                Err(e) => {
-                    tracing::error!("Failed to read dig_sites.toml: {}", e);
-                    Vec::new()
-                }
+        let source = std::fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+        let file: DigSiteFile = toml::from_str(&source)
+            .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
+        let mut ids = HashSet::new();
+        for site in &file.sites {
+            if site.id.is_empty()
+                || site.quest_id.is_empty()
+                || site.quest_objective_id.is_empty()
+                || site.spawn_entity.is_empty()
+                || site.radius < 0
+                || site.spawn_level <= 0
+            {
+                return Err(format!("invalid dig site definition '{}'", site.id));
             }
-        } else {
-            tracing::warn!("No dig_sites.toml found at {:?}, no dig sites loaded", path);
-            Vec::new()
-        };
-
-        Self {
-            sites,
-            triggered: HashSet::new(),
+            if !ids.insert(site.id.clone()) {
+                return Err(format!("duplicate dig site id '{}'", site.id));
+            }
         }
+        tracing::info!("Loaded {} dig site(s) from {:?}", file.sites.len(), path);
+
+        Ok(Self {
+            sites: file.sites,
+            triggered: HashSet::new(),
+        })
+    }
+
+    pub async fn validate_references(
+        &self,
+        entities: &crate::entity::EntityRegistry,
+        quests: &crate::quest::QuestRegistry,
+    ) -> Result<(), String> {
+        for site in &self.sites {
+            if entities.get(&site.spawn_entity).is_none() {
+                return Err(format!(
+                    "dig site '{}' references unknown entity '{}'",
+                    site.id, site.spawn_entity
+                ));
+            }
+            let quest = quests.get(&site.quest_id).await.ok_or_else(|| {
+                format!(
+                    "dig site '{}' references unknown quest '{}'",
+                    site.id, site.quest_id
+                )
+            })?;
+            if !quest
+                .objectives
+                .iter()
+                .any(|objective| objective.id == site.quest_objective_id)
+            {
+                return Err(format!(
+                    "dig site '{}' references unknown objective '{}' in quest '{}'",
+                    site.id, site.quest_objective_id, site.quest_id
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Mark a (player, site) pair as triggered so it won't fire again

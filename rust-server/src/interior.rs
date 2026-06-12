@@ -1,3 +1,4 @@
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -152,8 +153,132 @@ impl InteriorMapDef {
         let path = path.as_ref();
         let content = std::fs::read_to_string(path)
             .map_err(|error| format!("Failed to read interior file {}: {error}", path.display()))?;
-        serde_json::from_str(&content)
-            .map_err(|error| format!("Failed to parse interior JSON {}: {error}", path.display()))
+        let interior: Self = serde_json::from_str(&content).map_err(|error| {
+            format!("Failed to parse interior JSON {}: {error}", path.display())
+        })?;
+        interior
+            .validate()
+            .map_err(|error| format!("Invalid interior {}: {error}", path.display()))?;
+        Ok(interior)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.id.is_empty()
+            || !self
+                .id
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "_-".contains(character))
+        {
+            return Err(
+                "id must contain only ASCII letters, digits, underscores, or dashes".into(),
+            );
+        }
+        if self.name.trim().is_empty() {
+            return Err("name cannot be empty".into());
+        }
+        if self.size.width == 0
+            || self.size.height == 0
+            || self.size.width > 512
+            || self.size.height > 512
+        {
+            return Err("dimensions must be between 1 and 512".into());
+        }
+        let tile_count = usize::try_from(self.size.width * self.size.height)
+            .map_err(|_| "tile count overflow")?;
+        for (name, layer) in [
+            ("ground", &self.layers.ground),
+            ("objects", &self.layers.objects),
+            ("overhead", &self.layers.overhead),
+        ] {
+            if layer.len() != tile_count {
+                return Err(format!(
+                    "{name} layer has {} tiles; expected {tile_count}",
+                    layer.len()
+                ));
+            }
+        }
+        if !self.collision.is_empty() {
+            let collision = base64::engine::general_purpose::STANDARD
+                .decode(&self.collision)
+                .map_err(|error| format!("collision is not valid base64: {error}"))?;
+            let expected = tile_count.div_ceil(8);
+            if collision.len() != expected {
+                return Err(format!(
+                    "collision has {} bytes; expected {expected}",
+                    collision.len()
+                ));
+            }
+        }
+        if let Some(heightmap) = &self.heightmap
+            && heightmap.len() != tile_count
+        {
+            return Err(format!(
+                "heightmap has {} entries; expected {tile_count}",
+                heightmap.len()
+            ));
+        }
+        for (name, blocks) in [
+            ("blockTypesDown", &self.block_types_down),
+            ("blockTypesRight", &self.block_types_right),
+        ] {
+            if let Some(blocks) = blocks
+                && blocks.len() != tile_count
+            {
+                return Err(format!(
+                    "{name} has {} entries; expected {tile_count}",
+                    blocks.len()
+                ));
+            }
+        }
+        for (name, spawn) in &self.spawn_points {
+            if name.trim().is_empty() || !self.contains_position(spawn.x, spawn.y) {
+                return Err(format!("spawn point '{name}' is empty or outside the map"));
+            }
+        }
+        for portal in &self.portals {
+            if portal.id.is_empty()
+                || portal.target_map.is_empty()
+                || portal.width <= 0
+                || portal.height <= 0
+                || portal.x < 0
+                || portal.y < 0
+                || portal.x + portal.width > self.size.width as i32
+                || portal.y + portal.height > self.size.height as i32
+            {
+                return Err(format!("invalid portal '{}'", portal.id));
+            }
+        }
+        for entity in &self.entities {
+            if entity.entity_id.is_empty()
+                || entity.x < 0
+                || entity.y < 0
+                || entity.x >= self.size.width as i32
+                || entity.y >= self.size.height as i32
+                || entity.level.is_some_and(|level| level <= 0)
+            {
+                return Err(format!("invalid entity spawn '{}'", entity.entity_id));
+            }
+        }
+        for wall in &self.walls {
+            if !matches!(wall.edge.as_str(), "down" | "right")
+                || wall.x < 0
+                || wall.y < 0
+                || wall.x >= self.size.width as i32
+                || wall.y >= self.size.height as i32
+            {
+                return Err(format!("invalid wall at ({}, {})", wall.x, wall.y));
+            }
+        }
+        Ok(())
+    }
+
+    fn contains_position(&self, x: f32, y: f32) -> bool {
+        x.is_finite()
+            && y.is_finite()
+            && x >= 0.0
+            && y >= 0.0
+            && x < self.size.width as f32
+            && y < self.size.height as f32
     }
 
     pub fn get_spawn_point(&self, name: &str) -> Option<&SpawnPoint> {

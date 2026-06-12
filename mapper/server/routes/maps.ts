@@ -53,9 +53,7 @@ function isValidChunk(value: unknown): value is ChunkPayload {
   const { width, height, coord, layers, collision } = value;
   if (!isPositiveDimension(width) || !isPositiveDimension(height)) return false;
   const tileCount = width * height;
-  return isPositiveDimension(width)
-    && isPositiveDimension(height)
-    && Number.isInteger(coord.cx)
+  return Number.isInteger(coord.cx)
     && Number.isInteger(coord.cy)
     && Math.abs(coord.cx as number) <= 10_000_000
     && Math.abs(coord.cy as number) <= 10_000_000

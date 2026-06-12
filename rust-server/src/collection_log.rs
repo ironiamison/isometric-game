@@ -1,5 +1,6 @@
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CollectionLogDefinitions {
@@ -14,10 +15,75 @@ pub struct CollectionLogDefinitions {
 }
 
 impl CollectionLogDefinitions {
-    pub fn load(path: &str) -> Self {
+    pub fn load(path: &Path) -> Result<Self, String> {
         let content = std::fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
-        toml::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+        toml::from_str(&content)
+            .map_err(|error| format!("failed to parse {}: {error}", path.display()))
+    }
+
+    pub fn validate(
+        &self,
+        item_registry: &crate::data::ItemRegistry,
+        entity_registry: &crate::entity::EntityRegistry,
+        quest_names: &HashMap<String, String>,
+    ) -> Result<(), String> {
+        const SKILL_SOURCES: &[&str] = &[
+            "alchemy",
+            "cooking",
+            "farming",
+            "fishing",
+            "fletching",
+            "leatherworking",
+            "mining",
+            "smithing",
+            "woodcutting",
+        ];
+
+        for source in self.monster_drops.keys().chain(self.boss_rewards.keys()) {
+            if !entity_registry.contains(source) {
+                return Err(format!("unknown entity source '{source}'"));
+            }
+        }
+        for source in self.quest_rewards.keys() {
+            if !quest_names.contains_key(source) {
+                return Err(format!("unknown quest source '{source}'"));
+            }
+        }
+        for source in self.skilling.keys() {
+            if !SKILL_SOURCES.contains(&source.as_str()) {
+                return Err(format!("unknown skilling source '{source}'"));
+            }
+        }
+
+        for (item_id, source, detail) in self.all_entries() {
+            if item_registry.get(&item_id).is_none() {
+                return Err(format!(
+                    "{source} source '{detail}' references unknown item '{item_id}'"
+                ));
+            }
+        }
+
+        for (category, sources) in [
+            ("monster_drops", &self.monster_drops),
+            ("boss_rewards", &self.boss_rewards),
+            ("skilling", &self.skilling),
+            ("quest_rewards", &self.quest_rewards),
+        ] {
+            for (source, items) in sources {
+                if items.is_empty() {
+                    return Err(format!("{category} source '{source}' has no items"));
+                }
+                let unique = items.iter().collect::<HashSet<_>>();
+                if unique.len() != items.len() {
+                    return Err(format!(
+                        "{category} source '{source}' contains duplicate items"
+                    ));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Get all (item_id, source, source_detail) triples for protocol transmission
@@ -74,7 +140,7 @@ impl CollectionLogDefinitions {
                 "farming" => "Farming",
                 "fletching" => "Fletching",
                 "leatherworking" => "Leatherworking",
-                _ => "",
+                _ => unreachable!("collection log skill source was validated"),
             };
             if !display.is_empty() {
                 names.insert(id.clone(), display.to_string());

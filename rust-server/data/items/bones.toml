@@ -41,6 +41,16 @@ base_price = 300
 sellable = true
 prayer_xp = 120
 
+[pharaoh_bones]
+display_name = "Pharaoh bones"
+sprite = "big_bones"
+description = "Ancient remains steeped in the curse of Kha'reth. Grants exceptional Prayer experience when buried."
+category = "material"
+max_stack = 99
+base_price = 500
+sellable = true
+prayer_xp = 150
+
 [dragon_bones]
 display_name = "Dragon bones"
 sprite = "dragon_bones"

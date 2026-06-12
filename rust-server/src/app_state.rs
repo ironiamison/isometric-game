@@ -14,23 +14,6 @@ impl AppState {
                 .unwrap_or_else(|error| panic!("authoritative content validation failed: {error}")),
         );
 
-        // Load collection log definitions from TOML file
-        let collection_log_defs =
-            collection_log::CollectionLogDefinitions::load("data/collection_log.toml");
-
-        // Build display name lookup for collection log subcategories
-        let quest_names: std::collections::HashMap<String, String> = {
-            let quests = content.quest_registry.all_quests().await;
-            quests
-                .into_iter()
-                .map(|q| (q.id.clone(), q.name.clone()))
-                .collect()
-        };
-        let collection_log_display_names: Vec<(String, String)> = collection_log_defs
-            .build_display_names(&content.entity_registry, &quest_names)
-            .into_iter()
-            .collect();
-
         // Initialize instance manager
         let instance_manager = Arc::new(InstanceManager::new());
 
@@ -74,8 +57,6 @@ impl AppState {
             // SECURITY: Token signer for session tokens
             token_signer: SessionTokenSigner::new(config.session_signing_secret.clone()),
             content,
-            collection_log_defs: Arc::new(collection_log_defs),
-            collection_log_display_names: Arc::new(collection_log_display_names),
             instance_manager,
             player_instances: Arc::new(RwLock::new(HashMap::new())),
             player_entrance_positions: Arc::new(RwLock::new(HashMap::new())),

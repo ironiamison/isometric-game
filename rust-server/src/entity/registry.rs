@@ -348,6 +348,49 @@ impl EntityRegistry {
     pub fn is_empty(&self) -> bool {
         self.prototypes.is_empty()
     }
+
+    pub fn validate_items(&self, items: &crate::data::ItemRegistry) -> Result<(), String> {
+        for prototype in self.prototypes.values() {
+            for loot in &prototype.loot {
+                if loot.item_id != "nothing" && items.get(&loot.item_id).is_none() {
+                    return Err(format!(
+                        "entity '{}' references unknown loot item '{}'",
+                        prototype.id, loot.item_id
+                    ));
+                }
+                if !(0.0..=1.0).contains(&loot.drop_chance)
+                    || loot.quantity_min <= 0
+                    || loot.quantity_max < loot.quantity_min
+                {
+                    return Err(format!(
+                        "entity '{}' has invalid loot range for '{}'",
+                        prototype.id, loot.item_id
+                    ));
+                }
+            }
+            for table in &prototype.loot_tables {
+                if !(0.0..=1.0).contains(&table.chance) {
+                    return Err(format!(
+                        "entity '{}' has invalid loot table chance for '{}'",
+                        prototype.id, table.name
+                    ));
+                }
+                for entry in &table.entries {
+                    if (entry.item_id != "nothing" && items.get(&entry.item_id).is_none())
+                        || entry.weight <= 0
+                        || entry.quantity_min <= 0
+                        || entry.quantity_max < entry.quantity_min
+                    {
+                        return Err(format!(
+                            "entity '{}' has invalid loot table item '{}'",
+                            prototype.id, entry.item_id
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Default for EntityRegistry {

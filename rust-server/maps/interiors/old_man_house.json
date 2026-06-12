@@ -800,7 +800,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316013600_we693iowc",
@@ -809,7 +810,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316013884_nno4cu2z8",
@@ -818,7 +820,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316014350_4mjwbwgcn",
@@ -827,7 +830,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316014667_7x5ayhazc",
@@ -836,7 +840,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316014977_tukoot61p",
@@ -845,7 +850,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316016034_0ylzuv5vn",
@@ -854,7 +860,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316016617_nmrkefwhf",
@@ -863,7 +870,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316017100_wsq7253su",
@@ -872,7 +880,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316017500_vjjvzrgup",
@@ -881,7 +890,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316017817_awu7982ds",
@@ -890,7 +900,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316018201_yqtvogiyk",
@@ -899,7 +910,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     },
     {
       "id": "exit_1769316018517_iy1dftkhx",
@@ -908,7 +920,8 @@
       "width": 1,
       "height": 1,
       "target_x": 0,
-      "target_y": 0
+      "target_y": 0,
+      "target_map": "overworld"
     }
   ]
 }

@@ -42,37 +42,46 @@ impl GameRoom {
         tracing::info!("Discovered {} chunk files", chunk_coords.len());
 
         for coord in &chunk_coords {
-            if let Some(chunk) = world.get_or_load_chunk(*coord).await {
-                for spawn in &chunk.entity_spawns {
-                    let npc_id = spawn
-                        .unique_id
-                        .clone()
-                        .unwrap_or_else(|| format!("npc_{}", npc_counter));
-                    npc_counter += 1;
+            let chunk = world.get_or_load_chunk(*coord).await.unwrap_or_else(|| {
+                panic!(
+                    "failed to load authoritative chunk ({}, {})",
+                    coord.x, coord.y
+                )
+            });
+            for spawn in &chunk.entity_spawns {
+                let npc_id = spawn
+                    .unique_id
+                    .clone()
+                    .unwrap_or_else(|| format!("npc_{}", npc_counter));
+                npc_counter += 1;
 
-                    if let Some(prototype) = entity_registry.get(&spawn.entity_id) {
-                        // Use spawn's level if specified, otherwise use prototype's level
-                        let level = spawn.level.unwrap_or(prototype.stats.level);
-                        tracing::info!(
-                            "Spawning {} at ({}, {}) level {}",
-                            spawn.entity_id,
-                            spawn.world_x,
-                            spawn.world_y,
-                            level
-                        );
-                        let npc = Npc::from_prototype(
-                            &npc_id,
-                            &spawn.entity_id,
-                            prototype,
-                            spawn.world_x,
-                            spawn.world_y,
-                            level,
-                            spawn.facing.as_deref(),
-                        );
-                        npcs.insert(npc_id, npc);
-                    } else {
-                        tracing::warn!("Prototype '{}' not found, skipping spawn", spawn.entity_id);
+                if let Some(prototype) = entity_registry.get(&spawn.entity_id) {
+                    // Use spawn's level if specified, otherwise use prototype's level
+                    let level = spawn.level.unwrap_or(prototype.stats.level);
+                    tracing::info!(
+                        "Spawning {} at ({}, {}) level {}",
+                        spawn.entity_id,
+                        spawn.world_x,
+                        spawn.world_y,
+                        level
+                    );
+                    let npc = Npc::from_prototype(
+                        &npc_id,
+                        &spawn.entity_id,
+                        prototype,
+                        spawn.world_x,
+                        spawn.world_y,
+                        level,
+                        spawn.facing.as_deref(),
+                    );
+                    if npcs.insert(npc_id.clone(), npc).is_some() {
+                        panic!("duplicate NPC unique ID '{npc_id}'");
                     }
+                } else {
+                    panic!(
+                        "chunk ({}, {}) references unknown entity '{}'",
+                        coord.x, coord.y, spawn.entity_id
+                    );
                 }
             }
         }
@@ -99,6 +108,12 @@ impl GameRoom {
         for coord in &chunk_coords {
             if let Some(chunk) = world.get_or_load_chunk(*coord).await {
                 for gz in &chunk.gathering_zones {
+                    if !gathering.zones.contains_key(&gz.zone_id) {
+                        panic!(
+                            "chunk ({}, {}) references unknown gathering zone '{}'",
+                            coord.x, coord.y, gz.zone_id
+                        );
+                    }
                     gathering.add_marker(crate::gathering::GatheringMarker {
                         x: gz.world_x,
                         y: gz.world_y,
@@ -405,7 +420,11 @@ impl GameRoom {
 
         // Load persistent ground spawn definitions and create initial ground items
         let mut ground_spawn_manager =
-            crate::ground_spawn::GroundSpawnManager::load(std::path::Path::new("data"));
+            crate::ground_spawn::GroundSpawnManager::load(std::path::Path::new("data"))
+                .unwrap_or_else(|error| panic!("ground spawn content validation failed: {error}"));
+        ground_spawn_manager
+            .validate_items(&item_registry)
+            .unwrap_or_else(|error| panic!("ground spawn reference validation failed: {error}"));
         let mut ground_items = HashMap::new();
         {
             let current_time = std::time::SystemTime::now()
@@ -493,7 +512,12 @@ impl GameRoom {
             }
         }
 
-        let waystone_manager = crate::waystone::WaystoneManager::load(std::path::Path::new("data"));
+        let waystone_manager = crate::waystone::WaystoneManager::load(std::path::Path::new("data"))
+            .unwrap_or_else(|error| panic!("waystone content validation failed: {error}"));
+        waystone_manager
+            .validate_quests(&quest_registry)
+            .await
+            .unwrap_or_else(|error| panic!("waystone reference validation failed: {error}"));
         let overworld_world_map = world_map::build_overworld_world_map(
             &world,
             &chunk_coords,
@@ -525,6 +549,25 @@ impl GameRoom {
             .map(|zone| (zone.chunk_x, zone.chunk_y))
             .collect();
         tracing::info!("Loaded {} PVP zone chunks", pvp_zones.len());
+
+        let dig_site_manager = crate::dig_site::DigSiteManager::load(std::path::Path::new("data"))
+            .unwrap_or_else(|error| panic!("dig site validation failed: {error}"));
+        dig_site_manager
+            .validate_references(&entity_registry, &quest_registry)
+            .await
+            .unwrap_or_else(|error| panic!("dig site reference validation failed: {error}"));
+
+        let crafting_order_registry = crafting_orders::CraftingOrderRegistry::load("data")
+            .unwrap_or_else(|error| panic!("crafting order content validation failed: {error}"));
+        crafting_order_registry
+            .validate_items(&item_registry)
+            .unwrap_or_else(|error| panic!("crafting order reference validation failed: {error}"));
+
+        let crate_loot_registry = crate_loot::CrateLootRegistry::load("data")
+            .unwrap_or_else(|error| panic!("crate loot validation failed: {error}"));
+        crate_loot_registry
+            .validate_items(&item_registry)
+            .unwrap_or_else(|error| panic!("crate loot reference validation failed: {error}"));
 
         Self {
             id: Uuid::new_v4().to_string(),
@@ -571,9 +614,7 @@ impl GameRoom {
             interior_registry,
             scroll_spell_registry: Arc::new(scroll_spell_registry),
             ground_spawn_manager: RwLock::new(ground_spawn_manager),
-            dig_site_manager: RwLock::new(crate::dig_site::DigSiteManager::load(
-                std::path::Path::new("data"),
-            )),
+            dig_site_manager: RwLock::new(dig_site_manager),
             waystone_manager: RwLock::new(waystone_manager),
             chest_registry,
             chest_manager: RwLock::new(chest_manager),
@@ -584,8 +625,8 @@ impl GameRoom {
             overworld_world_map,
             pvp_zones,
             movement_anomalies: MovementAnomalyCounters::default(),
-            crafting_order_registry: crafting_orders::CraftingOrderRegistry::load("data"),
-            crate_loot_registry: crate_loot::CrateLootRegistry::load("data"),
+            crafting_order_registry,
+            crate_loot_registry,
             top_level_player_name: RwLock::new(None),
             top_level_value: RwLock::new(0),
             second_level_player_name: RwLock::new(None),

@@ -2,6 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::chest::ChestRegistry;
+use crate::collection_log::CollectionLogDefinitions;
 use crate::crafting::CraftingRegistry;
 use crate::data::ItemRegistry;
 use crate::entity::EntityRegistry;
@@ -18,6 +19,8 @@ pub(super) struct ContentRegistries {
     pub crafting_registry: Arc<CraftingRegistry>,
     pub chest_registry: Arc<ChestRegistry>,
     pub interior_registry: Arc<InteriorRegistry>,
+    pub collection_log_defs: Arc<CollectionLogDefinitions>,
+    pub collection_log_display_names: Arc<Vec<(String, String)>>,
 }
 
 impl ContentRegistries {
@@ -39,6 +42,9 @@ impl ContentRegistries {
         if item_registry.is_empty() {
             return Err("item registry is empty".to_string());
         }
+        entity_registry
+            .validate_items(&item_registry)
+            .map_err(|error| format!("entity registry: {error}"))?;
 
         let mut prayer_registry = PrayerRegistry::new();
         prayer_registry
@@ -64,6 +70,9 @@ impl ContentRegistries {
         if crafting_registry.is_empty() {
             return Err("crafting registry is empty".to_string());
         }
+        crafting_registry
+            .validate_items(&item_registry)
+            .map_err(|error| format!("crafting registry: {error}"))?;
 
         let mut chest_registry = ChestRegistry::new();
         chest_registry
@@ -78,6 +87,41 @@ impl ContentRegistries {
 
         let interior_registry = InteriorRegistry::load_from_directory(maps_dir.join("interiors"))
             .map_err(|error| format!("interior registry: {error}"))?;
+        for (interior_id, interior) in interior_registry.iter() {
+            for entity in &interior.entities {
+                if entity_registry.get(&entity.entity_id).is_none() {
+                    return Err(format!(
+                        "interior '{interior_id}' references unknown entity '{}'",
+                        entity.entity_id
+                    ));
+                }
+            }
+            for chest in &interior.chests {
+                if chest_registry.get(&chest.chest_id).is_none() {
+                    return Err(format!(
+                        "interior '{interior_id}' references unknown chest '{}'",
+                        chest.chest_id
+                    ));
+                }
+            }
+        }
+
+        let quest_names = quest_registry
+            .all_quests()
+            .await
+            .into_iter()
+            .map(|quest| (quest.id.clone(), quest.name.clone()))
+            .collect();
+        let collection_log_defs =
+            CollectionLogDefinitions::load(&data_dir.join("collection_log.toml"))
+                .map_err(|error| format!("collection log: {error}"))?;
+        collection_log_defs
+            .validate(&item_registry, &entity_registry, &quest_names)
+            .map_err(|error| format!("collection log: {error}"))?;
+        let collection_log_display_names = collection_log_defs
+            .build_display_names(&entity_registry, &quest_names)
+            .into_iter()
+            .collect();
 
         Ok(Self {
             entity_registry: Arc::new(entity_registry),
@@ -87,6 +131,8 @@ impl ContentRegistries {
             crafting_registry: Arc::new(crafting_registry),
             chest_registry: Arc::new(chest_registry),
             interior_registry: Arc::new(interior_registry),
+            collection_log_defs: Arc::new(collection_log_defs),
+            collection_log_display_names: Arc::new(collection_log_display_names),
         })
     }
 }

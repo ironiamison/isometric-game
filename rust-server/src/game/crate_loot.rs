@@ -62,45 +62,55 @@ pub struct CrateLootRegistry {
 }
 
 impl CrateLootRegistry {
-    pub fn load(data_path: &str) -> Self {
+    pub fn load(data_path: &str) -> Result<Self, String> {
         let dir = format!("{}/crate_loot", data_path);
         let mut tables = HashMap::new();
 
-        let entries = match std::fs::read_dir(&dir) {
-            Ok(e) => e,
-            Err(e) => {
-                tracing::warn!("Failed to read crate_loot directory '{}': {}", dir, e);
-                return Self { tables };
-            }
-        };
+        let entries = std::fs::read_dir(&dir)
+            .map_err(|error| format!("failed to read crate_loot directory '{dir}': {error}"))?;
 
-        for entry in entries.flatten() {
-            let path = entry.path();
+        for entry in entries {
+            let path = entry
+                .map_err(|error| format!("failed to read crate loot directory entry: {error}"))?
+                .path();
             if path.extension().and_then(|e| e.to_str()) != Some("toml") {
                 continue;
             }
-            let stem = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(s) => s.to_string(),
-                None => continue,
-            };
-            match std::fs::read_to_string(&path) {
-                Ok(content) => match toml::from_str::<CrateLootFile>(&content) {
-                    Ok(loot_file) => {
-                        tracing::info!("Loaded crate loot table: {}", stem);
-                        tables.insert(stem, loot_file);
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to parse {}: {}", path.display(), e);
-                    }
-                },
-                Err(e) => {
-                    tracing::error!("Failed to read {}: {}", path.display(), e);
-                }
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| format!("invalid crate loot filename {}", path.display()))?
+                .to_string();
+            let source = std::fs::read_to_string(&path)
+                .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+            let loot_file: CrateLootFile = toml::from_str(&source)
+                .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
+            validate_loot_table(&stem, &loot_file)?;
+            tracing::info!("Loaded crate loot table: {}", stem);
+            if tables.insert(stem.clone(), loot_file).is_some() {
+                return Err(format!("duplicate crate loot table '{stem}'"));
             }
         }
 
+        if tables.is_empty() {
+            return Err("crate loot registry is empty".to_string());
+        }
         tracing::info!("Loaded {} crate loot tables", tables.len());
-        Self { tables }
+        Ok(Self { tables })
+    }
+
+    pub fn validate_items(&self, items: &crate::data::ItemRegistry) -> Result<(), String> {
+        for (table_id, table) in &self.tables {
+            for entry in loot_entries(table) {
+                if entry.item_id != "commission_marks" && items.get(&entry.item_id).is_none() {
+                    return Err(format!(
+                        "crate loot table '{table_id}' references unknown item '{}'",
+                        entry.item_id
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Roll a single loot reward from the given tier and bracket.
@@ -147,6 +157,46 @@ impl CrateLootRegistry {
         let qty = rng.gen_range(entry.quantity_min..=entry.quantity_max);
         Some((entry.item_id.clone(), qty))
     }
+}
+
+fn validate_loot_table(id: &str, table: &CrateLootFile) -> Result<(), String> {
+    let weights = &table.rarity_weights;
+    if weights.common + weights.uncommon + weights.rare + weights.epic == 0 {
+        return Err(format!(
+            "crate loot table '{id}' has zero total rarity weight"
+        ));
+    }
+    for entry in loot_entries(table) {
+        if entry.item_id.is_empty()
+            || entry.quantity_min <= 0
+            || entry.quantity_max < entry.quantity_min
+        {
+            return Err(format!(
+                "crate loot table '{id}' has invalid item '{}'",
+                entry.item_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn loot_entries(table: &CrateLootFile) -> impl Iterator<Item = &LootEntry> {
+    [
+        &table.low.common,
+        &table.low.uncommon,
+        &table.low.rare,
+        &table.low.epic,
+        &table.mid.common,
+        &table.mid.uncommon,
+        &table.mid.rare,
+        &table.mid.epic,
+        &table.high.common,
+        &table.high.uncommon,
+        &table.high.rare,
+        &table.high.epic,
+    ]
+    .into_iter()
+    .flatten()
 }
 
 // ============================================================================

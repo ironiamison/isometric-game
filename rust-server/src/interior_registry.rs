@@ -57,4 +57,8 @@ impl InteriorRegistry {
     pub fn list_ids(&self) -> Vec<&String> {
         self.interiors.keys().collect()
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &InteriorMapDef)> {
+        self.interiors.iter()
+    }
 }

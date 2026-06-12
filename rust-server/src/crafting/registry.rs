@@ -99,6 +99,28 @@ impl CraftingRegistry {
         self.recipes.is_empty()
     }
 
+    pub fn validate_items(&self, items: &crate::data::ItemRegistry) -> Result<(), String> {
+        for recipe in self.recipes.values() {
+            for ingredient in &recipe.ingredients {
+                if items.get(&ingredient.item_id).is_none() || ingredient.count <= 0 {
+                    return Err(format!(
+                        "recipe '{}' has invalid ingredient '{}'",
+                        recipe.id, ingredient.item_id
+                    ));
+                }
+            }
+            for result in &recipe.results {
+                if items.get(&result.item_id).is_none() || result.count <= 0 {
+                    return Err(format!(
+                        "recipe '{}' has invalid result '{}'",
+                        recipe.id, result.item_id
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Generate recipe definitions message for client sync
     pub fn to_client_definitions(&self) -> crate::protocol::ServerMessage {
         use crate::protocol::{ClientRecipeDef, RecipeIngredient, RecipeResult};

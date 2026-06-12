@@ -4,7 +4,7 @@ use crate::protocol::ServerMessage;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // ============================================================================
 // Data Structures
@@ -48,46 +48,76 @@ pub struct CraftingOrderRegistry {
 
 impl CraftingOrderRegistry {
     /// Load all order templates from data/orders/*.toml
-    pub fn load(data_path: &str) -> Self {
+    pub fn load(data_path: &str) -> Result<Self, String> {
         let orders_dir = format!("{}/orders", data_path);
         let mut orders = Vec::new();
+        let mut ids = HashSet::new();
 
-        let entries = match std::fs::read_dir(&orders_dir) {
-            Ok(entries) => entries,
-            Err(e) => {
-                tracing::warn!("Failed to read orders directory {}: {}", orders_dir, e);
-                return Self { orders };
-            }
-        };
+        let entries = std::fs::read_dir(&orders_dir)
+            .map_err(|error| format!("failed to read orders directory {orders_dir}: {error}"))?;
 
-        for entry in entries.flatten() {
-            let path = entry.path();
+        for entry in entries {
+            let path = entry
+                .map_err(|error| format!("failed to read orders directory entry: {error}"))?
+                .path();
             if path.extension().and_then(|e| e.to_str()) != Some("toml") {
                 continue;
             }
 
-            match std::fs::read_to_string(&path) {
-                Ok(content) => match toml::from_str::<OrdersFile>(&content) {
-                    Ok(file) => {
-                        tracing::info!(
-                            "Loaded {} orders from {}",
-                            file.orders.len(),
-                            path.display()
-                        );
-                        orders.extend(file.orders);
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to parse {}: {}", path.display(), e);
-                    }
-                },
-                Err(e) => {
-                    tracing::warn!("Failed to read {}: {}", path.display(), e);
+            let source = std::fs::read_to_string(&path)
+                .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+            let file: OrdersFile = toml::from_str(&source)
+                .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
+            for order in &file.orders {
+                if order.id.is_empty()
+                    || order.skill.is_empty()
+                    || order.min_level < 1
+                    || order.items.is_empty()
+                    || order
+                        .items
+                        .iter()
+                        .any(|item| item.id.is_empty() || item.quantity <= 0)
+                    || order.rewards.gold < 0
+                    || order.rewards.marks < 0
+                    || order.rewards.xp.values().any(|xp| *xp < 0)
+                {
+                    return Err(format!(
+                        "invalid crafting order '{}' in {}",
+                        order.id,
+                        path.display()
+                    ));
+                }
+                if !ids.insert(order.id.clone()) {
+                    return Err(format!("duplicate crafting order id '{}'", order.id));
+                }
+            }
+            tracing::info!(
+                "Loaded {} orders from {}",
+                file.orders.len(),
+                path.display()
+            );
+            orders.extend(file.orders);
+        }
+
+        if orders.is_empty() {
+            return Err("crafting order registry is empty".to_string());
+        }
+        tracing::info!("Loaded {} crafting order templates total", orders.len());
+        Ok(Self { orders })
+    }
+
+    pub fn validate_items(&self, items: &crate::data::ItemRegistry) -> Result<(), String> {
+        for order in &self.orders {
+            for item in &order.items {
+                if items.get(&item.id).is_none() {
+                    return Err(format!(
+                        "crafting order '{}' references unknown item '{}'",
+                        order.id, item.id
+                    ));
                 }
             }
         }
-
-        tracing::info!("Loaded {} crafting order templates total", orders.len());
-        Self { orders }
+        Ok(())
     }
 
     /// Get an order by ID

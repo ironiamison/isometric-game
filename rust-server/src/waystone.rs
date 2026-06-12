@@ -35,46 +35,60 @@ pub struct WaystoneManager {
 
 impl WaystoneManager {
     /// Load waystone definitions from `data_dir/waystones.toml`
-    pub fn load(data_dir: &Path) -> Self {
+    pub fn load(data_dir: &Path) -> Result<Self, String> {
         let path = data_dir.join("waystones.toml");
-        let defs = if path.exists() {
-            match std::fs::read_to_string(&path) {
-                Ok(contents) => match toml::from_str::<WaystoneFile>(&contents) {
-                    Ok(file) => {
-                        tracing::info!(
-                            "Loaded {} waystone(s) from {:?}",
-                            file.waystones.len(),
-                            path
-                        );
-                        file.waystones
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to parse waystones.toml: {}", e);
-                        Vec::new()
-                    }
-                },
-                Err(e) => {
-                    tracing::error!("Failed to read waystones.toml: {}", e);
-                    Vec::new()
-                }
-            }
-        } else {
-            tracing::warn!("No waystones.toml found at {:?}, no waystones loaded", path);
-            Vec::new()
-        };
+        let source = std::fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+        let file: WaystoneFile = toml::from_str(&source)
+            .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
 
         let mut waystones = HashMap::new();
         let mut by_position = HashMap::new();
 
-        for def in defs {
-            by_position.insert((def.x, def.y), def.id.clone());
-            waystones.insert(def.id.clone(), def);
+        for def in file.waystones {
+            if def.id.is_empty() || def.name.is_empty() || def.linked_to.is_empty() {
+                return Err("waystone id, name, and linked_to must be non-empty".to_string());
+            }
+            if by_position.insert((def.x, def.y), def.id.clone()).is_some() {
+                return Err(format!(
+                    "duplicate waystone position ({}, {})",
+                    def.x, def.y
+                ));
+            }
+            let id = def.id.clone();
+            if waystones.insert(id.clone(), def).is_some() {
+                return Err(format!("duplicate waystone id '{id}'"));
+            }
+        }
+        for waystone in waystones.values() {
+            if !waystones.contains_key(&waystone.linked_to) {
+                return Err(format!(
+                    "waystone '{}' links to unknown waystone '{}'",
+                    waystone.id, waystone.linked_to
+                ));
+            }
         }
 
-        Self {
+        tracing::info!("Loaded {} waystone(s) from {:?}", waystones.len(), path);
+        Ok(Self {
             waystones,
             by_position,
+        })
+    }
+
+    pub async fn validate_quests(
+        &self,
+        quests: &crate::quest::QuestRegistry,
+    ) -> Result<(), String> {
+        for waystone in self.waystones.values() {
+            if quests.get(&waystone.quest_required).await.is_none() {
+                return Err(format!(
+                    "waystone '{}' references unknown quest '{}'",
+                    waystone.id, waystone.quest_required
+                ));
+            }
         }
+        Ok(())
     }
 
     /// Find a waystone near position (checks exact tile and +-1 for click tolerance)

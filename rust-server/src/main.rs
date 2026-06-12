@@ -133,8 +133,6 @@ struct AppState {
     token_signer: SessionTokenSigner,
     /// Immutable content loaded and validated before the server starts accepting traffic.
     content: Arc<content::ContentRegistries>,
-    collection_log_defs: Arc<collection_log::CollectionLogDefinitions>,
-    collection_log_display_names: Arc<Vec<(String, String)>>,
     instance_manager: Arc<InstanceManager>,
     /// Tracks which instance each player is currently in (None = overworld)
     player_instances: Arc<RwLock<HashMap<String, String>>>,

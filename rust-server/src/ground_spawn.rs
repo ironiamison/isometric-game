@@ -46,43 +46,57 @@ pub struct GroundSpawnManager {
 
 impl GroundSpawnManager {
     /// Load spawn definitions from `data_dir/ground_spawns.toml`.
-    pub fn load(data_dir: &Path) -> Self {
+    pub fn load(data_dir: &Path) -> Result<Self, String> {
         let path = data_dir.join("ground_spawns.toml");
-        let spawns = match std::fs::read_to_string(&path) {
-            Ok(content) => match toml::from_str::<GroundSpawnsFile>(&content) {
-                Ok(file) => {
-                    tracing::info!(
-                        "Loaded {} persistent ground spawn definitions from {:?}",
-                        file.spawns.len(),
-                        path
-                    );
-                    file.spawns
-                        .into_iter()
-                        .map(|def| {
-                            let id = def.id.clone();
-                            (
-                                id,
-                                GroundSpawnState {
-                                    def,
-                                    picked_up_at: None,
-                                    active_ground_item_id: None,
-                                },
-                            )
-                        })
-                        .collect()
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to parse ground_spawns.toml: {}", e);
-                    HashMap::new()
-                }
-            },
-            Err(_) => {
-                tracing::info!("No ground_spawns.toml found, skipping persistent spawns");
-                HashMap::new()
+        let source = std::fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+        let file: GroundSpawnsFile = toml::from_str(&source)
+            .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
+        let mut spawns = HashMap::new();
+        for def in file.spawns {
+            if def.id.is_empty() {
+                return Err("ground spawn id cannot be empty".to_string());
             }
-        };
+            if def.item_id.is_empty() || def.quantity <= 0 {
+                return Err(format!(
+                    "ground spawn '{}' must have an item id and positive quantity",
+                    def.id
+                ));
+            }
+            let id = def.id.clone();
+            if spawns
+                .insert(
+                    id.clone(),
+                    GroundSpawnState {
+                        def,
+                        picked_up_at: None,
+                        active_ground_item_id: None,
+                    },
+                )
+                .is_some()
+            {
+                return Err(format!("duplicate ground spawn id '{id}'"));
+            }
+        }
 
-        Self { spawns }
+        tracing::info!(
+            "Loaded {} persistent ground spawn definitions from {:?}",
+            spawns.len(),
+            path
+        );
+        Ok(Self { spawns })
+    }
+
+    pub fn validate_items(&self, items: &crate::data::ItemRegistry) -> Result<(), String> {
+        for spawn in self.spawns.values() {
+            if items.get(&spawn.def.item_id).is_none() {
+                return Err(format!(
+                    "ground spawn '{}' references unknown item '{}'",
+                    spawn.def.id, spawn.def.item_id
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Mark a ground item as picked up by matching its active_ground_item_id.

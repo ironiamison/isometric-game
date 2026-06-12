@@ -228,8 +228,8 @@ pub(super) async fn handle_socket(
 
     // Send collection log definitions
     let clog_defs_msg = protocol::ServerMessage::CollectionLogDefinitions {
-        entries: state.collection_log_defs.all_entries(),
-        display_names: state.collection_log_display_names.as_ref().clone(),
+        entries: state.content.collection_log_defs.all_entries(),
+        display_names: state.content.collection_log_display_names.as_ref().clone(),
     };
     if let Ok(bytes) = protocol::encode_server_message(&clog_defs_msg) {
         let _ = sender.send(Message::Binary(bytes)).await;

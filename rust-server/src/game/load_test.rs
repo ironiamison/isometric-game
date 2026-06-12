@@ -39,6 +39,12 @@ async fn production_content_registries_load() {
         .expect("authoritative content");
 }
 
+#[tokio::test]
+async fn production_room_bootstrap_loads_all_runtime_content() {
+    let room = build_room().await;
+    assert_eq!(room.name, "load_test");
+}
+
 fn percentile(sorted: &[f64], percentile: f64) -> f64 {
     let index = ((sorted.len() - 1) as f64 * percentile).round() as usize;
     sorted[index.min(sorted.len() - 1)]

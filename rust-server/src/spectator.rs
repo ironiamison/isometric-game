@@ -319,8 +319,9 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                             // Collection log definitions
                             let clog_defs_msg =
                                 crate::protocol::ServerMessage::CollectionLogDefinitions {
-                                    entries: recv_state.collection_log_defs.all_entries(),
+                                    entries: recv_state.content.collection_log_defs.all_entries(),
                                     display_names: recv_state
+                                        .content
                                         .collection_log_display_names
                                         .as_ref()
                                         .clone(),
