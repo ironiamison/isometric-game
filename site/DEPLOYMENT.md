@@ -5,6 +5,7 @@ The `site/` package is a unified SvelteKit app that serves:
 - `/` — marketing homepage
 - `/world/` — world statistics (dashboard, players, leaderboards, items, bestiary)
 - `/play/` — browser WASM client shell (static files copied at deploy time)
+- `/control` — authenticated ops/admin panel (logs, perf, rooms, players, entities). The page is public but shows nothing without a token; its backing endpoints (`/api/perf`, `/api/logs`, `/api/admin/*`) are only registered when the Rust server is started with `AEVEN_ADMIN_API_TOKEN` set, and require that token as an `Authorization: Bearer` header.
 
 Everything deploys to a **single nginx root** (default: `/var/www/aeven/`).
 
