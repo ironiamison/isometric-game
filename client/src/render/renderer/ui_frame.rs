@@ -716,6 +716,60 @@ impl Renderer {
                     font_size,
                     WHITE,
                 );
+
+                // Hover tooltip naming each bar (Health / Mana / Prayer). Detect the hover
+                // directly off the mouse position (converted to virtual coords). Drawn here in
+                // the non-interactive pass, so any panel drawn later cleanly occludes it.
+                let (vsw, vsh) = virtual_screen_size();
+                let (raw_mx, raw_my) = macroquad::input::mouse_position();
+                let mx = raw_mx * vsw / macroquad::window::screen_width();
+                let my = raw_my * vsh / macroquad::window::screen_height();
+                let over = |by: f32| {
+                    mx >= bar_rx && mx <= bar_rx + bar_rw && my >= by && my <= by + bar_height
+                };
+                let tip = if over(hp_bar_y) {
+                    Some(format!("Health: {} / {}", player.hp, player.max_hp))
+                } else if over(mp_bar_y) {
+                    Some(format!("Mana: {} / {}", mp, max_mp))
+                } else if over(prayer_bar_y) {
+                    Some(format!(
+                        "Prayer: {} / {}",
+                        state.prayer_points, state.max_prayer_points
+                    ))
+                } else {
+                    None
+                };
+                if let Some(label) = tip {
+                    let pad = 5.0 * s;
+                    let tw = self.measure_text_sharp(&label, font_size).width;
+                    let box_w = tw + pad * 2.0;
+                    let box_h = 22.0 * s;
+                    // Below-right of the cursor, clamped to stay on screen.
+                    let mut bx = mx + 14.0 * s;
+                    let mut by = my + 14.0 * s;
+                    if bx + box_w > vsw {
+                        bx = vsw - box_w;
+                    }
+                    if by + box_h > vsh {
+                        by = vsh - box_h;
+                    }
+                    draw_rectangle(bx + 2.0, by + 2.0, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.4));
+                    draw_rectangle(
+                        bx - 1.0,
+                        by - 1.0,
+                        box_w + 2.0,
+                        box_h + 2.0,
+                        crate::render::ui::common::TOOLTIP_FRAME,
+                    );
+                    draw_rectangle(bx, by, box_w, box_h, crate::render::ui::common::TOOLTIP_BG);
+                    self.draw_text_sharp(
+                        &label,
+                        (bx + pad).floor(),
+                        (by + 15.0 * s).floor(),
+                        font_size,
+                        TEXT_NORMAL,
+                    );
+                }
             }
 
             // Bottom of the stat cluster: where transient HUD indicators begin. On
@@ -863,15 +917,23 @@ impl Renderer {
 
                 // Slayer task chip (first, if active)
                 let has_slayer_chip = state.ui_state.slayer_current_task.is_some();
-                let slayer_chip_x = chip_cursor_x;
                 let (slayer_w, slayer_h) =
-                    self.render_slayer_task_chip(state, slayer_chip_x, chip_row_y);
+                    self.render_slayer_task_chip(state, chip_cursor_x, chip_row_y);
                 if slayer_w > 0.0 {
                     chip_cursor_x += slayer_w + chip_gap;
                     crh = crh.max(slayer_h);
                 }
 
-                // Potion buff chips (after slayer task)
+                // Resource contract chip (after slayer task, if active)
+                let has_contract_chip = state.resource_contract.is_some();
+                let (contract_w, contract_h) =
+                    self.render_resource_contract_chip(state, chip_cursor_x, chip_row_y);
+                if contract_w > 0.0 {
+                    chip_cursor_x += contract_w + chip_gap;
+                    crh = crh.max(contract_h);
+                }
+
+                // Potion buff chips (after the contract)
                 let mut has_buff_chip = false;
                 for buff in &state.active_potion_buffs {
                     let (buff_w, buff_h) =
@@ -887,7 +949,7 @@ impl Renderer {
                 // so it's no longer drawn as a floating chip here.
                 let _ = chip_cursor_x;
 
-                has_any_chip = has_slayer_chip || has_buff_chip;
+                has_any_chip = has_slayer_chip || has_contract_chip || has_buff_chip;
                 chip_row_h = crh;
             } else {
                 has_any_chip = false;

@@ -1089,61 +1089,6 @@ impl Renderer {
         ))
     }
 
-    /// Render resource contract tracker (left-aligned, below stat bars)
-    pub(crate) fn render_resource_contract_tracker(
-        &self,
-        state: &GameState,
-        x: f32,
-        y_start: f32,
-        max_width: f32,
-    ) {
-        let contract = match &state.resource_contract {
-            Some(c) => c,
-            None => return,
-        };
-
-        let line_height = 18.0;
-        let objective_line_height = line_height - 2.0;
-        let mut y = y_start;
-
-        // Header
-        self.draw_text_sharp("CONTRACT", x, y, 16.0, Color::from_rgba(180, 220, 130, 255));
-        y += line_height;
-
-        let title = format!("{} ({})", contract.task_text, contract.difficulty);
-        for line in self.wrap_text(&title, max_width, 16.0).iter().take(3) {
-            self.draw_text_sharp(line, x, y, 16.0, WHITE);
-            y += line_height;
-        }
-
-        let complete = contract.amount_completed >= contract.amount_required;
-        let (check, status_color) = if complete {
-            ("[x]", Color::from_rgba(100, 255, 100, 255))
-        } else {
-            ("[ ]", Color::from_rgba(200, 200, 200, 255))
-        };
-        let progress_text = format!(
-            "{} {}/{} {}",
-            check, contract.amount_completed, contract.amount_required, contract.progress_label
-        );
-        for line in self
-            .wrap_text(&progress_text, max_width, 16.0)
-            .iter()
-            .take(2)
-        {
-            self.draw_text_sharp(line, x, y, 16.0, status_color);
-            y += objective_line_height;
-        }
-
-        if complete {
-            let return_text = format!("[ ] Return to {}", contract.giver_name);
-            for line in self.wrap_text(&return_text, max_width, 16.0).iter().take(2) {
-                self.draw_text_sharp(line, x, y, 16.0, Color::from_rgba(200, 200, 200, 255));
-                y += objective_line_height;
-            }
-        }
-    }
-
     pub(crate) fn render_quest_completed(&self, state: &GameState) {
         let current_time = macroquad::time::get_time();
         let (sw, _sh) = virtual_screen_size();

@@ -259,6 +259,7 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
             difficulty,
             task_text,
             progress_label,
+            target_item_id,
             amount_required,
             amount_completed,
             giver_name,
@@ -280,6 +281,10 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
             map.push((
                 Value::String("progress_label".into()),
                 Value::String(progress_label.clone().into()),
+            ));
+            map.push((
+                Value::String("target_item_id".into()),
+                Value::String(target_item_id.clone().into()),
             ));
             map.push((
                 Value::String("amount_required".into()),

@@ -748,6 +748,7 @@ pub enum ServerMessage {
         difficulty: String,
         task_text: String,
         progress_label: String,
+        target_item_id: String,
         amount_required: i32,
         amount_completed: i32,
         giver_name: String,

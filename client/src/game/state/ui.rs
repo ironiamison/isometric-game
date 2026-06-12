@@ -98,6 +98,8 @@ pub struct ResourceContractInfo {
     pub difficulty: String,
     pub task_text: String,
     pub progress_label: String,
+    /// Item the player must collect — rendered as the contract chip's icon.
+    pub target_item_id: String,
     pub amount_required: i32,
     pub amount_completed: i32,
     pub giver_name: String,

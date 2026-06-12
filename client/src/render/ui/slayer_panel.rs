@@ -402,6 +402,155 @@ impl Renderer {
         }
     }
 
+    /// Render a small HUD chip showing the active resource contract: the target item's
+    /// icon with the collection progress beneath it. Full detail lives in the hover tooltip.
+    pub(crate) fn render_resource_contract_chip(
+        &self,
+        state: &GameState,
+        x: f32,
+        y: f32,
+    ) -> (f32, f32) {
+        let contract = match &state.resource_contract {
+            Some(c) => c,
+            None => return (0.0, 0.0),
+        };
+
+        let s = state.ui_state.ui_scale;
+        let sprite_area = 24.0 * s;
+        let font_sz = 16.0;
+        let padding = 3.0 * s;
+        let count_text = format!("{}/{}", contract.amount_completed, contract.amount_required);
+        let count_dims = self.measure_text_sharp(&count_text, font_sz);
+        let chip_w = (sprite_area + padding * 2.0).max(count_dims.width + padding * 2.0);
+        let chip_h = padding + sprite_area + 2.0 * s + count_dims.height + padding;
+
+        // Background + a green-tinted border to distinguish from the slayer chip's brown.
+        draw_rectangle(x, y, chip_w, chip_h, Color::from_rgba(0, 0, 0, 180));
+        draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, Color::from_rgba(90, 120, 65, 180));
+
+        // Target item icon.
+        if !contract.target_item_id.is_empty() {
+            let sprite_key = state.item_registry.get_sprite_key(&contract.target_item_id);
+            if let Some((texture, source_rect)) = self.item_sprites.get(sprite_key) {
+                let (icon_w, icon_h) = if let Some(r) = source_rect {
+                    (r.w, r.h)
+                } else {
+                    (texture.width(), texture.height())
+                };
+                let scale = (sprite_area / icon_w).min(sprite_area / icon_h);
+                let draw_w = icon_w * scale;
+                let draw_h = icon_h * scale;
+                let draw_x = x + (chip_w - draw_w) / 2.0;
+                let draw_y = y + padding + (sprite_area - draw_h) / 2.0;
+                draw_texture_ex(
+                    texture,
+                    draw_x,
+                    draw_y,
+                    WHITE,
+                    DrawTextureParams {
+                        source: source_rect,
+                        dest_size: Some(Vec2::new(draw_w, draw_h)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        // Progress count below the icon.
+        let complete = contract.amount_completed >= contract.amount_required;
+        let count_color = if complete {
+            Color::from_rgba(120, 230, 120, 255)
+        } else {
+            TEXT_NORMAL
+        };
+        self.draw_text_sharp(
+            &count_text,
+            (x + (chip_w - count_dims.width) / 2.0).floor(),
+            (y + padding + sprite_area + 2.0 * s + count_dims.height * 0.9).floor(),
+            font_sz,
+            count_color,
+        );
+
+        (chip_w, chip_h)
+    }
+
+    /// Hover tooltip for the resource contract chip — full contract detail.
+    pub(crate) fn render_resource_contract_chip_tooltip(&self, state: &GameState, x: f32, y: f32) {
+        let contract = match &state.resource_contract {
+            Some(c) => c,
+            None => return,
+        };
+
+        let s = state.ui_state.ui_scale;
+        let sprite_area = 24.0 * s;
+        let font_sz = 16.0;
+        let padding = 3.0 * s;
+        let count_text = format!("{}/{}", contract.amount_completed, contract.amount_required);
+        let count_dims = self.measure_text_sharp(&count_text, font_sz);
+        let chip_w = (sprite_area + padding * 2.0).max(count_dims.width + padding * 2.0);
+        let chip_h = padding + sprite_area + 2.0 * s + count_dims.height + padding;
+
+        let (raw_mx, raw_my) = mouse_position();
+        let (vw, vh) = virtual_screen_size();
+        let mx = raw_mx * vw / screen_width();
+        let my = raw_my * vh / screen_height();
+        if mx < x || mx > x + chip_w || my < y || my > y + chip_h {
+            return;
+        }
+
+        let tip_font = 16.0;
+        let line_h = 18.0 * s;
+        let tip_pad = 6.0 * s;
+
+        let complete = contract.amount_completed >= contract.amount_required;
+        let mut lines: Vec<(String, Color)> = vec![
+            ("CONTRACT".to_string(), TEXT_TITLE),
+            (
+                format!("{} ({})", contract.task_text, contract.difficulty),
+                TEXT_NORMAL,
+            ),
+            (
+                format!(
+                    "{}/{} {}",
+                    contract.amount_completed, contract.amount_required, contract.progress_label
+                ),
+                if complete { TEXT_GOLD } else { TEXT_NORMAL },
+            ),
+        ];
+        if complete {
+            lines.push((format!("Return to {}", contract.giver_name), TEXT_DIM));
+        }
+
+        let tip_w = lines
+            .iter()
+            .map(|(text, _)| self.measure_text_sharp(text, tip_font).width)
+            .fold(0.0f32, f32::max)
+            + tip_pad * 2.0;
+        let tip_h = tip_pad + lines.len() as f32 * line_h + tip_pad;
+        let tip_x = x + chip_w + 4.0 * s;
+        let tip_y = y;
+
+        draw_rectangle(tip_x, tip_y, tip_w, tip_h, Color::from_rgba(12, 12, 18, 240));
+        draw_rectangle_lines(
+            tip_x,
+            tip_y,
+            tip_w,
+            tip_h,
+            1.0,
+            Color::from_rgba(80, 70, 55, 200),
+        );
+
+        for (i, (text, color)) in lines.iter().enumerate() {
+            self.draw_text_sharp(
+                text,
+                tip_x + tip_pad,
+                (tip_y + tip_pad + (i as f32 + 0.8) * line_h).floor(),
+                tip_font,
+                *color,
+            );
+        }
+    }
+
     pub(crate) fn render_slayer_panel(
         &self,
         state: &GameState,

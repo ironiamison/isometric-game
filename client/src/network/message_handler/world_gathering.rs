@@ -941,6 +941,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                         difficulty: extract_string(value, "difficulty").unwrap_or_default(),
                         task_text: extract_string(value, "task_text").unwrap_or_default(),
                         progress_label: extract_string(value, "progress_label").unwrap_or_default(),
+                        target_item_id: extract_string(value, "target_item_id").unwrap_or_default(),
                         amount_required: extract_i32(value, "amount_required").unwrap_or(0),
                         amount_completed: extract_i32(value, "amount_completed").unwrap_or(0),
                         giver_name: extract_string(value, "giver_name").unwrap_or_default(),

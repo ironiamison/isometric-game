@@ -174,87 +174,47 @@ impl Renderer {
 
         // Chat button — on desktop rendered elsewhere; on Android it's in the collapsible menu bar
 
-        // Resource contract tracker - left side below stat bars
-        if state.resource_contract.is_some() {
+        // Chip-row hover tooltips (slayer task, resource contract, potion buffs). Rendered
+        // here, after the chips themselves, so the tooltips layer on top. We recompute the
+        // chip row's start (the cluster's left edge, portrait_x - hpad = bar_x - 8*s) and y,
+        // then walk the same left→right order the chips are drawn in, hit-testing each. Chip
+        // widths come from re-invoking the draw fns off-screen (they return their size).
+        {
             let s = self.font_scale.get();
-            let bar_width_contract = 120.0f32;
-            let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width_contract);
-            let slayer_offset = if state.ui_state.slayer_current_task.is_some() {
-                46.0 * s
-            } else {
-                0.0
-            };
-            let contract_y = stats_y
-                + 3.0 * (18.0 + 4.0) * s
-                + 14.0 * s
-                + slayer_offset
-                + self.hud_below_bars_offset();
-            self.render_resource_contract_tracker(state, bar_x, contract_y, 240.0);
-        }
+            let (bar_x, stats_y) = self.minimap_stats_stack_position(state, 0.0);
+            let bar_height = 18.0 * s;
+            let mp_bar_y = stats_y + (bar_height + 4.0 * s);
+            let prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
+            let current_time = macroquad::time::get_time();
+            let is_skilling = state.is_gathering || state.is_woodcutting;
+            let has_stall_bar = state.ui_state.stall_active;
+            let has_dash_bar = state.dash_cooldown_end > current_time;
+            let chip_y = prayer_bar_y
+                + bar_height
+                + self.hud_below_bars_offset()
+                + 4.0 * s
+                + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
+                + if has_stall_bar { 22.0 * s + 4.0 * s } else { 0.0 }
+                + if has_dash_bar { 22.0 * s + 4.0 * s } else { 0.0 };
+            let chip_gap = 4.0 * s;
+            // Chips draw flush with the cluster's left edge in render_ui (bar_x - 8*s).
+            let mut cx = bar_x - 8.0 * s;
 
-        // Slayer chip hover tooltip (rendered here so it draws on top of contract tracker)
-        if state.ui_state.slayer_current_task.is_some() {
-            if let Some(player) = state.get_local_player() {
-                let s = self.font_scale.get();
-                let font_size = 16.0;
-                let name = &player.name;
-                let level_text = format!(" Lv.{}", player.skills.total_level());
-                let name_w = self.measure_text_sharp(name, font_size).width;
-                let level_w = self.measure_text_sharp(&level_text, font_size).width;
-                let total_text_w = name_w + level_w;
-                let padding = 6.0;
-                let bar_width = (total_text_w + padding * 2.0).max(120.0 * s);
-                let bar_height = 18.0 * s;
-                let (bar_x, stats_y) = self.minimap_stats_stack_position(state, bar_width);
-                let mp_bar_y = stats_y + (bar_height + 4.0 * s);
-                let prayer_bar_y = mp_bar_y + bar_height + 4.0 * s;
-                let current_time = macroquad::time::get_time();
-                let is_skilling = state.is_gathering || state.is_woodcutting;
-                let has_stall_bar = state.ui_state.stall_active;
-                let has_dash_bar = state.dash_cooldown_end > current_time;
-                let chip_y = prayer_bar_y
-                    + bar_height
-                    + self.hud_below_bars_offset()
-                    + 4.0 * s
-                    + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
-                    + if has_stall_bar {
-                        22.0 * s + 4.0 * s
-                    } else {
-                        0.0
-                    }
-                    + if has_dash_bar {
-                        22.0 * s + 4.0 * s
-                    } else {
-                        0.0
-                    };
-                // Slayer chip is now first (leftmost), so tooltip x = bar_x
-                self.render_slayer_task_chip_tooltip(state, bar_x, chip_y);
-
-                // Potion buff chip tooltips (positioned after slayer chip, before combat style)
-                if !state.active_potion_buffs.is_empty() {
-                    let chip_gap = 4.0 * s;
-                    let mut tooltip_cursor_x = bar_x;
-                    // Skip past slayer chip
-                    let (sw, _) = self.render_slayer_task_chip(state, -10000.0, -10000.0);
-                    if sw > 0.0 {
-                        tooltip_cursor_x += sw + chip_gap;
-                    }
-                    // Iterate buff chips
-                    for buff in &state.active_potion_buffs {
-                        let (bw, bh) =
-                            self.render_potion_buff_chip(state, buff, -10000.0, -10000.0);
-                        if bw > 0.0 {
-                            self.render_potion_buff_chip_tooltip(
-                                state,
-                                buff,
-                                tooltip_cursor_x,
-                                chip_y,
-                                bw,
-                                bh,
-                            );
-                            tooltip_cursor_x += bw + chip_gap;
-                        }
-                    }
+            let (sw, _) = self.render_slayer_task_chip(state, -10000.0, -10000.0);
+            if sw > 0.0 {
+                self.render_slayer_task_chip_tooltip(state, cx, chip_y);
+                cx += sw + chip_gap;
+            }
+            let (cw, _) = self.render_resource_contract_chip(state, -10000.0, -10000.0);
+            if cw > 0.0 {
+                self.render_resource_contract_chip_tooltip(state, cx, chip_y);
+                cx += cw + chip_gap;
+            }
+            for buff in &state.active_potion_buffs {
+                let (bw, bh) = self.render_potion_buff_chip(state, buff, -10000.0, -10000.0);
+                if bw > 0.0 {
+                    self.render_potion_buff_chip_tooltip(state, buff, cx, chip_y, bw, bh);
+                    cx += bw + chip_gap;
                 }
             }
         }

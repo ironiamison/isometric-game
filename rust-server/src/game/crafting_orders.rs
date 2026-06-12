@@ -297,6 +297,8 @@ impl GameRoom {
                     difficulty: t.skill.clone(),
                     task_text: format!("Deliver: {}", item_summary.join(", ")),
                     progress_label: "delivered".to_string(),
+                    // Use the first delivery item as the chip icon.
+                    target_item_id: t.items.first().map(|i| i.id.clone()).unwrap_or_default(),
                     amount_required: 1,
                     amount_completed: 0,
                     giver_name: "Adventure Board".to_string(),
@@ -308,6 +310,7 @@ impl GameRoom {
                 difficulty: String::new(),
                 task_text: String::new(),
                 progress_label: String::new(),
+                target_item_id: String::new(),
                 amount_required: 0,
                 amount_completed: 0,
                 giver_name: String::new(),
