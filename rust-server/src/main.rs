@@ -629,7 +629,8 @@ async fn main() {
     if config.admin_api_token.is_some() {
         app = app
             .route("/api/perf", get(api_perf))
-            .route("/api/logs", get(api_logs));
+            .route("/api/logs", get(api_logs))
+            .route("/api/admin/rooms", get(admin_api::api_admin_rooms));
         info!("Authenticated operational endpoints enabled");
     } else {
         info!("Operational endpoints disabled; set AEVEN_ADMIN_API_TOKEN to enable them");
