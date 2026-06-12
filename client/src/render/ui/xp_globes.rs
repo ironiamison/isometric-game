@@ -460,10 +460,12 @@ impl Renderer {
             let radius = GLOBE_SIZE / 2.0;
 
             // Show tooltip if mouse is hovering over this globe (desktop only)
-            let dx = mouse_x - center_x;
-            let dy = mouse_y - center_y;
             #[cfg(not(target_os = "android"))]
-            let is_hovered = dx * dx + dy * dy <= radius * radius;
+            let is_hovered = {
+                let dx = mouse_x - center_x;
+                let dy = mouse_y - center_y;
+                dx * dx + dy * dy <= radius * radius
+            };
             #[cfg(target_os = "android")]
             let is_hovered = false; // On mobile, use tap-to-pin only
 

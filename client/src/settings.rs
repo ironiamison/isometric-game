@@ -57,6 +57,7 @@ fn ui_settings_path() -> Option<std::path::PathBuf> {
 
 #[cfg(target_os = "android")]
 pub fn android_files_dir() -> Option<std::path::PathBuf> {
+    use macroquad::miniquad;
     unsafe {
         let env = miniquad::native::android::attach_jni_env();
         let activity = miniquad::native::android::ACTIVITY;

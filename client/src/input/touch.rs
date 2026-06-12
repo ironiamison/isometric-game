@@ -24,6 +24,7 @@ fn to_virtual_coords(x: f32, y: f32) -> (f32, f32) {
 fn virtual_screen_size() -> (f32, f32) {
     #[cfg(target_os = "android")]
     {
+        use crate::mobile_scale::VIRTUAL_WIDTH;
         // Calculate virtual height to match screen aspect ratio
         let screen_w = screen_width();
         let screen_h = screen_height();

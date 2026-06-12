@@ -31,11 +31,11 @@ pub use app::window_conf;
 use app::AppState;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use audio::AudioManager;
-#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+#[cfg(target_arch = "wasm32")]
 use auth::AuthSession;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use config::{SERVER_URL, WS_URL};
-#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+#[cfg(target_arch = "wasm32")]
 use game::GameState;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use gameplay::run_game_frame;

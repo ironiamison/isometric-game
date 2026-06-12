@@ -31,6 +31,10 @@ impl Renderer {
         }
     }
 
+    // `loaded` is a loading-progress counter whose reads (update_loading) are
+    // gated to wasm32; on android the macro is a no-op, so the tail increments
+    // are intentionally unread. Suppress the resulting false-positive lint.
+    #[allow(unused_assignments)]
     pub async fn new(audio: &mut crate::audio::AudioManager) -> Self {
         // Load manifest first to compute total sprite count
         let manifest = SpriteManifest::load().await;
