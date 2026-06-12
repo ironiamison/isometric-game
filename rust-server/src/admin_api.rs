@@ -168,6 +168,28 @@ pub(super) async fn api_admin_players(
     Json(out).into_response()
 }
 
+pub(super) async fn api_admin_room_entities(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(room_id): Path<String>,
+) -> axum::response::Response {
+    if !stats_api::is_admin_request(&state, &headers) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let Some(room) = state.rooms.get(&room_id) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let instances = state.player_instances.read().await.clone();
+    let npcs = room.get_all_npcs().await.iter().map(admin_npc_from).collect();
+    let players = room
+        .get_all_players()
+        .await
+        .iter()
+        .map(|p| admin_player_from(p, &room_id, instances.get(&p.id).cloned()))
+        .collect();
+    Json(AdminRoomEntities { room_id, npcs, players }).into_response()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
