@@ -113,16 +113,26 @@ pub(super) async fn list_characters(
             let char_infos: Vec<CharacterInfo> = chars
                 .into_iter()
                 .map(|c| {
-                    let sprite_head =
-                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_head);
-                    let sprite_body =
-                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_body);
-                    let sprite_weapon =
-                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_weapon);
-                    let sprite_back =
-                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_back);
-                    let sprite_feet =
-                        CharacterInfo::resolve_sprite(&state.item_registry, &c.equipped_feet);
+                    let sprite_head = CharacterInfo::resolve_sprite(
+                        &state.content.item_registry,
+                        &c.equipped_head,
+                    );
+                    let sprite_body = CharacterInfo::resolve_sprite(
+                        &state.content.item_registry,
+                        &c.equipped_body,
+                    );
+                    let sprite_weapon = CharacterInfo::resolve_sprite(
+                        &state.content.item_registry,
+                        &c.equipped_weapon,
+                    );
+                    let sprite_back = CharacterInfo::resolve_sprite(
+                        &state.content.item_registry,
+                        &c.equipped_back,
+                    );
+                    let sprite_feet = CharacterInfo::resolve_sprite(
+                        &state.content.item_registry,
+                        &c.equipped_feet,
+                    );
                     CharacterInfo {
                         id: c.id,
                         name: c.name.clone(),
@@ -278,23 +288,23 @@ pub(super) async fn create_character(
                     success: true,
                     character: Some({
                         let sprite_head = CharacterInfo::resolve_sprite(
-                            &state.item_registry,
+                            &state.content.item_registry,
                             &char_data.equipped_head,
                         );
                         let sprite_body = CharacterInfo::resolve_sprite(
-                            &state.item_registry,
+                            &state.content.item_registry,
                             &char_data.equipped_body,
                         );
                         let sprite_weapon = CharacterInfo::resolve_sprite(
-                            &state.item_registry,
+                            &state.content.item_registry,
                             &char_data.equipped_weapon,
                         );
                         let sprite_back = CharacterInfo::resolve_sprite(
-                            &state.item_registry,
+                            &state.content.item_registry,
                             &char_data.equipped_back,
                         );
                         let sprite_feet = CharacterInfo::resolve_sprite(
-                            &state.item_registry,
+                            &state.content.item_registry,
                             &char_data.equipped_feet,
                         );
                         CharacterInfo {

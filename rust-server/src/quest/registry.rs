@@ -40,8 +40,10 @@ impl QuestRegistry {
         info!("Loading quests from {:?}", self.data_dir);
 
         if !self.data_dir.exists() {
-            warn!("Quest directory does not exist: {:?}", self.data_dir);
-            return Ok(());
+            return Err(format!(
+                "Quest directory does not exist: {:?}",
+                self.data_dir
+            ));
         }
 
         // Collect all TOML files first (sync), then load them (async)

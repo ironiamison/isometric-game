@@ -33,7 +33,9 @@ impl World {
         Self {
             chunks: RwLock::new(HashMap::new()),
             chunk_dir: chunk_dir.to_string(),
-            generate_missing: true, // For development
+            // Synthetic chunks are a development aid and must never mask missing
+            // authoritative map content in an optimized server build.
+            generate_missing: cfg!(debug_assertions),
             collision_ignore_gids,
         }
     }

@@ -63,55 +63,62 @@ impl ChestRegistry {
     }
 
     /// Load chest definitions from a TOML file
-    pub fn load_from_file(&mut self, path: &Path) {
-        let content = match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Failed to read chests file {:?}: {}", path, e);
-                return;
-            }
-        };
+    pub fn load_from_file(&mut self, path: &Path) -> Result<(), String> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+        let table: HashMap<String, ChestDef> = toml::from_str(&content)
+            .map_err(|error| format!("failed to parse {}: {error}", path.display()))?;
 
-        let table: HashMap<String, ChestDef> = match toml::from_str(&content) {
-            Ok(t) => t,
-            Err(e) => {
-                warn!("Failed to parse chests TOML {:?}: {}", path, e);
-                return;
+        for (id, def) in table {
+            if !(1..=MAX_CHEST_SLOTS).contains(&def.slots) {
+                return Err(format!(
+                    "chest '{id}' has {} slots; expected 1..={MAX_CHEST_SLOTS}",
+                    def.slots
+                ));
             }
-        };
-
-        for (id, mut def) in table {
-            // Clamp slots to MAX_CHEST_SLOTS
-            if def.slots > MAX_CHEST_SLOTS {
-                warn!(
-                    "Chest '{}' has {} slots, clamping to {}",
-                    id, def.slots, MAX_CHEST_SLOTS
-                );
-                def.slots = MAX_CHEST_SLOTS;
-            }
-
-            // Validate spawn item slot indices
-            def.spawn_items.retain(|item| {
-                if (item.slot as usize) >= def.slots {
-                    warn!(
-                        "Chest '{}' spawn item '{}' has slot {} >= slots {}, skipping",
-                        id, item.item_id, item.slot, def.slots
-                    );
-                    false
-                } else {
-                    true
+            for item in &def.spawn_items {
+                if item.quantity <= 0 {
+                    return Err(format!(
+                        "chest '{id}' spawn item '{}' has non-positive quantity {}",
+                        item.item_id, item.quantity
+                    ));
                 }
-            });
+                if usize::from(item.slot) >= def.slots {
+                    return Err(format!(
+                        "chest '{id}' spawn item '{}' uses slot {} but chest has {} slots",
+                        item.item_id, item.slot, def.slots
+                    ));
+                }
+            }
 
             self.defs.insert(id, def);
         }
 
         info!("Loaded {} chest definitions", self.defs.len());
+        Ok(())
     }
 
     /// Get a chest definition by ID
     pub fn get(&self, id: &str) -> Option<&ChestDef> {
         self.defs.get(id)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.defs.is_empty()
+    }
+
+    pub fn validate_items(&self, items: &ItemRegistry) -> Result<(), String> {
+        for (chest_id, definition) in &self.defs {
+            for spawn in &definition.spawn_items {
+                if items.get(&spawn.item_id).is_none() {
+                    return Err(format!(
+                        "chest '{chest_id}' references unknown item '{}'",
+                        spawn.item_id
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 }
 

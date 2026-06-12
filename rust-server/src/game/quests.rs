@@ -290,7 +290,9 @@ impl GameRoom {
                 for objective in &quest.objectives {
                     if objective.objective_type == ObjectiveType::CollectItem
                         && objective.consume
-                        && !player.inventory.has_item(&objective.target, objective.count)
+                        && !player
+                            .inventory
+                            .has_item(&objective.target, objective.count)
                     {
                         tracing::warn!(
                             "Player {} tried to complete quest {} but missing {} x{} in inventory",

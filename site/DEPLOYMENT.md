@@ -11,7 +11,7 @@ Everything deploys to a **single nginx root** (default: `/var/www/aeven/`).
 
 ## Prerequisites on VPS
 
-- Node.js 20+ and npm
+- Node.js 22.x and npm 10.x (matching `.node-version` and package metadata)
 - nginx
 - Rust toolchain (for WASM client builds — already required by `deploy.sh`)
 
@@ -125,7 +125,7 @@ In a browser:
 
 ```bash
 cd site
-npm install
+npm ci
 npm run dev
 ```
 

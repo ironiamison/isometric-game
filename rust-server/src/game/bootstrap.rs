@@ -3,17 +3,18 @@ use super::*;
 impl GameRoom {
     pub async fn new(
         name: &str,
-        entity_registry: Arc<EntityRegistry>,
-        quest_registry: Arc<QuestRegistry>,
-        crafting_registry: Arc<crate::crafting::CraftingRegistry>,
-        item_registry: Arc<ItemRegistry>,
-        prayer_registry: Arc<PrayerRegistry>,
+        content: Arc<crate::content::ContentRegistries>,
         player_instances: Arc<RwLock<HashMap<String, String>>>,
         instance_manager: Arc<crate::instance::InstanceManager>,
         db: Option<Arc<crate::db::Database>>,
-        interior_registry: Arc<crate::interior::InteriorRegistry>,
-        chest_registry: Arc<crate::chest::ChestRegistry>,
     ) -> Self {
+        let entity_registry = content.entity_registry.clone();
+        let quest_registry = content.quest_registry.clone();
+        let crafting_registry = content.crafting_registry.clone();
+        let item_registry = content.item_registry.clone();
+        let prayer_registry = content.prayer_registry.clone();
+        let interior_registry = content.interior_registry.clone();
+        let chest_registry = content.chest_registry.clone();
         let world = Arc::new(World::new("maps/world_0"));
         let (spawn_x, spawn_y) = world.get_spawn_position().await;
         let spawn_chunk = ChunkCoord::from_world(spawn_x, spawn_y);
@@ -80,23 +81,18 @@ impl GameRoom {
 
         // Load shop registry
         let mut shop_registry = ShopRegistry::new();
-        if let Err(e) = shop_registry.load_from_directory(std::path::Path::new("data/shops")) {
-            tracing::error!("Failed to load shop registry: {}", e);
-        }
+        shop_registry
+            .load_from_directory(std::path::Path::new("data/shops"))
+            .unwrap_or_else(|error| panic!("shop registry validation failed: {error}"));
         tracing::info!("Loaded {} shop definitions", shop_registry.len());
 
         // Load gathering system
-        let mut gathering =
-            match crate::gathering::GatheringSystem::load(std::path::Path::new("data")) {
-                Ok(g) => {
-                    tracing::info!("Loaded gathering system with {} zones", g.zones.len());
-                    g
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load gathering system: {} (using empty)", e);
-                    crate::gathering::GatheringSystem::new()
-                }
-            };
+        let mut gathering = crate::gathering::GatheringSystem::load(std::path::Path::new("data"))
+            .unwrap_or_else(|error| panic!("gathering content validation failed: {error}"));
+        tracing::info!(
+            "Loaded gathering system with {} zones",
+            gathering.zones.len()
+        );
 
         // Load gathering markers from chunk data
         let mut chunk_marker_count = 0;
@@ -142,67 +138,37 @@ impl GameRoom {
         }
 
         // Load quest locations for reach_location objectives
+        let quest_locations_source = std::fs::read_to_string("data/quest_locations.toml")
+            .unwrap_or_else(|error| panic!("failed to read quest_locations.toml: {error}"));
         let quest_locations: HashMap<String, QuestLocation> =
-            match std::fs::read_to_string("data/quest_locations.toml") {
-                Ok(content) => match toml::from_str::<HashMap<String, QuestLocation>>(&content) {
-                    Ok(locs) => {
-                        tracing::info!("Loaded {} quest locations", locs.len());
-                        locs
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to parse quest_locations.toml: {}", e);
-                        HashMap::new()
-                    }
-                },
-                Err(_) => {
-                    tracing::info!("No quest_locations.toml found, skipping");
-                    HashMap::new()
-                }
-            };
+            toml::from_str(&quest_locations_source)
+                .unwrap_or_else(|error| panic!("invalid quest_locations.toml: {error}"));
+        tracing::info!("Loaded {} quest locations", quest_locations.len());
 
         // Load woodcutting system
-        let woodcutting =
-            match crate::woodcutting::WoodcuttingSystem::load(std::path::Path::new("data")) {
-                Ok(w) => {
-                    tracing::info!(
-                        "Loaded woodcutting system with {} tree types",
-                        w.tree_types.len()
-                    );
-                    w
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load woodcutting system: {} (using empty)", e);
-                    crate::woodcutting::WoodcuttingSystem::new()
-                }
-            };
+        let woodcutting = crate::woodcutting::WoodcuttingSystem::load(std::path::Path::new("data"))
+            .unwrap_or_else(|error| panic!("woodcutting content validation failed: {error}"));
+        tracing::info!(
+            "Loaded woodcutting system with {} tree types",
+            woodcutting.tree_types.len()
+        );
 
         // Load mining system
-        let mining = match crate::mining::MiningSystem::load(std::path::Path::new("data")) {
-            Ok(m) => {
-                tracing::info!("Loaded mining system with {} ore types", m.ore_types.len());
-                m
-            }
-            Err(e) => {
-                tracing::warn!("Failed to load mining system: {} (using empty)", e);
-                crate::mining::MiningSystem::new()
-            }
-        };
+        let mining = crate::mining::MiningSystem::load(std::path::Path::new("data"))
+            .unwrap_or_else(|error| panic!("mining content validation failed: {error}"));
+        tracing::info!(
+            "Loaded mining system with {} ore types",
+            mining.ore_types.len()
+        );
 
         // Load farming system
-        let mut farming = match crate::farming::FarmingSystem::load(std::path::Path::new("data")) {
-            Ok(f) => {
-                tracing::info!(
-                    "Loaded farming system with {} crops, {} patches",
-                    f.crops.len(),
-                    f.patches.len()
-                );
-                f
-            }
-            Err(e) => {
-                tracing::warn!("Failed to load farming system: {} (using empty)", e);
-                crate::farming::FarmingSystem::new()
-            }
-        };
+        let mut farming = crate::farming::FarmingSystem::load(std::path::Path::new("data"))
+            .unwrap_or_else(|error| panic!("farming content validation failed: {error}"));
+        tracing::info!(
+            "Loaded farming system with {} crops, {} patches",
+            farming.crops.len(),
+            farming.patches.len()
+        );
         let mut resource_contracts = crate::resource_contracts::ResourceContractManager::new();
 
         // Restore planted patches from database
@@ -384,39 +350,30 @@ impl GameRoom {
         }
 
         // Load slayer registry
-        let slayer_registry =
-            match crate::slayer::SlayerRegistry::load(std::path::Path::new("data")) {
-                Ok(r) => Arc::new(r),
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to load slayer registry: {}, using empty registry",
-                        e
-                    );
-                    Arc::new(crate::slayer::SlayerRegistry::empty())
-                }
-            };
+        let slayer_registry = Arc::new(
+            crate::slayer::SlayerRegistry::load(std::path::Path::new("data"))
+                .unwrap_or_else(|error| panic!("slayer content validation failed: {error}")),
+        );
 
         // Load chair config
+        let chairs_source = std::fs::read_to_string("data/chairs.toml")
+            .unwrap_or_else(|error| panic!("failed to read chairs.toml: {error}"));
+        let chairs_config: ChairsConfig = toml::from_str(&chairs_source)
+            .unwrap_or_else(|error| panic!("invalid chairs.toml: {error}"));
         let mut chair_gids: HashMap<u32, Direction> = HashMap::new();
-        match std::fs::read_to_string("data/chairs.toml") {
-            Ok(content) => match toml::from_str::<ChairsConfig>(&content) {
-                Ok(config) => {
-                    for entry in config.chairs {
-                        let dir = match entry.direction.as_str() {
-                            "down" => Direction::Down,
-                            "left" => Direction::Left,
-                            "up" => Direction::Up,
-                            "right" => Direction::Right,
-                            _ => Direction::Down,
-                        };
-                        chair_gids.insert(entry.gid, dir);
-                    }
-                    tracing::info!("Loaded {} chair GID definitions", chair_gids.len());
-                }
-                Err(e) => tracing::warn!("Failed to parse chairs.toml: {}", e),
-            },
-            Err(e) => tracing::warn!("Failed to read chairs.toml: {} (no chairs)", e),
+        for entry in chairs_config.chairs {
+            let direction = match entry.direction.as_str() {
+                "down" => Direction::Down,
+                "left" => Direction::Left,
+                "up" => Direction::Up,
+                "right" => Direction::Right,
+                invalid => panic!("invalid chair direction '{invalid}' for gid {}", entry.gid),
+            };
+            if chair_gids.insert(entry.gid, direction).is_some() {
+                panic!("duplicate chair gid {}", entry.gid);
+            }
         }
+        tracing::info!("Loaded {} chair GID definitions", chair_gids.len());
 
         // Populate chair positions from chunk map objects
         let mut chairs: HashMap<(i32, i32), ChairState> = HashMap::new();
@@ -442,11 +399,9 @@ impl GameRoom {
         // Load scroll spell registry
         let mut scroll_spell_registry = crate::scroll_spell::ScrollSpellRegistry::new();
         let scroll_spells_path = std::path::Path::new("data/spells/scroll_spells.toml");
-        if scroll_spells_path.exists()
-            && let Err(e) = scroll_spell_registry.load_from_file(scroll_spells_path)
-        {
-            tracing::error!("Failed to load scroll spell registry: {}", e);
-        }
+        scroll_spell_registry
+            .load_from_file(scroll_spells_path)
+            .unwrap_or_else(|error| panic!("scroll spell content validation failed: {error}"));
 
         // Load persistent ground spawn definitions and create initial ground items
         let mut ground_spawn_manager =
@@ -483,20 +438,12 @@ impl GameRoom {
         }
 
         // Load overworld chest spawns from TOML
-        let overworld_chest_spawns = {
-            let spawns_path = std::path::Path::new("data/chest_spawns.toml");
-            if spawns_path.exists() {
-                let content = std::fs::read_to_string(spawns_path).unwrap_or_default();
-                let file: crate::chest::ChestSpawnsFile =
-                    toml::from_str(&content).unwrap_or_else(|e| {
-                        tracing::warn!("Failed to parse chest_spawns.toml: {}", e);
-                        crate::chest::ChestSpawnsFile { chests: Vec::new() }
-                    });
-                file.chests
-            } else {
-                Vec::new()
-            }
-        };
+        let chest_spawns_source = std::fs::read_to_string("data/chest_spawns.toml")
+            .unwrap_or_else(|error| panic!("failed to read chest_spawns.toml: {error}"));
+        let overworld_chest_spawns =
+            toml::from_str::<crate::chest::ChestSpawnsFile>(&chest_spawns_source)
+                .unwrap_or_else(|error| panic!("invalid chest_spawns.toml: {error}"))
+                .chests;
 
         // Collect interior chest placements from interior_registry
         let mut interior_chests = Vec::new();
@@ -558,39 +505,26 @@ impl GameRoom {
         .await;
 
         // Load PVP zone allowlist
-        let pvp_zones: HashSet<(i32, i32)> = match std::fs::read_to_string("data/pvp_zones.toml") {
-            Ok(content) => {
-                #[derive(serde::Deserialize)]
-                struct PvpZoneConfig {
-                    #[serde(default)]
-                    zones: Vec<PvpZoneEntry>,
-                }
-                #[derive(serde::Deserialize)]
-                struct PvpZoneEntry {
-                    chunk_x: i32,
-                    chunk_y: i32,
-                }
-                match toml::from_str::<PvpZoneConfig>(&content) {
-                    Ok(config) => {
-                        let set: HashSet<(i32, i32)> = config
-                            .zones
-                            .iter()
-                            .map(|z| (z.chunk_x, z.chunk_y))
-                            .collect();
-                        tracing::info!("Loaded {} PVP zone chunks", set.len());
-                        set
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to parse pvp_zones.toml: {}", e);
-                        HashSet::new()
-                    }
-                }
-            }
-            Err(_) => {
-                tracing::info!("No pvp_zones.toml found, PVP disabled everywhere");
-                HashSet::new()
-            }
-        };
+        #[derive(serde::Deserialize)]
+        struct PvpZoneConfig {
+            #[serde(default)]
+            zones: Vec<PvpZoneEntry>,
+        }
+        #[derive(serde::Deserialize)]
+        struct PvpZoneEntry {
+            chunk_x: i32,
+            chunk_y: i32,
+        }
+        let pvp_source = std::fs::read_to_string("data/pvp_zones.toml")
+            .unwrap_or_else(|error| panic!("failed to read pvp_zones.toml: {error}"));
+        let pvp_config: PvpZoneConfig = toml::from_str(&pvp_source)
+            .unwrap_or_else(|error| panic!("invalid pvp_zones.toml: {error}"));
+        let pvp_zones: HashSet<(i32, i32)> = pvp_config
+            .zones
+            .iter()
+            .map(|zone| (zone.chunk_x, zone.chunk_y))
+            .collect();
+        tracing::info!("Loaded {} PVP zone chunks", pvp_zones.len());
 
         Self {
             id: Uuid::new_v4().to_string(),

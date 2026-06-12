@@ -1558,7 +1558,10 @@ mod tests {
 
     #[test]
     fn adventure_board_grant_covers_panel_actions_but_nothing_more() {
-        let offers = vec![offer("fishing", &["easy", "medium"]), offer("mining", &["easy"])];
+        let offers = vec![
+            offer("fishing", &["easy", "medium"]),
+            offer("mining", &["easy"]),
+        ];
 
         // No active contract / no orders: only the offer choices are granted.
         let ids = adventure_board_choice_ids(&offers, &None, &[], &None);

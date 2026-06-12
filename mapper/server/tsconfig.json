@@ -5,6 +5,7 @@
     "moduleResolution": "Node16",
     "esModuleInterop": true,
     "strict": true,
+    "types": ["node", "express", "multer"],
     "outDir": "dist",
     "rootDir": ".",
     "skipLibCheck": true

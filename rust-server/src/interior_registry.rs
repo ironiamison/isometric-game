@@ -1,48 +1,51 @@
 use crate::interior::InteriorMapDef;
 use std::collections::HashMap;
 use std::path::Path;
-use tracing::{error, info, warn};
+use tracing::info;
 
 pub struct InteriorRegistry {
     interiors: HashMap<String, InteriorMapDef>,
 }
 
 impl InteriorRegistry {
-    pub fn load_from_directory(dir: &str) -> Result<Self, String> {
+    pub fn load_from_directory(dir: impl AsRef<Path>) -> Result<Self, String> {
         let mut interiors = HashMap::new();
-        let path = Path::new(dir);
+        let path = dir.as_ref();
 
         if !path.exists() {
-            warn!(
-                "Interiors directory {} does not exist, creating empty registry",
-                dir
-            );
-            return Ok(Self { interiors });
+            return Err(format!(
+                "interiors directory {} does not exist",
+                path.display()
+            ));
         }
 
         let entries = std::fs::read_dir(path)
             .map_err(|e| format!("Failed to read interiors directory: {}", e))?;
 
-        for entry in entries.flatten() {
-            let file_path = entry.path();
+        for entry in entries {
+            let file_path = entry
+                .map_err(|error| format!("failed to read interior directory entry: {error}"))?
+                .path();
             if file_path.extension().is_some_and(|ext| ext == "json") {
-                match InteriorMapDef::load_from_file(file_path.to_str().unwrap()) {
-                    Ok(interior) => {
-                        info!(
-                            "Loaded interior map: {} ({}) with {} entities",
-                            interior.id,
-                            interior.name,
-                            interior.entities.len()
-                        );
-                        interiors.insert(interior.id.clone(), interior);
-                    }
-                    Err(e) => {
-                        error!("Failed to load interior {:?}: {}", file_path, e);
-                    }
+                let interior = InteriorMapDef::load_from_file(&file_path)?;
+                info!(
+                    "Loaded interior map: {} ({}) with {} entities",
+                    interior.id,
+                    interior.name,
+                    interior.entities.len()
+                );
+                if interiors.insert(interior.id.clone(), interior).is_some() {
+                    return Err(format!("duplicate interior id in {}", file_path.display()));
                 }
             }
         }
 
+        if interiors.is_empty() {
+            return Err(format!(
+                "interiors directory {} contains no JSON maps",
+                path.display()
+            ));
+        }
         info!("Loaded {} interior maps", interiors.len());
         Ok(Self { interiors })
     }

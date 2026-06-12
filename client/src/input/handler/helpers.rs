@@ -39,8 +39,7 @@ impl EventHandler for PasteWatcher {
 /// shared input subscriber. Call once per frame.
 pub(super) fn poll_paste_request() -> bool {
     static SUBSCRIBER: OnceLock<usize> = OnceLock::new();
-    let subscriber =
-        *SUBSCRIBER.get_or_init(macroquad::input::utils::register_input_subscriber);
+    let subscriber = *SUBSCRIBER.get_or_init(macroquad::input::utils::register_input_subscriber);
     let mut watcher = PasteWatcher::default();
     macroquad::input::utils::repeat_all_miniquad_input(&mut watcher, subscriber);
     watcher.paste_requested

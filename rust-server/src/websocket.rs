@@ -142,13 +142,13 @@ pub(super) async fn handle_socket(
     }
 
     // Send item definitions
-    let item_defs = state.item_registry.to_client_definitions();
+    let item_defs = state.content.item_registry.to_client_definitions();
     if let Ok(bytes) = protocol::encode_server_message(&item_defs) {
         let _ = sender.send(Message::Binary(bytes)).await;
     }
 
     // Send recipe definitions
-    let recipe_defs = state.crafting_registry.to_client_definitions();
+    let recipe_defs = state.content.crafting_registry.to_client_definitions();
     if let Ok(bytes) = protocol::encode_server_message(&recipe_defs) {
         let _ = sender.send(Message::Binary(bytes)).await;
     }

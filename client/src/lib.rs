@@ -143,32 +143,7 @@ async fn async_main() {
                             app_state = AppState::CharacterSelect(char_screen);
                         }
                         ScreenState::StartGuestMode => {
-                            let mut game_state = GameState::new();
-                            game_state.ui_state.audio_volume = audio.music_volume();
-                            game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
-                            game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls =
-                                settings::load_classic_controls();
-                            // Load persisted UI settings
-                            let ui_settings = settings::load_ui_settings();
-                            game_state.camera.zoom = ui_settings.zoom;
-                            game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                            game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
-                            game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
-                            game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
-                            game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.chat_log_background =
-                                ui_settings.chat_log_background;
-                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized =
-                                ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public =
-                                ui_settings.hide_system_in_public;
-                            if game_state.ui_state.classic_controls {
-                                game_state.ui_state.chat_open = true;
-                            }
-                            #[cfg(not(target_os = "android"))]
-                            app::maybe_show_control_scheme_dialogue(&mut game_state);
+                            let game_state = app::new_game_state(&audio, None);
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
                             input_handler.load_touch_icons().await;
@@ -195,33 +170,7 @@ async fn async_main() {
                             character_id,
                             character_name,
                         } => {
-                            let mut game_state = GameState::new();
-                            game_state.selected_character_name = Some(character_name);
-                            game_state.ui_state.audio_volume = audio.music_volume();
-                            game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
-                            game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls =
-                                settings::load_classic_controls();
-                            // Load persisted UI settings
-                            let ui_settings = settings::load_ui_settings();
-                            game_state.camera.zoom = ui_settings.zoom;
-                            game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                            game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
-                            game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
-                            game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
-                            game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.chat_log_background =
-                                ui_settings.chat_log_background;
-                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized =
-                                ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public =
-                                ui_settings.hide_system_in_public;
-                            if game_state.ui_state.classic_controls {
-                                game_state.ui_state.chat_open = true;
-                            }
-                            #[cfg(not(target_os = "android"))]
-                            app::maybe_show_control_scheme_dialogue(&mut game_state);
+                            let game_state = app::new_game_state(&audio, Some(character_name));
 
                             let network = NetworkClient::new_authenticated(
                                 WS_URL,
@@ -407,31 +356,7 @@ async fn async_main() {
                             app_state = WasmAppState::CharacterSelect(char_screen);
                         }
                         ScreenState::StartGuestMode => {
-                            let mut game_state = GameState::new();
-                            game_state.ui_state.audio_volume = audio.music_volume();
-                            game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
-                            game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls =
-                                settings::load_classic_controls();
-                            // Load persisted UI settings
-                            let ui_settings = settings::load_ui_settings();
-                            game_state.camera.zoom = ui_settings.zoom;
-                            game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                            game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
-                            game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
-                            game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
-                            game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.chat_log_background =
-                                ui_settings.chat_log_background;
-                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized =
-                                ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public =
-                                ui_settings.hide_system_in_public;
-                            if game_state.ui_state.classic_controls {
-                                game_state.ui_state.chat_open = true;
-                            }
-                            app::maybe_show_control_scheme_dialogue(&mut game_state);
+                            let game_state = app::new_game_state(&audio, None);
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
                             input_handler.load_touch_icons().await;
@@ -528,33 +453,8 @@ async fn async_main() {
                     if let Some(result) = auth_client.poll() {
                         match result {
                             AuthResult::Matchmake(Ok((room_id, session_token))) => {
-                                let mut game_state = GameState::new();
-                                game_state.selected_character_name = Some(character_name.clone());
-                                game_state.ui_state.audio_volume = audio.music_volume();
-                                game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
-                                game_state.ui_state.audio_muted = audio.is_muted();
-                                game_state.ui_state.classic_controls =
-                                    settings::load_classic_controls();
-                                // Load persisted UI settings
-                                let ui_settings = settings::load_ui_settings();
-                                game_state.camera.zoom = ui_settings.zoom;
-                                game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                                game_state.ui_state.shift_drop_enabled =
-                                    ui_settings.shift_drop_enabled;
-                                game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
-                                game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
-                                game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                                game_state.ui_state.chat_log_background =
-                                    ui_settings.chat_log_background;
-                                game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                                game_state.ui_state.quest_tracker_minimized =
-                                    ui_settings.quest_tracker_minimized;
-                                game_state.ui_state.hide_system_in_public =
-                                    ui_settings.hide_system_in_public;
-                                if game_state.ui_state.classic_controls {
-                                    game_state.ui_state.chat_open = true;
-                                }
-                                app::maybe_show_control_scheme_dialogue(&mut game_state);
+                                let game_state =
+                                    app::new_game_state(&audio, Some(character_name.clone()));
 
                                 // Store matchmaking results in localStorage for WASM network client
                                 {

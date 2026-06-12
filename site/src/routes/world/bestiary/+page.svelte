@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type Entity } from '$lib/api';
-  import { Search, Skull } from 'lucide-svelte';
+  import { Search, Skull } from '@lucide/svelte';
 
   let data: Entity[] | undefined = $state();
   let isLoading = $state(true);

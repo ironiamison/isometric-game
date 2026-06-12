@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::info;
 
 use super::prototype::{
     AnimationType, EntityBehaviors, EntityPrototype, LootEntry, LootTable, RawEntityPrototype,
@@ -70,9 +70,8 @@ impl EntityRegistry {
 
                 for (id, proto) in table {
                     if raw_prototypes.contains_key(&id) {
-                        warn!("Duplicate entity ID '{}' in {:?}, overwriting", id, path);
+                        return Err(format!("Duplicate entity ID '{}' in {:?}", id, path));
                     }
-                    // info!("Loaded entity prototype: {}", id);
                     raw_prototypes.insert(id, proto);
                 }
             }

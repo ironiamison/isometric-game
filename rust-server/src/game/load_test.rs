@@ -1,12 +1,6 @@
 use super::{GameRoom, Player};
-use crate::chest::ChestRegistry;
-use crate::crafting::CraftingRegistry;
-use crate::data::ItemRegistry;
-use crate::entity::EntityRegistry;
+use crate::content::ContentRegistries;
 use crate::instance::InstanceManager;
-use crate::interior::InteriorRegistry;
-use crate::prayer::PrayerRegistry;
-use crate::quest::QuestRegistry;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -15,92 +9,34 @@ use tokio::sync::{RwLock, mpsc};
 const LOAD_TEST_PLAYERS: usize = 128;
 const LOAD_TEST_TICKS: usize = 100;
 
+fn server_path(relative: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
+}
+
 async fn build_room() -> GameRoom {
-    let data_dir = std::path::Path::new("data");
-
-    let mut entity_registry = EntityRegistry::new();
-    entity_registry.load_from_directory(data_dir).unwrap();
-
-    let mut item_registry = ItemRegistry::new();
-    item_registry.load_from_directory(data_dir).unwrap();
-
-    let mut prayer_registry = PrayerRegistry::new();
-    prayer_registry.load_from_directory(data_dir).unwrap();
-
-    let quest_registry = Arc::new(QuestRegistry::new(data_dir));
-    quest_registry.load_all().await.unwrap();
-
-    let mut crafting_registry = CraftingRegistry::new();
-    crafting_registry.load_from_directory(data_dir).unwrap();
-
-    let mut chest_registry = ChestRegistry::new();
-    chest_registry.load_from_file(&data_dir.join("chests.toml"));
-
-    let interior_registry = Arc::new(
-        InteriorRegistry::load_from_directory("maps/interiors")
-            .expect("load test interior registry"),
+    let data_dir = server_path("data");
+    let content = Arc::new(
+        ContentRegistries::load(&data_dir, &server_path("maps"))
+            .await
+            .expect("load test content"),
     );
 
     GameRoom::new(
         "load_test",
-        Arc::new(entity_registry),
-        quest_registry,
-        Arc::new(crafting_registry),
-        Arc::new(item_registry),
-        Arc::new(prayer_registry),
+        content,
         Arc::new(RwLock::new(HashMap::new())),
         Arc::new(InstanceManager::new()),
         None,
-        interior_registry,
-        Arc::new(chest_registry),
     )
     .await
 }
 
 #[tokio::test]
 async fn production_content_registries_load() {
-    let data_dir = std::path::Path::new("data");
-
-    let mut entity_registry = EntityRegistry::new();
-    entity_registry
-        .load_from_directory(data_dir)
-        .expect("entity registry");
-    assert!(!entity_registry.is_empty(), "entity registry is empty");
-
-    let mut item_registry = ItemRegistry::new();
-    item_registry
-        .load_from_directory(data_dir)
-        .expect("item registry");
-    assert!(!item_registry.is_empty(), "item registry is empty");
-
-    let mut prayer_registry = PrayerRegistry::new();
-    prayer_registry
-        .load_from_directory(data_dir)
-        .expect("prayer registry");
-    assert!(!prayer_registry.is_empty(), "prayer registry is empty");
-
-    let quest_registry = QuestRegistry::new(data_dir);
-    quest_registry.load_all().await.expect("quest registry");
-    assert!(quest_registry.count().await > 0, "quest registry is empty");
-
-    let mut crafting_registry = CraftingRegistry::new();
-    crafting_registry
-        .load_from_directory(data_dir)
-        .expect("crafting registry");
-    assert!(!crafting_registry.is_empty(), "crafting registry is empty");
-
-    InteriorRegistry::load_from_directory("maps/interiors").expect("interior registry");
-
-    for directory in ["maps/world_0", "maps/world_1", "maps/interiors"] {
-        for entry in std::fs::read_dir(directory).expect("map directory") {
-            let path = entry.expect("map directory entry").path();
-            if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
-                let source = std::fs::read_to_string(&path).expect("map file");
-                serde_json::from_str::<serde_json::Value>(&source)
-                    .unwrap_or_else(|error| panic!("invalid JSON in {}: {error}", path.display()));
-            }
-        }
-    }
+    let data_dir = server_path("data");
+    ContentRegistries::load(&data_dir, &server_path("maps"))
+        .await
+        .expect("authoritative content");
 }
 
 fn percentile(sorted: &[f64], percentile: f64) -> f64 {

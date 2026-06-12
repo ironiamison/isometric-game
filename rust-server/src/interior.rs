@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 
 /// Type of instance this interior creates
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -147,11 +148,12 @@ pub struct InteriorSize {
 }
 
 impl InteriorMapDef {
-    pub fn load_from_file(path: &str) -> Result<Self, String> {
+    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, String> {
+        let path = path.as_ref();
         let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read interior file {}: {}", path, e))?;
+            .map_err(|error| format!("Failed to read interior file {}: {error}", path.display()))?;
         serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse interior JSON {}: {}", path, e))
+            .map_err(|error| format!("Failed to parse interior JSON {}: {error}", path.display()))
     }
 
     pub fn get_spawn_point(&self, name: &str) -> Option<&SpawnPoint> {

@@ -1,10 +1,25 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 source "$HOME/.cargo/env" 2>/dev/null || true
 
-REPO_DIR="/root/isometric-game"
+REPO_DIR="${REPO_DIR:-/root/isometric-game}"
 SITE_DEPLOY_DIR="${SITE_DEPLOY_DIR:-/var/www/aeven}"
 cd "$REPO_DIR"
+
+require_node_toolchain() {
+    if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        echo "ERROR: Node.js 22 and npm 10 are required."
+        exit 1
+    fi
+
+    local node_major npm_major
+    node_major=$(node -p "process.versions.node.split('.')[0]")
+    npm_major=$(npm --version | cut -d. -f1)
+    if [ "$node_major" != "22" ] || [ "$npm_major" != "10" ]; then
+        echo "ERROR: Node.js 22.x and npm 10.x are required; found node $(node --version), npm $(npm --version)."
+        exit 1
+    fi
+}
 
 # Get current commit before pull
 BEFORE=$(git rev-parse HEAD)
@@ -28,11 +43,9 @@ SHARED_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- \
     crates/aeven-protocol/ Cargo.toml Cargo.lock rust-toolchain.toml | head -1)
 
 deploy_site() {
-    if ! command -v npm >/dev/null 2>&1; then
-        echo "ERROR: npm not found. Install Node.js/npm on the VPS."
-        exit 1
-    fi
+    require_node_toolchain
 
+    local PLAY_DIR WASM_DIR
     PLAY_DIR="$REPO_DIR/site/static/play"
     mkdir -p "$PLAY_DIR"
 

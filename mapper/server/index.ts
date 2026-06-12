@@ -29,6 +29,14 @@ const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 
 // Valid worlds
 const VALID_WORLDS = ['world_0', 'world_1'] as const;
+const TRUST_PROXY_HOPS = process.env.MAPPER_TRUST_PROXY_HOPS;
+if (TRUST_PROXY_HOPS !== undefined) {
+  const hops = Number(TRUST_PROXY_HOPS);
+  if (!Number.isInteger(hops) || hops < 1 || hops > 3) {
+    throw new Error('MAPPER_TRUST_PROXY_HOPS must be an integer from 1 to 3');
+  }
+  app.set('trust proxy', hops);
+}
 
 function getWorldDirs(world: string) {
   return {
@@ -115,7 +123,7 @@ app.use((_req, res, next) => {
   next();
 });
 
-const auth = await installMapperAuth(app, mapperRoot, IS_PRODUCTION);
+const auth = await installMapperAuth(app, mapperRoot, IS_PRODUCTION, VALID_WORLDS);
 
 // Frontend dist path (served after API routes)
 const distPath = path.join(mapperRoot, 'dist');

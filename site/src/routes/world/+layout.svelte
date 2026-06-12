@@ -9,7 +9,7 @@
     Trophy,
     Users,
     X,
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
 
   let { children } = $props();
   let mobileOpen = $state(false);

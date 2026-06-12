@@ -12,8 +12,8 @@ pub mod state;
 
 pub use definition::{ObjectiveType, Quest};
 pub use events::QuestEvent;
-pub use registry::QuestRegistry;
 #[cfg(debug_assertions)]
 pub use registry::HotReloadEvent;
+pub use registry::QuestRegistry;
 pub use runner::QuestRunner;
 pub use state::{PlayerQuestState, QuestStatus};

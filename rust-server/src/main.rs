@@ -29,8 +29,8 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-mod app_state;
 mod admin_api;
+mod app_state;
 mod arena;
 mod boss;
 mod characters;
@@ -39,6 +39,7 @@ mod chunk;
 mod client_messages;
 mod collection_log;
 mod config;
+mod content;
 mod crafting;
 mod data;
 mod db;
@@ -83,18 +84,13 @@ use app_state::*;
 use characters::*;
 use client_messages::*;
 use config::ServerConfig;
-use crafting::CraftingRegistry;
-use data::ItemRegistry;
 use db::Database;
-use entity::EntityRegistry;
 use game::GameRoom;
 use instance::InstanceManager;
 use instances::*;
-use interior_registry::InteriorRegistry;
 use matchmaking::*;
-use prayer::PrayerRegistry;
 use protocol::{ClientMessage, ServerMessage};
-use quest::{ObjectiveType, QuestRegistry};
+use quest::ObjectiveType;
 use security::{RateLimiter, SessionTokenSigner};
 use server_auth::*;
 use spectator::*;
@@ -135,16 +131,10 @@ struct AppState {
     matchmake_rate_limiter: RateLimiter,
     // SECURITY: Signed session token generator
     token_signer: SessionTokenSigner,
-    // Entity and item registries (loaded from TOML at startup)
-    entity_registry: Arc<EntityRegistry>,
-    item_registry: Arc<ItemRegistry>,
-    prayer_registry: Arc<PrayerRegistry>,
-    quest_registry: Arc<QuestRegistry>,
-    crafting_registry: Arc<CraftingRegistry>,
-    chest_registry: Arc<crate::chest::ChestRegistry>,
+    /// Immutable content loaded and validated before the server starts accepting traffic.
+    content: Arc<content::ContentRegistries>,
     collection_log_defs: Arc<collection_log::CollectionLogDefinitions>,
     collection_log_display_names: Arc<Vec<(String, String)>>,
-    interior_registry: Arc<InteriorRegistry>,
     instance_manager: Arc<InstanceManager>,
     /// Tracks which instance each player is currently in (None = overworld)
     player_instances: Arc<RwLock<HashMap<String, String>>>,

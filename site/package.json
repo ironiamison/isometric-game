@@ -15,6 +15,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
+    "@types/node": "^22.19.21",
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
@@ -26,7 +27,7 @@
     "vite": "^6.0.7"
   },
   "dependencies": {
-    "lucide-svelte": "^0.474.0"
+    "@lucide/svelte": "^1.17.0"
   },
   "overrides": {
     "cookie": "0.7.2"

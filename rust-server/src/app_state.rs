@@ -7,40 +7,12 @@ impl AppState {
             .await
             .expect("Failed to initialize database");
 
-        // Load entity registry from TOML files
-        let mut entity_registry = EntityRegistry::new();
         let data_dir = std::path::Path::new("data");
-        if let Err(e) = entity_registry.load_from_directory(data_dir) {
-            error!("Failed to load entity registry: {}", e);
-        }
-
-        // Load item registry from TOML files
-        let mut item_registry = ItemRegistry::new();
-        if let Err(e) = item_registry.load_from_directory(data_dir) {
-            error!("Failed to load item registry: {}", e);
-        }
-
-        // Load prayer registry from TOML file
-        let mut prayer_registry = PrayerRegistry::new();
-        if let Err(e) = prayer_registry.load_from_directory(data_dir) {
-            error!("Failed to load prayer registry: {}", e);
-        }
-
-        // Load quest registry from TOML files
-        let quest_registry = Arc::new(QuestRegistry::new(data_dir));
-        if let Err(e) = quest_registry.load_all().await {
-            error!("Failed to load quest registry: {}", e);
-        }
-
-        // Load crafting registry from TOML files
-        let mut crafting_registry = CraftingRegistry::new();
-        if let Err(e) = crafting_registry.load_from_directory(data_dir) {
-            error!("Failed to load crafting registry: {}", e);
-        }
-
-        // Load chest registry from TOML file
-        let mut chest_registry = crate::chest::ChestRegistry::new();
-        chest_registry.load_from_file(&data_dir.join("chests.toml"));
+        let content = Arc::new(
+            content::ContentRegistries::load(data_dir, std::path::Path::new("maps"))
+                .await
+                .unwrap_or_else(|error| panic!("authoritative content validation failed: {error}")),
+        );
 
         // Load collection log definitions from TOML file
         let collection_log_defs =
@@ -48,22 +20,16 @@ impl AppState {
 
         // Build display name lookup for collection log subcategories
         let quest_names: std::collections::HashMap<String, String> = {
-            let quests = quest_registry.all_quests().await;
+            let quests = content.quest_registry.all_quests().await;
             quests
                 .into_iter()
                 .map(|q| (q.id.clone(), q.name.clone()))
                 .collect()
         };
         let collection_log_display_names: Vec<(String, String)> = collection_log_defs
-            .build_display_names(&entity_registry, &quest_names)
+            .build_display_names(&content.entity_registry, &quest_names)
             .into_iter()
             .collect();
-
-        // Load interior registry from JSON files
-        let interior_registry = Arc::new(
-            InteriorRegistry::load_from_directory("maps/interiors")
-                .expect("Failed to load interior registry"),
-        );
 
         // Initialize instance manager
         let instance_manager = Arc::new(InstanceManager::new());
@@ -71,7 +37,7 @@ impl AppState {
         // Start hot-reload watcher for quest files (dev mode)
         #[cfg(debug_assertions)]
         {
-            match quest_registry.start_file_watcher() {
+            match content.quest_registry.start_file_watcher() {
                 Ok(mut rx) => {
                     // Spawn task to log reload events
                     tokio::spawn(async move {
@@ -107,15 +73,9 @@ impl AppState {
             matchmake_rate_limiter: RateLimiter::new(20, 60),
             // SECURITY: Token signer for session tokens
             token_signer: SessionTokenSigner::new(config.session_signing_secret.clone()),
-            entity_registry: Arc::new(entity_registry),
-            item_registry: Arc::new(item_registry),
-            prayer_registry: Arc::new(prayer_registry),
-            quest_registry,
-            crafting_registry: Arc::new(crafting_registry),
-            chest_registry: Arc::new(chest_registry),
+            content,
             collection_log_defs: Arc::new(collection_log_defs),
             collection_log_display_names: Arc::new(collection_log_display_names),
-            interior_registry,
             instance_manager,
             player_instances: Arc::new(RwLock::new(HashMap::new())),
             player_entrance_positions: Arc::new(RwLock::new(HashMap::new())),
@@ -147,16 +107,10 @@ impl AppState {
         let room = Arc::new(
             GameRoom::new(
                 room_name,
-                self.entity_registry.clone(),
-                self.quest_registry.clone(),
-                self.crafting_registry.clone(),
-                self.item_registry.clone(),
-                self.prayer_registry.clone(),
+                self.content.clone(),
                 self.player_instances.clone(),
                 self.instance_manager.clone(),
                 Some(self.db.clone()),
-                self.interior_registry.clone(),
-                self.chest_registry.clone(),
             )
             .await,
         );

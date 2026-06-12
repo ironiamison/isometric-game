@@ -13,7 +13,7 @@ pub(super) async fn auto_enter_instance(
     use crate::protocol::{ChunkLayerData, ChunkPortalData};
     use base64::Engine;
 
-    let interior = match state.interior_registry.get(map_id) {
+    let interior = match state.content.interior_registry.get(map_id) {
         Some(i) => i,
         None => {
             warn!(
@@ -58,7 +58,7 @@ pub(super) async fn auto_enter_instance(
             instance.set_collision(&bytes).await;
         }
         instance
-            .spawn_npcs(&interior.entities, &state.entity_registry)
+            .spawn_npcs(&interior.entities, &state.content.entity_registry)
             .await;
 
         // Register gathering markers for this instance
@@ -333,7 +333,7 @@ pub(super) async fn handle_enter_portal(
             .or_else(|| instance_id.split('_').nth(1))
             .unwrap_or(&instance_id);
 
-        let interior = match state.interior_registry.get(interior_id) {
+        let interior = match state.content.interior_registry.get(interior_id) {
             Some(i) => i,
             None => {
                 error!(
@@ -578,7 +578,7 @@ pub(super) async fn handle_enter_portal(
 
     // Get interior definition
     info!("Looking up interior map '{}'", portal.target_map);
-    let interior = match state.interior_registry.get(&portal.target_map) {
+    let interior = match state.content.interior_registry.get(&portal.target_map) {
         Some(i) => {
             info!(
                 "Found interior '{}' with {} spawn points",
@@ -592,7 +592,7 @@ pub(super) async fn handle_enter_portal(
                 "Portal '{}' references unknown interior '{}'. Available interiors: {:?}",
                 portal_id,
                 portal.target_map,
-                state.interior_registry.list_ids()
+                state.content.interior_registry.list_ids()
             );
             return;
         }
@@ -677,7 +677,7 @@ pub(super) async fn handle_enter_portal(
             instance.set_heightmap(hm.clone()).await;
         }
         instance
-            .spawn_npcs(&interior.entities, &state.entity_registry)
+            .spawn_npcs(&interior.entities, &state.content.entity_registry)
             .await;
 
         // Register gathering markers for this instance

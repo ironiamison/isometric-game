@@ -229,13 +229,15 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                             }
 
                             // Item definitions
-                            let item_defs = recv_state.item_registry.to_client_definitions();
+                            let item_defs =
+                                recv_state.content.item_registry.to_client_definitions();
                             if let Ok(bytes) = protocol::encode_server_message(&item_defs) {
                                 let _ = recv_tx.send(bytes).await;
                             }
 
                             // Recipe definitions
-                            let recipe_defs = recv_state.crafting_registry.to_client_definitions();
+                            let recipe_defs =
+                                recv_state.content.crafting_registry.to_client_definitions();
                             if let Ok(bytes) = protocol::encode_server_message(&recipe_defs) {
                                 let _ = recv_tx.send(bytes).await;
                             }

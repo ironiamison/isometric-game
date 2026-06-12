@@ -4,10 +4,10 @@
 
   let navEl: HTMLElement | undefined = $state();
   let starsEl: HTMLElement | undefined = $state();
-  let playHref = $state('/play');
+  let playHref = $state('/play/');
 
   onMount(() => {
-    playHref = appendUtms('/play');
+    playHref = appendUtms('/play/');
 
     if (starsEl) {
       for (let i = 0; i < 60; i++) {
@@ -208,7 +208,13 @@
         <span class="card-icon">&#x1F310;</span>
         <h3 class="card-title">Play in Browser</h3>
         <p class="card-desc">Jump in instantly — no download needed. Works on any browser.</p>
-        <a href={playHref} class="pixel-btn btn-water">Launch</a>
+        <button
+          type="button"
+          class="pixel-btn btn-water"
+          onclick={() => window.location.assign(playHref)}
+        >
+          Launch
+        </button>
       </div>
 
       <div class="card pixel-box fade-up desktop-download-card" style="position: relative">

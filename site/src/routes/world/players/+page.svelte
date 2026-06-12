@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type OnlinePlayer } from '$lib/api';
-  import { Users } from 'lucide-svelte';
+  import { Users } from '@lucide/svelte';
 
   type SortKey = keyof OnlinePlayer;
   type SortDir = 'asc' | 'desc';

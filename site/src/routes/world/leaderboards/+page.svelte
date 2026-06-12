@@ -3,7 +3,7 @@
   import { api, type LeaderboardEntry, type LeaderboardSort } from '$lib/api';
   import { formatPlayedTime } from '$lib/format';
   import { METRIC_GROUPS, METRICS, metricValue, type Metric } from '$lib/leaderboard';
-  import { Search, Trophy } from 'lucide-svelte';
+  import { Search, Trophy } from '@lucide/svelte';
 
   let activeSort: LeaderboardSort = $state('total_level');
   let search = $state('');

@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { api, type LeaderboardEntry, type PlayerProfileRanks } from '$lib/api';
   import { formatPlayedTime, percentile } from '$lib/format';
-  import { ArrowLeft, Check, Copy, UserRound } from 'lucide-svelte';
+  import { ArrowLeft, Check, Copy, UserRound } from '@lucide/svelte';
 
   type ProfileStat = {
     label: string;

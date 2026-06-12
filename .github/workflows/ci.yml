@@ -75,7 +75,7 @@ jobs:
           - directory: mapper
             command: npm run lint && npm run build
           - directory: mapper/server
-            command: npm run build
+            command: npm test
           - directory: site
             command: npm run check && npm run build
     defaults:

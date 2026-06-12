@@ -58,11 +58,3 @@ notify = "6"
 
 [dev-dependencies]
 tempfile = "3"
-
-# Optimized production builds: faster game loop, smaller binary.
-# Applied on the next `cargo build --release`.
-[profile.release]
-lto = "thin"          # cross-crate inlining
-codegen-units = 1     # better optimization (slower compile, faster binary)
-strip = true          # drop debug symbols (smaller binary)
-panic = "abort"       # smaller/faster; a panic restarts via systemd anyway

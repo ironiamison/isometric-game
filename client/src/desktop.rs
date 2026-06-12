@@ -10,7 +10,7 @@ use crate::input::InputHandler;
 use crate::network::NetworkClient;
 use crate::render::Renderer;
 use crate::ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
-use crate::{game, network, settings};
+use crate::{game, network};
 
 /// Spectator state for login/character select screens — streams the world behind the UI.
 #[cfg(not(target_arch = "wasm32"))]
@@ -180,46 +180,7 @@ pub(crate) async fn run() {
                             if let Some(mut spec) = spectator.take() {
                                 spec.network.disconnect();
                             }
-                            // Guest mode - connect without auth
-                            let mut game_state = GameState::new();
-                            // Sync audio settings to UI state
-                            game_state.ui_state.audio_volume = audio.music_volume();
-                            game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
-                            game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls =
-                                settings::load_classic_controls();
-                            // Load persisted UI settings
-                            let ui_settings = settings::load_ui_settings();
-                            game_state.camera.zoom = ui_settings.zoom;
-                            game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                            game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
-                            game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
-                            game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
-                            game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.graphics_low = ui_settings.graphics_low;
-                            game_state.ui_state.chat_log_background =
-                                ui_settings.chat_log_background;
-                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized =
-                                ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public =
-                                ui_settings.hide_system_in_public;
-                            if game_state.ui_state.classic_controls {
-                                game_state.ui_state.chat_open = true;
-                            }
-                            if !settings::load_control_scheme_chosen() {
-                                game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
-                                    quest_id: "__control_scheme__".to_string(),
-                                    npc_id: String::new(),
-                                    speaker: "Control Scheme".to_string(),
-                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Ctrl to jump, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
-                                    choices: vec![
-                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space Attack + Enter)".to_string() },
-                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl Attack + Always-on Chat)".to_string() },
-                                    ],
-                                    show_time: get_time(),
-                                });
-                            }
+                            let game_state = crate::app::new_game_state(&audio, None);
                             let network = NetworkClient::new_guest(WS_URL);
                             let mut input_handler = InputHandler::new();
                             input_handler.load_touch_icons().await;
@@ -301,52 +262,11 @@ pub(crate) async fn run() {
                                                     Some((cam_x, cam_y));
                                                 game_state.camera.transition_progress = 0.0;
                                                 game_state.spectator_mode = false;
-                                                game_state.selected_character_name =
-                                                    Some(character_name);
-                                                // Sync audio settings to UI state
-                                                game_state.ui_state.audio_volume =
-                                                    audio.music_volume();
-                                                game_state.ui_state.audio_sfx_volume =
-                                                    audio.sfx_volume();
-                                                game_state.ui_state.audio_muted = audio.is_muted();
-                                                game_state.ui_state.classic_controls =
-                                                    settings::load_classic_controls();
-                                                // Load persisted UI settings
-                                                let ui_settings = settings::load_ui_settings();
-                                                game_state.camera.zoom = ui_settings.zoom;
-                                                game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                                                game_state.ui_state.shift_drop_enabled =
-                                                    ui_settings.shift_drop_enabled;
-                                                game_state.ui_state.chat_log_visible =
-                                                    ui_settings.chat_log_visible;
-                                                game_state.ui_state.tap_to_pathfind =
-                                                    ui_settings.tap_to_pathfind;
-                                                game_state.ui_state.use_joystick =
-                                                    ui_settings.use_joystick;
-                                                game_state.ui_state.graphics_low =
-                                                    ui_settings.graphics_low;
-                                                game_state.ui_state.chat_log_background =
-                                                    ui_settings.chat_log_background;
-                                                game_state.ui_state.hotkey_bar =
-                                                    ui_settings.hotkey_bar;
-                                                game_state.ui_state.quest_tracker_minimized =
-                                                    ui_settings.quest_tracker_minimized;
-                                                if game_state.ui_state.classic_controls {
-                                                    game_state.ui_state.chat_open = true;
-                                                }
-                                                if !settings::load_control_scheme_chosen() {
-                                                    game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
-                                                        quest_id: "__control_scheme__".to_string(),
-                                                        npc_id: String::new(),
-                                                        speaker: "Control Scheme".to_string(),
-                                                        text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Ctrl to jump, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
-                                                        choices: vec![
-                                                            game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space Attack + Enter)".to_string() },
-                                                            game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl Attack + Always-on Chat)".to_string() },
-                                                        ],
-                                                        show_time: get_time(),
-                                                    });
-                                                }
+                                                crate::app::configure_game_state(
+                                                    &mut game_state,
+                                                    &audio,
+                                                    Some(character_name),
+                                                );
 
                                                 let mut input_handler = InputHandler::new();
                                                 input_handler.load_touch_icons().await;
@@ -375,46 +295,8 @@ pub(crate) async fn run() {
                             }
 
                             // Fallback: fresh connection (no spectator or upgrade failed)
-                            let mut game_state = GameState::new();
-                            game_state.selected_character_name = Some(character_name);
-                            // Sync audio settings to UI state
-                            game_state.ui_state.audio_volume = audio.music_volume();
-                            game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
-                            game_state.ui_state.audio_muted = audio.is_muted();
-                            game_state.ui_state.classic_controls =
-                                settings::load_classic_controls();
-                            // Load persisted UI settings
-                            let ui_settings = settings::load_ui_settings();
-                            game_state.camera.zoom = ui_settings.zoom;
-                            game_state.ui_state.ui_scale = ui_settings.ui_scale;
-                            game_state.ui_state.shift_drop_enabled = ui_settings.shift_drop_enabled;
-                            game_state.ui_state.chat_log_visible = ui_settings.chat_log_visible;
-                            game_state.ui_state.tap_to_pathfind = ui_settings.tap_to_pathfind;
-                            game_state.ui_state.use_joystick = ui_settings.use_joystick;
-                            game_state.ui_state.graphics_low = ui_settings.graphics_low;
-                            game_state.ui_state.chat_log_background =
-                                ui_settings.chat_log_background;
-                            game_state.ui_state.hotkey_bar = ui_settings.hotkey_bar;
-                            game_state.ui_state.quest_tracker_minimized =
-                                ui_settings.quest_tracker_minimized;
-                            game_state.ui_state.hide_system_in_public =
-                                ui_settings.hide_system_in_public;
-                            if game_state.ui_state.classic_controls {
-                                game_state.ui_state.chat_open = true;
-                            }
-                            if !settings::load_control_scheme_chosen() {
-                                game_state.ui_state.active_dialogue = Some(game::state::ActiveDialogue {
-                                    quest_id: "__control_scheme__".to_string(),
-                                    npc_id: String::new(),
-                                    speaker: "Control Scheme".to_string(),
-                                    text: "Welcome! Choose your control scheme:\n\nModern: WASD to move, Space to attack, Ctrl to jump, Enter to chat\n\nClassic: Arrow keys to move, Ctrl to attack, always-on chat input".to_string(),
-                                    choices: vec![
-                                        game::state::DialogueChoice { id: "modern".to_string(), text: "Modern (WASD + Space Attack + Enter)".to_string() },
-                                        game::state::DialogueChoice { id: "classic".to_string(), text: "Classic (Arrows + Ctrl Attack + Always-on Chat)".to_string() },
-                                    ],
-                                    show_time: get_time(),
-                                });
-                            }
+                            let game_state =
+                                crate::app::new_game_state(&audio, Some(character_name));
 
                             let network = NetworkClient::new_authenticated(
                                 WS_URL,

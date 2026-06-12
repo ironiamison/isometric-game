@@ -18,6 +18,7 @@ export async function installMapperAuth(
   app: Express,
   mapperRoot: string,
   isProduction: boolean,
+  validWorlds: readonly string[],
 ): Promise<MapperAuth> {
   // --- Auth ---
   type AuthenticatedRequest = Request & { mapperUser?: string };
@@ -30,9 +31,49 @@ export async function installMapperAuth(
     (req as AuthenticatedRequest).mapperUser = username;
   }
   
-  const users: Record<string, MapperUser> = JSON.parse(
-      process.env.MAPPER_USERS || await fs.readFile(path.join(mapperRoot, 'users.json'), 'utf-8')
-    );
+  const usersSource =
+    process.env.MAPPER_USERS
+    ?? await fs.readFile(path.join(mapperRoot, 'users.json'), 'utf-8');
+  const parsedUsers: unknown = JSON.parse(usersSource);
+  if (typeof parsedUsers !== 'object' || parsedUsers === null || Array.isArray(parsedUsers)) {
+    throw new Error('Mapper users configuration must be an object');
+  }
+
+  const users: Record<string, MapperUser> = {};
+  for (const [username, value] of Object.entries(parsedUsers)) {
+    if (!/^[a-zA-Z0-9_.-]{1,64}$/.test(username)) {
+      throw new Error(`Invalid mapper username: ${username}`);
+    }
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new Error(`Invalid mapper user configuration: ${username}`);
+    }
+    const candidate = value as Partial<MapperUser>;
+    if (
+      !Array.isArray(candidate.worlds)
+      || candidate.worlds.length === 0
+      || candidate.worlds.some(
+        (world) => typeof world !== 'string' || !validWorlds.includes(world),
+      )
+    ) {
+      throw new Error(`Mapper user ${username} has invalid world access`);
+    }
+    if (new Set(candidate.worlds).size !== candidate.worlds.length) {
+      throw new Error(`Mapper user ${username} has duplicate world access`);
+    }
+    if (isProduction && typeof candidate.passwordHash !== 'string') {
+      throw new Error(`Mapper user ${username} requires passwordHash in production`);
+    }
+    users[username] = {
+      worlds: [...candidate.worlds],
+      ...(typeof candidate.passwordHash === 'string'
+        ? { passwordHash: candidate.passwordHash }
+        : {}),
+      ...(typeof candidate.password === 'string' ? { password: candidate.password } : {}),
+    };
+  }
+  if (Object.keys(users).length === 0) {
+    throw new Error('At least one mapper user must be configured');
+  }
   const configuredAuthSecret = process.env.MAPPER_AUTH_SECRET;
   if (isProduction && (!configuredAuthSecret || configuredAuthSecret.length < 32)) {
     throw new Error('MAPPER_AUTH_SECRET must be set to at least 32 characters in production');
@@ -40,6 +81,10 @@ export async function installMapperAuth(
   const AUTH_SECRET = configuredAuthSecret || crypto.randomBytes(32).toString('hex');
   const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
   const COOKIE_SECURITY = isProduction ? '; Secure' : '';
+  const COOKIE_PRIORITY = '; Priority=High';
+  const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+  const MAX_LOGIN_FAILURES = 5;
+  const loginFailures = new Map<string, { count: number; resetAt: number }>();
   
   function sign(value: string): string {
     return crypto.createHmac('sha256', AUTH_SECRET).update(value).digest('base64url');
@@ -98,6 +143,41 @@ export async function installMapperAuth(
       return safeEqual(password, user.password);
     }
     return false;
+  }
+
+  const dummyPasswordHash = (() => {
+    const salt = 'mapper-login-timing-padding';
+    const n = 16_384;
+    const r = 8;
+    const p = 1;
+    const expected = crypto.scryptSync('not-a-real-password', salt, 64, {
+      N: n,
+      r,
+      p,
+      maxmem: 128 * 1024 * 1024,
+    }).toString('base64url');
+    return `scrypt$${n}$${r}$${p}$${salt}$${expected}`;
+  })();
+
+  function loginKey(req: Request): string {
+    return req.ip || req.socket.remoteAddress || 'unknown';
+  }
+
+  function currentLoginFailure(key: string): { count: number; resetAt: number } | undefined {
+    const failure = loginFailures.get(key);
+    if (failure && failure.resetAt <= Date.now()) {
+      loginFailures.delete(key);
+      return undefined;
+    }
+    return failure;
+  }
+
+  function recordLoginFailure(key: string): void {
+    const current = currentLoginFailure(key);
+    loginFailures.set(key, {
+      count: (current?.count ?? 0) + 1,
+      resetAt: current?.resetAt ?? Date.now() + LOGIN_WINDOW_MS,
+    });
   }
   
   function parseCookies(header: string | undefined): Record<string, string> {
@@ -281,16 +361,44 @@ export async function installMapperAuth(
   
   app.post(['/login', '/mapper/login'], (req, res) => {
     const { username, password } = req.body || {};
-    const user = username && users[username];
-    if (user && typeof password === 'string' && verifyPassword(password, user)) {
+    const key = loginKey(req);
+    const failure = currentLoginFailure(key);
+    if (failure && failure.count >= MAX_LOGIN_FAILURES) {
+      res.setHeader('Retry-After', Math.ceil((failure.resetAt - Date.now()) / 1000));
+      return res
+        .status(429)
+        .send(LOGIN_HTML.replace(
+          'ERRPLACEHOLDER',
+          '<p class="error">Too many attempts. Try again later.</p>',
+        ));
+    }
+
+    const safeUsername =
+      typeof username === 'string' && username.length <= 64 ? username : '';
+    const safePassword =
+      typeof password === 'string' && password.length <= 1024 ? password : '';
+    const user = users[safeUsername];
+    const passwordMatches = verifyPassword(
+      safePassword,
+      user ?? { worlds: [], passwordHash: dummyPasswordHash },
+    );
+
+    if (user && safePassword && passwordMatches) {
+      loginFailures.delete(key);
       const csrfToken = crypto.randomBytes(32).toString('base64url');
       res.setHeader('Set-Cookie', [
-        `mapper_token=${makeToken(username)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MAX_AGE_SECONDS}${COOKIE_SECURITY}`,
-        `mapper_csrf=${csrfToken}; Path=/; SameSite=Strict; Max-Age=${SESSION_MAX_AGE_SECONDS}${COOKIE_SECURITY}`,
+        `mapper_token=${makeToken(safeUsername)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MAX_AGE_SECONDS}${COOKIE_SECURITY}${COOKIE_PRIORITY}`,
+        `mapper_csrf=${csrfToken}; Path=/; SameSite=Strict; Max-Age=${SESSION_MAX_AGE_SECONDS}${COOKIE_SECURITY}${COOKIE_PRIORITY}`,
       ]);
       return res.redirect('/mapper/');
     }
-    res.status(401).send(LOGIN_HTML.replace('ERRPLACEHOLDER', '<p class="error">Invalid credentials</p>'));
+    recordLoginFailure(key);
+    return res
+      .status(401)
+      .send(LOGIN_HTML.replace(
+        'ERRPLACEHOLDER',
+        '<p class="error">Invalid credentials</p>',
+      ));
   });
   
   app.get(['/login', '/mapper/login'], (_req, res) => {
@@ -299,8 +407,8 @@ export async function installMapperAuth(
   
   app.post(['/logout', '/mapper/logout'], (_req, res) => {
     res.setHeader('Set-Cookie', [
-      `mapper_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${COOKIE_SECURITY}`,
-      `mapper_csrf=; Path=/; SameSite=Strict; Max-Age=0${COOKIE_SECURITY}`,
+      `mapper_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${COOKIE_SECURITY}${COOKIE_PRIORITY}`,
+      `mapper_csrf=; Path=/; SameSite=Strict; Max-Age=0${COOKIE_SECURITY}${COOKIE_PRIORITY}`,
     ]);
     res.redirect('/mapper/login');
   });

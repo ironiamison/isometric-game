@@ -949,7 +949,11 @@ impl Renderer {
             // glyphs sit ABOVE tracker_y by `offset_y`. Build the hit rect around the glyphs
             // (not the empty space below them) and pad it for a comfortable click target.
             let text_dims = self.measure_text_sharp(text, font_size);
-            let hit_pad = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let hit_pad = if cfg!(target_os = "android") {
+                12.0
+            } else {
+                8.0
+            };
             let visible_top = tracker_y - text_dims.offset_y;
             return Some(macroquad::math::Rect::new(
                 text_x - hit_pad,

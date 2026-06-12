@@ -381,6 +381,7 @@ struct StatsEntity {
 
 pub(super) async fn stats_items(State(state): State<AppState>) -> impl IntoResponse {
     let items: Vec<StatsItem> = state
+        .content
         .item_registry
         .all()
         .map(|item| StatsItem {
@@ -420,7 +421,7 @@ pub(super) async fn stats_items(State(state): State<AppState>) -> impl IntoRespo
 
 pub(super) async fn stats_entities(State(state): State<AppState>) -> impl IntoResponse {
     // Collect quest kill-objective targets
-    let all_quests = state.quest_registry.all_quests().await;
+    let all_quests = state.content.quest_registry.all_quests().await;
     let mut quest_map: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     for quest in &all_quests {
@@ -435,6 +436,7 @@ pub(super) async fn stats_entities(State(state): State<AppState>) -> impl IntoRe
     }
 
     let entities: Vec<StatsEntity> = state
+        .content
         .entity_registry
         .all()
         .filter(|e| e.is_hostile())

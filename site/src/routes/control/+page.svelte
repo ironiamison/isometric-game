@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { control, tokenStore, UnauthorizedError } from '$lib/control';
   import type { PerfSnapshot, AdminRoomSummary, AdminPlayer, AdminRoomEntities, LogEntry } from '$lib/control';
-  import { Lock, LogIn, RefreshCw, Activity } from 'lucide-svelte';
+  import { Lock, LogIn, RefreshCw, Activity } from '@lucide/svelte';
 
   let token = $state<string | null>(null);
   let tokenInput = $state('');

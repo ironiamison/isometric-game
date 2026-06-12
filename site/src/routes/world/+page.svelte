@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type LeaderboardEntry, type Overview } from '$lib/api';
-  import { Crown, Crosshair, Gem, Signal, Skull, Trophy, UserCheck, UserRound, Users } from 'lucide-svelte';
+  import { Crown, Crosshair, Gem, Signal, Skull, Trophy, UserCheck, UserRound, Users } from '@lucide/svelte';
 
   let overview: Overview | undefined = $state();
   let topLevels: LeaderboardEntry[] | undefined = $state();

@@ -156,23 +156,23 @@ pub(super) async fn login_account(
                         .into_iter()
                         .map(|c| {
                             let sprite_head = CharacterInfo::resolve_sprite(
-                                &state.item_registry,
+                                &state.content.item_registry,
                                 &c.equipped_head,
                             );
                             let sprite_body = CharacterInfo::resolve_sprite(
-                                &state.item_registry,
+                                &state.content.item_registry,
                                 &c.equipped_body,
                             );
                             let sprite_weapon = CharacterInfo::resolve_sprite(
-                                &state.item_registry,
+                                &state.content.item_registry,
                                 &c.equipped_weapon,
                             );
                             let sprite_back = CharacterInfo::resolve_sprite(
-                                &state.item_registry,
+                                &state.content.item_registry,
                                 &c.equipped_back,
                             );
                             let sprite_feet = CharacterInfo::resolve_sprite(
-                                &state.item_registry,
+                                &state.content.item_registry,
                                 &c.equipped_feet,
                             );
                             CharacterInfo {

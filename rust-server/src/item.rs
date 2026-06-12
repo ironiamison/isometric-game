@@ -619,7 +619,10 @@ mod grant_tests {
         assert!(!inv.try_add_item("new_item", 1, &registry));
         assert_eq!(inv.count_item("new_item"), 0);
         let occupied_after = inv.slots.iter().filter(|s| s.is_some()).count();
-        assert_eq!(occupied_after, occupied_before, "failed grant must leave inventory untouched");
+        assert_eq!(
+            occupied_after, occupied_before,
+            "failed grant must leave inventory untouched"
+        );
     }
 
     #[test]
@@ -630,7 +633,11 @@ mod grant_tests {
         fill_distinct(&mut inv, INVENTORY_SIZE - 1);
         assert!(!inv.try_add_all(&[("alpha", 1), ("beta", 1)], &registry));
         assert_eq!(inv.count_item("alpha"), 0);
-        assert_eq!(inv.count_item("beta"), 0, "partial grant must not leak the first item");
+        assert_eq!(
+            inv.count_item("beta"),
+            0,
+            "partial grant must not leak the first item"
+        );
     }
 
     #[test]

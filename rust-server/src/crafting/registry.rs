@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::info;
 
 use super::definition::{RawRecipeDefinition, RecipeCategory, RecipeDefinition};
 
@@ -25,8 +25,10 @@ impl CraftingRegistry {
         let recipes_dir = data_dir.join("recipes");
 
         if !recipes_dir.exists() {
-            warn!("Recipes directory does not exist: {:?}", recipes_dir);
-            return Ok(());
+            return Err(format!(
+                "Recipes directory does not exist: {:?}",
+                recipes_dir
+            ));
         }
 
         let entries = std::fs::read_dir(&recipes_dir)
@@ -46,16 +48,9 @@ impl CraftingRegistry {
 
                 for (id, raw) in table {
                     if self.recipes.contains_key(&id) {
-                        warn!("Duplicate recipe ID '{}' in {:?}, overwriting", id, path);
+                        return Err(format!("Duplicate recipe ID '{}' in {:?}", id, path));
                     }
                     let recipe = RecipeDefinition::from_raw(&id, &raw);
-                    // info!(
-                    //     "Loaded recipe: {} ({}) - {} ingredients -> {} results",
-                    //     recipe.display_name,
-                    //     id,
-                    //     recipe.ingredients.len(),
-                    //     recipe.results.len()
-                    // );
                     self.recipes.insert(id, recipe);
                 }
             }

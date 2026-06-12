@@ -1,14 +1,20 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 source "$HOME/.cargo/env" 2>/dev/null || true
 
-REPO_DIR="/root/isometric-game"
+REPO_DIR="${REPO_DIR:-/root/isometric-game}"
 SITE_DEPLOY_DIR="${SITE_DEPLOY_DIR:-/var/www/aeven}"
 
 echo "Force building and deploying unified site..."
 
-if ! command -v npm >/dev/null 2>&1; then
-    echo "ERROR: npm not found. Install Node.js/npm on the VPS."
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    echo "ERROR: Node.js 22 and npm 10 are required."
+    exit 1
+fi
+NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
+NPM_MAJOR=$(npm --version | cut -d. -f1)
+if [ "$NODE_MAJOR" != "22" ] || [ "$NPM_MAJOR" != "10" ]; then
+    echo "ERROR: Node.js 22.x and npm 10.x are required; found node $(node --version), npm $(npm --version)."
     exit 1
 fi
 

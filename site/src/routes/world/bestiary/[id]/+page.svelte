@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { api, type Entity } from '$lib/api';
   import { formatChance, formatItemName, signed } from '$lib/format';
-  import { ArrowLeft, Dice5, Droplets, ScrollText, Skull, TrendingUp } from 'lucide-svelte';
+  import { ArrowLeft, Dice5, Droplets, ScrollText, Skull, TrendingUp } from '@lucide/svelte';
 
   let entities: Entity[] | undefined = $state();
   let isLoading = $state(true);

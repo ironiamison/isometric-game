@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::info;
 
 use super::item_def::{ItemDefinition, RawItemDefinition, WeaponType};
 
@@ -21,8 +21,7 @@ impl ItemRegistry {
         let items_dir = data_dir.join("items");
 
         if !items_dir.exists() {
-            warn!("Items directory does not exist: {:?}", items_dir);
-            return Ok(());
+            return Err(format!("Items directory does not exist: {:?}", items_dir));
         }
 
         let entries = std::fs::read_dir(&items_dir)
@@ -42,10 +41,9 @@ impl ItemRegistry {
 
                 for (id, raw) in table {
                     if self.items.contains_key(&id) {
-                        warn!("Duplicate item ID '{}' in {:?}, overwriting", id, path);
+                        return Err(format!("Duplicate item ID '{}' in {:?}", id, path));
                     }
                     let item = ItemDefinition::from_raw(&id, &raw);
-                    // info!("Loaded item: {} ({})", item.display_name, id);
                     self.items.insert(id, item);
                 }
             }

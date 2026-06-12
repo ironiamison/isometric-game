@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
 
+use crate::audio::AudioManager;
 use crate::game::tutorial::TutorialManager;
 use crate::game::GameState;
 #[cfg(target_os = "android")]
@@ -47,6 +48,43 @@ pub fn maybe_start_tutorial(game_state: &mut GameState) {
     }
     tutorial.hint_visible = false;
     game_state.tutorial = Some(tutorial);
+}
+
+pub fn configure_game_state(
+    game_state: &mut GameState,
+    audio: &AudioManager,
+    selected_character_name: Option<String>,
+) {
+    game_state.selected_character_name = selected_character_name;
+    game_state.ui_state.audio_volume = audio.music_volume();
+    game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
+    game_state.ui_state.audio_muted = audio.is_muted();
+    game_state.ui_state.classic_controls = crate::settings::load_classic_controls();
+
+    let settings = crate::settings::load_ui_settings();
+    game_state.camera.zoom = settings.zoom;
+    game_state.ui_state.ui_scale = settings.ui_scale;
+    game_state.ui_state.shift_drop_enabled = settings.shift_drop_enabled;
+    game_state.ui_state.chat_log_visible = settings.chat_log_visible;
+    game_state.ui_state.tap_to_pathfind = settings.tap_to_pathfind;
+    game_state.ui_state.use_joystick = settings.use_joystick;
+    game_state.ui_state.graphics_low = settings.graphics_low;
+    game_state.ui_state.chat_log_background = settings.chat_log_background;
+    game_state.ui_state.hotkey_bar = settings.hotkey_bar;
+    game_state.ui_state.quest_tracker_minimized = settings.quest_tracker_minimized;
+    game_state.ui_state.hide_system_in_public = settings.hide_system_in_public;
+    if game_state.ui_state.classic_controls {
+        game_state.ui_state.chat_open = true;
+    }
+
+    #[cfg(not(target_os = "android"))]
+    maybe_show_control_scheme_dialogue(game_state);
+}
+
+pub fn new_game_state(audio: &AudioManager, selected_character_name: Option<String>) -> GameState {
+    let mut game_state = GameState::new();
+    configure_game_state(&mut game_state, audio, selected_character_name);
+    game_state
 }
 
 pub fn update_tutorial(game_state: &mut GameState) {

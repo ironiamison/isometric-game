@@ -517,13 +517,18 @@ impl GameRoom {
                     continue;
                 };
                 total_gold = new_total;
-            } else if self.grant_item_to_player(player_id, item_id, *quantity).await {
+            } else if self
+                .grant_item_to_player(player_id, item_id, *quantity)
+                .await
+            {
                 item_count += quantity;
             } else {
                 // Inventory full — re-queue so the reward stays claimable
                 // instead of vanishing.
                 if let Some(ref db) = self.db
-                    && let Err(e) = db.add_koth_pending_reward(player_id, item_id, *quantity).await
+                    && let Err(e) = db
+                        .add_koth_pending_reward(player_id, item_id, *quantity)
+                        .await
                 {
                     tracing::error!(
                         "Failed to re-queue KOTH reward {} x{} for {}: {}",

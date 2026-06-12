@@ -21,6 +21,8 @@ export interface MapRouterDependencies {
 const COORDINATE_PATTERN = /^-?\d{1,7}$/;
 const RESOURCE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const CHUNK_KEY_PATTERN = /^-?\d{1,7},-?\d{1,7}$/;
+const CHUNK_FILE_PATTERN = /^-?\d{1,7}_-?\d{1,7}\.json$/;
+const MAX_BULK_CHUNKS = 5_000;
 
 interface ChunkPayload extends Record<string, unknown> {
   coord: { cx: number; cy: number };
@@ -34,28 +36,47 @@ function isPositiveDimension(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) > 0 && (value as number) <= 512;
 }
 
+function isTileLayer(value: unknown, expectedLength: number): value is number[] {
+  return Array.isArray(value)
+    && value.length === expectedLength
+    && value.every((tile) => Number.isInteger(tile) && tile >= 0 && tile <= 0xffff_ffff);
+}
+
+function isPackedCollision(value: unknown, tileCount: number): value is number[] {
+  return Array.isArray(value)
+    && value.length === Math.ceil(tileCount / 8)
+    && value.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255);
+}
+
 function isValidChunk(value: unknown): value is ChunkPayload {
   if (!isRecord(value) || !isRecord(value.coord) || !isRecord(value.layers)) return false;
   const { width, height, coord, layers, collision } = value;
+  if (!isPositiveDimension(width) || !isPositiveDimension(height)) return false;
+  const tileCount = width * height;
   return isPositiveDimension(width)
     && isPositiveDimension(height)
     && Number.isInteger(coord.cx)
     && Number.isInteger(coord.cy)
-    && Array.isArray(layers.ground)
-    && Array.isArray(layers.objects)
-    && Array.isArray(layers.overhead)
-    && Array.isArray(collision);
+    && Math.abs(coord.cx as number) <= 10_000_000
+    && Math.abs(coord.cy as number) <= 10_000_000
+    && isTileLayer(layers.ground, tileCount)
+    && isTileLayer(layers.objects, tileCount)
+    && isTileLayer(layers.overhead, tileCount)
+    && isPackedCollision(collision, tileCount);
 }
 
 function isValidInterior(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value) || !isRecord(value.size) || !isRecord(value.layers)) return false;
+  if (!isPositiveDimension(value.size.width) || !isPositiveDimension(value.size.height)) {
+    return false;
+  }
+  const tileCount = value.size.width * value.size.height;
   return typeof value.id === 'string'
     && RESOURCE_ID_PATTERN.test(value.id)
-    && isPositiveDimension(value.size.width)
-    && isPositiveDimension(value.size.height)
-    && Array.isArray(value.layers.ground)
-    && Array.isArray(value.layers.objects)
-    && Array.isArray(value.layers.overhead);
+    && isTileLayer(value.layers.ground, tileCount)
+    && isTileLayer(value.layers.objects, tileCount)
+    && isTileLayer(value.layers.overhead, tileCount)
+    && typeof value.collision === 'string';
 }
 
 async function writeJsonAtomically(filePath: string, value: unknown): Promise<void> {
@@ -66,6 +87,49 @@ async function writeJsonAtomically(filePath: string, value: unknown): Promise<vo
     await fs.rename(tempPath, filePath);
   } catch (error) {
     await fs.rm(tempPath, { force: true });
+    throw error;
+  }
+}
+
+async function replaceJsonDirectoryAtomically(
+  directory: string,
+  entries: ReadonlyMap<string, unknown>,
+): Promise<void> {
+  const parent = path.dirname(directory);
+  const basename = path.basename(directory);
+  const operationId = crypto.randomUUID();
+  const staging = path.join(parent, `.${basename}.${operationId}.staging`);
+  const backup = path.join(parent, `.${basename}.${operationId}.backup`);
+  await fs.mkdir(parent, { recursive: true });
+  await fs.mkdir(staging);
+
+  try {
+    for (const [filename, value] of entries) {
+      await writeJsonAtomically(path.join(staging, filename), value);
+    }
+
+    let hadExistingDirectory = false;
+    try {
+      await fs.rename(directory, backup);
+      hadExistingDirectory = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+
+    try {
+      await fs.rename(staging, directory);
+    } catch (error) {
+      if (hadExistingDirectory) {
+        await fs.rename(backup, directory).catch(() => undefined);
+      }
+      throw error;
+    }
+
+    if (hadExistingDirectory) {
+      await fs.rm(backup, { recursive: true, force: true });
+    }
+  } catch (error) {
+    await fs.rm(staging, { recursive: true, force: true });
     throw error;
   }
 }
@@ -115,7 +179,7 @@ router.get('/api/chunks', async (req, res) => {
     const { chunksDir } = getWorldDirs(getWorldFromRequest(req));
     const files = await fs.readdir(chunksDir);
     const chunks = files
-      .filter(f => f.endsWith('.json'))
+      .filter((file) => CHUNK_FILE_PATTERN.test(file))
       .map(f => {
         const [cx, cy] = f.replace('.json', '').split('_').map(Number);
         return { cx, cy };
@@ -140,7 +204,7 @@ router.get('/api/chunks/all', async (req, res) => {
     const chunks: Record<string, unknown> = {};
 
     for (const file of files) {
-      if (!file.endsWith('.json')) continue;
+      if (!CHUNK_FILE_PATTERN.test(file)) continue;
       const filePath = path.join(chunksDir, file);
       const data = await fs.readFile(filePath, 'utf-8');
       const key = file.replace('.json', '').replace('_', ',');
@@ -207,6 +271,9 @@ router.put('/api/chunks', async (req, res) => {
       return res.status(400).json({ error: 'Chunk map must be an object' });
     }
     const chunks = req.body;
+    if (Object.keys(chunks).length > MAX_BULK_CHUNKS) {
+      return res.status(413).json({ error: `At most ${MAX_BULK_CHUNKS} chunks may be saved` });
+    }
     for (const [key, chunk] of Object.entries(chunks)) {
       if (!CHUNK_KEY_PATTERN.test(key) || !isValidChunk(chunk)) {
         return res.status(400).json({ error: `Invalid chunk entry: ${key}` });
@@ -335,7 +402,7 @@ router.get('/api/map/export', async (req, res) => {
     const chunks: Record<string, unknown> = {};
 
     for (const file of files) {
-      if (!file.endsWith('.json')) continue;
+      if (!CHUNK_FILE_PATTERN.test(file)) continue;
       const filePath = path.join(chunksDir, file);
       const data = await fs.readFile(filePath, 'utf-8');
       const key = file.replace('.json', '').replace('_', ',');
@@ -363,6 +430,10 @@ router.post('/api/map/import', async (req, res) => {
     if (!isRecord(chunks)) {
       return res.status(400).json({ error: 'Invalid import format' });
     }
+    if (Object.keys(chunks).length > MAX_BULK_CHUNKS) {
+      return res.status(413).json({ error: `At most ${MAX_BULK_CHUNKS} chunks may be imported` });
+    }
+    const replacement = new Map<string, unknown>();
     for (const [key, chunk] of Object.entries(chunks)) {
       if (!CHUNK_KEY_PATTERN.test(key) || !isValidChunk(chunk)) {
         return res.status(400).json({ error: `Invalid chunk entry: ${key}` });
@@ -371,28 +442,11 @@ router.post('/api/map/import', async (req, res) => {
       if (chunk.coord.cx !== cx || chunk.coord.cy !== cy) {
         return res.status(400).json({ error: `Chunk coordinate mismatch: ${key}` });
       }
+      replacement.set(`${cx}_${cy}.json`, chunk);
     }
 
-    // Clear existing chunks
-    try {
-      const existingFiles = await fs.readdir(chunksDir);
-      for (const file of existingFiles) {
-        await fs.unlink(path.join(chunksDir, file));
-      }
-    } catch {
-      // Directory might not exist yet
-    }
-
-    // Write new chunks
-    let count = 0;
-    for (const [key, chunk] of Object.entries(chunks)) {
-      const [cx, cy] = key.split(',');
-      const filePath = path.join(chunksDir, `${cx}_${cy}.json`);
-      await writeJsonAtomically(filePath, chunk);
-      count++;
-    }
-
-    res.json({ success: true, imported: count });
+    await replaceJsonDirectoryAtomically(chunksDir, replacement);
+    res.json({ success: true, imported: replacement.size });
   } catch (err) {
     console.error('Error importing map:', err);
     res.status(500).json({ error: 'Failed to import map' });

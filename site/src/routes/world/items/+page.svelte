@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type Item } from '$lib/api';
-  import { Gem, Search } from 'lucide-svelte';
+  import { Gem, Search } from '@lucide/svelte';
 
   const CATEGORIES = ['all', 'equipment', 'consumable', 'material', 'quest'] as const;
 

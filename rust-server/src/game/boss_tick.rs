@@ -357,14 +357,18 @@ impl GameRoom {
                     quantity,
                     player_id
                 );
-                if self.grant_item_to_player(player_id, item_id, *quantity).await {
+                if self
+                    .grant_item_to_player(player_id, item_id, *quantity)
+                    .await
+                {
                     item_count += quantity;
                 } else {
                     // Inventory full — re-queue so the reward stays claimable
                     // instead of vanishing.
                     if let Some(ref db) = self.db
-                        && let Err(e) =
-                            db.add_boss_pending_reward(player_id, item_id, *quantity).await
+                        && let Err(e) = db
+                            .add_boss_pending_reward(player_id, item_id, *quantity)
+                            .await
                     {
                         tracing::error!(
                             "Failed to re-queue boss reward {} x{} for {}: {}",
@@ -494,10 +498,15 @@ impl GameRoom {
         // Bank was full for these — try the inventory, and if that's full too
         // re-queue them as pending so nothing is lost.
         for (item_id, quantity) in &overflow_items {
-            if self.grant_item_to_player(player_id, item_id, *quantity).await {
+            if self
+                .grant_item_to_player(player_id, item_id, *quantity)
+                .await
+            {
                 item_count += quantity;
             } else if let Some(ref db) = self.db
-                && let Err(e) = db.add_boss_pending_reward(player_id, item_id, *quantity).await
+                && let Err(e) = db
+                    .add_boss_pending_reward(player_id, item_id, *quantity)
+                    .await
             {
                 tracing::error!(
                     "Failed to re-queue boss reward {} x{} for {}: {}",
