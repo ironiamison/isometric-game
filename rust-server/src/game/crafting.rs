@@ -752,25 +752,44 @@ impl GameRoom {
                     continue;
                 }
 
-                let crafting = player.crafting_state.take().unwrap();
-                let recipe = match self.crafting_registry.get(&crafting.recipe_id) {
+                let recipe = match player
+                    .crafting_state
+                    .as_ref()
+                    .and_then(|state| self.crafting_registry.get(&state.recipe_id))
+                {
                     Some(recipe) => recipe.clone(),
-                    None => continue,
+                    None => {
+                        player.crafting_state = None;
+                        continue;
+                    }
                 };
 
                 let burned = check_burn(&recipe, player.skills.survivalist.level);
+                let grant: Vec<(&str, i32)> = if burned {
+                    vec![(recipe.burn_result.as_ref().unwrap().as_str(), 1)]
+                } else {
+                    recipe
+                        .results
+                        .iter()
+                        .map(|result| (result.item_id.as_str(), result.count))
+                        .collect()
+                };
+
+                // All-or-nothing: if the finished item won't fit, leave the craft
+                // in its completed-but-unclaimed state so it lands the instant the
+                // player frees space, rather than destroying it. We peek at the
+                // crafting_state above and only `take()` it once the grant lands.
+                if !player.inventory.try_add_all(&grant, &self.item_registry) {
+                    continue;
+                }
+
+                let crafting = player.crafting_state.take().unwrap();
                 let mut items_gained = Vec::new();
                 if burned {
                     let burn_item = recipe.burn_result.as_ref().unwrap();
-                    player.inventory.add_item(burn_item, 1, &self.item_registry);
                     items_gained.push((burn_item.clone(), 1));
                 } else {
                     for result in &recipe.results {
-                        player.inventory.add_item(
-                            &result.item_id,
-                            result.count,
-                            &self.item_registry,
-                        );
                         items_gained.push((result.item_id.clone(), result.count as u32));
                     }
                 }

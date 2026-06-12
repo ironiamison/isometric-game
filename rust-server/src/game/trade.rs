@@ -666,53 +666,75 @@ impl GameRoom {
             _ => return,
         };
 
+        // Build each side's post-trade inventory on a clone, applying both the
+        // give-aways and the incoming items together. Removing the offered items
+        // frees the slots the incoming items need, so we simulate the full
+        // exchange and only commit if BOTH players can hold their new items —
+        // otherwise cancel and leave every inventory untouched. This is what
+        // stops a full inventory from silently eating a received item.
+        let mut new_inv_a = match players.get(&pa) {
+            Some(player) => player.inventory.clone(),
+            None => return,
+        };
+        let mut new_inv_b = match players.get(&pb) {
+            Some(player) => player.inventory.clone(),
+            None => return,
+        };
+
         for item in session.offer_a.items.iter().rev() {
-            if let Some(player) = players.get_mut(&pa)
-                && let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize)
-            {
+            if let Some(Some(slot)) = new_inv_a.slots.get_mut(item.inv_slot as usize) {
                 slot.quantity -= item.quantity;
                 if slot.quantity <= 0 {
-                    player.inventory.slots[item.inv_slot as usize] = None;
+                    new_inv_a.slots[item.inv_slot as usize] = None;
                 }
             }
         }
         for item in session.offer_b.items.iter().rev() {
-            if let Some(player) = players.get_mut(&pb)
-                && let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize)
-            {
+            if let Some(Some(slot)) = new_inv_b.slots.get_mut(item.inv_slot as usize) {
                 slot.quantity -= item.quantity;
                 if slot.quantity <= 0 {
-                    player.inventory.slots[item.inv_slot as usize] = None;
+                    new_inv_b.slots[item.inv_slot as usize] = None;
                 }
             }
         }
 
-        if let Some(player_a) = players.get_mut(&pa) {
-            player_a.inventory.gold =
-                item::checked_gold_debit(player_a.inventory.gold, session.offer_a.gold)
-                    .and_then(|gold| item::checked_gold_credit(gold, session.offer_b.gold))
-                    .expect("trade balances were validated before mutation");
-        }
-        if let Some(player_b) = players.get_mut(&pb) {
-            player_b.inventory.gold =
-                item::checked_gold_debit(player_b.inventory.gold, session.offer_b.gold)
-                    .and_then(|gold| item::checked_gold_credit(gold, session.offer_a.gold))
-                    .expect("trade balances were validated before mutation");
+        new_inv_a.gold = item::checked_gold_debit(new_inv_a.gold, session.offer_a.gold)
+            .and_then(|gold| item::checked_gold_credit(gold, session.offer_b.gold))
+            .expect("trade balances were validated before mutation");
+        new_inv_b.gold = item::checked_gold_debit(new_inv_b.gold, session.offer_b.gold)
+            .and_then(|gold| item::checked_gold_credit(gold, session.offer_a.gold))
+            .expect("trade balances were validated before mutation");
+
+        let incoming_a: Vec<(&str, i32)> = session
+            .offer_b
+            .items
+            .iter()
+            .map(|item| (item.item_id.as_str(), item.quantity))
+            .collect();
+        let incoming_b: Vec<(&str, i32)> = session
+            .offer_a
+            .items
+            .iter()
+            .map(|item| (item.item_id.as_str(), item.quantity))
+            .collect();
+
+        if !new_inv_a.try_add_all(&incoming_a, &registry)
+            || !new_inv_b.try_add_all(&incoming_b, &registry)
+        {
+            drop(players);
+            let msg = ServerMessage::TradeCancelled {
+                reason: "Not enough inventory space to complete the trade.".to_string(),
+            };
+            self.send_to_player(&session.player_a, msg.clone()).await;
+            self.send_to_player(&session.player_b, msg).await;
+            return;
         }
 
-        for item in &session.offer_b.items {
-            if let Some(player) = players.get_mut(&pa) {
-                player
-                    .inventory
-                    .add_item(&item.item_id, item.quantity, &registry);
-            }
+        if let Some(player_a) = players.get_mut(&pa) {
+            player_a.inventory = new_inv_a;
         }
-        for item in &session.offer_a.items {
-            if let Some(player) = players.get_mut(&pb) {
-                player
-                    .inventory
-                    .add_item(&item.item_id, item.quantity, &registry);
-            }
+        if let Some(player_b) = players.get_mut(&pb) {
+            player_b.inventory = new_inv_b;
         }
 
         let inv_a = players

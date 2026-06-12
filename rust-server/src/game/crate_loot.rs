@@ -201,7 +201,10 @@ impl GameRoom {
 
         let is_commission_marks = reward_id == "commission_marks";
 
-        // 3. Write lock: remove crate, add reward (unless commission marks)
+        // 3. Write lock: all-or-nothing. Only consume the crate if the reward
+        //    actually fits, so a full inventory can never eat the loot. We
+        //    simulate on a clone because removing the crate frees its own slot
+        //    first — the reward may fit only after that removal.
         let inventory_update = {
             let mut players = self.players.write().await;
             let player = match players.get_mut(player_id) {
@@ -209,17 +212,29 @@ impl GameRoom {
                 None => return,
             };
 
-            player.inventory.remove_item(&item_id, 1);
+            let mut trial = player.inventory.clone();
+            trial.remove_item(&item_id, 1);
 
-            if !is_commission_marks {
-                player
-                    .inventory
-                    .add_item(&reward_id, qty, &self.item_registry);
+            if !is_commission_marks && !trial.try_add_item(&reward_id, qty, &self.item_registry) {
+                None
+            } else {
+                player.inventory = trial;
+                let slots = player.inventory.to_update();
+                let gold = player.inventory.gold;
+                Some((slots, gold))
             }
+        };
 
-            let slots = player.inventory.to_update();
-            let gold = player.inventory.gold;
-            (slots, gold)
+        let inventory_update = match inventory_update {
+            Some(update) => update,
+            None => {
+                self.send_system_message(
+                    player_id,
+                    "Your inventory is too full to open that crate — make some space and try again.",
+                )
+                .await;
+                return;
+            }
         };
 
         // Handle commission marks via database (outside write lock)

@@ -332,6 +332,7 @@ impl GameRoom {
 
         let mut total_gold = 0i32;
         let mut item_count = 0u32;
+        let mut kept_pending = 0u32;
 
         for (item_id, quantity) in &rewards {
             tracing::info!(
@@ -356,9 +357,25 @@ impl GameRoom {
                     quantity,
                     player_id
                 );
-                self.grant_item_to_player(player_id, item_id, *quantity)
-                    .await;
-                item_count += quantity;
+                if self.grant_item_to_player(player_id, item_id, *quantity).await {
+                    item_count += quantity;
+                } else {
+                    // Inventory full — re-queue so the reward stays claimable
+                    // instead of vanishing.
+                    if let Some(ref db) = self.db
+                        && let Err(e) =
+                            db.add_boss_pending_reward(player_id, item_id, *quantity).await
+                    {
+                        tracing::error!(
+                            "Failed to re-queue boss reward {} x{} for {}: {}",
+                            item_id,
+                            quantity,
+                            player_id,
+                            e
+                        );
+                    }
+                    kept_pending += quantity;
+                }
             }
         }
 
@@ -404,6 +421,13 @@ impl GameRoom {
             format!("Claimed {} items from boss rewards!", item_count)
         };
         self.send_system_message(player_id, &msg).await;
+        if kept_pending > 0 {
+            self.send_system_message(
+                player_id,
+                "Your inventory was full — the remaining rewards are still waiting to be claimed. Make some space and claim again.",
+            )
+            .await;
+        }
     }
 
     /// Claim all pending boss rewards and send directly to bank
@@ -467,11 +491,22 @@ impl GameRoom {
             }
         }
 
-        // Grant overflow items to inventory instead
+        // Bank was full for these — try the inventory, and if that's full too
+        // re-queue them as pending so nothing is lost.
         for (item_id, quantity) in &overflow_items {
-            self.grant_item_to_player(player_id, item_id, *quantity)
-                .await;
-            item_count += quantity;
+            if self.grant_item_to_player(player_id, item_id, *quantity).await {
+                item_count += quantity;
+            } else if let Some(ref db) = self.db
+                && let Err(e) = db.add_boss_pending_reward(player_id, item_id, *quantity).await
+            {
+                tracing::error!(
+                    "Failed to re-queue boss reward {} x{} for {}: {}",
+                    item_id,
+                    quantity,
+                    player_id,
+                    e
+                );
+            }
         }
 
         // Send bank update

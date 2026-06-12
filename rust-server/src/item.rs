@@ -114,6 +114,37 @@ impl Inventory {
         quantity // Return what couldn't fit
     }
 
+    /// Grant every item, or none.
+    ///
+    /// This is the single safe entry point for handing items to a player: it
+    /// commits all of `items` only if they *all* fit, otherwise it leaves the
+    /// inventory completely untouched and returns `false`. Using a trial clone
+    /// makes it correct in the tricky cases plain `add_item` gets wrong:
+    /// cross-item stacking (two grants competing for the same empty slots) and
+    /// removals that free space (simulate the removal on the clone first, then
+    /// call this on the same clone before committing).
+    ///
+    /// Callers must branch on the result — on `false`, abort the surrounding
+    /// action (don't consume the source, don't clear a pending reward) and tell
+    /// the player their inventory is full.
+    #[must_use]
+    pub fn try_add_all(&mut self, items: &[(&str, i32)], registry: &ItemRegistry) -> bool {
+        let mut trial = self.clone();
+        for (item_id, quantity) in items {
+            if trial.add_item(item_id, *quantity, registry) != 0 {
+                return false; // something didn't fit — commit nothing
+            }
+        }
+        *self = trial;
+        true
+    }
+
+    /// Convenience wrapper around [`Inventory::try_add_all`] for a single item.
+    #[must_use]
+    pub fn try_add_item(&mut self, item_id: &str, quantity: i32, registry: &ItemRegistry) -> bool {
+        self.try_add_all(&[(item_id, quantity)], registry)
+    }
+
     /// Use an item at the given slot. Returns the item_id if successful.
     pub fn use_item(&mut self, slot_index: usize, registry: &ItemRegistry) -> Option<String> {
         if slot_index >= INVENTORY_SIZE {
@@ -556,5 +587,68 @@ mod economy_tests {
         assert_eq!(checked_gold_debit(-1, 1), None);
         assert_eq!(checked_gold_debit(3, 4), None);
         assert_eq!(checked_gold_debit(4, 4), Some(0));
+    }
+}
+
+#[cfg(test)]
+mod grant_tests {
+    use super::*;
+
+    /// Fill the inventory with `n` distinct single-slot items.
+    fn fill_distinct(inv: &mut Inventory, n: usize) {
+        for i in 0..n {
+            inv.slots[i] = Some(InventorySlot::new(format!("item_{i}"), 1));
+        }
+    }
+
+    #[test]
+    fn grants_when_everything_fits() {
+        let registry = ItemRegistry::new(); // unknown items => DEFAULT_MAX_STACK
+        let mut inv = Inventory::new();
+        assert!(inv.try_add_all(&[("sword", 1), ("shield", 2)], &registry));
+        assert_eq!(inv.count_item("sword"), 1);
+        assert_eq!(inv.count_item("shield"), 2);
+    }
+
+    #[test]
+    fn full_inventory_grant_mutates_nothing() {
+        let registry = ItemRegistry::new();
+        let mut inv = Inventory::new();
+        fill_distinct(&mut inv, INVENTORY_SIZE); // all 20 slots occupied
+        let occupied_before = inv.slots.iter().filter(|s| s.is_some()).count();
+        assert!(!inv.try_add_item("new_item", 1, &registry));
+        assert_eq!(inv.count_item("new_item"), 0);
+        let occupied_after = inv.slots.iter().filter(|s| s.is_some()).count();
+        assert_eq!(occupied_after, occupied_before, "failed grant must leave inventory untouched");
+    }
+
+    #[test]
+    fn all_or_nothing_across_competing_items() {
+        // One free slot, but two distinct new items need two slots: neither lands.
+        let registry = ItemRegistry::new();
+        let mut inv = Inventory::new();
+        fill_distinct(&mut inv, INVENTORY_SIZE - 1);
+        assert!(!inv.try_add_all(&[("alpha", 1), ("beta", 1)], &registry));
+        assert_eq!(inv.count_item("alpha"), 0);
+        assert_eq!(inv.count_item("beta"), 0, "partial grant must not leak the first item");
+    }
+
+    #[test]
+    fn stacks_onto_existing_partial_stack() {
+        let registry = ItemRegistry::new();
+        let mut inv = Inventory::new();
+        fill_distinct(&mut inv, INVENTORY_SIZE); // no empty slots...
+        inv.slots[5] = Some(InventorySlot::new("potion".to_string(), 10)); // ...but a partial stack exists
+        assert!(inv.try_add_item("potion", 5, &registry));
+        assert_eq!(inv.count_item("potion"), 15);
+    }
+
+    #[test]
+    fn gold_always_fits_even_when_full() {
+        let registry = ItemRegistry::new();
+        let mut inv = Inventory::new();
+        fill_distinct(&mut inv, INVENTORY_SIZE);
+        assert!(inv.try_add_item(GOLD_ITEM_ID, 500, &registry));
+        assert_eq!(inv.gold, 500);
     }
 }

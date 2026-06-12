@@ -266,31 +266,71 @@ impl GameRoom {
         quest_state: &mut PlayerQuestState,
     ) {
         if let Some(quest) = self.quest_registry.get(quest_id).await {
-            // Verify the player has all required collect items in their inventory
-            // before completing (items may have been banked after collection).
-            // Skip objectives with consume=false (intermediate items used up before turn-in).
-            {
-                let players = self.players.read().await;
-                if let Some(player) = players.get(player_id) {
-                    for objective in &quest.objectives {
-                        if objective.objective_type == ObjectiveType::CollectItem
-                            && objective.consume
-                            && !player
-                                .inventory
-                                .has_item(&objective.target, objective.count)
-                        {
-                            tracing::warn!(
-                                "Player {} tried to complete quest {} but missing {} x{} in inventory",
-                                player_id,
-                                quest_id,
-                                objective.target,
-                                objective.count
-                            );
-                            return;
-                        }
+            // Verify the player still has the required collect items, and that
+            // the reward items will actually fit, BEFORE marking the quest
+            // complete. (Items may have been banked after collection; skip
+            // objectives with consume=false.) Consuming the collect items frees
+            // space, so simulate the removal on a clone first — the reward may
+            // only fit afterwards. All-or-nothing: if it won't fit we touch
+            // nothing and the quest stays claimable.
+            let reward_items: Vec<(&str, i32)> = quest
+                .rewards
+                .items
+                .iter()
+                .map(|r| (r.item_id.as_str(), r.count))
+                .collect();
+
+            let committed = {
+                let mut players = self.players.write().await;
+                let player = match players.get_mut(player_id) {
+                    Some(p) => p,
+                    None => return,
+                };
+
+                for objective in &quest.objectives {
+                    if objective.objective_type == ObjectiveType::CollectItem
+                        && objective.consume
+                        && !player.inventory.has_item(&objective.target, objective.count)
+                    {
+                        tracing::warn!(
+                            "Player {} tried to complete quest {} but missing {} x{} in inventory",
+                            player_id,
+                            quest_id,
+                            objective.target,
+                            objective.count
+                        );
+                        return;
                     }
                 }
-            }
+
+                let mut trial = player.inventory.clone();
+                for objective in &quest.objectives {
+                    if objective.objective_type == ObjectiveType::CollectItem && objective.consume {
+                        trial.remove_item(&objective.target, objective.count);
+                    }
+                }
+
+                if !trial.try_add_all(&reward_items, &self.item_registry) {
+                    None
+                } else {
+                    trial.gold = item::checked_gold_credit(trial.gold, quest.rewards.gold)
+                        .unwrap_or(item::MAX_GOLD);
+                    player.inventory = trial;
+                    Some((player.inventory.to_update(), player.inventory.gold))
+                }
+            };
+
+            let (slots, gold) = match committed {
+                Some(update) => update,
+                None => {
+                    self.send_system_message(
+                        player_id,
+                        "Your inventory is too full to claim the quest reward — make some space and try again.",
+                    )
+                    .await;
+                    return;
+                }
+            };
 
             quest_state.complete_quest(quest_id);
             self.send_to_player(
@@ -303,50 +343,25 @@ impl GameRoom {
                 },
             )
             .await;
+            self.send_to_player(
+                player_id,
+                ServerMessage::InventoryUpdate {
+                    player_id: player_id.to_string(),
+                    slots,
+                    gold,
+                },
+            )
+            .await;
 
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                for objective in &quest.objectives {
-                    if objective.objective_type == ObjectiveType::CollectItem && objective.consume {
-                        player
-                            .inventory
-                            .remove_item(&objective.target, objective.count);
-                    }
-                }
-
-                player.inventory.gold =
-                    item::checked_gold_credit(player.inventory.gold, quest.rewards.gold)
-                        .unwrap_or(item::MAX_GOLD);
-                for item_reward in &quest.rewards.items {
-                    player.inventory.add_item(
-                        &item_reward.item_id,
-                        item_reward.count,
-                        &self.item_registry,
-                    );
-                }
-                let slots = player.inventory.to_update();
-                let gold = player.inventory.gold;
-                drop(players);
-                self.send_to_player(
+            // Record collection log entries for quest reward items
+            for item_reward in &quest.rewards.items {
+                self.record_collection_entry(
                     player_id,
-                    ServerMessage::InventoryUpdate {
-                        player_id: player_id.to_string(),
-                        slots,
-                        gold,
-                    },
+                    &item_reward.item_id,
+                    "quest_rewards",
+                    quest_id,
                 )
                 .await;
-
-                // Record collection log entries for quest reward items
-                for item_reward in &quest.rewards.items {
-                    self.record_collection_entry(
-                        player_id,
-                        &item_reward.item_id,
-                        "quest_rewards",
-                        quest_id,
-                    )
-                    .await;
-                }
             }
         }
         tracing::info!("Player {} completed quest {}", player_id, quest_id);
@@ -364,10 +379,20 @@ impl GameRoom {
 
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
-            for (item_id, count) in granted_items {
-                player
-                    .inventory
-                    .add_item(item_id, *count, &self.item_registry);
+            // All-or-nothing: don't grant (and don't progress objectives below)
+            // unless every item fits, so a full inventory can't eat script loot.
+            let granted: Vec<(&str, i32)> = granted_items
+                .iter()
+                .map(|(id, count)| (id.as_str(), *count))
+                .collect();
+            if !player.inventory.try_add_all(&granted, &self.item_registry) {
+                drop(players);
+                self.send_system_message(
+                    player_id,
+                    "Your inventory is too full to receive these items — make some space and try again.",
+                )
+                .await;
+                return;
             }
             let slots = player.inventory.to_update();
             let gold = player.inventory.gold;

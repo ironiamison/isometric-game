@@ -392,17 +392,28 @@ impl GameRoom {
         }
     }
 
-    /// Helper to grant a non-gold item to a player
-    pub(crate) async fn grant_item_to_player(&self, player_id: &str, item_id: &str, quantity: u32) {
+    /// Helper to grant a non-gold item to a player.
+    ///
+    /// Returns `true` only if the whole quantity fit. On `false` the inventory
+    /// is left untouched and the caller is responsible for keeping the reward
+    /// claimable (e.g. re-queuing it as a pending reward) so it isn't lost.
+    pub(crate) async fn grant_item_to_player(
+        &self,
+        player_id: &str,
+        item_id: &str,
+        quantity: u32,
+    ) -> bool {
         let mut players = self.players.write().await;
         if let Some(player) = players.get_mut(player_id) {
             let Ok(quantity) = i32::try_from(quantity) else {
                 tracing::error!("Discarding oversized item reward for {}", item_id);
-                return;
+                return false;
             };
             player
                 .inventory
-                .add_item(item_id, quantity, &self.item_registry);
+                .try_add_item(item_id, quantity, &self.item_registry)
+        } else {
+            false
         }
     }
 
@@ -493,6 +504,7 @@ impl GameRoom {
 
         let mut total_gold = 0i32;
         let mut item_count = 0u32;
+        let mut kept_pending = 0u32;
 
         for (item_id, quantity) in &rewards {
             if item_id == "gold_coins" {
@@ -505,10 +517,23 @@ impl GameRoom {
                     continue;
                 };
                 total_gold = new_total;
-            } else {
-                self.grant_item_to_player(player_id, item_id, *quantity)
-                    .await;
+            } else if self.grant_item_to_player(player_id, item_id, *quantity).await {
                 item_count += quantity;
+            } else {
+                // Inventory full — re-queue so the reward stays claimable
+                // instead of vanishing.
+                if let Some(ref db) = self.db
+                    && let Err(e) = db.add_koth_pending_reward(player_id, item_id, *quantity).await
+                {
+                    tracing::error!(
+                        "Failed to re-queue KOTH reward {} x{} for {}: {}",
+                        item_id,
+                        quantity,
+                        player_id,
+                        e
+                    );
+                }
+                kept_pending += quantity;
             }
         }
 
@@ -535,5 +560,12 @@ impl GameRoom {
             format!("Claimed {} items from KOTH rewards!", item_count)
         };
         self.send_system_message(player_id, &msg).await;
+        if kept_pending > 0 {
+            self.send_system_message(
+                player_id,
+                "Your inventory was full — the remaining rewards are still waiting to be claimed. Make some space and claim again.",
+            )
+            .await;
+        }
     }
 }

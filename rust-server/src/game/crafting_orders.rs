@@ -470,20 +470,11 @@ impl GameRoom {
                 break 'claim Err(msg);
             }
 
-            // 4. Remove items from inventory
-            for item in &template.items {
-                player.inventory.remove_item(&item.id, item.quantity);
-            }
-
-            // 5. Grant gold
-            let Some(new_gold) =
-                item::checked_gold_credit(player.inventory.gold, template.rewards.gold)
-            else {
-                break 'claim Err("Gold limit reached.".to_string());
-            };
-            player.inventory.gold = new_gold;
-
-            // 5b. Grant reward crate
+            // 4-5b. Consume the turn-in items, credit gold, and grant the reward
+            //       crate together as all-or-nothing on a trial clone. Removing
+            //       the turn-in items frees the space the crate needs, so we
+            //       simulate the whole exchange and only commit if the crate
+            //       fits — a full inventory can never eat the items or the crate.
             let bracket = if template.min_level >= 50 {
                 "high"
             } else if template.min_level >= 20 {
@@ -496,7 +487,24 @@ impl GameRoom {
             } else {
                 format!("artisans_crate_{}", bracket)
             };
-            player.inventory.add_item(&crate_id, 1, &self.item_registry);
+
+            let mut trial = player.inventory.clone();
+            for item in &template.items {
+                trial.remove_item(&item.id, item.quantity);
+            }
+            let Some(new_gold) = item::checked_gold_credit(trial.gold, template.rewards.gold)
+            else {
+                break 'claim Err("Gold limit reached.".to_string());
+            };
+            trial.gold = new_gold;
+            if !trial.try_add_item(&crate_id, 1, &self.item_registry) {
+                break 'claim Err(
+                    "Your inventory is too full to receive the reward crate — make some space and try again."
+                        .to_string(),
+                );
+            }
+            player.inventory = trial;
+
             let crate_name = self
                 .item_registry
                 .get(&crate_id)
