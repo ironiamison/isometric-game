@@ -165,18 +165,16 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
             if let Some(value) = data {
                 // Parse partner's items
                 let mut items = Vec::new();
-                if let Some(arr) = extract_map_field(value, "partner_items") {
-                    if let rmpv::Value::Array(ref list) = *arr {
-                        for item in list {
-                            let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
-                            let item_id = extract_string(item, "item_id").unwrap_or_default();
-                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
-                            items.push(crate::game::TradeOfferItem {
-                                slot_index,
-                                item_id,
-                                quantity,
-                            });
-                        }
+                if let Some(rmpv::Value::Array(list)) = extract_map_field(value, "partner_items") {
+                    for item in list {
+                        let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
+                        let item_id = extract_string(item, "item_id").unwrap_or_default();
+                        let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                        items.push(crate::game::TradeOfferItem {
+                            slot_index,
+                            item_id,
+                            quantity,
+                        });
                     }
                 }
                 state.ui_state.trade_partner_items = items;
@@ -190,18 +188,16 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
         "tradeMyOfferUpdate" => {
             if let Some(value) = data {
                 let mut items = Vec::new();
-                if let Some(arr) = extract_map_field(value, "my_items") {
-                    if let rmpv::Value::Array(ref list) = *arr {
-                        for item in list {
-                            let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
-                            let item_id = extract_string(item, "item_id").unwrap_or_default();
-                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
-                            items.push(crate::game::TradeOfferItem {
-                                slot_index,
-                                item_id,
-                                quantity,
-                            });
-                        }
+                if let Some(rmpv::Value::Array(list)) = extract_map_field(value, "my_items") {
+                    for item in list {
+                        let slot_index = extract_u8(item, "slot_index").unwrap_or(0);
+                        let item_id = extract_string(item, "item_id").unwrap_or_default();
+                        let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                        items.push(crate::game::TradeOfferItem {
+                            slot_index,
+                            item_id,
+                            quantity,
+                        });
                     }
                 }
                 state.ui_state.trade_my_items = items;
@@ -254,20 +250,18 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
         "stallUpdate" => {
             if let Some(value) = data {
                 let mut slots = Vec::new();
-                if let Some(arr) = extract_map_field(value, "slots") {
-                    if let rmpv::Value::Array(ref list) = *arr {
-                        for item in list {
-                            let slot = extract_u8(item, "slot").unwrap_or(0);
-                            let item_id = extract_string(item, "item_id").unwrap_or_default();
-                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
-                            let price = extract_i32(item, "price").unwrap_or(0);
-                            slots.push(crate::game::StallSlotInfo {
-                                slot,
-                                item_id,
-                                quantity,
-                                price,
-                            });
-                        }
+                if let Some(rmpv::Value::Array(list)) = extract_map_field(value, "slots") {
+                    for item in list {
+                        let slot = extract_u8(item, "slot").unwrap_or(0);
+                        let item_id = extract_string(item, "item_id").unwrap_or_default();
+                        let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                        let price = extract_i32(item, "price").unwrap_or(0);
+                        slots.push(crate::game::StallSlotInfo {
+                            slot,
+                            item_id,
+                            quantity,
+                            price,
+                        });
                     }
                 }
                 state.ui_state.stall_my_slots = slots;
@@ -279,20 +273,18 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                 let seller_name = extract_string(value, "seller_name").unwrap_or_default();
                 let stall_name = extract_string(value, "stall_name").unwrap_or_default();
                 let mut items = Vec::new();
-                if let Some(arr) = extract_map_field(value, "items") {
-                    if let rmpv::Value::Array(ref list) = *arr {
-                        for item in list {
-                            let slot = extract_u8(item, "slot").unwrap_or(0);
-                            let item_id = extract_string(item, "item_id").unwrap_or_default();
-                            let quantity = extract_i32(item, "quantity").unwrap_or(1);
-                            let price = extract_i32(item, "price").unwrap_or(0);
-                            items.push(crate::game::StallSlotInfo {
-                                slot,
-                                item_id,
-                                quantity,
-                                price,
-                            });
-                        }
+                if let Some(rmpv::Value::Array(list)) = extract_map_field(value, "items") {
+                    for item in list {
+                        let slot = extract_u8(item, "slot").unwrap_or(0);
+                        let item_id = extract_string(item, "item_id").unwrap_or_default();
+                        let quantity = extract_i32(item, "quantity").unwrap_or(1);
+                        let price = extract_i32(item, "price").unwrap_or(0);
+                        items.push(crate::game::StallSlotInfo {
+                            slot,
+                            item_id,
+                            quantity,
+                            price,
+                        });
                     }
                 }
                 state.ui_state.stall_browse = Some(crate::game::StallBrowseInfo {

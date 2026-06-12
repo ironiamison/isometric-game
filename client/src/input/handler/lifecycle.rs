@@ -1,5 +1,11 @@
 use super::*;
 
+impl Default for InputHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InputHandler {
     pub fn new() -> Self {
         Self {

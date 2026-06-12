@@ -574,10 +574,8 @@ impl ArenaManager {
         }
 
         if num_entrants <= 2 {
-            let mut payouts = vec![total_pot];
-            for _ in 1..num_ranked {
-                payouts.push(0);
-            }
+            let mut payouts = vec![0; num_ranked];
+            payouts[0] = total_pot;
             return payouts;
         }
 

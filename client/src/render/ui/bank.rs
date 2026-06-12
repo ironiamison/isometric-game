@@ -486,7 +486,7 @@ impl Renderer {
         }
 
         let row_height = slot_size + slot_gap;
-        let total_rows = (total_slots + BANK_COLS - 1) / BANK_COLS;
+        let total_rows = total_slots.div_ceil(BANK_COLS);
         let total_grid_height = total_rows as f32 * row_height - slot_gap;
         let needs_scroll = total_grid_height > grid_height;
 
@@ -686,8 +686,8 @@ impl Renderer {
     ) {
         let s = self.font_scale.get();
         let row_height = slot_size + slot_gap;
-        let total_slots = 20; // Standard inventory size
-        let total_rows = (total_slots + INV_COLS - 1) / INV_COLS;
+        let total_slots: usize = 20; // Standard inventory size
+        let total_rows = total_slots.div_ceil(INV_COLS);
         let total_grid_height = total_rows as f32 * row_height - slot_gap;
         let needs_scroll = total_grid_height > grid_height;
 

@@ -1,4 +1,5 @@
 use super::*;
+use tokio::sync::broadcast;
 
 impl GameRoom {
     fn is_pvp_zone(&self, world_x: i32, world_y: i32) -> bool {
@@ -99,13 +100,13 @@ impl GameRoom {
 
         // Check if this level-up changes the rankings (skip admins — they're excluded from rankings)
         let players = self.players.read().await;
-        if let Some(player) = players.get(player_id) {
-            if !player.is_admin {
-                let name = player.name.clone();
-                let total = player.skills.total_level();
-                drop(players);
-                self.check_top_player_after_level_up(&name, total).await;
-            }
+        if let Some(player) = players.get(player_id)
+            && !player.is_admin
+        {
+            let name = player.name.clone();
+            let total = player.skills.total_level();
+            drop(players);
+            self.check_top_player_after_level_up(&name, total).await;
         }
     }
 
@@ -119,27 +120,24 @@ impl GameRoom {
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {
-        self.broadcast_tx.subscribe()
+        self.transport.subscribe()
     }
 
     pub async fn add_spectator(&self, spectator_id: &str, sender: mpsc::Sender<Vec<u8>>) {
-        self.spectator_senders
-            .write()
-            .await
-            .insert(spectator_id.to_string(), sender);
+        self.transport.add_spectator(spectator_id, sender).await;
     }
 
     pub async fn remove_spectator(&self, spectator_id: &str) {
-        self.spectator_senders.write().await.remove(spectator_id);
+        self.transport.remove_spectator(spectator_id).await;
     }
 
     pub async fn spectator_count(&self) -> usize {
-        self.spectator_senders.read().await.len()
+        self.transport.spectator_count().await
     }
 
     pub async fn broadcast(&self, msg: ServerMessage) {
         if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
-            let _ = self.broadcast_tx.send(bytes);
+            self.transport.broadcast(bytes);
         }
     }
 
@@ -168,10 +166,10 @@ impl GameRoom {
             .await
             .get(source_player_id)
             .cloned();
+        let senders = self.transport.player_senders().await;
         let recipients: Vec<(String, mpsc::Sender<Vec<u8>>)> = {
             let player_instances = self.player_instances.read().await;
             let players = self.players.read().await;
-            let senders = self.player_senders.read().await;
             senders
                 .iter()
                 .filter(|(player_id, _)| {
@@ -212,10 +210,10 @@ impl GameRoom {
         source_y: i32,
         msg: ServerMessage,
     ) {
+        let senders = self.transport.player_senders().await;
         let recipients: Vec<(String, mpsc::Sender<Vec<u8>>)> = {
             let player_instances = self.player_instances.read().await;
             let players = self.players.read().await;
-            let senders = self.player_senders.read().await;
             senders
                 .iter()
                 .filter(|(player_id, _)| {
@@ -274,9 +272,9 @@ impl GameRoom {
         instance_id: Option<&str>,
         msg: ServerMessage,
     ) {
+        let senders = self.transport.player_senders().await;
         let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
             let player_instances = self.player_instances.read().await;
-            let senders = self.player_senders.read().await;
             senders
                 .iter()
                 .filter(|(player_id, _)| {
@@ -300,17 +298,17 @@ impl GameRoom {
             }
             _ => None,
         };
-        if let Some(source_player_id) = positional_source {
-            if self.players.read().await.contains_key(&source_player_id) {
-                self.broadcast_to_zone_except(&source_player_id, msg, exclude)
-                    .await;
-                return;
-            }
+        if let Some(source_player_id) = positional_source
+            && self.players.read().await.contains_key(&source_player_id)
+        {
+            self.broadcast_to_zone_except(&source_player_id, msg, exclude)
+                .await;
+            return;
         }
 
+        let senders = self.transport.player_senders().await;
         let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
             let player_instances = self.player_instances.read().await;
-            let senders = self.player_senders.read().await;
             senders
                 .iter()
                 .filter(|(player_id, _)| {
@@ -329,24 +327,17 @@ impl GameRoom {
     }
 
     pub async fn register_player_sender(&self, player_id: &str, sender: mpsc::Sender<Vec<u8>>) {
-        let mut senders = self.player_senders.write().await;
-        senders.insert(player_id.to_string(), sender);
-        self.sync_states
-            .insert(player_id.to_string(), PlayerSyncState::new());
+        self.transport.register_player(player_id, sender).await;
         tracing::debug!("Registered sender for player {}", player_id);
     }
 
     pub async fn unregister_player_sender(&self, player_id: &str) {
-        let mut senders = self.player_senders.write().await;
-        senders.remove(player_id);
-        self.sync_states.remove(player_id);
+        self.transport.unregister_player(player_id).await;
         tracing::debug!("Unregistered sender for player {}", player_id);
     }
 
     pub async fn reset_sync_state(&self, player_id: &str) {
-        if let Some(mut state) = self.sync_states.get_mut(player_id) {
-            *state = PlayerSyncState::new();
-        }
+        self.transport.reset_sync_state(player_id);
     }
 
     pub async fn find_portal_at_player(&self, player_id: &str) -> Option<crate::chunk::Portal> {
@@ -451,23 +442,17 @@ impl GameRoom {
             _ => {}
         }
 
-        let sender = self.player_senders.read().await.get(player_id).cloned();
+        let sender = self.transport.player_sender(player_id).await;
         if let Some(sender) = sender {
-            if let Ok(bytes) = encode_server_message(&msg) {
-                if let Err(e) = sender.try_send(bytes) {
-                    match e {
-                        tokio::sync::mpsc::error::TrySendError::Full(_) => {
-                            tracing::debug!(
-                                "Unicast queue full for {}; dropping message",
-                                player_id
-                            );
-                        }
-                        tokio::sync::mpsc::error::TrySendError::Closed(_) => {
-                            tracing::warn!(
-                                "Failed to send unicast to {}: channel closed",
-                                player_id
-                            );
-                        }
+            if let Ok(bytes) = encode_server_message(&msg)
+                && let Err(e) = sender.try_send(bytes)
+            {
+                match e {
+                    tokio::sync::mpsc::error::TrySendError::Full(_) => {
+                        tracing::debug!("Unicast queue full for {}; dropping message", player_id);
+                    }
+                    tokio::sync::mpsc::error::TrySendError::Closed(_) => {
+                        tracing::warn!("Failed to send unicast to {}: channel closed", player_id);
                     }
                 }
             }
@@ -560,15 +545,14 @@ impl GameRoom {
             grant.clone()
         };
 
-        if let Some(npc_grant) = grant.npc_interaction.as_ref() {
-            if self
+        if let Some(npc_grant) = grant.npc_interaction.as_ref()
+            && self
                 .validate_npc_grant(player_id, npc_grant, 2.5)
                 .await
                 .is_none()
-            {
-                self.dialogue_grants.write().await.remove(player_id);
-                return false;
-            }
+        {
+            self.dialogue_grants.write().await.remove(player_id);
+            return false;
         }
         true
     }

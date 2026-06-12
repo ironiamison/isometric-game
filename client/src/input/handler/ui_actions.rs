@@ -273,7 +273,7 @@ impl InputHandler {
     ) -> bool {
         let chat_consuming_keyboard = mode.chat_consuming_keyboard;
         let classic = mode.classic;
-        let mx = frame.mx;
+        let _mx = frame.mx;
         let my = frame.my;
         let mouse_clicked = frame.mouse_clicked;
         let clicked_element = frame.clicked_element.clone();
@@ -590,10 +590,10 @@ impl InputHandler {
                         let dy = item.y - player.y;
                         let dist = (dx * dx + dy * dy).sqrt();
 
-                        if dist < PICKUP_RANGE {
-                            if nearest_item.is_none() || dist < nearest_item.as_ref().unwrap().1 {
-                                nearest_item = Some((id.clone(), dist));
-                            }
+                        if dist < PICKUP_RANGE
+                            && (nearest_item.is_none() || dist < nearest_item.as_ref().unwrap().1)
+                        {
+                            nearest_item = Some((id.clone(), dist));
                         }
                     }
 
@@ -629,10 +629,9 @@ impl InputHandler {
                         let cdx = (px - cx).abs();
                         let cdy = (py - cy).abs();
                         let dist = cdx.max(cdy);
-                        if dist <= 1 {
-                            if nearest_chair.is_none() || dist < nearest_chair.unwrap().1 {
-                                nearest_chair = Some(((cx, cy), dist));
-                            }
+                        if dist <= 1 && (nearest_chair.is_none() || dist < nearest_chair.unwrap().1)
+                        {
+                            nearest_chair = Some(((cx, cy), dist));
                         }
                     }
                     if let Some(((cx, cy), _)) = nearest_chair {
@@ -659,10 +658,10 @@ impl InputHandler {
                             let dy = npc.y - player.y;
                             let dist = (dx * dx + dy * dy).sqrt();
 
-                            if dist < INTERACT_RANGE {
-                                if nearest_npc.is_none() || dist < nearest_npc.as_ref().unwrap().1 {
-                                    nearest_npc = Some((id.clone(), dist));
-                                }
+                            if dist < INTERACT_RANGE
+                                && (nearest_npc.is_none() || dist < nearest_npc.as_ref().unwrap().1)
+                            {
+                                nearest_npc = Some((id.clone(), dist));
                             }
                         }
 
@@ -734,12 +733,11 @@ impl InputHandler {
                                 let dx = item.x - player.x;
                                 let dy = item.y - player.y;
                                 let dist = (dx * dx + dy * dy).sqrt();
-                                if dist < PICKUP_RANGE {
-                                    if nearest_item.is_none()
-                                        || dist < nearest_item.as_ref().unwrap().1
-                                    {
-                                        nearest_item = Some((id.clone(), dist));
-                                    }
+                                if dist < PICKUP_RANGE
+                                    && (nearest_item.is_none()
+                                        || dist < nearest_item.as_ref().unwrap().1)
+                                {
+                                    nearest_item = Some((id.clone(), dist));
                                 }
                             }
                             if let Some((item_id, _)) = nearest_item {

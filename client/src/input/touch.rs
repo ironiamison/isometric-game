@@ -1,7 +1,6 @@
 // Touch input handling for mobile devices
 // Provides virtual joystick and touch buttons
 
-use crate::mobile_scale::VIRTUAL_WIDTH;
 use macroquad::prelude::*;
 
 /// Convert screen coordinates to virtual coordinates (for Android scaling)
@@ -104,9 +103,15 @@ pub struct VirtualDPad {
     just_released_dir: DPadDirection,
 }
 
+impl Default for VirtualDPad {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VirtualDPad {
     pub fn new() -> Self {
-        let (screen_w, screen_h) = virtual_screen_size();
+        let (_screen_w, screen_h) = virtual_screen_size();
         // Position in bottom-left area — on Android, use smaller buttons
         #[cfg(target_os = "android")]
         let (center_x, center_y, button_size) = (80.0, screen_h - 75.0, 42.0);
@@ -426,6 +431,12 @@ pub struct VirtualJoystick {
     just_released_dir: DPadDirection,
 }
 
+impl Default for VirtualJoystick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VirtualJoystick {
     pub fn new() -> Self {
         Self {
@@ -564,7 +575,7 @@ impl VirtualJoystick {
 
     /// Render the joystick (only when active)
     pub fn render(&self) {
-        if let Some(_) = self.touch_id {
+        if self.touch_id.is_some() {
             // Outer circle
             draw_circle(
                 self.center.x,
@@ -803,6 +814,12 @@ pub struct TouchControls {
     pub enabled: bool,
     /// Whether any touch was consumed by controls this frame
     touch_consumed: bool,
+}
+
+impl Default for TouchControls {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TouchControls {

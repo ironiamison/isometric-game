@@ -83,7 +83,6 @@ export function Canvas() {
     addSpawnPoint,
     removeSpawnPoint,
     addExitPortal,
-    removeExitPortal,
     findExitPortalAt,
     setSelectedExitPortal,
     setSelectedInteriorEntity,
@@ -667,6 +666,7 @@ export function Canvas() {
       setTile,
       toggleCollision,
       fillTiles,
+      magicWandSelect,
       fillSelectedTiles,
       addEntity,
       removeEntity,
@@ -684,6 +684,9 @@ export function Canvas() {
       findPortalAtWorld,
       setSelectedPortal,
       adjustHeight,
+      setBlockType,
+      selectedBlockTypeDown,
+      selectedBlockTypeRight,
       toggleWall,
       setInteriorTile,
       toggleInteriorCollision,
@@ -697,7 +700,6 @@ export function Canvas() {
       addSpawnPoint,
       removeSpawnPoint,
       addExitPortal,
-      removeExitPortal,
       findExitPortalAt,
       setSelectedExitPortal,
       setSelectedInteriorEntity,
@@ -756,7 +758,7 @@ export function Canvas() {
         handleToolAction(e.clientX, e.clientY);
       }
     },
-    [activeTool, handleToolAction, viewport, adjustHeight]
+    [activeTool, handleToolAction, viewport, adjustHeight, brushSize]
   );
 
   const handleMouseMove = useCallback(

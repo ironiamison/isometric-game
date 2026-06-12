@@ -39,11 +39,11 @@ impl GameRoom {
                 let is_queued = arena.queued_players.contains(&player_id);
 
                 if in_queue_zone && !is_queued && arena.state == crate::arena::ArenaState::Idle {
-                    if !arena.queue_rejected.contains(&player_id) {
-                        if let Err(e) = arena.queue_player(&player_id, &player_name, player_gold) {
-                            arena.queue_rejected.insert(player_id.clone());
-                            queue_errors.push((player_id, e));
-                        }
+                    if !arena.queue_rejected.contains(&player_id)
+                        && let Err(e) = arena.queue_player(&player_id, &player_name, player_gold)
+                    {
+                        arena.queue_rejected.insert(player_id.clone());
+                        queue_errors.push((player_id, e));
                     }
                 } else if !in_queue_zone {
                     if is_queued && arena.state == crate::arena::ArenaState::Idle {
@@ -89,14 +89,14 @@ impl GameRoom {
                     {
                         let mut players = self.players.write().await;
                         for placement in &placements {
-                            if placement.gold_reward > 0 {
-                                if let Some(player) = players.get_mut(&placement.player_id) {
-                                    player.inventory.gold = item::checked_gold_credit(
-                                        player.inventory.gold,
-                                        placement.gold_reward,
-                                    )
-                                    .unwrap_or(item::MAX_GOLD);
-                                }
+                            if placement.gold_reward > 0
+                                && let Some(player) = players.get_mut(&placement.player_id)
+                            {
+                                player.inventory.gold = item::checked_gold_credit(
+                                    player.inventory.gold,
+                                    placement.gold_reward,
+                                )
+                                .unwrap_or(item::MAX_GOLD);
                             }
                         }
                     }
@@ -206,15 +206,14 @@ impl GameRoom {
                     })
                     .await;
                 }
-                _ => {}
             }
         }
     }
 
     pub(super) async fn broadcast_to_arena(&self, msg: ServerMessage) {
+        let senders = self.transport.player_senders().await;
         let recipients: Vec<mpsc::Sender<Vec<u8>>> = {
             let player_instances = self.player_instances.read().await;
-            let senders = self.player_senders.read().await;
             player_instances
                 .iter()
                 .filter(|(_, instance_id)| instance_id.starts_with("pub_duel_arena"))

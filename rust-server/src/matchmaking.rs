@@ -26,6 +26,46 @@ struct RoomInfo {
     clients: usize,
 }
 
+fn player_restore_data(
+    character: &crate::db::CharacterData,
+    ip_address: String,
+) -> crate::game::PlayerRestoreData {
+    crate::game::PlayerRestoreData {
+        name: character.name.clone(),
+        x: character.x as i32,
+        y: character.y as i32,
+        z: character.z,
+        hp: character.hp,
+        prayer_points: character.prayer_points,
+        mp: character.mp,
+        skills: character.skills.clone(),
+        gold: character.gold,
+        inventory_json: character.inventory_json.clone(),
+        gender: character.gender.clone(),
+        skin: character.skin.clone(),
+        hair_style: character.hair_style,
+        hair_color: character.hair_color,
+        equipped_head: character.equipped_head.clone(),
+        equipped_body: character.equipped_body.clone(),
+        equipped_weapon: character.equipped_weapon.clone(),
+        equipped_back: character.equipped_back.clone(),
+        equipped_feet: character.equipped_feet.clone(),
+        equipped_ring: character.equipped_ring.clone(),
+        equipped_gloves: character.equipped_gloves.clone(),
+        equipped_necklace: character.equipped_necklace.clone(),
+        equipped_belt: character.equipped_belt.clone(),
+        is_admin: character.is_admin,
+        account_id: character.account_id,
+        ip_address: Some(ip_address),
+        sitting_at_x: character.sitting_at_x,
+        sitting_at_y: character.sitting_at_y,
+        bank_json: character.bank_json.clone(),
+        bank_gold: character.bank_gold,
+        bank_max_slots: character.bank_max_slots,
+        combat_style_prefs_json: character.combat_style_prefs.clone(),
+    }
+}
+
 pub(super) async fn matchmake_join_or_create(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -33,7 +73,7 @@ pub(super) async fn matchmake_join_or_create(
     headers: axum::http::HeaderMap,
     Json(options): Json<JoinOptions>,
 ) -> impl IntoResponse {
-    let client_ip = addr.ip().to_string();
+    let client_ip = state.config.client_ip(&headers, addr).to_string();
 
     if room_name != GAME_ROOM_NAME {
         return (
@@ -86,8 +126,8 @@ pub(super) async fn matchmake_join_or_create(
     };
 
     // Validate token and get authenticated account info
-    let (account_id, _username) = match state.auth_sessions.get(&auth_token) {
-        Some(auth_data) => auth_data.clone(),
+    let account_id = match get_auth_session(&state.auth_sessions, &auth_token) {
+        Some(auth_data) => auth_data.account_id,
         None => {
             warn!("Matchmaking rejected: Invalid or expired token");
             return (
@@ -209,37 +249,7 @@ pub(super) async fn matchmake_join_or_create(
                         }
                         if let Err(e) = state
                             .db
-                            .save_character(
-                                character_id,
-                                save_data.x,
-                                save_data.y,
-                                save_data.z,
-                                save_data.hp,
-                                save_data.prayer_points,
-                                save_data.mp,
-                                &save_data.skills,
-                                save_data.gold,
-                                &save_data.inventory_json,
-                                save_data.equipped_head.as_deref(),
-                                save_data.equipped_body.as_deref(),
-                                save_data.equipped_weapon.as_deref(),
-                                save_data.equipped_back.as_deref(),
-                                save_data.equipped_feet.as_deref(),
-                                save_data.equipped_ring.as_deref(),
-                                save_data.equipped_gloves.as_deref(),
-                                save_data.equipped_necklace.as_deref(),
-                                save_data.equipped_belt.as_deref(),
-                                played_time_delta,
-                                save_data.current_map.as_deref(),
-                                save_data.sitting_at_x,
-                                save_data.sitting_at_y,
-                                save_data.entrance_x,
-                                save_data.entrance_y,
-                                &save_data.bank_json,
-                                save_data.bank_gold,
-                                save_data.bank_max_slots,
-                                &save_data.combat_style_prefs,
-                            )
+                            .save_character(character_id, &save_data, played_time_delta)
                             .await
                         {
                             error!(
@@ -258,17 +268,15 @@ pub(super) async fn matchmake_join_or_create(
                     if character_id > 0 {
                         if let Some(quest_state) =
                             old_room_ref.get_player_quest_state(&old_player_id).await
-                        {
-                            if let Err(e) = state
+                            && let Err(e) = state
                                 .db
                                 .save_character_quest_state(character_id, &quest_state)
                                 .await
-                            {
-                                error!(
-                                    "Session takeover: failed to save quest state for {}: {}",
-                                    old_sess.character_name, e
-                                );
-                            }
+                        {
+                            error!(
+                                "Session takeover: failed to save quest state for {}: {}",
+                                old_sess.character_name, e
+                            );
                         }
 
                         let discovered = old_room_ref
@@ -298,20 +306,18 @@ pub(super) async fn matchmake_join_or_create(
 
                         let slayer_state =
                             old_room_ref.get_player_slayer_state(&old_player_id).await;
-                        if slayer_state.current_task.is_some()
+                        if (slayer_state.current_task.is_some()
                             || slayer_state.tasks_completed > 0
-                            || slayer_state.points > 0
-                        {
-                            if let Err(e) = state
+                            || slayer_state.points > 0)
+                            && let Err(e) = state
                                 .db
                                 .save_character_slayer_state(character_id, &slayer_state)
                                 .await
-                            {
-                                error!(
-                                    "Session takeover: failed to save slayer state for {}: {}",
-                                    old_sess.character_name, e
-                                );
-                            }
+                        {
+                            error!(
+                                "Session takeover: failed to save slayer state for {}: {}",
+                                old_sess.character_name, e
+                            );
                         }
                     }
                 }
@@ -326,35 +332,34 @@ pub(super) async fn matchmake_join_or_create(
                         let removed_instance_id =
                             state.player_instances.write().await.remove(&old_player_id);
                         old_room.reset_sync_state(&old_player_id).await;
-                        if let Some(instance_id) = removed_instance_id {
-                            if let Some(instance) =
+                        if let Some(instance_id) = removed_instance_id
+                            && let Some(instance) =
                                 state.instance_manager.get_by_instance_id(&instance_id)
+                        {
+                            let other_players: Vec<String> = instance
+                                .get_player_ids()
+                                .await
+                                .into_iter()
+                                .filter(|id| id != &old_player_id)
+                                .collect();
+                            let remaining = instance.remove_player(&old_player_id).await;
+                            for other_id in &other_players {
+                                old_room
+                                    .send_to_player(
+                                        other_id,
+                                        ServerMessage::PlayerLeft {
+                                            id: old_player_id.clone(),
+                                        },
+                                    )
+                                    .await;
+                            }
+                            if remaining == 0
+                                && instance.instance_type == InstanceType::Private
+                                && let Some(owner_id) = &instance.owner_id
                             {
-                                let other_players: Vec<String> = instance
-                                    .get_player_ids()
-                                    .await
-                                    .into_iter()
-                                    .filter(|id| id != &old_player_id)
-                                    .collect();
-                                let remaining = instance.remove_player(&old_player_id).await;
-                                for other_id in &other_players {
-                                    old_room
-                                        .send_to_player(
-                                            other_id,
-                                            ServerMessage::PlayerLeft {
-                                                id: old_player_id.clone(),
-                                            },
-                                        )
-                                        .await;
-                                }
-                                if remaining == 0 && instance.instance_type == InstanceType::Private
-                                {
-                                    if let Some(owner_id) = &instance.owner_id {
-                                        state
-                                            .instance_manager
-                                            .remove_private(owner_id, &instance.map_id);
-                                    }
-                                }
+                                state
+                                    .instance_manager
+                                    .remove_private(owner_id, &instance.map_id);
                             }
                         }
                     }
@@ -457,38 +462,7 @@ pub(super) async fn matchmake_join_or_create(
 
     room.reserve_player_with_data(
         &player_id,
-        &character_data.name,
-        character_data.x as i32,
-        character_data.y as i32,
-        character_data.z,
-        character_data.hp,
-        character_data.prayer_points,
-        character_data.mp,
-        character_data.skills.clone(),
-        character_data.gold,
-        &character_data.inventory_json,
-        &character_data.gender,
-        &character_data.skin,
-        character_data.hair_style,
-        character_data.hair_color,
-        character_data.equipped_head.clone(),
-        character_data.equipped_body.clone(),
-        character_data.equipped_weapon.clone(),
-        character_data.equipped_back.clone(),
-        character_data.equipped_feet.clone(),
-        character_data.equipped_ring.clone(),
-        character_data.equipped_gloves.clone(),
-        character_data.equipped_necklace.clone(),
-        character_data.equipped_belt.clone(),
-        character_data.is_admin,
-        account_id,
-        Some(client_ip.clone()),
-        character_data.sitting_at_x,
-        character_data.sitting_at_y,
-        &character_data.bank_json,
-        character_data.bank_gold,
-        character_data.bank_max_slots,
-        &character_data.combat_style_prefs,
+        player_restore_data(&character_data, client_ip.clone()),
     )
     .await;
 

@@ -25,7 +25,7 @@ impl InteriorRegistry {
 
         for entry in entries.flatten() {
             let file_path = entry.path();
-            if file_path.extension().map_or(false, |ext| ext == "json") {
+            if file_path.extension().is_some_and(|ext| ext == "json") {
                 match InteriorMapDef::load_from_file(file_path.to_str().unwrap()) {
                     Ok(interior) => {
                         info!(

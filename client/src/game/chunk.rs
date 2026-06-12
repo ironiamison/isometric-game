@@ -191,7 +191,7 @@ impl Chunk {
     /// Get height at a local tile position (returns 0 if no heightmap)
     pub fn get_height(&self, local_x: u32, local_y: u32) -> u8 {
         if let Some(ref heights) = self.heights {
-            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            let index = (local_y * CHUNK_SIZE + local_x) as usize;
             heights.get(index).copied().unwrap_or(0)
         } else {
             0
@@ -201,7 +201,7 @@ impl Chunk {
     /// Get block type for down (+Y) face at a local tile position (returns 0 if no data)
     pub fn get_block_type_down(&self, local_x: u32, local_y: u32) -> u16 {
         if let Some(ref bt) = self.block_types_down {
-            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            let index = (local_y * CHUNK_SIZE + local_x) as usize;
             bt.get(index).copied().unwrap_or(0)
         } else {
             0
@@ -211,7 +211,7 @@ impl Chunk {
     /// Get block type for right (+X) face at a local tile position (returns 0 if no data)
     pub fn get_block_type_right(&self, local_x: u32, local_y: u32) -> u16 {
         if let Some(ref bt) = self.block_types_right {
-            let index = (local_y * CHUNK_SIZE as u32 + local_x) as usize;
+            let index = (local_y * CHUNK_SIZE + local_x) as usize;
             bt.get(index).copied().unwrap_or(0)
         } else {
             0
@@ -259,6 +259,12 @@ pub struct ChunkManager {
 struct OverworldCache {
     chunks: HashMap<ChunkCoord, Chunk>,
     current_chunk: ChunkCoord,
+}
+
+impl Default for ChunkManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChunkManager {
@@ -393,8 +399,8 @@ impl ChunkManager {
         // Remove from pending
         self.pending_requests.remove(&coord);
 
-        let object_count = chunk.objects.len();
-        let portal_count = chunk.portals.len();
+        let _object_count = chunk.objects.len();
+        let _portal_count = chunk.portals.len();
 
         // Store chunk
         self.chunks.insert(coord, chunk);
@@ -582,7 +588,7 @@ impl ChunkManager {
                 return false;
             }
             // Calculate how many tiles upward this object extends
-            let tiles_high = ((obj.height + TILE_HEIGHT_PX - 1) / TILE_HEIGHT_PX) as i32;
+            let tiles_high = obj.height.div_ceil(TILE_HEIGHT_PX) as i32;
             // Object covers from (tile_y - tiles_high + 1) to tile_y
             let min_y = obj.tile_y - tiles_high + 1;
             tile_y >= min_y && tile_y <= obj.tile_y

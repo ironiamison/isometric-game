@@ -255,7 +255,7 @@ impl InputHandler {
             let guide_actions_locked = is_guide_dialogue && adventurer_guide_actions_locked(state);
             let guide_selected_active_tier =
                 is_guide_dialogue && is_selected_adventurer_guide_tier_active(state);
-            let guide_selected_tier_completable =
+            let _guide_selected_tier_completable =
                 is_guide_dialogue && is_selected_adventurer_guide_tier_completable(state);
 
             // Touch drag scrolling for dialogue choices on mobile

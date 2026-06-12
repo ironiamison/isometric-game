@@ -314,11 +314,10 @@ impl GameRoom {
                         let remaining = instance.remove_player(player_id).await;
                         if remaining == 0
                             && instance.instance_type == crate::interior::InstanceType::Private
+                            && let Some(owner_id) = &instance.owner_id
                         {
-                            if let Some(owner_id) = &instance.owner_id {
-                                self.instance_manager
-                                    .remove_private(owner_id, &instance.map_id);
-                            }
+                            self.instance_manager
+                                .remove_private(owner_id, &instance.map_id);
                         }
 
                         for other_id in &other_players {
@@ -390,19 +389,14 @@ impl GameRoom {
                 {
                     continue;
                 }
-                if let Some(quest_state) = quest_state.as_ref() {
-                    if let Some(progress) = quest_state.active_quests.get(&site.quest_id) {
-                        if progress.status == crate::quest::QuestStatus::Active {
-                            if let Some(objective) =
-                                progress.objectives.get(&site.quest_objective_id)
-                            {
-                                if !objective.completed {
-                                    found = Some(site.clone());
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                if let Some(quest_state) = quest_state.as_ref()
+                    && let Some(progress) = quest_state.active_quests.get(&site.quest_id)
+                    && progress.status == crate::quest::QuestStatus::Active
+                    && let Some(objective) = progress.objectives.get(&site.quest_objective_id)
+                    && !objective.completed
+                {
+                    found = Some(site.clone());
+                    break;
                 }
             }
             found
@@ -515,12 +509,11 @@ impl GameRoom {
             spell_name
         );
 
-        if let Some(db) = self.db.as_ref() {
-            if let Some(character_id) = Self::parse_character_id(player_id) {
-                if let Err(error) = db.save_unlocked_spell(character_id, &spell_id).await {
-                    tracing::warn!("Failed to save unlocked spell to DB: {}", error);
-                }
-            }
+        if let Some(db) = self.db.as_ref()
+            && let Some(character_id) = Self::parse_character_id(player_id)
+            && let Err(error) = db.save_unlocked_spell(character_id, &spell_id).await
+        {
+            tracing::warn!("Failed to save unlocked spell to DB: {}", error);
         }
 
         self.send_to_player(
@@ -814,29 +807,29 @@ impl GameRoom {
                 WeaponType::Ranged => "ranged",
             };
             let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                if !player.combat_style.is_valid_for(new_weapon_type) {
-                    // Try to restore preferred style for this weapon type
-                    let preferred = player
-                        .combat_style_prefs
-                        .get(weapon_key)
-                        .copied()
-                        .filter(|s| s.is_valid_for(new_weapon_type));
-                    let new_style =
-                        preferred.unwrap_or(CombatStyle::available_styles(new_weapon_type)[0]);
-                    player.combat_style = new_style;
-                    tracing::info!(
-                        "Player {} combat style {} to {} for {:?} weapon",
-                        player_id,
-                        if preferred.is_some() {
-                            "restored"
-                        } else {
-                            "auto-reset"
-                        },
-                        player.combat_style.as_str(),
-                        new_weapon_type
-                    );
-                }
+            if let Some(player) = players.get_mut(player_id)
+                && !player.combat_style.is_valid_for(new_weapon_type)
+            {
+                // Try to restore preferred style for this weapon type
+                let preferred = player
+                    .combat_style_prefs
+                    .get(weapon_key)
+                    .copied()
+                    .filter(|s| s.is_valid_for(new_weapon_type));
+                let new_style =
+                    preferred.unwrap_or(CombatStyle::available_styles(new_weapon_type)[0]);
+                player.combat_style = new_style;
+                tracing::info!(
+                    "Player {} combat style {} to {} for {:?} weapon",
+                    player_id,
+                    if preferred.is_some() {
+                        "restored"
+                    } else {
+                        "auto-reset"
+                    },
+                    player.combat_style.as_str(),
+                    new_weapon_type
+                );
             }
             drop(players);
         }
@@ -999,16 +992,16 @@ impl GameRoom {
             // Auto-fallback: unequipping weapon means unarmed (melee) - restore preferred melee style
             use crate::game::CombatStyle;
             let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                if !player.combat_style.is_valid_for(WeaponType::Melee) {
-                    let preferred = player
-                        .combat_style_prefs
-                        .get("melee")
-                        .copied()
-                        .filter(|s| s.is_valid_for(WeaponType::Melee));
-                    player.combat_style =
-                        preferred.unwrap_or(CombatStyle::available_styles(WeaponType::Melee)[0]);
-                }
+            if let Some(player) = players.get_mut(player_id)
+                && !player.combat_style.is_valid_for(WeaponType::Melee)
+            {
+                let preferred = player
+                    .combat_style_prefs
+                    .get("melee")
+                    .copied()
+                    .filter(|s| s.is_valid_for(WeaponType::Melee));
+                player.combat_style =
+                    preferred.unwrap_or(CombatStyle::available_styles(WeaponType::Melee)[0]);
             }
             drop(players);
         }

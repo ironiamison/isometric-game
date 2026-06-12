@@ -128,12 +128,12 @@ impl GameRoom {
         }
 
         if entity_type == "adventure_board" {
-            self.show_adventure_board_dialogue(player_id, &npc_id).await;
+            self.show_adventure_board_dialogue(player_id, npc_id).await;
             return;
         }
 
         if entity_type == "master_artisan" {
-            self.show_prestige_shop_dialogue(player_id, &npc_id).await;
+            self.show_prestige_shop_dialogue(player_id, npc_id).await;
             return;
         }
 
@@ -144,7 +144,7 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_altar {
-            self.show_altar_dialogue(player_id, &npc_id, &entity_type)
+            self.show_altar_dialogue(player_id, npc_id, &entity_type)
                 .await;
             return;
         }
@@ -157,7 +157,7 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_plot_seller {
-            self.show_master_farmer_dialogue(player_id, &npc_id).await;
+            self.show_master_farmer_dialogue(player_id, npc_id).await;
             return;
         }
 
@@ -180,7 +180,7 @@ impl GameRoom {
             if fully_upgraded {
                 self.handle_bank_open(player_id).await;
             } else {
-                self.show_banker_dialogue(player_id, &npc_id).await;
+                self.show_banker_dialogue(player_id, npc_id).await;
             }
             return;
         }
@@ -206,7 +206,7 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_koth_rewards {
-            self.show_koth_rewards_dialogue(player_id, &npc_id).await;
+            self.show_koth_rewards_dialogue(player_id, npc_id).await;
             return;
         }
 
@@ -218,7 +218,7 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_boss_rewards {
-            self.show_boss_rewards_dialogue(player_id, &npc_id).await;
+            self.show_boss_rewards_dialogue(player_id, npc_id).await;
             return;
         }
 
@@ -230,7 +230,7 @@ impl GameRoom {
             .unwrap_or(false);
 
         if is_port_master {
-            self.show_port_master_dialogue(player_id, &npc_id, &entity_type)
+            self.show_port_master_dialogue(player_id, npc_id, &entity_type)
                 .await;
             return;
         }
@@ -242,13 +242,13 @@ impl GameRoom {
                 .resource_contract_npc_unlocked(player_id, &entity_type)
                 .await
         {
-            self.show_resource_contract_master_dialogue(player_id, &npc_id, &entity_type)
+            self.show_resource_contract_master_dialogue(player_id, npc_id, &entity_type)
                 .await;
             return;
         }
 
         if self
-            .try_open_merchant_shop(player_id, &npc_id, &entity_type)
+            .try_open_merchant_shop(player_id, npc_id, &entity_type)
             .await
         {
             return;
@@ -474,36 +474,36 @@ impl GameRoom {
             return;
         }
 
-        if let Some(rest) = quest_id.strip_prefix("adventure_board_contract:") {
-            if let Some((npc_id, kind_str)) = rest.split_once(':') {
-                if crate::resource_contracts::ResourceContractKind::from_str(kind_str).is_some() {
-                    if let Some(diff_str) = choice_id.strip_prefix("accept_") {
-                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                            .await;
-                        self.handle_accept_adventure_board_contract(
-                            player_id, npc_id, kind_str, diff_str,
-                        )
+        if let Some(rest) = quest_id.strip_prefix("adventure_board_contract:")
+            && let Some((npc_id, kind_str)) = rest.split_once(':')
+        {
+            if crate::resource_contracts::ResourceContractKind::from_str(kind_str).is_some() {
+                if let Some(diff_str) = choice_id.strip_prefix("accept_") {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
                         .await;
-                    } else if choice_id == "claim_contract" {
-                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                            .await;
-                        self.handle_claim_resource_contract(player_id).await;
-                    } else if choice_id == "abandon_contract" {
-                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                            .await;
-                        self.handle_abandon_resource_contract(player_id).await;
-                    } else if choice_id == "nevermind" {
-                        self.show_adventure_board_dialogue(player_id, npc_id).await;
-                    } else {
-                        self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                            .await;
-                    }
+                    self.handle_accept_adventure_board_contract(
+                        player_id, npc_id, kind_str, diff_str,
+                    )
+                    .await;
+                } else if choice_id == "claim_contract" {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                    self.handle_claim_resource_contract(player_id).await;
+                } else if choice_id == "abandon_contract" {
+                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                        .await;
+                    self.handle_abandon_resource_contract(player_id).await;
+                } else if choice_id == "nevermind" {
+                    self.show_adventure_board_dialogue(player_id, npc_id).await;
                 } else {
                     self.send_to_player(player_id, ServerMessage::DialogueClosed)
                         .await;
                 }
-                return;
+            } else {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
             }
+            return;
         }
 
         // Handle plot seller dialogue choices (format: "plot_seller:{npc_id}")
@@ -544,39 +544,39 @@ impl GameRoom {
             return;
         }
 
-        if let Some(rest) = quest_id.strip_prefix("resource_contract_master:") {
-            if let Some((npc_id, entity_type)) = rest.split_once(':') {
-                if choice_id == "contracts" {
-                    self.show_resource_contract_dialogue(player_id, npc_id, entity_type)
-                        .await;
-                } else if choice_id == "open_shop" {
-                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                        .await;
-                    let _ = self
-                        .try_open_merchant_shop(player_id, npc_id, entity_type)
-                        .await;
-                } else if let Some(diff_str) = choice_id.strip_prefix("accept_") {
-                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                        .await;
-                    self.handle_accept_resource_contract(player_id, npc_id, entity_type, diff_str)
-                        .await;
-                } else if choice_id == "claim_contract" {
-                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                        .await;
-                    self.handle_claim_resource_contract(player_id).await;
-                } else if choice_id == "abandon_contract" {
-                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                        .await;
-                    self.handle_abandon_resource_contract(player_id).await;
-                } else if choice_id == "nevermind" {
-                    self.show_resource_contract_master_dialogue(player_id, npc_id, entity_type)
-                        .await;
-                } else {
-                    self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                        .await;
-                }
-                return;
+        if let Some(rest) = quest_id.strip_prefix("resource_contract_master:")
+            && let Some((npc_id, entity_type)) = rest.split_once(':')
+        {
+            if choice_id == "contracts" {
+                self.show_resource_contract_dialogue(player_id, npc_id, entity_type)
+                    .await;
+            } else if choice_id == "open_shop" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+                let _ = self
+                    .try_open_merchant_shop(player_id, npc_id, entity_type)
+                    .await;
+            } else if let Some(diff_str) = choice_id.strip_prefix("accept_") {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+                self.handle_accept_resource_contract(player_id, npc_id, entity_type, diff_str)
+                    .await;
+            } else if choice_id == "claim_contract" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+                self.handle_claim_resource_contract(player_id).await;
+            } else if choice_id == "abandon_contract" {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
+                self.handle_abandon_resource_contract(player_id).await;
+            } else if choice_id == "nevermind" {
+                self.show_resource_contract_master_dialogue(player_id, npc_id, entity_type)
+                    .await;
+            } else {
+                self.send_to_player(player_id, ServerMessage::DialogueClosed)
+                    .await;
             }
+            return;
         }
 
         // Handle banker dialogue choices (format: "banker:{npc_id}")

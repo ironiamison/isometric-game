@@ -203,7 +203,7 @@ impl Inventory {
     pub fn find_slot_by_item_id(&self, item_id: &str) -> Option<usize> {
         self.slots
             .iter()
-            .position(|slot| slot.as_ref().map_or(false, |s| s.item_id == item_id))
+            .position(|slot| slot.as_ref().is_some_and(|s| s.item_id == item_id))
     }
 
     /// Swap two inventory slots (for optimistic UI updates)

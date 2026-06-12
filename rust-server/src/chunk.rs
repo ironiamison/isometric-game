@@ -411,10 +411,10 @@ impl Chunk {
         let center_x = CHUNK_SIZE / 2;
         let center_y = CHUNK_SIZE / 2;
 
-        for radius in 0..16 {
-            for dy in -(radius as i32)..=(radius as i32) {
-                for dx in -(radius as i32)..=(radius as i32) {
-                    if dx.abs() == radius as i32 || dy.abs() == radius as i32 {
+        for radius in 0_i32..16 {
+            for dy in -radius..=radius {
+                for dx in -radius..=radius {
+                    if dx.abs() == radius || dy.abs() == radius {
                         let x = (center_x as i32 + dx) as u32;
                         let y = (center_y as i32 + dy) as u32;
                         if x < CHUNK_SIZE && y < CHUNK_SIZE && self.is_walkable_local(x, y) {

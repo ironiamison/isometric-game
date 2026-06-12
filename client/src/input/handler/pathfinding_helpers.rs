@@ -1,5 +1,10 @@
 use super::*;
 
+type GridPosition = (i32, i32);
+type Path = Vec<GridPosition>;
+type SplicePathCandidate = (i32, SpliceCandidate, Path);
+type SpliceDestinationCandidate = (i32, SpliceCandidate, GridPosition, Path);
+
 pub(super) fn sync_path_index(path_state: &mut PathState, player_pos: (i32, i32)) {
     while path_state.current_index < path_state.path.len() {
         let (wx, wy) = path_state.path[path_state.current_index];
@@ -147,7 +152,7 @@ pub(super) fn find_path_with_optimistic_splice(
     goal: (i32, i32),
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
-) -> Option<Vec<(i32, i32)>> {
+) -> Option<Path> {
     find_path_with_limited_splice(state, start, goal, occupied, max_distance, 6)
 }
 
@@ -160,7 +165,7 @@ pub(super) fn find_path_with_committed_step_splice(
     goal: (i32, i32),
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
-) -> Option<Vec<(i32, i32)>> {
+) -> Option<Path> {
     find_path_with_limited_splice(state, start, goal, occupied, max_distance, 1)
 }
 
@@ -171,11 +176,11 @@ pub(super) fn find_path_with_limited_splice(
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
     max_splice_ahead: usize,
-) -> Option<Vec<(i32, i32)>> {
+) -> Option<Path> {
     let candidates = splice_candidates(state, start, max_splice_ahead);
     let path_state = state.auto_path.as_ref();
 
-    let mut best: Option<(i32, SpliceCandidate, Vec<(i32, i32)>)> = None;
+    let mut best: Option<SplicePathCandidate> = None;
 
     for cand in candidates {
         if let Some(path) =
@@ -197,9 +202,7 @@ pub(super) fn find_path_with_limited_splice(
         }
     }
 
-    let Some((_, cand, path)) = best else {
-        return None;
-    };
+    let (_, cand, path) = best?;
 
     if let (Some((start_idx, end_idx)), Some(path_state)) = (cand.prefix_range, path_state) {
         let mut combined = Vec::new();
@@ -247,7 +250,7 @@ pub(super) fn find_path_to_attack_with_optimistic_splice(
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
     weapon_range: i32,
-) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+) -> Option<pathfinding::DestinationPath> {
     if weapon_range <= 1 {
         let preferred = preferred_adjacent_tile_for_target(state, target);
         return find_path_to_adjacent_with_optimistic_splice(
@@ -263,7 +266,7 @@ pub(super) fn find_path_to_attack_with_optimistic_splice(
     // For ranged: use optimistic splice candidates with range-based pathfinding
     let candidates = splice_candidates(state, start, 6);
 
-    let mut best: Option<(i32, SpliceCandidate, (i32, i32), Vec<(i32, i32)>)> = None;
+    let mut best: Option<SpliceDestinationCandidate> = None;
 
     for cand in candidates {
         if let Some((dest, path)) = pathfinding::find_path_within_range(
@@ -290,9 +293,7 @@ pub(super) fn find_path_to_attack_with_optimistic_splice(
         }
     }
 
-    let Some((_, cand, dest, path)) = best else {
-        return None;
-    };
+    let (_, cand, dest, path) = best?;
 
     let path_state = state.auto_path.as_ref();
     if let (Some((start_idx, end_idx)), Some(path_state)) = (cand.prefix_range, path_state) {
@@ -314,11 +315,11 @@ pub(super) fn find_path_to_adjacent_with_optimistic_splice(
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
     preferred_adjacent: Option<(i32, i32)>,
-) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+) -> Option<pathfinding::DestinationPath> {
     let candidates = splice_candidates(state, start, 6);
     let path_state = state.auto_path.as_ref();
 
-    let mut best: Option<(i32, SpliceCandidate, (i32, i32), Vec<(i32, i32)>)> = None;
+    let mut best: Option<SpliceDestinationCandidate> = None;
 
     for cand in candidates {
         if let Some((dest, path)) = pathfinding::find_path_to_adjacent_prefer(
@@ -345,9 +346,7 @@ pub(super) fn find_path_to_adjacent_with_optimistic_splice(
         }
     }
 
-    let Some((_, cand, dest, path)) = best else {
-        return None;
-    };
+    let (_, cand, dest, path) = best?;
 
     if let (Some((start_idx, end_idx)), Some(path_state)) = (cand.prefix_range, path_state) {
         let mut combined = Vec::new();

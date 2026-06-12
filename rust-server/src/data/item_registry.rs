@@ -32,7 +32,7 @@ impl ItemRegistry {
             let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
             let path = entry.path();
 
-            if path.extension().map_or(false, |ext| ext == "toml") {
+            if path.extension().is_some_and(|ext| ext == "toml") {
                 let content = std::fs::read_to_string(&path)
                     .map_err(|e| format!("Failed to read {:?}: {}", path, e))?;
 

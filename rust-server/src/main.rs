@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use crate::data::item_def::EquipmentSlot;
 use crate::skills::Skills;
 use axum::{
@@ -6,7 +8,7 @@ use axum::{
         ConnectInfo, Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    http::StatusCode,
+    http::{Method, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post},
 };
@@ -23,7 +25,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{Mutex, OwnedRwLockReadGuard, RwLock, mpsc, watch};
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -35,6 +37,7 @@ mod chest;
 mod chunk;
 mod client_messages;
 mod collection_log;
+mod config;
 mod crafting;
 mod data;
 mod db;
@@ -78,11 +81,12 @@ mod world;
 use app_state::*;
 use characters::*;
 use client_messages::*;
+use config::ServerConfig;
 use crafting::CraftingRegistry;
 use data::ItemRegistry;
 use db::Database;
 use entity::EntityRegistry;
-use game::{GameRoom, Player, PlayerUpdate};
+use game::GameRoom;
 use instance::InstanceManager;
 use instances::*;
 use interior_registry::InteriorRegistry;
@@ -118,6 +122,7 @@ struct GameSession {
 
 #[derive(Clone)]
 struct AppState {
+    config: Arc<ServerConfig>,
     rooms: Arc<DashMap<String, Arc<GameRoom>>>,
     room_creation_lock: Arc<Mutex<()>>,
     // Session ID -> GameSession
@@ -165,7 +170,42 @@ const GAME_ROOM_NAME: &str = "game_room";
 // ============================================================================
 
 /// Auth sessions: token -> (account_id, username)
-type AuthSessions = Arc<DashMap<String, (i64, String)>>;
+type AuthSessions = Arc<DashMap<String, AuthSession>>;
+
+#[derive(Clone)]
+struct AuthSession {
+    account_id: i64,
+    username: String,
+    expires_at: Instant,
+}
+
+impl AuthSession {
+    fn new(account_id: i64, username: String, ttl: Duration) -> Self {
+        Self {
+            account_id,
+            username,
+            expires_at: Instant::now() + ttl,
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        Instant::now() < self.expires_at
+    }
+}
+
+fn get_auth_session(sessions: &AuthSessions, token: &str) -> Option<AuthSession> {
+    let session = sessions.get(token).map(|entry| entry.clone())?;
+    if session.is_valid() {
+        Some(session)
+    } else {
+        sessions.remove(token);
+        None
+    }
+}
+
+fn has_valid_auth_session(sessions: &AuthSessions, token: &str) -> bool {
+    get_auth_session(sessions, token).is_some()
+}
 
 // ============================================================================
 // WebSocket Handler
@@ -193,7 +233,11 @@ async fn main() {
             .init();
     }
 
-    let state = AppState::new(log_buffer).await;
+    let config = Arc::new(
+        ServerConfig::from_env()
+            .unwrap_or_else(|error| panic!("Invalid server configuration: {error}")),
+    );
+    let state = AppState::new(log_buffer, config.clone()).await;
     let room_load_start = std::time::Instant::now();
     state.get_or_create_room(GAME_ROOM_NAME).await;
     info!(
@@ -304,10 +348,7 @@ async fn main() {
                 std::collections::HashMap::new();
             for session in save_state.sessions.iter() {
                 let session_data = session.value().clone();
-                if !save_state
-                    .auth_sessions
-                    .contains_key(&session_data.auth_token)
-                {
+                if !has_valid_auth_session(&save_state.auth_sessions, &session_data.auth_token) {
                     warn!(
                         "Auto-save skipped for {}: auth token no longer valid",
                         session_data.character_name
@@ -395,37 +436,7 @@ async fn main() {
                 {
                     match save_state
                         .db
-                        .save_character(
-                            character_id,
-                            save_data.x,
-                            save_data.y,
-                            save_data.z,
-                            save_data.hp,
-                            save_data.prayer_points,
-                            save_data.mp,
-                            &save_data.skills,
-                            save_data.gold,
-                            &save_data.inventory_json,
-                            save_data.equipped_head.as_deref(),
-                            save_data.equipped_body.as_deref(),
-                            save_data.equipped_weapon.as_deref(),
-                            save_data.equipped_back.as_deref(),
-                            save_data.equipped_feet.as_deref(),
-                            save_data.equipped_ring.as_deref(),
-                            save_data.equipped_gloves.as_deref(),
-                            save_data.equipped_necklace.as_deref(),
-                            save_data.equipped_belt.as_deref(),
-                            played_time_delta,
-                            save_data.current_map.as_deref(),
-                            save_data.sitting_at_x,
-                            save_data.sitting_at_y,
-                            save_data.entrance_x,
-                            save_data.entrance_y,
-                            &save_data.bank_json,
-                            save_data.bank_gold,
-                            save_data.bank_max_slots,
-                            &save_data.combat_style_prefs,
-                        )
+                        .save_character(character_id, &save_data, played_time_delta)
                         .await
                     {
                         Ok(()) => saved_count += 1,
@@ -434,14 +445,13 @@ async fn main() {
                         }
                     }
 
-                    if let Some(quest_state) = quest_state {
-                        if let Err(e) = save_state
+                    if let Some(quest_state) = quest_state
+                        && let Err(e) = save_state
                             .db
                             .save_character_quest_state(character_id, &quest_state)
                             .await
-                        {
-                            warn!("Quest auto-save failed for {}: {}", character_name, e);
-                        }
+                    {
+                        warn!("Quest auto-save failed for {}: {}", character_name, e);
                     }
 
                     let _ = save_state
@@ -510,6 +520,9 @@ async fn main() {
             interval.tick().await;
             perf_state.auth_rate_limiter.prune_expired();
             perf_state.matchmake_rate_limiter.prune_expired();
+            perf_state
+                .auth_sessions
+                .retain(|_, session| session.is_valid());
             let perf = perf_state.perf_metrics.snapshot(3, 0);
             info!(
                 "[PERF] uptime={}s load(rooms={} players={} overworld={} instance={} spectators={}) tick_loop(p95={}ms p99={}ms max={}ms) room_tick(p95={}ms p99={}ms max={}ms) autosave_total(p95={}ms max={}ms) handler(p95={}ms max={}ms) ws_send(p95={}ms max={}ms) movement(reject_rate={}%, attempts={}, rejected={}, reasons=tile:{}({}%) player:{}({}%) npc:{}({}%) chair:{}({}%) arena:{}({}%), stale_packets={}({}%) seq_gaps={}({}%) input_gaps={}({}%) stale_intent_clears={}({}%)) state_sync(drop_rate={}%, skip_rate={}%, attempts={}, capacity_skips={}, drops={}, full={}({}%), delta={}({}%), fallback_self={}, raw_bytes={}, wire_bytes={}, wire_vs_raw={}%) counters(overruns={} slow_room_ticks={} slow_autosaves={} slow_handlers={} slow_ws_sends={})",
@@ -574,8 +587,16 @@ async fn main() {
         }
     });
 
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::list(config.allowed_origins.clone()))
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+        ]);
+
     // Build router
-    let app = Router::new()
+    let mut app = Router::new()
         // Health check
         .route("/health", get(health_check))
         // Authentication
@@ -602,33 +623,24 @@ async fn main() {
         .route("/api/stats/leaderboard", get(stats_leaderboard))
         .route("/api/stats/player/:name", get(stats_player_profile))
         .route("/api/stats/items", get(stats_items))
-        .route("/api/stats/entities", get(stats_entities))
-        .route("/api/perf", get(api_perf))
-        // Server logs (admin)
-        .route("/api/logs", get(api_logs))
-        .route("/logs", get(logs_page))
-        // In development, you may want CorsLayer::permissive()
-        // For production, specify allowed origins explicitly
-        .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods([
-                    axum::http::Method::GET,
-                    axum::http::Method::POST,
-                    axum::http::Method::OPTIONS,
-                ])
-                .allow_headers([
-                    axum::http::header::CONTENT_TYPE,
-                    axum::http::header::AUTHORIZATION,
-                ]),
-        );
+        .route("/api/stats/entities", get(stats_entities));
+
+    if config.admin_api_token.is_some() {
+        app = app
+            .route("/api/perf", get(api_perf))
+            .route("/api/logs", get(api_logs));
+        info!("Authenticated operational endpoints enabled");
+    } else {
+        info!("Operational endpoints disabled; set AEVEN_ADMIN_API_TOKEN to enable them");
+    }
+    let app = app.layer(cors);
 
     // Graceful shutdown: save all players on Ctrl+C
     let shutdown_state = state.clone();
 
     let app = app.with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 2567));
+    let addr = config.bind_addr;
     info!("Game server listening on http://{}", addr);
     let shutdown_signal = async move {
         tokio::signal::ctrl_c().await.ok();
@@ -680,34 +692,8 @@ async fn main() {
                     .db
                     .save_character(
                         character_id,
-                        save_data.x,
-                        save_data.y,
-                        save_data.z,
-                        save_data.hp,
-                        save_data.prayer_points,
-                        save_data.mp,
-                        &save_data.skills,
-                        save_data.gold,
-                        &save_data.inventory_json,
-                        save_data.equipped_head.as_deref(),
-                        save_data.equipped_body.as_deref(),
-                        save_data.equipped_weapon.as_deref(),
-                        save_data.equipped_back.as_deref(),
-                        save_data.equipped_feet.as_deref(),
-                        save_data.equipped_ring.as_deref(),
-                        save_data.equipped_gloves.as_deref(),
-                        save_data.equipped_necklace.as_deref(),
-                        save_data.equipped_belt.as_deref(),
+                        &save_data,
                         0, // played_time_delta - skip for shutdown
-                        save_data.current_map.as_deref(),
-                        save_data.sitting_at_x,
-                        save_data.sitting_at_y,
-                        save_data.entrance_x,
-                        save_data.entrance_y,
-                        &save_data.bank_json,
-                        save_data.bank_gold,
-                        save_data.bank_max_slots,
-                        &save_data.combat_style_prefs,
                     )
                     .await
                 {

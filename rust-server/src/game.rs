@@ -1,11 +1,10 @@
-use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
 };
-use tokio::sync::{RwLock, broadcast, mpsc};
+use tokio::sync::{RwLock, mpsc};
 use uuid::Uuid;
 
 use crate::chunk::{CHUNK_SIZE, ChunkCoord};
@@ -64,8 +63,11 @@ mod tick_resources;
 mod tick_snapshots;
 pub(crate) mod titles;
 mod trade;
+mod transport;
 mod travel;
 mod world_map;
+
+use transport::{FULL_SYNC_INTERVAL, RoomTransport, full_sync_offset};
 
 // ============================================================================
 // Constants
@@ -142,12 +144,10 @@ fn direction_from_delta(dx: i32, dy: i32) -> Direction {
         } else {
             Direction::Left
         }
+    } else if dy > 0 {
+        Direction::Down
     } else {
-        if dy > 0 {
-            Direction::Down
-        } else {
-            Direction::Up
-        }
+        Direction::Up
     }
 }
 
@@ -229,6 +229,46 @@ pub struct PlayerSaveData {
     pub combat_style_prefs: String, // JSON: {"melee":"aggressive","ranged":"rapid"}
 }
 
+/// Complete domain input for restoring a persisted character into a room.
+///
+/// Keeping this as a named payload prevents persistence column order from
+/// leaking into gameplay APIs.
+#[derive(Debug, Clone)]
+pub struct PlayerRestoreData {
+    pub name: String,
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    pub hp: i32,
+    pub prayer_points: i32,
+    pub mp: i32,
+    pub skills: Skills,
+    pub gold: i32,
+    pub inventory_json: String,
+    pub gender: String,
+    pub skin: String,
+    pub hair_style: Option<i32>,
+    pub hair_color: Option<i32>,
+    pub equipped_head: Option<String>,
+    pub equipped_body: Option<String>,
+    pub equipped_weapon: Option<String>,
+    pub equipped_back: Option<String>,
+    pub equipped_feet: Option<String>,
+    pub equipped_ring: Option<String>,
+    pub equipped_gloves: Option<String>,
+    pub equipped_necklace: Option<String>,
+    pub equipped_belt: Option<String>,
+    pub is_admin: bool,
+    pub account_id: i64,
+    pub ip_address: Option<String>,
+    pub sitting_at_x: Option<i32>,
+    pub sitting_at_y: Option<i32>,
+    pub bank_json: String,
+    pub bank_gold: i32,
+    pub bank_max_slots: u32,
+    pub combat_style_prefs_json: String,
+}
+
 // ============================================================================
 // Direction
 // ============================================================================
@@ -272,12 +312,10 @@ impl Direction {
             } else {
                 Direction::Left
             }
+        } else if dy > 0.0 {
+            Direction::Down
         } else {
-            if dy > 0.0 {
-                Direction::Down
-            } else {
-                Direction::Up
-            }
+            Direction::Up
         }
     }
 
@@ -342,19 +380,15 @@ pub struct AutoAction {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum CombatStyle {
+    #[default]
     Accurate,
     Aggressive,
     Defensive,
     Controlled,
     Rapid,
     Longrange,
-}
-
-impl Default for CombatStyle {
-    fn default() -> Self {
-        CombatStyle::Accurate
-    }
 }
 
 impl CombatStyle {
@@ -732,12 +766,11 @@ impl Player {
     pub fn attack_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
         for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                if let Some(def) = item_registry.get(item_id) {
-                    if let Some(equip) = &def.equipment {
-                        bonus += equip.attack_bonus;
-                    }
-                }
+            if let Some(item_id) = equipped
+                && let Some(def) = item_registry.get(item_id)
+                && let Some(equip) = &def.equipment
+            {
+                bonus += equip.attack_bonus;
             }
         }
         bonus + self.buff_bonus("attack")
@@ -747,12 +780,11 @@ impl Player {
     pub fn strength_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
         for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                if let Some(def) = item_registry.get(item_id) {
-                    if let Some(equip) = &def.equipment {
-                        bonus += equip.strength_bonus;
-                    }
-                }
+            if let Some(item_id) = equipped
+                && let Some(def) = item_registry.get(item_id)
+                && let Some(equip) = &def.equipment
+            {
+                bonus += equip.strength_bonus;
             }
         }
         bonus + self.buff_bonus("strength")
@@ -762,12 +794,11 @@ impl Player {
     pub fn ranged_strength_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
         for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                if let Some(def) = item_registry.get(item_id) {
-                    if let Some(equip) = &def.equipment {
-                        bonus += equip.ranged_strength_bonus;
-                    }
-                }
+            if let Some(item_id) = equipped
+                && let Some(def) = item_registry.get(item_id)
+                && let Some(equip) = &def.equipment
+            {
+                bonus += equip.ranged_strength_bonus;
             }
         }
         bonus
@@ -777,12 +808,11 @@ impl Player {
     pub fn defence_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
         for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                if let Some(def) = item_registry.get(item_id) {
-                    if let Some(equip) = &def.equipment {
-                        bonus += equip.defence_bonus;
-                    }
-                }
+            if let Some(item_id) = equipped
+                && let Some(def) = item_registry.get(item_id)
+                && let Some(equip) = &def.equipment
+            {
+                bonus += equip.defence_bonus;
             }
         }
         bonus + self.buff_bonus("defence")
@@ -792,12 +822,11 @@ impl Player {
     pub fn magic_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
         for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                if let Some(def) = item_registry.get(item_id) {
-                    if let Some(equip) = &def.equipment {
-                        bonus += equip.magic_bonus;
-                    }
-                }
+            if let Some(item_id) = equipped
+                && let Some(def) = item_registry.get(item_id)
+                && let Some(equip) = &def.equipment
+            {
+                bonus += equip.magic_bonus;
             }
         }
         bonus + self.buff_bonus("magic")
@@ -1243,68 +1272,6 @@ struct ChairConfigEntry {
     direction: String,
 }
 
-// ============================================================================
-// Delta Sync State (per-player tracking for bandwidth optimization)
-// ============================================================================
-
-const FULL_SYNC_INTERVAL: u64 = 20; // Force full sync every 20 ticks (1 second at 20Hz)
-
-struct PlayerSyncState {
-    context_id: String,
-    last_players: HashMap<String, PlayerUpdate>,
-    last_npcs: HashMap<String, NpcUpdate>,
-    last_full_sync_tick: u64,
-    next_full_sync_tick: u64,
-}
-
-impl PlayerSyncState {
-    fn new() -> Self {
-        Self {
-            context_id: String::new(),
-            last_players: HashMap::new(),
-            last_npcs: HashMap::new(),
-            last_full_sync_tick: 0,
-            next_full_sync_tick: 0,
-        }
-    }
-
-    fn ensure_context(&mut self, context_id: &str) {
-        if self.context_id != context_id {
-            *self = Self::new();
-            self.context_id = context_id.to_string();
-        }
-    }
-}
-
-fn full_sync_offset(player_id: &str) -> u64 {
-    player_id.bytes().fold(0u64, |hash, byte| {
-        hash.wrapping_mul(31).wrapping_add(byte as u64)
-    }) % FULL_SYNC_INTERVAL
-}
-
-#[cfg(test)]
-mod sync_state_tests {
-    use super::PlayerSyncState;
-
-    #[test]
-    fn context_change_forces_a_new_full_sync() {
-        let mut state = PlayerSyncState::new();
-        state.ensure_context("instance-a");
-        state.last_full_sync_tick = 10;
-        state.next_full_sync_tick = 30;
-
-        state.ensure_context("instance-a");
-        assert_eq!(state.last_full_sync_tick, 10);
-
-        state.ensure_context("");
-        assert_eq!(state.context_id, "");
-        assert_eq!(state.last_full_sync_tick, 0);
-        assert_eq!(state.next_full_sync_tick, 0);
-        assert!(state.last_players.is_empty());
-        assert!(state.last_npcs.is_empty());
-    }
-}
-
 #[cfg(test)]
 mod interaction_security_tests {
     use super::{
@@ -1464,11 +1431,8 @@ pub struct GameRoom {
     /// Track which chunk each player is in for streaming updates
     player_chunks: RwLock<HashMap<String, ChunkCoord>>,
     tick: RwLock<u64>,
-    broadcast_tx: broadcast::Sender<Vec<u8>>,
-    /// Per-player message senders for unicast (SECURITY: private inventory updates)
-    player_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
-    /// Per-player delta sync state for bandwidth optimization
-    sync_states: DashMap<String, PlayerSyncState>,
+    /// Connection channels and per-client synchronization baselines.
+    transport: RoomTransport,
     /// Tracks which instance each player is currently in (None = overworld)
     player_instances: Arc<RwLock<HashMap<String, String>>>,
     /// Last server-validated NPC interaction for each player.
@@ -1525,8 +1489,6 @@ pub struct GameRoom {
     chest_manager: RwLock<crate::chest::ChestManager>,
     /// Tracks which chest each player has open (player_id -> chest_key)
     player_open_chests: RwLock<HashMap<String, String>>,
-    /// Per-spectator message senders (read-only viewers on login screen)
-    spectator_senders: RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>,
     /// Active trade sessions: trade_id -> TradeSession
     trades: RwLock<HashMap<String, TradeSession>>,
     /// Player -> trade_id mapping for quick lookup

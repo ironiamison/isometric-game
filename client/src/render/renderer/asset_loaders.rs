@@ -74,6 +74,8 @@ pub(super) async fn load_individual_sprites(
     total: usize,
     label: &str,
 ) -> HashMap<String, Texture2D> {
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = total;
     let mut sprites = HashMap::new();
     for item in items {
         let key = item.rsplit('/').next().unwrap_or(item).to_string();

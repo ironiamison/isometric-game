@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "packageManager": "npm@10.9.4",
+  "engines": {
+    "node": "22.x",
+    "npm": "10.x"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -22,5 +27,8 @@
   },
   "dependencies": {
     "lucide-svelte": "^0.474.0"
+  },
+  "overrides": {
+    "cookie": "0.7.2"
   }
 }

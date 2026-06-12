@@ -1,3 +1,6 @@
+#![allow(clippy::vec_init_then_push)]
+// Wire maps are appended in protocol order and may include conditional fields.
+
 use super::*;
 
 // ============================================================================

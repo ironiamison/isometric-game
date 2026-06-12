@@ -299,8 +299,7 @@ impl NetworkClient {
 
     pub fn send(&mut self, msg: &ClientMessage) {
         if self.connection_state == ConnectionState::Connected {
-            let (msg_type, msg_data) = msg.to_protocol();
-            match protocol::encode_message(msg_type, &msg_data) {
+            match aeven_protocol::encode_client_message(msg) {
                 Ok(bytes) => unsafe {
                     ws_send(JsObject::buffer(&bytes));
                 },

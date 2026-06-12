@@ -118,13 +118,13 @@ impl InputHandler {
                         }
                         UiElementId::CraftingCategoryTab(idx) => {
                             // Disable category switching during crafting
-                            if !state.ui_state.crafting_in_progress {
-                                if *idx != state.ui_state.crafting_selected_category {
-                                    state.ui_state.crafting_selected_category = *idx;
-                                    state.ui_state.crafting_selected_recipe = 0;
-                                    state.ui_state.crafting_scroll_offset = 0.0;
-                                    state.pending_sfx.push("enter".to_string());
-                                }
+                            if !state.ui_state.crafting_in_progress
+                                && *idx != state.ui_state.crafting_selected_category
+                            {
+                                state.ui_state.crafting_selected_category = *idx;
+                                state.ui_state.crafting_selected_recipe = 0;
+                                state.ui_state.crafting_scroll_offset = 0.0;
+                                state.pending_sfx.push("enter".to_string());
                             }
                             return true;
                         }
@@ -396,21 +396,20 @@ impl InputHandler {
                 // Disable navigation during crafting
                 if !state.ui_state.crafting_in_progress {
                     // Left/Right navigate categories
-                    if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A) {
-                        if state.ui_state.crafting_selected_category > 0 {
-                            state.ui_state.crafting_selected_category -= 1;
-                            state.ui_state.crafting_selected_recipe = 0;
-                            state.ui_state.crafting_scroll_offset = 0.0;
-                        }
+                    if (is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A))
+                        && state.ui_state.crafting_selected_category > 0
+                    {
+                        state.ui_state.crafting_selected_category -= 1;
+                        state.ui_state.crafting_selected_recipe = 0;
+                        state.ui_state.crafting_scroll_offset = 0.0;
                     }
-                    if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
-                        if state.ui_state.crafting_selected_category
+                    if (is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D))
+                        && state.ui_state.crafting_selected_category
                             < categories.len().saturating_sub(1)
-                        {
-                            state.ui_state.crafting_selected_category += 1;
-                            state.ui_state.crafting_selected_recipe = 0;
-                            state.ui_state.crafting_scroll_offset = 0.0;
-                        }
+                    {
+                        state.ui_state.crafting_selected_category += 1;
+                        state.ui_state.crafting_selected_recipe = 0;
+                        state.ui_state.crafting_scroll_offset = 0.0;
                     }
 
                     // Get discovered recipes for current category (matches renderer filtering)
@@ -449,19 +448,18 @@ impl InputHandler {
 
                     // Up/Down navigate recipes
                     let mut key_navigated = false;
-                    if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                        if state.ui_state.crafting_selected_recipe > 0 {
-                            state.ui_state.crafting_selected_recipe -= 1;
-                            key_navigated = true;
-                        }
+                    if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                        && state.ui_state.crafting_selected_recipe > 0
+                    {
+                        state.ui_state.crafting_selected_recipe -= 1;
+                        key_navigated = true;
                     }
-                    if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                        if state.ui_state.crafting_selected_recipe
+                    if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                        && state.ui_state.crafting_selected_recipe
                             < recipes_in_category.len().saturating_sub(1)
-                        {
-                            state.ui_state.crafting_selected_recipe += 1;
-                            key_navigated = true;
-                        }
+                    {
+                        state.ui_state.crafting_selected_recipe += 1;
+                        key_navigated = true;
                     }
 
                     // Only auto-scroll when keyboard navigated, not every frame
@@ -777,28 +775,27 @@ impl InputHandler {
                             .map(|d| d.stock.len())
                             .unwrap_or(0);
 
-                        if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                            if state.ui_state.shop_selected_buy_index > 0 {
-                                state.ui_state.shop_selected_buy_index -= 1;
-                                state.ui_state.shop_buy_quantity = 1;
-                            }
+                        if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                            && state.ui_state.shop_selected_buy_index > 0
+                        {
+                            state.ui_state.shop_selected_buy_index -= 1;
+                            state.ui_state.shop_buy_quantity = 1;
                         }
-                        if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                            if state.ui_state.shop_selected_buy_index < item_count.saturating_sub(1)
-                            {
-                                state.ui_state.shop_selected_buy_index += 1;
-                                state.ui_state.shop_buy_quantity = 1;
-                            }
+                        if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                            && state.ui_state.shop_selected_buy_index < item_count.saturating_sub(1)
+                        {
+                            state.ui_state.shop_selected_buy_index += 1;
+                            state.ui_state.shop_buy_quantity = 1;
                         }
 
                         // +/- to adjust quantity
                         if is_key_pressed(KeyCode::Equal) || is_key_pressed(KeyCode::KpAdd) {
                             state.ui_state.shop_buy_quantity += 1;
                         }
-                        if is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract) {
-                            if state.ui_state.shop_buy_quantity > 1 {
-                                state.ui_state.shop_buy_quantity -= 1;
-                            }
+                        if (is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract))
+                            && state.ui_state.shop_buy_quantity > 1
+                        {
+                            state.ui_state.shop_buy_quantity -= 1;
                         }
 
                         // Enter to confirm buy
@@ -823,29 +820,28 @@ impl InputHandler {
                         let inventory_items = state.inventory.aggregate_items();
                         let item_count = inventory_items.len();
 
-                        if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                            if state.ui_state.shop_selected_sell_index > 0 {
-                                state.ui_state.shop_selected_sell_index -= 1;
-                                state.ui_state.shop_sell_quantity = 1;
-                            }
+                        if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                            && state.ui_state.shop_selected_sell_index > 0
+                        {
+                            state.ui_state.shop_selected_sell_index -= 1;
+                            state.ui_state.shop_sell_quantity = 1;
                         }
-                        if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                            if state.ui_state.shop_selected_sell_index
+                        if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                            && state.ui_state.shop_selected_sell_index
                                 < item_count.saturating_sub(1)
-                            {
-                                state.ui_state.shop_selected_sell_index += 1;
-                                state.ui_state.shop_sell_quantity = 1;
-                            }
+                        {
+                            state.ui_state.shop_selected_sell_index += 1;
+                            state.ui_state.shop_sell_quantity = 1;
                         }
 
                         // +/- to adjust quantity
                         if is_key_pressed(KeyCode::Equal) || is_key_pressed(KeyCode::KpAdd) {
                             state.ui_state.shop_sell_quantity += 1;
                         }
-                        if is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract) {
-                            if state.ui_state.shop_sell_quantity > 1 {
-                                state.ui_state.shop_sell_quantity -= 1;
-                            }
+                        if (is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract))
+                            && state.ui_state.shop_sell_quantity > 1
+                        {
+                            state.ui_state.shop_sell_quantity -= 1;
                         }
 
                         // Enter to confirm sell
@@ -1107,29 +1103,24 @@ impl InputHandler {
                 let max_scroll = (total_content - recipe_list_h).max(0.0);
 
                 // W/S or Up/Down to navigate recipes
-                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                    if state.ui_state.alchemy_station_selected_recipe > 0 {
-                        state.ui_state.alchemy_station_selected_recipe -= 1;
-                        let item_top =
-                            state.ui_state.alchemy_station_selected_recipe as f32 * row_h;
-                        if item_top < state.ui_state.alchemy_station_scroll_offset {
-                            state.ui_state.alchemy_station_scroll_offset = item_top;
-                        }
+                if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                    && state.ui_state.alchemy_station_selected_recipe > 0
+                {
+                    state.ui_state.alchemy_station_selected_recipe -= 1;
+                    let item_top = state.ui_state.alchemy_station_selected_recipe as f32 * row_h;
+                    if item_top < state.ui_state.alchemy_station_scroll_offset {
+                        state.ui_state.alchemy_station_scroll_offset = item_top;
                     }
                 }
-                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                    if state.ui_state.alchemy_station_selected_recipe
+                if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                    && state.ui_state.alchemy_station_selected_recipe
                         < recipe_count.saturating_sub(1)
-                    {
-                        state.ui_state.alchemy_station_selected_recipe += 1;
-                        let item_bottom =
-                            (state.ui_state.alchemy_station_selected_recipe + 1) as f32 * row_h;
-                        if item_bottom
-                            > state.ui_state.alchemy_station_scroll_offset + recipe_list_h
-                        {
-                            state.ui_state.alchemy_station_scroll_offset =
-                                item_bottom - recipe_list_h;
-                        }
+                {
+                    state.ui_state.alchemy_station_selected_recipe += 1;
+                    let item_bottom =
+                        (state.ui_state.alchemy_station_selected_recipe + 1) as f32 * row_h;
+                    if item_bottom > state.ui_state.alchemy_station_scroll_offset + recipe_list_h {
+                        state.ui_state.alchemy_station_scroll_offset = item_bottom - recipe_list_h;
                     }
                 }
 
@@ -1138,10 +1129,10 @@ impl InputHandler {
                     state.ui_state.alchemy_station_quantity =
                         (state.ui_state.alchemy_station_quantity + 1).min(99);
                 }
-                if is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract) {
-                    if state.ui_state.alchemy_station_quantity > 1 {
-                        state.ui_state.alchemy_station_quantity -= 1;
-                    }
+                if (is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract))
+                    && state.ui_state.alchemy_station_quantity > 1
+                {
+                    state.ui_state.alchemy_station_quantity -= 1;
                 }
 
                 // Enter or C to brew

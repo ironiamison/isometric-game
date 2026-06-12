@@ -112,20 +112,19 @@ impl GameRoom {
             let gathering = self.gathering.read().await;
             if let Some(zone) =
                 gathering.get_zone_for_marker(instance_id.as_deref(), marker_x, marker_y)
+                && zone.skill.as_str() == "fishing"
+                && !has_fishing_rod(equipped_weapon.as_deref())
             {
-                if zone.skill.as_str() == "fishing" && !has_fishing_rod(equipped_weapon.as_deref())
-                {
-                    drop(gathering);
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::Error {
-                            code: 400,
-                            message: "You need a fishing rod to do that".to_string(),
-                        },
-                    )
-                    .await;
-                    return;
-                }
+                drop(gathering);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::Error {
+                        code: 400,
+                        message: "You need a fishing rod to do that".to_string(),
+                    },
+                )
+                .await;
+                return;
             }
         }
 
@@ -257,24 +256,24 @@ impl GameRoom {
             let woodcutting = self.woodcutting.read().await;
             if let Some(tree_config) = woodcutting.get_tree_type(tree_gid) {
                 let players = self.players.read().await;
-                if let Some(player) = players.get(player_id) {
-                    if !player.inventory.has_space_for(
+                if let Some(player) = players.get(player_id)
+                    && !player.inventory.has_space_for(
                         &tree_config.log_item_id,
                         1,
                         &self.item_registry,
-                    ) {
-                        drop(players);
-                        drop(woodcutting);
-                        self.send_to_player(
-                            player_id,
-                            ServerMessage::Error {
-                                code: 400,
-                                message: "Your inventory is full!".to_string(),
-                            },
-                        )
-                        .await;
-                        return;
-                    }
+                    )
+                {
+                    drop(players);
+                    drop(woodcutting);
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::Error {
+                            code: 400,
+                            message: "Your inventory is full!".to_string(),
+                        },
+                    )
+                    .await;
+                    return;
                 }
             }
         }
@@ -499,24 +498,24 @@ impl GameRoom {
             let mining = self.mining.read().await;
             if let Some(ore_config) = mining.get_ore_type(rock_gid) {
                 let players = self.players.read().await;
-                if let Some(player) = players.get(player_id) {
-                    if !player.inventory.has_space_for(
+                if let Some(player) = players.get(player_id)
+                    && !player.inventory.has_space_for(
                         &ore_config.ore_item_id,
                         1,
                         &self.item_registry,
-                    ) {
-                        drop(players);
-                        drop(mining);
-                        self.send_to_player(
-                            player_id,
-                            ServerMessage::Error {
-                                code: 400,
-                                message: "Your inventory is full!".to_string(),
-                            },
-                        )
-                        .await;
-                        return;
-                    }
+                    )
+                {
+                    drop(players);
+                    drop(mining);
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::Error {
+                            code: 400,
+                            message: "Your inventory is full!".to_string(),
+                        },
+                    )
+                    .await;
+                    return;
                 }
             }
         }

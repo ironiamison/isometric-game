@@ -73,7 +73,7 @@ impl GameRoom {
                 let coord = ChunkCoord::from_world(wx, wy);
                 if let Some(chunk) = chunks_guard.get(&coord) {
                     let (lx, ly) = world_to_local(wx, wy);
-                    chunk.get_height(lx as u32, ly as u32) as i32
+                    chunk.get_height(lx, ly) as i32
                 } else {
                     0
                 }
@@ -119,10 +119,10 @@ impl GameRoom {
                 }
 
                 let new_pos = (npc.x, npc.y);
-                if !walkable_check(npc.x, npc.y) {
-                    if let Some(message) = blocked_move_log(old_pos, new_pos, &npc.id) {
-                        tracing::error!("{}", message);
-                    }
+                if !walkable_check(npc.x, npc.y)
+                    && let Some(message) = blocked_move_log(old_pos, new_pos, &npc.id)
+                {
+                    tracing::error!("{}", message);
                 }
 
                 if npc.is_alive() {

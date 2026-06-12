@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useEditorStore } from '@/state/store';
 import { tilesetLoader } from '@/core/TilesetLoader';
 import { entityRegistryLoader } from '@/core/EntityRegistry';
@@ -16,9 +16,21 @@ import { LayerPanel } from '@/components/LayerPanel';
 import { EntityPanel } from '@/components/EntityPanel';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { NotesPanel } from '@/components/NotesPanel';
-import { AssetManager } from '@/components/AssetManager';
-import { ContentStudio } from '@/components/ContentStudio';
 import './App.css';
+
+const AssetManager = lazy(() =>
+  import('@/components/AssetManager').then((module) => ({ default: module.AssetManager }))
+);
+const ContentStudio = lazy(() =>
+  import('@/components/ContentStudio').then((module) => ({ default: module.ContentStudio }))
+);
+
+const workspaceFallback = (
+  <div className="loading">
+    <div className="loading-spinner" />
+    <div className="loading-message">Loading workspace...</div>
+  </div>
+);
 
 function App() {
   const [workspaceMode, setWorkspaceMode] = useState<'map' | 'content'>('map');
@@ -109,6 +121,9 @@ function App() {
     setNotes,
     fetchUserInfo,
     paletteSide,
+    assetManagerOpen,
+    assetManagerTab,
+    assetRevision,
   } = useEditorStore();
 
   // Initialize app
@@ -337,7 +352,11 @@ function App() {
   }
 
   if (workspaceMode === 'content') {
-    return <ContentStudio onOpenMap={() => setWorkspaceMode('map')} />;
+    return (
+      <Suspense fallback={workspaceFallback}>
+        <ContentStudio onOpenMap={() => setWorkspaceMode('map')} />
+      </Suspense>
+    );
   }
 
   const paletteSidebar = (
@@ -354,7 +373,7 @@ function App() {
         overflow: 'hidden',
         minHeight: 100,
       }}>
-        <ObjectPalette />
+        <ObjectPalette key={assetRevision} />
       </div>
       <LayerPanel />
     </>
@@ -449,7 +468,11 @@ function App() {
           </>
         )}
       </div>
-      <AssetManager />
+      {assetManagerOpen && (
+        <Suspense fallback={null}>
+          <AssetManager key={assetManagerTab} />
+        </Suspense>
+      )}
     </div>
   );
 }

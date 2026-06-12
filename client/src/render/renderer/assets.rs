@@ -36,14 +36,18 @@ impl Renderer {
         let manifest = SpriteManifest::load().await;
 
         // Fixed assets: 1 tileset + 14 players + 3 hair + 1 font + 8 UI textures + 1 shader + 4 arrows + 2 music = 34
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         const FIXED_ASSETS: usize = 34;
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         let manifest_total = manifest.equipment.len()
             + manifest.weapons.len()
             + manifest.inventory.len()
             + manifest.objects.len()
             + manifest.walls.len()
             + manifest.enemies.len();
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         let total = FIXED_ASSETS + manifest_total;
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         let mut loaded: usize = 0;
 
         // On WASM, update the HTML overlay. On other platforms, no-op.
@@ -57,7 +61,10 @@ impl Renderer {
         // Preload audio first (music + SFX)
         set_loading!("Loading audio...");
         audio.preload_all().await;
-        loaded += 2; // menu.ogg + start.ogg
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        {
+            loaded += 2; // menu.ogg + start.ogg
+        }
 
         set_loading!("Loading tileset...");
 
@@ -71,7 +78,10 @@ impl Renderer {
                 None
             }
         };
-        loaded += 1;
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        {
+            loaded += 1;
+        }
 
         // Load player sprites - atlas on WASM/Android, individual on desktop
         set_loading!("Loading player sprites...");
@@ -940,7 +950,10 @@ impl Renderer {
 
         let font =
             BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
-        loaded += 1;
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        {
+            loaded += 1;
+        }
 
         set_loading!("Loading UI...");
 
@@ -1136,7 +1149,7 @@ impl Renderer {
                         let lx = ox - 1; // local coord in icon space
                         let ly = oy - 1;
                         // Current pixel: transparent if outside icon bounds
-                        let is_transparent = if lx >= 0 && lx < 16 && ly >= 0 && ly < 16 {
+                        let is_transparent = if (0..16).contains(&lx) && (0..16).contains(&ly) {
                             img.get_pixel((src_x0 + lx) as u32, ly as u32).a < 0.5
                         } else {
                             true
@@ -1146,15 +1159,16 @@ impl Renderer {
                             for &(dx, dy) in &[(-1i32, 0i32), (1, 0), (0, -1), (0, 1)] {
                                 let nlx = lx + dx;
                                 let nly = ly + dy;
-                                if nlx >= 0 && nlx < 16 && nly >= 0 && nly < 16 {
-                                    if img.get_pixel((src_x0 + nlx) as u32, nly as u32).a >= 0.5 {
-                                        outline.set_pixel(
-                                            (dst_x0 + ox) as u32,
-                                            oy as u32,
-                                            outline_color,
-                                        );
-                                        break;
-                                    }
+                                if (0..16).contains(&nlx)
+                                    && (0..16).contains(&nly)
+                                    && img.get_pixel((src_x0 + nlx) as u32, nly as u32).a >= 0.5
+                                {
+                                    outline.set_pixel(
+                                        (dst_x0 + ox) as u32,
+                                        oy as u32,
+                                        outline_color,
+                                    );
+                                    break;
                                 }
                             }
                         }
@@ -1270,12 +1284,9 @@ impl Renderer {
             let mut icons = HashMap::new();
             for prayer in &prayer_names {
                 let path = asset_path(&format!("assets/ui/prayers/{}.png", prayer));
-                match load_texture(&path).await {
-                    Ok(tex) => {
-                        tex.set_filter(FilterMode::Nearest);
-                        icons.insert(prayer.to_string(), tex);
-                    }
-                    Err(_) => {}
+                if let Ok(tex) = load_texture(&path).await {
+                    tex.set_filter(FilterMode::Nearest);
+                    icons.insert(prayer.to_string(), tex);
                 }
             }
             SpriteStore::Individual(icons)
@@ -1313,12 +1324,9 @@ impl Renderer {
             let mut icons = HashMap::new();
             for (spell_id, icon_name) in &spell_icon_mappings {
                 let path = asset_path(&format!("assets/ui/spells/{}.png", icon_name));
-                match load_texture(&path).await {
-                    Ok(tex) => {
-                        tex.set_filter(FilterMode::Nearest);
-                        icons.insert(spell_id.to_string(), tex);
-                    }
-                    Err(_) => {}
+                if let Ok(tex) = load_texture(&path).await {
+                    tex.set_filter(FilterMode::Nearest);
+                    icons.insert(spell_id.to_string(), tex);
                 }
             }
             SpriteStore::Individual(icons)

@@ -227,7 +227,7 @@ impl Screen for LoginScreen {
         if self.shooting_stars.len() < 2 {
             let pseudo = (self.frame_counter * 173.0) as u32;
             // ~1 every 3-5 seconds on average
-            if pseudo % 200 == 0 {
+            if pseudo.is_multiple_of(200) {
                 let start_x = ((pseudo as f32 * 0.371) % 0.6 + 0.1) * sw;
                 let start_y = ((pseudo as f32 * 0.529) % 0.2 + 0.02) * sh;
                 let angle = 0.4 + ((pseudo as f32 * 0.213) % 0.4); // downward-right angle
@@ -313,7 +313,7 @@ impl Screen for LoginScreen {
         let form_gap = if compact { 2.0 } else { 8.0 };
         let label_h = 12.0;
         let field_gap = if compact { 14.0 } else { spacing + 4.0 };
-        let buttons_gap = spacing + 14.0;
+        let _buttons_gap = spacing + 14.0;
 
         let checkbox_row_h = 20.0;
         let checkbox_gap = if compact { 4.0 } else { 8.0 };
@@ -566,7 +566,7 @@ impl Screen for LoginScreen {
         let form_gap = if compact { 2.0 } else { 8.0 };
         let label_h = 12.0;
         let field_gap = if compact { 14.0 } else { spacing + 4.0 };
-        let buttons_gap = spacing + 14.0;
+        let _buttons_gap = spacing + 14.0;
 
         let checkbox_row_h = 20.0;
         let checkbox_gap = if compact { 4.0 } else { 8.0 };

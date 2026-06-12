@@ -98,14 +98,13 @@ impl GameRoom {
         let calc_type_bonus_str = |npc_tags: &[String]| -> f32 {
             let mut total = 0.0f32;
             for slot in &equipped_items {
-                if let Some(item_id) = slot {
-                    if let Some(def) = self.item_registry.get(item_id) {
-                        if let Some(equip) = &def.equipment {
-                            for tb in &equip.type_bonuses {
-                                if npc_tags.contains(&tb.tag) {
-                                    total += tb.strength_percent;
-                                }
-                            }
+                if let Some(item_id) = slot
+                    && let Some(def) = self.item_registry.get(item_id)
+                    && let Some(equip) = &def.equipment
+                {
+                    for tb in &equip.type_bonuses {
+                        if npc_tags.contains(&tb.tag) {
+                            total += tb.strength_percent;
                         }
                     }
                 }
@@ -175,10 +174,11 @@ impl GameRoom {
         if weapon_type == WeaponType::Ranged {
             let players = self.players.read().await;
             if let Some(player) = players.get(player_id) {
-                let has_arrows = player.inventory.slots.iter().any(|slot| {
-                    slot.as_ref()
-                        .map_or(false, |s| s.item_id.ends_with("_arrow"))
-                });
+                let has_arrows = player
+                    .inventory
+                    .slots
+                    .iter()
+                    .any(|slot| slot.as_ref().is_some_and(|s| s.item_id.ends_with("_arrow")));
                 if !has_arrows {
                     drop(players);
                     self.send_to_player(
@@ -234,44 +234,47 @@ impl GameRoom {
             // which can miss targets not on a cardinal/diagonal line)
             if attacker_instance.is_none() {
                 let npcs = self.npcs.read().await;
-                if let Some(npc) = npcs.get(forced_id) {
-                    if npc.is_alive() && npc.is_attackable() {
-                        target_id = Some(forced_id.to_string());
-                        is_npc = true;
-                        target_tile_x = npc.x;
-                        target_tile_y = npc.y;
-                    }
+                if let Some(npc) = npcs.get(forced_id)
+                    && npc.is_alive()
+                    && npc.is_attackable()
+                {
+                    target_id = Some(forced_id.to_string());
+                    is_npc = true;
+                    target_tile_x = npc.x;
+                    target_tile_y = npc.y;
                 }
-            } else if let Some(ref inst_id) = attacker_instance {
-                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
-                    let npcs = instance.npcs.read().await;
-                    if let Some(npc) = npcs.get(forced_id) {
-                        if npc.is_alive() && npc.is_attackable() {
-                            target_id = Some(forced_id.to_string());
-                            is_npc = true;
-                            is_instance_npc = true;
-                            target_tile_x = npc.x;
-                            target_tile_y = npc.y;
-                        }
-                    }
+            } else if let Some(ref inst_id) = attacker_instance
+                && let Some(instance) = self.instance_manager.get_by_instance_id(inst_id)
+            {
+                let npcs = instance.npcs.read().await;
+                if let Some(npc) = npcs.get(forced_id)
+                    && npc.is_alive()
+                    && npc.is_attackable()
+                {
+                    target_id = Some(forced_id.to_string());
+                    is_npc = true;
+                    is_instance_npc = true;
+                    target_tile_x = npc.x;
+                    target_tile_y = npc.y;
                 }
             }
             // Also check players as forced target
             if target_id.is_none() {
                 let players = self.players.read().await;
-                if let Some(player) = players.get(forced_id) {
-                    if player.active && player.hp > 0 {
-                        let instances = self.player_instances.read().await;
-                        let target_instance = instances.get(forced_id).cloned();
-                        drop(instances);
-                        // PVP must be allowed at attacker's location (overworld zone or instance flag)
-                        let pvp_ok = self.is_pvp_allowed(player_id, attacker_x, attacker_y).await;
-                        if target_instance == attacker_instance && pvp_ok {
-                            target_id = Some(forced_id.to_string());
-                            is_npc = false;
-                            target_tile_x = player.x;
-                            target_tile_y = player.y;
-                        }
+                if let Some(player) = players.get(forced_id)
+                    && player.active
+                    && player.hp > 0
+                {
+                    let instances = self.player_instances.read().await;
+                    let target_instance = instances.get(forced_id).cloned();
+                    drop(instances);
+                    // PVP must be allowed at attacker's location (overworld zone or instance flag)
+                    let pvp_ok = self.is_pvp_allowed(player_id, attacker_x, attacker_y).await;
+                    if target_instance == attacker_instance && pvp_ok {
+                        target_id = Some(forced_id.to_string());
+                        is_npc = false;
+                        target_tile_x = player.x;
+                        target_tile_y = player.y;
                     }
                 }
             }
@@ -432,34 +435,34 @@ impl GameRoom {
         }
 
         // In slayer-only areas, players can only attack NPCs matching their active slayer task
-        if is_npc {
-            if let Some(ref inst_id) = attacker_instance {
-                if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
-                    if let Some(interior) = self.interior_registry.get(&instance.map_id) {
-                        if interior.requires_slayer_task {
-                            let slayer_state = self.get_player_slayer_state(player_id).await;
-                            let npc_prototype = if is_instance_npc {
-                                let npcs = instance.npcs.read().await;
-                                npcs.get(&target_id).map(|n| n.prototype_id.clone())
-                            } else {
-                                None
-                            };
-                            if let Some(proto_id) = npc_prototype {
-                                let allowed = match &slayer_state.current_task {
-                                    Some(task) => {
-                                        proto_id == task.monster_id
-                                            || proto_id
-                                                .starts_with(&format!("{}_", task.monster_id))
-                                    }
-                                    None => false,
-                                };
-                                if !allowed {
-                                    self.send_system_message(player_id, "You can only attack your slayer task monster in this area.").await;
-                                    return;
-                                }
-                            }
-                        }
+        if is_npc
+            && let Some(ref inst_id) = attacker_instance
+            && let Some(instance) = self.instance_manager.get_by_instance_id(inst_id)
+            && let Some(interior) = self.interior_registry.get(&instance.map_id)
+            && interior.requires_slayer_task
+        {
+            let slayer_state = self.get_player_slayer_state(player_id).await;
+            let npc_prototype = if is_instance_npc {
+                let npcs = instance.npcs.read().await;
+                npcs.get(&target_id).map(|n| n.prototype_id.clone())
+            } else {
+                None
+            };
+            if let Some(proto_id) = npc_prototype {
+                let allowed = match &slayer_state.current_task {
+                    Some(task) => {
+                        proto_id == task.monster_id
+                            || proto_id.starts_with(&format!("{}_", task.monster_id))
                     }
+                    None => false,
+                };
+                if !allowed {
+                    self.send_system_message(
+                        player_id,
+                        "You can only attack your slayer task monster in this area.",
+                    )
+                    .await;
+                    return;
                 }
             }
         }
@@ -601,12 +604,12 @@ impl GameRoom {
                                 npc.hp
                             );
                             // Track damage dealer for boss loot distribution
-                            if damage > 0 {
-                                if let Some(ref inst_id) = attacker_instance {
-                                    let mut boss_states = self.boss_states.write().await;
-                                    if let Some(boss) = boss_states.get_mut(inst_id) {
-                                        boss.damage_dealers.insert(player_id.to_string());
-                                    }
+                            if damage > 0
+                                && let Some(ref inst_id) = attacker_instance
+                            {
+                                let mut boss_states = self.boss_states.write().await;
+                                if let Some(boss) = boss_states.get_mut(inst_id) {
+                                    boss.damage_dealers.insert(player_id.to_string());
                                 }
                             }
                             (npc.hp, name, died, damage)
@@ -1060,14 +1063,14 @@ impl GameRoom {
                         {
                             let mut players = self.players.write().await;
                             for placement in &placements {
-                                if placement.gold_reward > 0 {
-                                    if let Some(p) = players.get_mut(&placement.player_id) {
-                                        p.inventory.gold = item::checked_gold_credit(
-                                            p.inventory.gold,
-                                            placement.gold_reward,
-                                        )
-                                        .unwrap_or(item::MAX_GOLD);
-                                    }
+                                if placement.gold_reward > 0
+                                    && let Some(p) = players.get_mut(&placement.player_id)
+                                {
+                                    p.inventory.gold = item::checked_gold_credit(
+                                        p.inventory.gold,
+                                        placement.gold_reward,
+                                    )
+                                    .unwrap_or(item::MAX_GOLD);
                                 }
                             }
                         }
@@ -1337,7 +1340,7 @@ impl GameRoom {
                     } else if !item.can_pickup(player_id, current_time) {
                         let elapsed = current_time.saturating_sub(item.drop_time);
                         let remaining_ms = 10000u64.saturating_sub(elapsed);
-                        let remaining_secs = (remaining_ms + 999) / 1000;
+                        let remaining_secs = remaining_ms.div_ceil(1000);
                         (None, Some(remaining_secs))
                     } else {
                         (Some((item.item_id.clone(), item.quantity)), None)

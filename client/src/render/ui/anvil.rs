@@ -405,7 +405,7 @@ impl Renderer {
         let cell_w = (content_w - (columns as f32 - 1.0) * gap) / columns as f32;
         let cell_h = 106.0 * s;
 
-        let rows = (anvil_recipes.len() + columns - 1) / columns;
+        let rows = anvil_recipes.len().div_ceil(columns);
         let total_content = rows as f32 * (cell_h + gap);
         let max_scroll = (total_content - content_h).max(0.0);
         let scroll_offset = state.ui_state.anvil_scroll_offset.clamp(0.0, max_scroll);

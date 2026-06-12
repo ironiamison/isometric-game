@@ -48,8 +48,8 @@ impl Renderer {
         let row_height = SOCIAL_ROW_HEIGHT * scale;
         let padding = SOCIAL_PADDING * scale;
         let input_height = SOCIAL_INPUT_HEIGHT * scale;
-        let button_size = MENU_BUTTON_SIZE * scale;
-        let exp_bar_gap = EXP_BAR_GAP * scale;
+        let _button_size = MENU_BUTTON_SIZE * scale;
+        let _exp_bar_gap = EXP_BAR_GAP * scale;
 
         // Position panel on right side, above the menu buttons
         let panel_x = screen_w - panel_width - 8.0;
@@ -238,7 +238,12 @@ impl Renderer {
         self.enable_scissor_clip(x, y, width, height);
 
         let mut row_y = y - (scroll_offset % row_height);
-        for i in first_visible..last_visible {
+        for (i, player) in nearby
+            .iter()
+            .enumerate()
+            .take(last_visible)
+            .skip(first_visible)
+        {
             if row_y + row_height < y {
                 row_y += row_height;
                 continue;
@@ -246,8 +251,6 @@ impl Renderer {
             if row_y > y + height {
                 break;
             }
-
-            let player = &nearby[i];
 
             // Only add clickable bounds if row is fully visible
             if row_y >= y && row_y + row_height <= y + height {

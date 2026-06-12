@@ -11,7 +11,7 @@ use std::collections::HashMap;
 pub const FONT_SIZES: &[u16] = &[8, 16, 24, 32, 40, 48];
 
 /// Multi-size bitmap font that provides pixel-perfect rendering
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BitmapFont {
     /// Fonts keyed by their native size
     fonts: HashMap<u16, Font>,
@@ -185,13 +185,5 @@ impl BitmapFont {
     /// Check if font is loaded
     pub fn is_loaded(&self) -> bool {
         !self.fonts.is_empty()
-    }
-}
-
-impl Default for BitmapFont {
-    fn default() -> Self {
-        Self {
-            fonts: HashMap::new(),
-        }
     }
 }

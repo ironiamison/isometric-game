@@ -441,7 +441,7 @@ impl KothState {
                     self.points += wave_points(self.current_wave);
                     self.points += speed_bonus(self.wave_start_time, current_time);
 
-                    if self.current_wave % 5 == 0 {
+                    if self.current_wave.is_multiple_of(5) {
                         // Checkpoint
                         self.phase = KothPhase::Checkpoint;
                         let rewards = checkpoint_rewards(self.current_wave);

@@ -74,8 +74,8 @@ impl Renderer {
         let panel_padding = SKILLS_PANEL_PADDING * scale;
         let slot_size = SKILL_SLOT_SIZE * scale;
         let slot_spacing = SKILL_SLOT_SPACING * scale;
-        let button_size = MENU_BUTTON_SIZE * scale;
-        let exp_bar_gap = EXP_BAR_GAP * scale;
+        let _button_size = MENU_BUTTON_SIZE * scale;
+        let _exp_bar_gap = EXP_BAR_GAP * scale;
 
         // Position panel on right side, above the menu buttons (align with button right edge)
         let panel_x = screen_w - panel_width - 8.0;
@@ -134,9 +134,8 @@ impl Renderer {
 
             let is_hovered = matches!(hovered, Some(UiElementId::SkillSlot(i)) if *i == slot_index);
 
-            if slot_index < ACTIVE_SKILLS.len() {
+            if let Some(&skill_type) = ACTIVE_SKILLS.get(slot_index) {
                 // Active skill slot
-                let skill_type = ACTIVE_SKILLS[slot_index];
                 let skill = state
                     .get_local_player()
                     .map(|p| p.skills.get(skill_type).clone())

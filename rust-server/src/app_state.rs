@@ -1,9 +1,9 @@
 use super::*;
 
 impl AppState {
-    pub(super) async fn new(log_buffer: log_buffer::LogBuffer) -> Self {
+    pub(super) async fn new(log_buffer: log_buffer::LogBuffer, config: Arc<ServerConfig>) -> Self {
         // Initialize database
-        let db = Database::new("sqlite:game.db?mode=rwc")
+        let db = Database::new(&config.database_url)
             .await
             .expect("Failed to initialize database");
 
@@ -95,6 +95,7 @@ impl AppState {
         }
 
         Self {
+            config: config.clone(),
             rooms: Arc::new(DashMap::new()),
             room_creation_lock: Arc::new(Mutex::new(())),
             sessions: Arc::new(DashMap::new()),
@@ -105,7 +106,7 @@ impl AppState {
             // Matchmaking: 20 attempts per 60 seconds per IP
             matchmake_rate_limiter: RateLimiter::new(20, 60),
             // SECURITY: Token signer for session tokens
-            token_signer: SessionTokenSigner::new(),
+            token_signer: SessionTokenSigner::new(config.session_signing_secret.clone()),
             entity_registry: Arc::new(entity_registry),
             item_registry: Arc::new(item_registry),
             prayer_registry: Arc::new(prayer_registry),
@@ -171,7 +172,7 @@ pub(super) struct SessionLease {
 
 pub(super) async fn acquire_session_lease(
     sessions: &DashMap<String, GameSession>,
-    auth_sessions: &DashMap<String, (i64, String)>,
+    auth_sessions: &AuthSessions,
     session_id: &str,
     room_id: &str,
     player_id: &str,
@@ -193,8 +194,8 @@ pub(super) async fn acquire_session_lease(
         return None;
     }
 
-    let auth_session = auth_sessions.get(&session.auth_token)?;
-    if auth_session.value().0 != session.account_id {
+    let auth_session = get_auth_session(auth_sessions, &session.auth_token)?;
+    if auth_session.account_id != session.account_id {
         return None;
     }
 
@@ -226,8 +227,11 @@ mod session_lease_tests {
     #[tokio::test]
     async fn takeover_waits_for_in_flight_command_and_rejects_stale_session() {
         let sessions = DashMap::new();
-        let auth_sessions = DashMap::new();
-        auth_sessions.insert("auth".to_string(), (7, "tester".to_string()));
+        let auth_sessions = Arc::new(DashMap::new());
+        auth_sessions.insert(
+            "auth".to_string(),
+            AuthSession::new(7, "tester".to_string(), Duration::from_secs(60)),
+        );
 
         let old_gate = Arc::new(RwLock::new(true));
         sessions.insert("old".to_string(), test_session(old_gate.clone()));

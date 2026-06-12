@@ -52,11 +52,10 @@ pub(super) async fn auto_enter_instance(
 
     if is_new || !*instance.npcs_spawned.read().await {
         // Load collision data for NPC walkability
-        if !interior.collision.is_empty() {
-            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision)
-            {
-                instance.set_collision(&bytes).await;
-            }
+        if !interior.collision.is_empty()
+            && let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision)
+        {
+            instance.set_collision(&bytes).await;
         }
         instance
             .spawn_npcs(&interior.entities, &state.entity_registry)
@@ -435,12 +434,13 @@ pub(super) async fn handle_enter_portal(
                         .collect();
 
                     let remaining = instance.remove_player(player_id).await;
-                    if remaining == 0 && instance.instance_type == InstanceType::Private {
-                        if let Some(owner_id) = &instance.owner_id {
-                            state
-                                .instance_manager
-                                .remove_private(owner_id, &instance.map_id);
-                        }
+                    if remaining == 0
+                        && instance.instance_type == InstanceType::Private
+                        && let Some(owner_id) = &instance.owner_id
+                    {
+                        state
+                            .instance_manager
+                            .remove_private(owner_id, &instance.map_id);
                     }
 
                     // Notify other players in the instance that this player left
@@ -667,11 +667,10 @@ pub(super) async fn handle_enter_portal(
     // Spawn NPCs if this is a new instance
     if is_new || !*instance.npcs_spawned.read().await {
         // Load collision data for NPC walkability
-        if !interior.collision.is_empty() {
-            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision)
-            {
-                instance.set_collision(&bytes).await;
-            }
+        if !interior.collision.is_empty()
+            && let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&interior.collision)
+        {
+            instance.set_collision(&bytes).await;
         }
         // Load heightmap if present
         if let Some(ref hm) = interior.heightmap {

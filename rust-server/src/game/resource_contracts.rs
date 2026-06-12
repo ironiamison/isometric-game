@@ -299,7 +299,7 @@ impl GameRoom {
                 .await
                 .ok()
                 .flatten()
-                .map_or(false, |d| d == today);
+                .is_some_and(|d| d == today);
 
             let order_ids = if already_generated {
                 // Orders were already generated today — return whatever remains (may be empty)
@@ -359,48 +359,48 @@ impl GameRoom {
             }
 
             // Check for active order
-            if let Ok(Some(active_order_id)) = db.get_active_order(char_id).await {
-                if let Some(template) = self.crafting_order_registry.get_order(&active_order_id) {
-                    let items: Vec<CraftingOrderItemData> = template
-                        .items
-                        .iter()
-                        .map(|item| {
-                            let item_name = self
-                                .item_registry
-                                .get(&item.id)
-                                .map(|def| def.display_name.clone())
-                                .unwrap_or_else(|| item.id.clone());
-                            CraftingOrderItemData {
-                                item_id: item.id.clone(),
-                                item_name,
-                                quantity: item.quantity,
-                            }
-                        })
-                        .collect();
-
-                    // Check if player can claim (has all required items)
-                    let can_claim = {
-                        let players = self.players.read().await;
-                        if let Some(player) = players.get(player_id) {
-                            template
-                                .items
-                                .iter()
-                                .all(|item| player.inventory.has_item(&item.id, item.quantity))
-                        } else {
-                            false
+            if let Ok(Some(active_order_id)) = db.get_active_order(char_id).await
+                && let Some(template) = self.crafting_order_registry.get_order(&active_order_id)
+            {
+                let items: Vec<CraftingOrderItemData> = template
+                    .items
+                    .iter()
+                    .map(|item| {
+                        let item_name = self
+                            .item_registry
+                            .get(&item.id)
+                            .map(|def| def.display_name.clone())
+                            .unwrap_or_else(|| item.id.clone());
+                        CraftingOrderItemData {
+                            item_id: item.id.clone(),
+                            item_name,
+                            quantity: item.quantity,
                         }
-                    };
+                    })
+                    .collect();
 
-                    crafting_order_active = Some(CraftingOrderActiveData {
-                        order_id: active_order_id,
-                        tier: template.tier.clone(),
-                        skill: template.skill.clone(),
-                        items,
-                        reward_gold: template.rewards.gold,
-                        reward_marks: template.rewards.marks,
-                        can_claim,
-                    });
-                }
+                // Check if player can claim (has all required items)
+                let can_claim = {
+                    let players = self.players.read().await;
+                    if let Some(player) = players.get(player_id) {
+                        template
+                            .items
+                            .iter()
+                            .all(|item| player.inventory.has_item(&item.id, item.quantity))
+                    } else {
+                        false
+                    }
+                };
+
+                crafting_order_active = Some(CraftingOrderActiveData {
+                    order_id: active_order_id,
+                    tier: template.tier.clone(),
+                    skill: template.skill.clone(),
+                    items,
+                    reward_gold: template.rewards.gold,
+                    reward_marks: template.rewards.marks,
+                    can_claim,
+                });
             }
 
             // Load crafting order stats
@@ -723,18 +723,18 @@ impl GameRoom {
         // Check daily contract limit
         if let Some(ref db) = self.db {
             let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-            if let Ok(daily_count) = db.get_daily_contracts_completed(player_id, &today).await {
-                if daily_count >= DAILY_CONTRACT_LIMIT {
-                    self.send_system_message(
-                        player_id,
-                        &format!(
-                            "You've reached your daily contract limit ({}/{}).",
-                            daily_count, DAILY_CONTRACT_LIMIT
-                        ),
-                    )
-                    .await;
-                    return;
-                }
+            if let Ok(daily_count) = db.get_daily_contracts_completed(player_id, &today).await
+                && daily_count >= DAILY_CONTRACT_LIMIT
+            {
+                self.send_system_message(
+                    player_id,
+                    &format!(
+                        "You've reached your daily contract limit ({}/{}).",
+                        daily_count, DAILY_CONTRACT_LIMIT
+                    ),
+                )
+                .await;
+                return;
             }
         }
 
@@ -797,8 +797,8 @@ impl GameRoom {
             resource_contracts.insert_contract(contract.clone());
         }
 
-        if let Some(ref db) = self.db {
-            if let Err(e) = db
+        if let Some(ref db) = self.db
+            && let Err(e) = db
                 .save_resource_contract(
                     player_id,
                     contract.kind.as_str(),
@@ -812,9 +812,8 @@ impl GameRoom {
                     contract.created_at,
                 )
                 .await
-            {
-                tracing::error!("Failed to save resource contract: {}", e);
-            }
+        {
+            tracing::error!("Failed to save resource contract: {}", e);
         }
 
         self.send_system_message(
@@ -863,18 +862,18 @@ impl GameRoom {
         // Check daily contract limit
         if let Some(ref db) = self.db {
             let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-            if let Ok(daily_count) = db.get_daily_contracts_completed(player_id, &today).await {
-                if daily_count >= DAILY_CONTRACT_LIMIT {
-                    self.send_system_message(
-                        player_id,
-                        &format!(
-                            "You've reached your daily contract limit ({}/{}).",
-                            daily_count, DAILY_CONTRACT_LIMIT
-                        ),
-                    )
-                    .await;
-                    return;
-                }
+            if let Ok(daily_count) = db.get_daily_contracts_completed(player_id, &today).await
+                && daily_count >= DAILY_CONTRACT_LIMIT
+            {
+                self.send_system_message(
+                    player_id,
+                    &format!(
+                        "You've reached your daily contract limit ({}/{}).",
+                        daily_count, DAILY_CONTRACT_LIMIT
+                    ),
+                )
+                .await;
+                return;
             }
         }
 
@@ -933,8 +932,8 @@ impl GameRoom {
             resource_contracts.insert_contract(contract.clone());
         }
 
-        if let Some(ref db) = self.db {
-            if let Err(e) = db
+        if let Some(ref db) = self.db
+            && let Err(e) = db
                 .save_resource_contract(
                     player_id,
                     contract.kind.as_str(),
@@ -948,9 +947,8 @@ impl GameRoom {
                     contract.created_at,
                 )
                 .await
-            {
-                tracing::error!("Failed to save board resource contract: {}", e);
-            }
+        {
+            tracing::error!("Failed to save board resource contract: {}", e);
         }
 
         self.send_system_message(
@@ -1111,10 +1109,10 @@ impl GameRoom {
             if let Err(e) = db.delete_resource_contract(player_id).await {
                 tracing::error!("Failed to delete resource contract: {}", e);
             }
-            if contract.kind == ResourceContractKind::Farming {
-                if let Err(e) = db.delete_farming_contract(player_id).await {
-                    tracing::warn!("Failed to delete legacy farming contract: {}", e);
-                }
+            if contract.kind == ResourceContractKind::Farming
+                && let Err(e) = db.delete_farming_contract(player_id).await
+            {
+                tracing::warn!("Failed to delete legacy farming contract: {}", e);
             }
             if let Err(e) = db
                 .add_resource_contract_completion(player_id, gold_reward, xp_reward)
@@ -1192,10 +1190,10 @@ impl GameRoom {
             if let Err(e) = db.delete_resource_contract(player_id).await {
                 tracing::error!("Failed to delete resource contract: {}", e);
             }
-            if contract.kind == ResourceContractKind::Farming {
-                if let Err(e) = db.delete_farming_contract(player_id).await {
-                    tracing::warn!("Failed to delete legacy farming contract: {}", e);
-                }
+            if contract.kind == ResourceContractKind::Farming
+                && let Err(e) = db.delete_farming_contract(player_id).await
+            {
+                tracing::warn!("Failed to delete legacy farming contract: {}", e);
             }
         }
 
@@ -1265,13 +1263,12 @@ impl GameRoom {
             {
                 tracing::warn!("Failed to update resource contract progress: {}", e);
             }
-            if contract.kind == ResourceContractKind::Farming {
-                if let Err(e) = db
+            if contract.kind == ResourceContractKind::Farming
+                && let Err(e) = db
                     .update_farming_contract_progress(player_id, completed)
                     .await
-                {
-                    tracing::warn!("Failed to update legacy farming contract progress: {}", e);
-                }
+            {
+                tracing::warn!("Failed to update legacy farming contract progress: {}", e);
             }
         }
 

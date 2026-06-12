@@ -5,30 +5,22 @@ use serde::{Deserialize, Serialize};
 /// What a single hotkey slot is bound to
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[derive(Default)]
 pub enum HotkeySlotBinding {
+    #[default]
     Empty,
-    Item { item_id: String },
-    Spell { spell_id: String },
-}
-
-impl Default for HotkeySlotBinding {
-    fn default() -> Self {
-        Self::Empty
-    }
+    Item {
+        item_id: String,
+    },
+    Spell {
+        spell_id: String,
+    },
 }
 
 /// A single preset containing 5 hotkey slot bindings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct HotkeyPreset {
     pub slots: [HotkeySlotBinding; 5],
-}
-
-impl Default for HotkeyPreset {
-    fn default() -> Self {
-        Self {
-            slots: Default::default(),
-        }
-    }
 }
 
 /// Full hotkey bar configuration: 5 presets, one active at a time

@@ -9,7 +9,7 @@ pub enum Gender {
 }
 
 impl Gender {
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_wire(s: &str) -> Self {
         match s {
             "female" => Gender::Female,
             _ => Gender::Male,
@@ -37,8 +37,9 @@ pub const HEAD_SPRITE_WIDTH: f32 = 30.0;
 pub const HEAD_SPRITE_HEIGHT: f32 = 34.0;
 
 /// Animation states the player can be in
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AnimationState {
+    #[default]
     Idle,
     Walking,
     Attacking,
@@ -46,12 +47,6 @@ pub enum AnimationState {
     SittingChair,
     Casting,
     ShootingBow,
-}
-
-impl Default for AnimationState {
-    fn default() -> Self {
-        AnimationState::Idle
-    }
 }
 
 /// Animation configuration for each state
@@ -171,7 +166,7 @@ impl PlayerAnimation {
 
         if self.frame >= config.frame_count as f32 {
             if config.looping {
-                self.frame = self.frame % config.frame_count as f32;
+                self.frame %= config.frame_count as f32;
             } else {
                 self.frame = (config.frame_count - 1) as f32;
                 self.finished = true;
@@ -387,7 +382,7 @@ impl NpcAnimation {
 
         if self.frame >= frame_count as f32 {
             if looping {
-                self.frame = self.frame % frame_count as f32;
+                self.frame %= frame_count as f32;
             } else {
                 self.frame = (frame_count - 1) as f32;
                 self.finished = true;

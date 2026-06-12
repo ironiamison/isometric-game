@@ -318,7 +318,7 @@ impl Renderer {
         icon_frame: usize,
         is_hovered: bool,
         is_active: bool,
-        scale: f32,
+        _scale: f32,
     ) {
         // Frame colors based on state
         let (bg_color, border_color) = if is_active {

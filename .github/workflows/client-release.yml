@@ -7,6 +7,10 @@ on:
     paths:
       - 'client/**'
       - 'launcher/**'
+      - 'crates/aeven-protocol/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
       - 'tools/**'
       - '.github/workflows/client-release.yml'
 
@@ -40,7 +44,7 @@ jobs:
           python-version: '3.11'
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.92.0
 
       - name: Install Linux deps
         if: runner.os == 'Linux'
@@ -51,7 +55,10 @@ jobs:
             libudev-dev libxcursor-dev libxrandr-dev libxinerama-dev
 
       - name: Build client
-        run: cargo build --release --manifest-path client/Cargo.toml
+        env:
+          AEVEN_SERVER_URL: https://aeven.xyz
+          AEVEN_WS_URL: wss://aeven.xyz
+        run: cargo build --locked --release --manifest-path client/Cargo.toml --target-dir client/target
 
       - name: Package client
         shell: bash

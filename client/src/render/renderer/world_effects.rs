@@ -104,8 +104,8 @@ impl Renderer {
             // Show the raw anchor footprint (green) — tiles (x,y) to (x+size-1, y+size-1)
             for dy in 0..npc.size {
                 for dx in 0..npc.size {
-                    let tx = npc.x as f32 + dx as f32;
-                    let ty = npc.y as f32 + dy as f32;
+                    let tx = npc.x + dx as f32;
+                    let ty = npc.y + dy as f32;
                     let (sx, sy) = world_to_screen(tx, ty, &state.camera);
                     let half_w = (TILE_WIDTH / 2.0) * zoom * 0.5;
                     let half_h = (TILE_HEIGHT / 2.0) * zoom * 0.5;
@@ -126,11 +126,8 @@ impl Renderer {
             }
             // Show sprite center (blue dot)
             let center_offset = (npc.size - 1) as f32 * 0.5;
-            let (cx, cy) = world_to_screen(
-                npc.x as f32 + center_offset,
-                npc.y as f32 + center_offset,
-                &state.camera,
-            );
+            let (cx, cy) =
+                world_to_screen(npc.x + center_offset, npc.y + center_offset, &state.camera);
             draw_circle(cx, cy, 4.0 * zoom, Color::new(0.0, 0.5, 1.0, 0.8));
         }
     }
@@ -213,7 +210,7 @@ impl Renderer {
 
         // Pulsing opacity (70-100%, 2-second cycle)
         let time = macroquad::time::get_time();
-        let alpha = (0.7 + 0.3 * (time * 3.14).sin() as f32).clamp(0.0, 1.0);
+        let alpha = (0.7 + 0.3 * (time * std::f64::consts::PI).sin() as f32).clamp(0.0, 1.0);
         let color = Color::new(1.0, 1.0, 1.0, alpha);
 
         let zoom = state.camera.zoom;

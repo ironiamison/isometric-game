@@ -5,8 +5,12 @@ on:
     branches: [master]
     paths:
       - 'client/**'
+      - 'crates/aeven-protocol/**'
       - 'rust-server/**'
       - 'site/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
 
 jobs:
   deploy:

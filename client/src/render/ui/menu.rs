@@ -28,8 +28,8 @@ impl Renderer {
         let content_height = 306.0 * s;
 
         // Position at bottom-right, above menu buttons (matching other panels)
-        let button_size = MENU_BUTTON_SIZE * s;
-        let exp_bar_gap = EXP_BAR_GAP * s;
+        let _button_size = MENU_BUTTON_SIZE * s;
+        let _exp_bar_gap = EXP_BAR_GAP * s;
         let button_area_height = bottom_ui_height(s);
         // Match quest panel sizing: 314 * s clamped to available space
         let min_panel_y = 4.0;
@@ -301,11 +301,7 @@ impl Renderer {
             is_hovered(mute_bounds),
             self,
         );
-        let shift_text = if state.ui_state.shift_drop_enabled {
-            "ShftDrp"
-        } else {
-            "ShftDrp"
-        };
+        let shift_text = "ShftDrp";
         draw_button(
             shift_drop_bounds.x,
             shift_drop_bounds.y,
@@ -322,11 +318,7 @@ impl Renderer {
         let chat_bounds = Rect::new(content_x, y, toggle_w, btn_height);
         layout.add(UiElementId::EscapeMenuChatLogToggle, chat_bounds);
 
-        let chat_text = if state.ui_state.chat_log_visible {
-            "Chat"
-        } else {
-            "Chat"
-        };
+        let chat_text = "Chat";
         draw_button(
             chat_bounds.x,
             chat_bounds.y,
@@ -359,11 +351,7 @@ impl Renderer {
         let tap_walk_bounds = Rect::new(content_x, y, toggle_w, btn_height);
         layout.add(UiElementId::EscapeMenuTapPathfindToggle, tap_walk_bounds);
 
-        let tap_text = if state.ui_state.tap_to_pathfind {
-            "TapWalk"
-        } else {
-            "TapWalk"
-        };
+        let tap_text = "TapWalk";
         draw_button(
             tap_walk_bounds.x,
             tap_walk_bounds.y,

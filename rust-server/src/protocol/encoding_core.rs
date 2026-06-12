@@ -5,6 +5,7 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
         ServerMessage::Welcome {
             player_id,
             is_new_character,
+            protocol_version,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -14,6 +15,10 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
             map.push((
                 Value::String("is_new_character".into()),
                 Value::Boolean(*is_new_character),
+            ));
+            map.push((
+                Value::String("protocol_version".into()),
+                Value::Integer(u64::from(*protocol_version).into()),
             ));
             Value::Map(map)
         }

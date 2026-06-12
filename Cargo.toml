@@ -1,0 +1,42 @@
+[workspace]
+members = [
+    "client",
+    "crates/aeven-protocol",
+    "launcher",
+    "rust-server",
+]
+resolver = "2"
+
+[profile.dev]
+opt-level = 0
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[profile.release-wasm]
+inherits = "release"
+opt-level = "z"
+
+[patch.crates-io]
+miniquad = { git = "https://github.com/not-fl3/miniquad", rev = "dd44380a7ace19462bb63e53dce6093d28219aa2" }
+
+[workspace.lints.rust]
+dead_code = "allow"
+unreachable_code = "deny"
+unreachable_patterns = "deny"
+unused_assignments = "deny"
+unused_imports = "deny"
+unused_mut = "deny"
+unused_parens = "deny"
+unused_variables = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"

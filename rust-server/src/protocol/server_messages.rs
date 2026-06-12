@@ -88,6 +88,7 @@ pub enum ServerMessage {
     Welcome {
         player_id: String,
         is_new_character: bool,
+        protocol_version: u16,
     },
     PlayerJoined {
         id: String,

@@ -18,6 +18,12 @@ pub struct MobileScaler {
     enabled: bool,
 }
 
+impl Default for MobileScaler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MobileScaler {
     pub fn new() -> Self {
         #[cfg(target_os = "android")]

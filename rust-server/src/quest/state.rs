@@ -275,10 +275,10 @@ impl PlayerQuestState {
             progress.complete();
         }
         // Move to completed
-        if let Some(progress) = self.active_quests.remove(quest_id) {
-            if progress.status == QuestStatus::Completed {
-                self.completed_quests.push(quest_id.to_string());
-            }
+        if let Some(progress) = self.active_quests.remove(quest_id)
+            && progress.status == QuestStatus::Completed
+        {
+            self.completed_quests.push(quest_id.to_string());
         }
     }
 
@@ -327,8 +327,8 @@ impl PlayerQuestState {
     /// Get all active quests that are waiting for a specific event type
     pub fn get_quests_for_target(
         &self,
-        target: &str,
-        objective_type: super::definition::ObjectiveType,
+        _target: &str,
+        _objective_type: super::definition::ObjectiveType,
     ) -> Vec<(&str, &str)> {
         // This would need the Quest definitions to check, so return quest_id + objective_id pairs
         // The caller should filter by checking the Quest definitions

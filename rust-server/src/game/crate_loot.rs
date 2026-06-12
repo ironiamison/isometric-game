@@ -223,14 +223,12 @@ impl GameRoom {
         };
 
         // Handle commission marks via database (outside write lock)
-        if is_commission_marks {
-            if let Some(db) = &self.db {
-                if let Some(character_id) = Self::parse_character_id(player_id) {
-                    if let Err(e) = db.add_commission_marks(character_id, qty).await {
-                        tracing::error!("Failed to add commission marks for {}: {}", player_id, e);
-                    }
-                }
-            }
+        if is_commission_marks
+            && let Some(db) = &self.db
+            && let Some(character_id) = Self::parse_character_id(player_id)
+            && let Err(e) = db.add_commission_marks(character_id, qty).await
+        {
+            tracing::error!("Failed to add commission marks for {}: {}", player_id, e);
         }
 
         // 4. Send InventoryUpdate

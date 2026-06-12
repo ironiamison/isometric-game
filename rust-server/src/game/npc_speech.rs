@@ -13,12 +13,12 @@ fn npc_speech_message(npc_id: &str, message: &str) -> ServerMessage {
     }
 }
 
-pub(in crate::game) fn nearby_players_for_speech<'a>(
-    players_by_chunk: &'a HashMap<(i32, i32), Vec<ChunkPlayerEntry>>,
+pub(in crate::game) fn nearby_players_for_speech(
+    players_by_chunk: &HashMap<(i32, i32), Vec<ChunkPlayerEntry>>,
     npc_x: i32,
     npc_y: i32,
     speech_radius: i32,
-) -> Vec<(&'a str, i32, i32)> {
+) -> Vec<(&str, i32, i32)> {
     use crate::chunk::CHUNK_SIZE;
 
     let chunk_radius = (speech_radius as f32 / CHUNK_SIZE as f32).ceil() as i32;
@@ -97,7 +97,7 @@ impl GameRoom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entity::AnimationType;
+    use crate::entity::prototype::AnimationType;
     use crate::entity::prototype::{
         DialogueConfig, EntityBehaviors, EntityPrototype, ResolvedRewards, ResolvedStats,
         SpeechConfig,

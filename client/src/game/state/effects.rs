@@ -1,5 +1,3 @@
-use super::*;
-
 #[derive(Debug, Clone, Copy)]
 pub enum AttackSoundType {
     Unarmed,
@@ -314,6 +312,12 @@ pub struct ChatLog {
     local: Vec<ChatMessage>,
     global: Vec<ChatMessage>,
     system: Vec<ChatMessage>,
+}
+
+impl Default for ChatLog {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChatLog {

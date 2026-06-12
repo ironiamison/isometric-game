@@ -3,14 +3,11 @@ use serde::{Deserialize, Serialize};
 use crate::game::PlayerUpdate;
 use crate::npc::NpcUpdate;
 
-mod client_messages;
-mod decode;
 mod encoding;
 mod server_messages;
 mod state_sync;
 
-pub use client_messages::ClientMessage;
-pub use decode::decode_client_message;
+pub use aeven_protocol::{ClientMessage, PROTOCOL_VERSION, decode_client_message};
 pub use encoding::encode_server_message;
 pub use server_messages::*;
 pub use state_sync::*;
@@ -23,8 +20,10 @@ pub use state_sync::*;
 const COMPRESSION_THRESHOLD: usize = 1024;
 
 /// Wrap a MessagePack payload with a compression prefix.
+///
 /// - 0x00 prefix: uncompressed data follows
 /// - 0x01 prefix: deflate-compressed data follows
+///
 /// Only compresses if the payload exceeds COMPRESSION_THRESHOLD bytes.
 pub fn maybe_compress(data: Vec<u8>) -> Vec<u8> {
     use flate2::Compression;
@@ -39,15 +38,14 @@ pub fn maybe_compress(data: Vec<u8>) -> Vec<u8> {
     }
 
     let mut encoder = DeflateEncoder::new(Vec::new(), Compression::fast());
-    if encoder.write_all(&data).is_ok() {
-        if let Ok(compressed) = encoder.finish() {
-            if compressed.len() < data.len() {
-                let mut out = Vec::with_capacity(1 + compressed.len());
-                out.push(0x01);
-                out.extend_from_slice(&compressed);
-                return out;
-            }
-        }
+    if encoder.write_all(&data).is_ok()
+        && let Ok(compressed) = encoder.finish()
+        && compressed.len() < data.len()
+    {
+        let mut out = Vec::with_capacity(1 + compressed.len());
+        out.push(0x01);
+        out.extend_from_slice(&compressed);
+        return out;
     }
 
     // Fallback: uncompressed

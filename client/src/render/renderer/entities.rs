@@ -38,7 +38,7 @@ impl Renderer {
         }
 
         // Name color based on NPC type
-        let name_color = if npc.is_hostile() {
+        let _name_color = if npc.is_hostile() {
             Color::from_rgba(255, 150, 150, 255) // Red for hostile
         } else if npc.is_quest_giver {
             Color::from_rgba(150, 220, 255, 255) // Cyan for quest givers
@@ -153,7 +153,8 @@ impl Renderer {
             let phase_offset = (npc.x + npc.y * 1.7) as f64;
 
             // Pulsing transparency (2 second cycle, 80-100% opacity)
-            let alpha_pulse = ((time * 3.14 + phase_offset).sin() * 0.5 + 0.5) as f32;
+            let alpha_pulse =
+                ((time * std::f64::consts::PI + phase_offset).sin() * 0.5 + 0.5) as f32;
             let mut alpha = (204.0 + alpha_pulse * 51.0) as u8; // 204-255 (80-100%)
 
             // Fade icon out when speech bubble appears, fade back in when it disappears
@@ -270,7 +271,7 @@ impl Renderer {
                 .get(&coord)
                 .map(|chunk| {
                     let (lx, ly) = crate::game::chunk::world_to_local(ix, iy);
-                    chunk.get_height(lx as u32, ly as u32) as f32
+                    chunk.get_height(lx, ly) as f32
                 })
                 .unwrap_or(0.0)
         };
@@ -383,9 +384,7 @@ impl Renderer {
     /// Render a fishing line from the player's rod tip to a landing point in the water
     pub(super) fn render_fishing_line(&self, player: &Player, camera: &Camera) {
         use crate::game::Direction;
-        use crate::render::animation::{
-            get_weapon_frame, get_weapon_offset, should_flip_horizontal, Gender,
-        };
+        use crate::render::animation::{get_weapon_frame, get_weapon_offset, Gender};
 
         let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, camera);
         let zoom = camera.zoom;
@@ -396,7 +395,7 @@ impl Renderer {
         let draw_y = screen_y - SPRITE_HEIGHT * zoom + 16.0 * zoom;
 
         // Get player gender for gender-specific offsets
-        let player_gender = Gender::from_str(&player.gender);
+        let player_gender = Gender::from_wire(&player.gender);
 
         let anim_frame = player.animation.frame as u32;
         let (offset_x, offset_y) = get_weapon_offset(
@@ -414,7 +413,7 @@ impl Renderer {
 
         // Fishing rod frame size (from manifest: 70x86)
         let fw: f32 = 70.0;
-        let fh: f32 = 86.0;
+        let _fh: f32 = 86.0;
 
         let weapon_draw_x = draw_x + offset_x * zoom;
         let weapon_draw_y = draw_y + offset_y * zoom;
@@ -436,7 +435,7 @@ impl Renderer {
 
         // Landing point: center of a tile 2-3 tiles ahead in the facing direction
         // Use player position as seed for stable per-session random distance
-        let seed = (player.x * 73.137 + player.y * 37.891) as f32;
+        let seed = player.x * 73.137 + player.y * 37.891;
         let cast_dist = 2.0 + (seed.sin() * 0.5 + 0.5); // range [2.0, 3.0]
         let (tile_dx, tile_dy): (f32, f32) = match player.animation.direction {
             Direction::Down => (0.0, cast_dist),
@@ -540,7 +539,7 @@ impl Renderer {
             let is_large = self
                 .farming_sprites
                 .get_dimensions(name)
-                .map_or(false, |(_, h)| h > 32.0);
+                .is_some_and(|(_, h)| h > 32.0);
             if !is_large {
                 if let Some((farm_texture, farm_atlas_offset)) = self.farming_sprites.get(name) {
                     let sign_frame = 5u32;
@@ -576,7 +575,7 @@ impl Renderer {
                 let (crop_atlas_x, crop_atlas_y) = crop_atlas_offset.unwrap_or((0.0, 0.0));
                 // Check if large format using dimensions (avoids extra lookup)
                 let dims = self.farming_sprites.get_dimensions(name);
-                let is_large = dims.map_or(false, |(_, h)| h > 32.0);
+                let is_large = dims.is_some_and(|(_, h)| h > 32.0);
 
                 if is_large {
                     // New large format: 4 frames, derive frame size from sheet dimensions
@@ -724,7 +723,7 @@ impl Renderer {
     }
 
     /// Map crop_id from farming config to sprite sheet name
-    pub(super) fn crop_to_sprite_name<'a>(crop_id: &'a str) -> &'a str {
+    pub(super) fn crop_to_sprite_name(crop_id: &str) -> &str {
         match crop_id {
             // Crop id has trailing 's' but sprite file does not
             "tangleroots" => "tangleroot",
@@ -805,11 +804,11 @@ impl Renderer {
         let label_x = screen_x - label_width / 2.0;
         // Position label above the sprite - large sprites need more offset
         let sprite_name = Self::crop_to_sprite_name(&patch.crop_id);
-        let label_offset = if self.is_large_farming_sprite(&sprite_name) {
+        let label_offset = if self.is_large_farming_sprite(sprite_name) {
             // Large sprite: offset by sprite height minus ground anchor
             let (_, sh) = self
                 .farming_sprites
-                .get_dimensions(&sprite_name)
+                .get_dimensions(sprite_name)
                 .unwrap_or((0.0, 48.0));
             (sh - 8.0) * zoom
         } else {

@@ -103,10 +103,10 @@ fn select_target_quest(
                 completed_quest = Some((quest_id.clone(), "completed"));
             }
         } else {
-            if let Some(ref previous) = quest.chain.previous {
-                if !quest_state.is_quest_completed(previous) {
-                    continue;
-                }
+            if let Some(ref previous) = quest.chain.previous
+                && !quest_state.is_quest_completed(previous)
+            {
+                continue;
             }
             if target_quest.is_none() {
                 target_quest = Some((quest_id.clone(), "not_started"));
@@ -118,7 +118,7 @@ fn select_target_quest(
 }
 
 fn sort_quests_for_npc(
-    quests: &mut Vec<Arc<Quest>>,
+    quests: &mut [Arc<Quest>],
     prototype: Option<&crate::entity::prototype::EntityPrototype>,
 ) {
     let ordered_ids = prototype
@@ -149,7 +149,7 @@ impl GameRoom {
         current: i32,
         target: i32,
     ) {
-        if let Some(sender) = self.player_senders.read().await.get(player_id) {
+        if let Some(sender) = self.transport.player_sender(player_id).await {
             let msg = quest_progress_message(quest_id, objective_id, current, target);
             if let Ok(data) = crate::protocol::encode_server_message(&msg) {
                 let _ = sender.send(data).await;
@@ -420,16 +420,16 @@ impl GameRoom {
         let mut quests = self.quest_registry.get_quests_for_npc(entity_type).await;
         // Also include quests listed in the NPC prototype's available_quests
         // (for secondary NPCs like Barnaby or searchable objects like bookshelves)
-        if let Some(ref proto) = prototype {
-            if let Some(ref qg) = proto.quest_giver {
-                let existing: std::collections::HashSet<String> =
-                    quests.iter().map(|q| q.id.clone()).collect();
-                for quest_id in &qg.available_quests {
-                    if !existing.contains(quest_id.as_str()) {
-                        if let Some(quest) = self.quest_registry.get(quest_id).await {
-                            quests.push(quest);
-                        }
-                    }
+        if let Some(proto) = prototype
+            && let Some(ref qg) = proto.quest_giver
+        {
+            let existing: std::collections::HashSet<String> =
+                quests.iter().map(|q| q.id.clone()).collect();
+            for quest_id in &qg.available_quests {
+                if !existing.contains(quest_id.as_str())
+                    && let Some(quest) = self.quest_registry.get(quest_id).await
+                {
+                    quests.push(quest);
                 }
             }
         }
@@ -437,21 +437,21 @@ impl GameRoom {
 
         if quests.is_empty() {
             tracing::debug!("NPC {} ({}) has no quests", npc_id, entity_type);
-            if let Some(proto) = prototype.as_ref() {
-                if let Some(greeting) = proto.dialogue.greeting.as_ref() {
-                    let (quest_id, choices) = greeting_dialogue_metadata(entity_type);
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::ShowDialogue {
-                            quest_id,
-                            npc_id: npc_id.to_string(),
-                            speaker: proto.display_name.clone(),
-                            text: greeting.clone(),
-                            choices,
-                        },
-                    )
-                    .await;
-                }
+            if let Some(proto) = prototype.as_ref()
+                && let Some(greeting) = proto.dialogue.greeting.as_ref()
+            {
+                let (quest_id, choices) = greeting_dialogue_metadata(entity_type);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::ShowDialogue {
+                        quest_id,
+                        npc_id: npc_id.to_string(),
+                        speaker: proto.display_name.clone(),
+                        text: greeting.clone(),
+                        choices,
+                    },
+                )
+                .await;
             }
             return;
         }
@@ -492,16 +492,13 @@ impl GameRoom {
                     )
                     .await;
 
-                    if result.objective_completed {
-                        if let Some(quest) = self.quest_registry.get(&result.quest_id).await {
-                            if let Some(objective) =
-                                quest.objectives.iter().find(|o| o.id == *objective_id)
-                            {
-                                if let Some(dialogue) = objective.dialogue.as_ref() {
-                                    talk_objective_dialogue = Some(dialogue.clone());
-                                }
-                            }
-                        }
+                    if result.objective_completed
+                        && let Some(quest) = self.quest_registry.get(&result.quest_id).await
+                        && let Some(objective) =
+                            quest.objectives.iter().find(|o| o.id == *objective_id)
+                        && let Some(dialogue) = objective.dialogue.as_ref()
+                    {
+                        talk_objective_dialogue = Some(dialogue.clone());
                     }
                 }
 
@@ -942,28 +939,25 @@ impl GameRoom {
                 )
                 .await;
 
-                if result.objective_completed {
-                    if let Some(quest) = self.quest_registry.get(&result.quest_id).await {
-                        if let Some(objective) = quest
-                            .objectives
-                            .iter()
-                            .find(|objective| objective.id == *objective_id)
-                        {
-                            if let Some(ref dialogue) = objective.dialogue {
-                                self.send_to_player(
-                                    player_id,
-                                    ServerMessage::ShowDialogue {
-                                        quest_id: String::new(),
-                                        npc_id: String::new(),
-                                        speaker: String::new(),
-                                        text: dialogue.clone(),
-                                        choices: vec![],
-                                    },
-                                )
-                                .await;
-                            }
-                        }
-                    }
+                if result.objective_completed
+                    && let Some(quest) = self.quest_registry.get(&result.quest_id).await
+                    && let Some(objective) = quest
+                        .objectives
+                        .iter()
+                        .find(|objective| objective.id == *objective_id)
+                    && let Some(ref dialogue) = objective.dialogue
+                {
+                    self.send_to_player(
+                        player_id,
+                        ServerMessage::ShowDialogue {
+                            quest_id: String::new(),
+                            npc_id: String::new(),
+                            speaker: String::new(),
+                            text: dialogue.clone(),
+                            choices: vec![],
+                        },
+                    )
+                    .await;
                 }
             }
         }
@@ -1072,25 +1066,25 @@ impl GameRoom {
 
                     // Complete objectives
                     for objective_id in &script_result.completed_objectives {
-                        if let Some(progress) = quest_state.get_quest_mut(&quest_id) {
-                            if progress.update_objective(objective_id, 1) {
-                                self.send_quest_progress_update(
-                                    player_id,
-                                    &quest_id,
-                                    objective_id,
-                                    progress
-                                        .objectives
-                                        .get(objective_id as &str)
-                                        .map(|o| o.current)
-                                        .unwrap_or(1),
-                                    progress
-                                        .objectives
-                                        .get(objective_id as &str)
-                                        .map(|o| o.target)
-                                        .unwrap_or(1),
-                                )
-                                .await;
-                            }
+                        if let Some(progress) = quest_state.get_quest_mut(&quest_id)
+                            && progress.update_objective(objective_id, 1)
+                        {
+                            self.send_quest_progress_update(
+                                player_id,
+                                &quest_id,
+                                objective_id,
+                                progress
+                                    .objectives
+                                    .get(objective_id as &str)
+                                    .map(|o| o.current)
+                                    .unwrap_or(1),
+                                progress
+                                    .objectives
+                                    .get(objective_id as &str)
+                                    .map(|o| o.target)
+                                    .unwrap_or(1),
+                            )
+                            .await;
                         }
                     }
 
@@ -1130,7 +1124,7 @@ impl GameRoom {
 mod tests {
     use super::*;
     use crate::protocol::ServerMessage;
-    use crate::quest::{Objective, QuestChain, QuestDialogue, Reward};
+    use crate::quest::definition::{Objective, QuestChain, QuestDialogue, Reward};
     use crate::skills::Skills;
     use std::collections::HashMap;
 

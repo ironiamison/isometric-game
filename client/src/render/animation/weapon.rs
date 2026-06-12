@@ -155,21 +155,12 @@ pub fn get_weapon_offset(
             }
         }
         AnimationState::Attacking => {
-            let attack_frame = anim_frame % 2;
             if use_back {
                 // Shift for back-facing attacks
-                if attack_frame == 0 {
-                    (-7.0, -6.0)
-                } else {
-                    (-7.0, -6.0)
-                }
+                (-7.0, -6.0)
             } else {
                 // Shift left for front-facing attacks
-                if attack_frame == 0 {
-                    (-5.0, 0.0)
-                } else {
-                    (-5.0, 0.0)
-                }
+                (-5.0, 0.0)
             }
         }
         AnimationState::Casting => (0.0, 0.0),

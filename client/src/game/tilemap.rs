@@ -1,6 +1,5 @@
 use macroquad::prelude::*;
 use serde::Deserialize;
-use std::collections::HashMap;
 
 /// Tiled JSON tilemap format (simplified for isometric maps)
 #[derive(Debug, Deserialize)]

@@ -69,7 +69,7 @@ impl CharacterCreateScreen {
 
     pub async fn load_font(&mut self) {
         // If assets were pre-loaded via use_renderer_assets(), skip loading
-        if self.player_sprites.len() > 0 {
+        if !self.player_sprites.is_empty() {
             return;
         }
 
@@ -118,11 +118,9 @@ impl CharacterCreateScreen {
 
     fn handle_name_input(&mut self) {
         while let Some(c) = get_char_pressed() {
-            if c.is_alphanumeric() || c == '_' || c == '-' {
-                if self.name.len() < 16 {
-                    self.name.push(c);
-                    self.error_message = None;
-                }
+            if (c.is_alphanumeric() || c == '_' || c == '-') && self.name.len() < 16 {
+                self.name.push(c);
+                self.error_message = None;
             }
         }
 

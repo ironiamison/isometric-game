@@ -229,14 +229,13 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
                             Value::Integer((i.ranged_strength as i64).into()),
                         ));
                     }
-                    if let Some(bonus) = i.ranged_strength_bonus {
-                        if bonus > 0 {
+                    if let Some(bonus) = i.ranged_strength_bonus
+                        && bonus > 0 {
                             imap.push((
                                 Value::String("ranged_strength_bonus".into()),
                                 Value::Integer((bonus as i64).into()),
                             ));
                         }
-                    }
                     // Woodcutting-specific fields
                     if let Some(level) = i.woodcutting_level_required {
                         imap.push((

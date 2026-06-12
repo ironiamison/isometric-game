@@ -110,7 +110,7 @@ impl Renderer {
         h: f32,
         r: f32,
         color: Color,
-        tail: Option<(f32, f32, f32)>,
+        _tail: Option<(f32, f32, f32)>,
     ) -> Mesh {
         let color_arr = [
             (color.r * 255.0) as u8,

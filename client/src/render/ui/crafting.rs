@@ -201,7 +201,7 @@ impl Renderer {
             .ui_state
             .shop_data
             .as_ref()
-            .map_or(true, |s| s.show_crafting);
+            .is_none_or(|s| s.show_crafting);
         if show_crafting {
             let is_recipes_selected = state.ui_state.shop_main_tab == 0;
             let recipes_bounds = Rect::new(main_tab_x, main_tab_y, main_tab_width, main_tab_height);

@@ -209,10 +209,10 @@ impl World {
         }
 
         // Parse collision from base64
-        if let Some(collision_b64) = value["collision"].as_str() {
-            if let Ok(collision_bytes) = BASE64.decode(collision_b64) {
-                chunk.collision = Chunk::unpack_collision(&collision_bytes);
-            }
+        if let Some(collision_b64) = value["collision"].as_str()
+            && let Ok(collision_bytes) = BASE64.decode(collision_b64)
+        {
+            chunk.collision = Chunk::unpack_collision(&collision_bytes);
         }
 
         // Parse height data (optional - missing means flat at z=0)
@@ -412,8 +412,8 @@ impl World {
                     }
                 } else if layer_type_str == "objectgroup" {
                     // Get layer offset (Tiled applies this to object positions)
-                    let offset_x = layer_value["offsetx"].as_f64().unwrap_or(0.0);
-                    let offset_y = layer_value["offsety"].as_f64().unwrap_or(0.0);
+                    let _offset_x = layer_value["offsetx"].as_f64().unwrap_or(0.0);
+                    let _offset_y = layer_value["offsety"].as_f64().unwrap_or(0.0);
 
                     // Parse object groups for collision, spawn points, and map objects
                     if let Some(objects) = layer_value["objects"].as_array() {
@@ -765,16 +765,14 @@ impl World {
                 let filename_str = filename.to_string_lossy();
 
                 // Parse chunk_X_Y.json format
-                if let Some(name) = filename_str.strip_prefix("chunk_") {
-                    if let Some(name) = name.strip_suffix(".json") {
-                        let parts: Vec<&str> = name.split('_').collect();
-                        if parts.len() == 2 {
-                            if let (Ok(x), Ok(y)) =
-                                (parts[0].parse::<i32>(), parts[1].parse::<i32>())
-                            {
-                                coords.push(ChunkCoord::new(x, y));
-                            }
-                        }
+                if let Some(name) = filename_str.strip_prefix("chunk_")
+                    && let Some(name) = name.strip_suffix(".json")
+                {
+                    let parts: Vec<&str> = name.split('_').collect();
+                    if parts.len() == 2
+                        && let (Ok(x), Ok(y)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>())
+                    {
+                        coords.push(ChunkCoord::new(x, y));
                     }
                 }
             }

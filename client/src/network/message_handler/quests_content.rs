@@ -35,7 +35,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                 // show a friendly post-tutorial greeting instead
                 let (quest_id, text, choices) = if quest_id == "__tutorial__"
                     && (crate::settings::load_tutorial_completed()
-                        || state.tutorial.as_ref().map_or(false, |t| t.is_done()))
+                        || state.tutorial.as_ref().is_some_and(|t| t.is_done()))
                 {
                     (
                         String::new(),
@@ -516,61 +516,54 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
         }
         "collectionLogDefinitions" => {
             if let Some(value) = data {
-                if let Some(entries_val) = extract_map_field(value, "entries") {
-                    if let rmpv::Value::Array(arr) = entries_val {
-                        let mut defs = Vec::new();
-                        for entry in arr {
-                            if let rmpv::Value::Array(fields) = entry {
-                                if fields.len() >= 3 {
-                                    let item_id = fields[0].as_str().unwrap_or("").to_string();
-                                    let source = fields[1].as_str().unwrap_or("").to_string();
-                                    let source_detail =
-                                        fields[2].as_str().unwrap_or("").to_string();
-                                    defs.push((item_id, source, source_detail));
-                                }
+                if let Some(rmpv::Value::Array(arr)) = extract_map_field(value, "entries") {
+                    let mut defs = Vec::new();
+                    for entry in arr {
+                        if let rmpv::Value::Array(fields) = entry {
+                            if fields.len() >= 3 {
+                                let item_id = fields[0].as_str().unwrap_or("").to_string();
+                                let source = fields[1].as_str().unwrap_or("").to_string();
+                                let source_detail = fields[2].as_str().unwrap_or("").to_string();
+                                defs.push((item_id, source, source_detail));
                             }
                         }
-                        log::info!("Received {} collection log definitions", defs.len());
-                        state.ui_state.collection_log_definitions = defs;
                     }
+                    log::info!("Received {} collection log definitions", defs.len());
+                    state.ui_state.collection_log_definitions = defs;
                 }
                 // Parse display names
-                if let Some(names_val) = extract_map_field(value, "display_names") {
-                    if let rmpv::Value::Array(arr) = names_val {
-                        let mut names = std::collections::HashMap::new();
-                        for entry in arr {
-                            if let rmpv::Value::Array(fields) = entry {
-                                if fields.len() >= 2 {
-                                    let id = fields[0].as_str().unwrap_or("").to_string();
-                                    let name = fields[1].as_str().unwrap_or("").to_string();
-                                    names.insert(id, name);
-                                }
+                if let Some(rmpv::Value::Array(arr)) = extract_map_field(value, "display_names") {
+                    let mut names = std::collections::HashMap::new();
+                    for entry in arr {
+                        if let rmpv::Value::Array(fields) = entry {
+                            if fields.len() >= 2 {
+                                let id = fields[0].as_str().unwrap_or("").to_string();
+                                let name = fields[1].as_str().unwrap_or("").to_string();
+                                names.insert(id, name);
                             }
                         }
-                        log::info!("Received {} collection log display names", names.len());
-                        state.ui_state.collection_log_display_names = names;
                     }
+                    log::info!("Received {} collection log display names", names.len());
+                    state.ui_state.collection_log_display_names = names;
                 }
             }
         }
         "collectionLogSync" => {
             if let Some(value) = data {
-                if let Some(entries_val) = extract_map_field(value, "entries") {
-                    if let rmpv::Value::Array(arr) = entries_val {
-                        let mut log = std::collections::HashMap::new();
-                        for entry in arr {
-                            if let rmpv::Value::Array(fields) = entry {
-                                if fields.len() >= 4 {
-                                    let item_id = fields[0].as_str().unwrap_or("").to_string();
-                                    let source = fields[1].as_str().unwrap_or("").to_string();
-                                    let obtained_at = fields[3].as_str().unwrap_or("").to_string();
-                                    log.insert((item_id, source), obtained_at);
-                                }
+                if let Some(rmpv::Value::Array(arr)) = extract_map_field(value, "entries") {
+                    let mut log = std::collections::HashMap::new();
+                    for entry in arr {
+                        if let rmpv::Value::Array(fields) = entry {
+                            if fields.len() >= 4 {
+                                let item_id = fields[0].as_str().unwrap_or("").to_string();
+                                let source = fields[1].as_str().unwrap_or("").to_string();
+                                let obtained_at = fields[3].as_str().unwrap_or("").to_string();
+                                log.insert((item_id, source), obtained_at);
                             }
                         }
-                        log::info!("Synced {} collection log entries", log.len());
-                        state.ui_state.collection_log = log;
                     }
+                    log::info!("Synced {} collection log entries", log.len());
+                    state.ui_state.collection_log = log;
                 }
             }
         }

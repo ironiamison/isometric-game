@@ -6,17 +6,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ItemCategory {
     Consumable,
+    #[default]
     Material,
     Equipment,
     Quest,
-}
-
-impl Default for ItemCategory {
-    fn default() -> Self {
-        ItemCategory::Material
-    }
 }
 
 impl ItemCategory {

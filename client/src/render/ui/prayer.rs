@@ -78,8 +78,8 @@ impl Renderer {
         let panel_padding = PRAYER_PANEL_PADDING * scale;
         let slot_size = PRAYER_SLOT_SIZE * scale;
         let slot_spacing = PRAYER_SLOT_SPACING * scale;
-        let button_size = MENU_BUTTON_SIZE * scale;
-        let exp_bar_gap = EXP_BAR_GAP * scale;
+        let _button_size = MENU_BUTTON_SIZE * scale;
+        let _exp_bar_gap = EXP_BAR_GAP * scale;
         let points_height = PRAYER_POINTS_HEIGHT * scale;
 
         // Position panel on right side, above the menu buttons
@@ -851,12 +851,10 @@ impl Renderer {
         if let Some(UiElementId::SpellSlot(i)) = hovered {
             if *i < SPELLS.len() {
                 self.render_spell_tooltip(state, *i);
-                return;
             } else {
                 let scroll_idx = *i - SPELLS.len();
                 if scroll_idx < state.scroll_spell_definitions.len() {
                     self.render_scroll_spell_tooltip(state, scroll_idx);
-                    return;
                 }
             }
         }

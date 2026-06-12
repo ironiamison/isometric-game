@@ -361,7 +361,7 @@ pub struct LegacyCombatSkills {
 
 impl LegacyCombatSkills {
     /// Convert from combined combat to split attack/strength/defence by dividing XP ÷ 3
-    pub fn to_skills(self) -> Skills {
+    pub fn into_skills(self) -> Skills {
         let split_xp = self.combat.xp / 3;
         let split_level = level_for_xp(split_xp);
         let split_skill = Skill {
@@ -400,7 +400,7 @@ pub struct LegacySkills {
 
 impl LegacySkills {
     /// Convert ancient legacy format to new format
-    pub fn to_skills(self) -> Skills {
+    pub fn into_skills(self) -> Skills {
         Skills {
             hitpoints: self.hitpoints,
             attack: self.attack,
@@ -425,22 +425,27 @@ impl Skills {
     /// Parse skills from a JSON string, handling all legacy formats.
     /// Returns default Skills if the JSON is empty or unparseable.
     pub fn from_json(json: &str) -> Skills {
+        Self::try_from_json(json).unwrap_or_else(|_| Skills::new())
+    }
+
+    /// Parse current and legacy skill payloads without hiding corrupt persistence data.
+    pub fn try_from_json(json: &str) -> Result<Skills, String> {
         if json.is_empty() {
-            return Skills::new();
+            return Ok(Skills::new());
         }
         // Try combined combat format first (has required `combat` field)
         if let Ok(legacy) = serde_json::from_str::<LegacyCombatSkills>(json) {
-            return legacy.to_skills();
+            return Ok(legacy.into_skills());
         }
         // Then try the current format (attack + strength + defence separate)
         if let Ok(skills) = serde_json::from_str::<Skills>(json) {
-            return skills;
+            return Ok(skills);
         }
         // Fall back to ancient format (hitpoints + attack + strength + defence only)
         if let Ok(legacy) = serde_json::from_str::<LegacySkills>(json) {
-            return legacy.to_skills();
+            return Ok(legacy.into_skills());
         }
-        Skills::new()
+        Err("skills JSON does not match any supported schema".to_string())
     }
 }
 
@@ -633,7 +638,7 @@ mod tests {
             survivalist: Skill::new(1),
         };
 
-        let skills = legacy.to_skills();
+        let skills = legacy.into_skills();
 
         // Hitpoints preserved
         assert_eq!(skills.hitpoints.level, 50);
@@ -655,7 +660,7 @@ mod tests {
             defence: Skill::new(45),
         };
 
-        let skills = legacy.to_skills();
+        let skills = legacy.into_skills();
 
         // All skills preserved directly
         assert_eq!(skills.hitpoints.level, 50);

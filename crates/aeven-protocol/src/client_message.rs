@@ -1,10 +1,10 @@
-use super::*;
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Client -> Server Messages
 // ============================================================================
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ClientMessage {
     #[serde(rename = "move")]
@@ -55,7 +55,12 @@ pub enum ClientMessage {
     Register { username: String, password: String },
 
     #[serde(rename = "requestChunk")]
-    RequestChunk { chunk_x: i32, chunk_y: i32 },
+    RequestChunk {
+        #[serde(rename = "chunkX", alias = "chunk_x")]
+        chunk_x: i32,
+        #[serde(rename = "chunkY", alias = "chunk_y")]
+        chunk_y: i32,
+    },
 
     /// Interact with an NPC (quest giver, merchant, etc.)
     #[serde(rename = "interact")]
@@ -99,7 +104,11 @@ pub enum ClientMessage {
 
     /// Unequip item from equipment slot
     #[serde(rename = "unequip")]
-    Unequip { slot_type: String },
+    Unequip {
+        slot_type: String,
+        #[serde(default)]
+        target_slot: Option<u8>,
+    },
 
     /// Drop item from inventory slot (optionally at a target tile)
     #[serde(rename = "dropItem")]
@@ -121,7 +130,9 @@ pub enum ClientMessage {
     /// Buy item from shop
     #[serde(rename = "shopBuy")]
     ShopBuy {
+        #[serde(rename = "npcId", alias = "npc_id")]
         npc_id: String,
+        #[serde(rename = "itemId", alias = "item_id")]
         item_id: String,
         quantity: i32,
     },
@@ -129,14 +140,19 @@ pub enum ClientMessage {
     /// Sell item to shop
     #[serde(rename = "shopSell")]
     ShopSell {
+        #[serde(rename = "npcId", alias = "npc_id")]
         npc_id: String,
+        #[serde(rename = "itemId", alias = "item_id")]
         item_id: String,
         quantity: i32,
     },
 
     /// Enter a portal to transition to another map
     #[serde(rename = "enterPortal")]
-    EnterPortal { portal_id: String },
+    EnterPortal {
+        #[serde(rename = "portalId", alias = "portal_id")]
+        portal_id: String,
+    },
 
     /// Start gathering at a marker tile
     #[serde(rename = "startGathering")]

@@ -3,11 +3,11 @@
 //! Manages Lua VM instances for executing quest scripts.
 //! Each player gets their own Lua state for isolation.
 
-use mlua::{Function, Lua, MultiValue, Result as LuaResult, Table, Value};
+use mlua::{Function, Lua, Result as LuaResult, Table, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 
 use super::api::QuestContext;
 use super::registry::QuestRegistry;
@@ -32,7 +32,7 @@ impl PlayerLuaState {
         let lua = Lua::new();
 
         // Set up sandbox - disable potentially dangerous functions
-        lua.scope(|scope| {
+        lua.scope(|_scope| {
             let globals = lua.globals();
 
             // Remove dangerous functions
@@ -69,7 +69,7 @@ impl PlayerLuaState {
 }
 
 /// Result from running a quest script interaction
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ScriptResult {
     /// Dialogue to show (if any)
     pub dialogue: Option<DialogueResult>,
@@ -89,22 +89,6 @@ pub struct ScriptResult {
     pub flags_to_set: Vec<(String, String)>,
     /// Objectives to mark as completed
     pub completed_objectives: Vec<String>,
-}
-
-impl Default for ScriptResult {
-    fn default() -> Self {
-        Self {
-            dialogue: None,
-            quest_accepted: false,
-            quest_completed: false,
-            notifications: Vec::new(),
-            bonus_rewards: None,
-            granted_items: Vec::new(),
-            new_dialogue_step: None,
-            flags_to_set: Vec::new(),
-            completed_objectives: Vec::new(),
-        }
-    }
 }
 
 /// Dialogue result from a script
@@ -284,7 +268,7 @@ impl QuestRunner {
         ctx_table.set("_result", result_table.clone())?;
 
         // Add get_quest_state method
-        let get_quest_state = lua.create_function(|lua, this: Table| {
+        let get_quest_state = lua.create_function(|_lua, this: Table| {
             let state: String = this.get("_quest_state")?;
             Ok(state)
         })?;
@@ -292,14 +276,14 @@ impl QuestRunner {
 
         // Add get_interacting_npc method — returns the entity_type of the NPC
         // the player is talking to (e.g. "prof_oddwick", "barnaby_ghost")
-        let get_interacting_npc = lua.create_function(|lua, this: Table| {
+        let get_interacting_npc = lua.create_function(|_lua, this: Table| {
             let npc: String = this.get("_interacting_npc").unwrap_or_default();
             Ok(npc)
         })?;
         ctx_table.set("get_interacting_npc", get_interacting_npc)?;
 
         // Add accept_quest method
-        let accept_quest = lua.create_function(|lua, this: Table| {
+        let accept_quest = lua.create_function(|_lua, this: Table| {
             let result: Table = this.get("_result")?;
             result.set("quest_accepted", true)?;
             Ok(())
@@ -307,7 +291,7 @@ impl QuestRunner {
         ctx_table.set("accept_quest", accept_quest)?;
 
         // Add complete_quest method
-        let complete_quest = lua.create_function(|lua, this: Table| {
+        let complete_quest = lua.create_function(|_lua, this: Table| {
             let result: Table = this.get("_result")?;
             result.set("quest_completed", true)?;
             Ok(())
@@ -324,7 +308,7 @@ impl QuestRunner {
         ctx_table.set("unlock_waystone", unlock_waystone)?;
 
         // Add show_notification method
-        let show_notification = lua.create_function(|lua, (this, text): (Table, String)| {
+        let show_notification = lua.create_function(|_lua, (this, text): (Table, String)| {
             let result: Table = this.get("_result")?;
             let notifications: Table = result.get("notifications")?;
             let len = notifications.len()? + 1;
@@ -337,7 +321,7 @@ impl QuestRunner {
         let objectives = ctx.quest_state.clone();
         let quest_id = ctx.quest_id.clone();
         let get_objective_progress =
-            lua.create_function(move |lua, (this, obj_id): (Table, String)| {
+            lua.create_function(move |lua, (_this, obj_id): (Table, String)| {
                 let progress_table = lua.create_table()?;
 
                 if let Some(quest_progress) = objectives.get_quest(&quest_id) {
@@ -361,8 +345,7 @@ impl QuestRunner {
         let start_time = ctx
             .quest_state
             .get_quest(&ctx.quest_id)
-            .and_then(|p| Some(p.started_at))
-            .flatten();
+            .and_then(|p| p.started_at);
         let get_quest_duration = lua.create_function(move |_, _: Table| {
             if let Some(started) = start_time {
                 let duration = chrono::Utc::now().signed_duration_since(started);
@@ -374,7 +357,7 @@ impl QuestRunner {
         ctx_table.set("get_quest_duration", get_quest_duration)?;
 
         // Add grant_bonus_reward method
-        let grant_bonus_reward = lua.create_function(|lua, (this, reward): (Table, Table)| {
+        let grant_bonus_reward = lua.create_function(|_lua, (this, reward): (Table, Table)| {
             let result: Table = this.get("_result")?;
             result.set("bonus_reward", reward)?;
             Ok(())
@@ -400,7 +383,7 @@ impl QuestRunner {
         ctx_table.set("give_item", give_item)?;
 
         // Add show_dialogue method - returns the player's choice or throws error to pause
-        let player_choice_val = player_choice.map(|s| s.to_string());
+        let _player_choice_val = player_choice.map(|s| s.to_string());
         let show_dialogue = lua.create_function(move |lua, (this, options): (Table, Table)| {
             let result: Table = this.get("_result")?;
             let current_choice: String = this.get("_player_choice").unwrap_or_default();
@@ -471,14 +454,14 @@ impl QuestRunner {
             // No continue signal yet - store dialogue and pause script
             result.set("dialogue", options.clone())?;
             result.set("_new_dialogue_step", counter)?;
-            return Err(mlua::Error::RuntimeError(
+            Err(mlua::Error::RuntimeError(
                 "__WAIT_FOR_CONTINUE__".to_string(),
-            ));
+            ))
         })?;
         ctx_table.set("show_dialogue", show_dialogue)?;
 
         // Add unlock_quest method
-        let unlock_quest = lua.create_function(|lua, (this, quest_id): (Table, String)| {
+        let unlock_quest = lua.create_function(|_lua, (this, quest_id): (Table, String)| {
             let result: Table = this.get("_result")?;
             let mut unlocks: Vec<String> = result.get("unlocked_quests").unwrap_or_default();
             unlocks.push(quest_id);
@@ -515,10 +498,8 @@ impl QuestRunner {
 
         // Extract notifications
         if let Ok(notifications) = result_table.get::<Table>("notifications") {
-            for pair in notifications.pairs::<i32, String>() {
-                if let Ok((_, text)) = pair {
-                    result.notifications.push(text);
-                }
+            for (_, text) in notifications.pairs::<i32, String>().flatten() {
+                result.notifications.push(text);
             }
         }
 
@@ -529,12 +510,10 @@ impl QuestRunner {
 
             let mut choices = Vec::new();
             if let Ok(choice_table) = dialogue.get::<Table>("choices") {
-                for pair in choice_table.pairs::<i32, Table>() {
-                    if let Ok((_, choice)) = pair {
-                        let id: String = choice.get("id").unwrap_or_default();
-                        let text: String = choice.get("text").unwrap_or_default();
-                        choices.push(DialogueChoice { id, text });
-                    }
+                for (_, choice) in choice_table.pairs::<i32, Table>().flatten() {
+                    let id: String = choice.get("id").unwrap_or_default();
+                    let text: String = choice.get("text").unwrap_or_default();
+                    choices.push(DialogueChoice { id, text });
                 }
             }
 
@@ -559,12 +538,11 @@ impl QuestRunner {
         // Extract granted items if present
         if let Ok(items) = result_table.get::<Table>("_granted_items") {
             for pair in items.pairs::<i64, Table>() {
-                if let Ok((_, entry)) = pair {
-                    if let (Ok(item_id), Ok(count)) =
+                if let Ok((_, entry)) = pair
+                    && let (Ok(item_id), Ok(count)) =
                         (entry.get::<String>("item_id"), entry.get::<i32>("count"))
-                    {
-                        result.granted_items.push((item_id, count));
-                    }
+                {
+                    result.granted_items.push((item_id, count));
                 }
             }
         }
@@ -584,7 +562,7 @@ impl QuestRunner {
         quest_id: &str,
         objective_id: &str,
         new_count: i32,
-        quest_state: &PlayerQuestState,
+        _quest_state: &PlayerQuestState,
     ) -> Result<Vec<String>, String> {
         // Load the quest script if not already loaded
         self.load_quest_script(player_id, quest_id).await?;
@@ -622,7 +600,7 @@ impl QuestRunner {
 
         // Add show_notification
         let show_notification = lua
-            .create_function(|lua, (this, text): (Table, String)| {
+            .create_function(|_lua, (this, text): (Table, String)| {
                 let result: Table = this.get("_result")?;
                 let notifs: Table = result.get("notifications")?;
                 let len = notifs.len()? + 1;
@@ -648,10 +626,8 @@ impl QuestRunner {
             .get("_result")
             .map_err(|e| format!("Lua error: {}", e))?;
         if let Ok(notifs) = result_table.get::<Table>("notifications") {
-            for pair in notifs.pairs::<i32, String>() {
-                if let Ok((_, text)) = pair {
-                    notifications.push(text);
-                }
+            for (_, text) in notifs.pairs::<i32, String>().flatten() {
+                notifications.push(text);
             }
         }
 
@@ -864,40 +840,33 @@ impl QuestRunner {
 
         // Extract notifications
         if let Ok(notifs) = result_table.get::<Table>("notifications") {
-            for pair in notifs.pairs::<i32, String>() {
-                if let Ok((_, text)) = pair {
-                    result.notifications.push(text);
-                }
+            for (_, text) in notifs.pairs::<i32, String>().flatten() {
+                result.notifications.push(text);
             }
         }
 
         // Extract flags
         if let Ok(flags) = result_table.get::<Table>("_flags") {
-            for pair in flags.pairs::<String, String>() {
-                if let Ok((key, value)) = pair {
-                    result.flags_to_set.push((key, value));
-                }
+            for (key, value) in flags.pairs::<String, String>().flatten() {
+                result.flags_to_set.push((key, value));
             }
         }
 
         // Extract completed objectives
         if let Ok(completions) = result_table.get::<Table>("_completed_objectives") {
-            for pair in completions.pairs::<i64, String>() {
-                if let Ok((_, obj_id)) = pair {
-                    result.completed_objectives.push(obj_id);
-                }
+            for (_, obj_id) in completions.pairs::<i64, String>().flatten() {
+                result.completed_objectives.push(obj_id);
             }
         }
 
         // Extract granted items
         if let Ok(items) = result_table.get::<Table>("_granted_items") {
             for pair in items.pairs::<i64, Table>() {
-                if let Ok((_, entry)) = pair {
-                    if let (Ok(item_id), Ok(count)) =
+                if let Ok((_, entry)) = pair
+                    && let (Ok(item_id), Ok(count)) =
                         (entry.get::<String>("item_id"), entry.get::<i32>("count"))
-                    {
-                        result.granted_items.push((item_id, count));
-                    }
+                {
+                    result.granted_items.push((item_id, count));
                 }
             }
         }

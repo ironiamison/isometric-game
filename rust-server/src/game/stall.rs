@@ -15,18 +15,16 @@ impl GameRoom {
             let registry = self.item_registry.clone();
             let mut players = self.players.write().await;
             if let Some(player) = players.get_mut(player_id) {
-                for slot in &stall.slots {
-                    if let Some(stall_slot) = slot {
-                        let leftover = player.inventory.add_item(
-                            &stall_slot.item_id,
-                            stall_slot.quantity,
-                            &registry,
-                        );
-                        if leftover > 0 {
-                            player
-                                .bank
-                                .add_item(&stall_slot.item_id, leftover, &registry);
-                        }
+                for stall_slot in stall.slots.iter().flatten() {
+                    let leftover = player.inventory.add_item(
+                        &stall_slot.item_id,
+                        stall_slot.quantity,
+                        &registry,
+                    );
+                    if leftover > 0 {
+                        player
+                            .bank
+                            .add_item(&stall_slot.item_id, leftover, &registry);
                     }
                 }
             }
@@ -150,17 +148,13 @@ impl GameRoom {
         let registry = self.item_registry.clone();
         {
             let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                if let Some(stall) = player.stall.take() {
-                    for slot in &stall.slots {
-                        if let Some(stall_slot) = slot {
-                            player.inventory.add_item(
-                                &stall_slot.item_id,
-                                stall_slot.quantity,
-                                &registry,
-                            );
-                        }
-                    }
+            if let Some(player) = players.get_mut(player_id)
+                && let Some(stall) = player.stall.take()
+            {
+                for stall_slot in stall.slots.iter().flatten() {
+                    player
+                        .inventory
+                        .add_item(&stall_slot.item_id, stall_slot.quantity, &registry);
                 }
             }
         }
@@ -547,12 +541,12 @@ impl GameRoom {
         }
 
         if let Some(seller) = players.get_mut(seller_id) {
-            if let Some(stall) = seller.stall.as_mut() {
-                if let Some(Some(slot)) = stall.slots.get_mut(stall_slot as usize) {
-                    slot.quantity -= buy_qty;
-                    if slot.quantity <= 0 {
-                        stall.slots[stall_slot as usize] = None;
-                    }
+            if let Some(stall) = seller.stall.as_mut()
+                && let Some(Some(slot)) = stall.slots.get_mut(stall_slot as usize)
+            {
+                slot.quantity -= buy_qty;
+                if slot.quantity <= 0 {
+                    stall.slots[stall_slot as usize] = None;
                 }
             }
             seller.inventory.gold = new_seller_gold;

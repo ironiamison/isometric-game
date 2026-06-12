@@ -1,10 +1,7 @@
 use super::GameRoom;
 use crate::boss::BossEvent;
-use crate::chunk::ChunkCoord;
 use crate::item;
-use crate::npc::{Npc, NpcState};
 use crate::protocol::ServerMessage;
-use rand::Rng;
 
 pub const BOSS_MAP_ID: &str = "desert_boss_cave";
 pub const PHARAOH_BOSS_MAP_ID: &str = "pyramid_tomb";

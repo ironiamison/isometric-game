@@ -325,10 +325,10 @@ impl ChestManager {
             for (&slot, &started_at) in &chest.spawn_timers {
                 let elapsed = now.duration_since(started_at).as_secs();
                 // Find the spawn item definition for this slot
-                if let Some(spawn_item) = def.spawn_items.iter().find(|si| si.slot == slot) {
-                    if elapsed >= spawn_item.respawn_secs {
-                        to_respawn.push((slot, spawn_item.item_id.clone(), spawn_item.quantity));
-                    }
+                if let Some(spawn_item) = def.spawn_items.iter().find(|si| si.slot == slot)
+                    && elapsed >= spawn_item.respawn_secs
+                {
+                    to_respawn.push((slot, spawn_item.item_id.clone(), spawn_item.quantity));
                 }
             }
 

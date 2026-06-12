@@ -30,6 +30,7 @@ void main() {
 /// - HairTexture: Hair sprite sheet
 /// - HairUvTransform: vec4(offset_x, offset_y, scale_x, scale_y) to transform head UV to hair UV
 /// - Tint: vec4 color tint to apply (default white with full alpha for normal rendering)
+///
 /// Vertex shader for animated water tiles
 pub const WATER_VERTEX: &str = r#"#version 100
 precision lowp float;

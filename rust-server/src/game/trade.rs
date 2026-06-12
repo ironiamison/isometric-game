@@ -667,22 +667,22 @@ impl GameRoom {
         };
 
         for item in session.offer_a.items.iter().rev() {
-            if let Some(player) = players.get_mut(&pa) {
-                if let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize) {
-                    slot.quantity -= item.quantity;
-                    if slot.quantity <= 0 {
-                        player.inventory.slots[item.inv_slot as usize] = None;
-                    }
+            if let Some(player) = players.get_mut(&pa)
+                && let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize)
+            {
+                slot.quantity -= item.quantity;
+                if slot.quantity <= 0 {
+                    player.inventory.slots[item.inv_slot as usize] = None;
                 }
             }
         }
         for item in session.offer_b.items.iter().rev() {
-            if let Some(player) = players.get_mut(&pb) {
-                if let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize) {
-                    slot.quantity -= item.quantity;
-                    if slot.quantity <= 0 {
-                        player.inventory.slots[item.inv_slot as usize] = None;
-                    }
+            if let Some(player) = players.get_mut(&pb)
+                && let Some(Some(slot)) = player.inventory.slots.get_mut(item.inv_slot as usize)
+            {
+                slot.quantity -= item.quantity;
+                if slot.quantity <= 0 {
+                    player.inventory.slots[item.inv_slot as usize] = None;
                 }
             }
         }

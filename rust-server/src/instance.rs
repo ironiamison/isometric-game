@@ -159,7 +159,7 @@ impl Instance {
         let npcs = self.npcs.read().await;
         npcs.values()
             .filter(|npc| !npc.hidden)
-            .map(|npc| crate::npc::NpcUpdate::from(npc))
+            .map(crate::npc::NpcUpdate::from)
             .collect()
     }
 }

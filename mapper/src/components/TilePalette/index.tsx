@@ -7,18 +7,15 @@ export function TilePalette() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { tilesets, selectedTileId, selectedTiles, setSelectedTileId, setActiveTool, setActiveLayer, fillSelectedTiles, openAssetManager } = useEditorStore();
-  const [activeTileset, setActiveTileset] = useState<Tileset | null>(null);
+  const [activeTilesetName, setActiveTilesetName] = useState<string | null>(null);
   const [hoveredTile, setHoveredTile] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [containerWidth, setContainerWidth] = useState(200);
-  const [displayCols, setDisplayCols] = useState(1);
-
-  // Set first tileset as active when tilesets load
-  useEffect(() => {
-    if (tilesets.length > 0 && !activeTileset) {
-      setActiveTileset(tilesets[0]);
-    }
-  }, [tilesets, activeTileset]);
+  const activeTileset: Tileset | null =
+    tilesets.find((tileset) => tileset.name === activeTilesetName) ?? tilesets[0] ?? null;
+  const displayCols = activeTileset
+    ? Math.max(1, Math.floor(containerWidth / (activeTileset.tileWidth * zoom)))
+    : 1;
 
   // Track container width
   useEffect(() => {
@@ -36,14 +33,6 @@ export function TilePalette() {
 
     return () => observer.disconnect();
   }, []);
-
-  // Calculate display columns based on container width
-  useEffect(() => {
-    if (!activeTileset) return;
-    const tileDisplayWidth = activeTileset.tileWidth * zoom;
-    const cols = Math.max(1, Math.floor(containerWidth / tileDisplayWidth));
-    setDisplayCols(cols);
-  }, [activeTileset, containerWidth, zoom]);
 
   // Render tileset preview with dynamic columns
   useEffect(() => {
@@ -182,8 +171,7 @@ export function TilePalette() {
             className={styles.select}
             value={activeTileset?.name || ''}
             onChange={(e) => {
-              const ts = tilesets.find((t) => t.name === e.target.value);
-              setActiveTileset(ts || null);
+              setActiveTilesetName(e.target.value);
             }}
           >
             {tilesets.map((ts) => (

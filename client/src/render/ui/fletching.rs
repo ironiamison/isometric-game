@@ -803,7 +803,7 @@ impl Renderer {
         // Progress text with pulsing ellipsis
         let base_text = "FLETCHING";
         let dots = match ((time * 2.0) as i32) % 4 {
-            0 => format!("{}", base_text),
+            0 => base_text.to_string(),
             1 => format!("{}.", base_text),
             2 => format!("{}..", base_text),
             _ => format!("{}...", base_text),

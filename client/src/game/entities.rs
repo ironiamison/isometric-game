@@ -3,8 +3,9 @@ use super::skills::Skills;
 use crate::render::animation::{AnimationState, PlayerAnimation};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Direction {
+    #[default]
     Down = 0,
     Left = 1,
     Up = 2,
@@ -13,12 +14,6 @@ pub enum Direction {
     DownRight = 5,
     UpLeft = 6,
     UpRight = 7,
-}
-
-impl Default for Direction {
-    fn default() -> Self {
-        Direction::Down
-    }
 }
 
 impl Direction {
@@ -47,12 +42,10 @@ impl Direction {
             } else {
                 Direction::Left
             }
+        } else if dy > 0.0 {
+            Direction::Down
         } else {
-            if dy > 0.0 {
-                Direction::Down
-            } else {
-                Direction::Up
-            }
+            Direction::Up
         }
     }
 
@@ -275,12 +268,10 @@ impl Player {
     /// Calculate total attack bonus from all equipped items
     pub fn attack_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
-        for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                let def = item_registry.get_or_placeholder(item_id);
-                if let Some(equip) = &def.equipment {
-                    bonus += equip.attack_bonus;
-                }
+        for item_id in self.all_equipped().into_iter().flatten() {
+            let def = item_registry.get_or_placeholder(item_id);
+            if let Some(equip) = &def.equipment {
+                bonus += equip.attack_bonus;
             }
         }
         bonus
@@ -289,12 +280,10 @@ impl Player {
     /// Calculate total strength bonus from all equipped items
     pub fn strength_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
-        for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                let def = item_registry.get_or_placeholder(item_id);
-                if let Some(equip) = &def.equipment {
-                    bonus += equip.strength_bonus;
-                }
+        for item_id in self.all_equipped().into_iter().flatten() {
+            let def = item_registry.get_or_placeholder(item_id);
+            if let Some(equip) = &def.equipment {
+                bonus += equip.strength_bonus;
             }
         }
         bonus
@@ -303,12 +292,10 @@ impl Player {
     /// Calculate total defence bonus from all equipped items
     pub fn defence_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
-        for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                let def = item_registry.get_or_placeholder(item_id);
-                if let Some(equip) = &def.equipment {
-                    bonus += equip.defence_bonus;
-                }
+        for item_id in self.all_equipped().into_iter().flatten() {
+            let def = item_registry.get_or_placeholder(item_id);
+            if let Some(equip) = &def.equipment {
+                bonus += equip.defence_bonus;
             }
         }
         bonus
@@ -317,12 +304,10 @@ impl Player {
     /// Calculate total magic bonus from all equipped items
     pub fn magic_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
-        for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                let def = item_registry.get_or_placeholder(item_id);
-                if let Some(equip) = &def.equipment {
-                    bonus += equip.magic_bonus;
-                }
+        for item_id in self.all_equipped().into_iter().flatten() {
+            let def = item_registry.get_or_placeholder(item_id);
+            if let Some(equip) = &def.equipment {
+                bonus += equip.magic_bonus;
             }
         }
         bonus
@@ -331,12 +316,10 @@ impl Player {
     /// Calculate total ranged strength bonus from all equipped items
     pub fn ranged_strength_bonus(&self, item_registry: &ItemRegistry) -> i32 {
         let mut bonus = 0;
-        for equipped in self.all_equipped() {
-            if let Some(item_id) = equipped {
-                let def = item_registry.get_or_placeholder(item_id);
-                if let Some(equip) = &def.equipment {
-                    bonus += equip.ranged_strength_bonus;
-                }
+        for item_id in self.all_equipped().into_iter().flatten() {
+            let def = item_registry.get_or_placeholder(item_id);
+            if let Some(equip) = &def.equipment {
+                bonus += equip.ranged_strength_bonus;
             }
         }
         bonus

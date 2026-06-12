@@ -296,7 +296,7 @@ impl InputHandler {
                 }
             } else if let Some(entity_id) = clicked_player {
                 // Check if clicked player has an open stall - browse instead of attack
-                let target_has_stall = state.players.get(&entity_id).map_or(false, |p| p.has_stall);
+                let target_has_stall = state.players.get(&entity_id).is_some_and(|p| p.has_stall);
 
                 if target_has_stall {
                     // Player has a stall - pathfind to them and browse their shop
@@ -924,7 +924,7 @@ impl InputHandler {
         &mut self,
         state: &mut GameState,
         frame: ProcessFrame<'_>,
-        commands: &mut Vec<InputCommand>,
+        _commands: &mut Vec<InputCommand>,
     ) -> bool {
         let mx = frame.mx;
         let my = frame.my;
@@ -991,7 +991,7 @@ impl InputHandler {
                 }
 
                 // Check ground items
-                for (_id, item) in &state.ground_items {
+                for item in state.ground_items.values() {
                     let ix = item.x.round() as i32;
                     let iy = item.y.round() as i32;
                     if ix == clicked_tile_x && iy == clicked_tile_y {

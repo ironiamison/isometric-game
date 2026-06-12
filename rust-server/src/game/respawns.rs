@@ -68,10 +68,10 @@ impl GameRoom {
         if !chairs_to_free.is_empty() {
             let mut chairs = self.chairs.write().await;
             for (player_id, (tile_x, tile_y)) in chairs_to_free {
-                if let Some(chair) = chairs.get_mut(&(tile_x, tile_y)) {
-                    if chair.occupied_by.as_deref() == Some(&player_id) {
-                        chair.occupied_by = None;
-                    }
+                if let Some(chair) = chairs.get_mut(&(tile_x, tile_y))
+                    && chair.occupied_by.as_deref() == Some(&player_id)
+                {
+                    chair.occupied_by = None;
                 }
             }
         }
@@ -98,11 +98,10 @@ impl GameRoom {
                     let remaining = instance.remove_player(&player.id).await;
                     if remaining == 0
                         && instance.instance_type == crate::interior::InstanceType::Private
+                        && let Some(owner_id) = &instance.owner_id
                     {
-                        if let Some(owner_id) = &instance.owner_id {
-                            self.instance_manager
-                                .remove_private(owner_id, &instance.map_id);
-                        }
+                        self.instance_manager
+                            .remove_private(owner_id, &instance.map_id);
                     }
 
                     for other_id in &other_players {

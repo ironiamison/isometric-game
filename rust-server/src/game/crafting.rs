@@ -249,12 +249,11 @@ impl GameRoom {
             recipe_id
         );
 
-        if let Some(ref db) = self.db {
-            if let Some(character_id) = Self::parse_character_id(player_id) {
-                if let Err(e) = db.save_discovered_recipe(character_id, &recipe_id).await {
-                    tracing::warn!("Failed to save discovered recipe to DB: {}", e);
-                }
-            }
+        if let Some(ref db) = self.db
+            && let Some(character_id) = Self::parse_character_id(player_id)
+            && let Err(e) = db.save_discovered_recipe(character_id, &recipe_id).await
+        {
+            tracing::warn!("Failed to save discovered recipe to DB: {}", e);
         }
 
         self.send_to_player(
@@ -327,26 +326,26 @@ impl GameRoom {
                 return;
             }
 
-            if let Some(ref tool) = recipe.required_tool {
-                if !player.inventory.has_item(tool, 1) {
-                    let tool_name = self
-                        .item_registry
-                        .get(tool)
-                        .map(|d| d.display_name.as_str())
-                        .unwrap_or(tool.as_str());
-                    drop(players);
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::CraftResult {
-                            success: false,
-                            recipe_id: recipe_id.to_string(),
-                            error: Some(format!("You need a {} to do that", tool_name)),
-                            items_gained: vec![],
-                        },
-                    )
-                    .await;
-                    return;
-                }
+            if let Some(ref tool) = recipe.required_tool
+                && !player.inventory.has_item(tool, 1)
+            {
+                let tool_name = self
+                    .item_registry
+                    .get(tool)
+                    .map(|d| d.display_name.as_str())
+                    .unwrap_or(tool.as_str());
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::CraftResult {
+                        success: false,
+                        recipe_id: recipe_id.to_string(),
+                        error: Some(format!("You need a {} to do that", tool_name)),
+                        items_gained: vec![],
+                    },
+                )
+                .await;
+                return;
             }
 
             for ingredient in &recipe.ingredients {
@@ -527,23 +526,23 @@ impl GameRoom {
             return;
         }
 
-        if let Some(ref tool) = recipe.required_tool {
-            if !player.inventory.has_item(tool, 1) {
-                let tool_name = self
-                    .item_registry
-                    .get(tool)
-                    .map(|d| d.display_name.as_str())
-                    .unwrap_or(tool.as_str());
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: format!("You need a {} to do that", tool_name),
-                    },
-                )
-                .await;
-                return;
-            }
+        if let Some(ref tool) = recipe.required_tool
+            && !player.inventory.has_item(tool, 1)
+        {
+            let tool_name = self
+                .item_registry
+                .get(tool)
+                .map(|d| d.display_name.as_str())
+                .unwrap_or(tool.as_str());
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: format!("You need a {} to do that", tool_name),
+                },
+            )
+            .await;
+            return;
         }
 
         if recipe.requires_discovery && !player.discovered_recipes.contains(recipe_id) {
@@ -957,23 +956,23 @@ impl GameRoom {
             return;
         }
 
-        if let Some(ref tool) = recipe.required_tool {
-            if !player.inventory.has_item(tool, 1) {
-                let tool_name = self
-                    .item_registry
-                    .get(tool)
-                    .map(|d| d.display_name.as_str())
-                    .unwrap_or(tool.as_str());
-                drop(players);
-                self.send_to_player(
-                    player_id,
-                    ServerMessage::CraftingCancelled {
-                        reason: format!("You need a {} to do that", tool_name),
-                    },
-                )
-                .await;
-                return;
-            }
+        if let Some(ref tool) = recipe.required_tool
+            && !player.inventory.has_item(tool, 1)
+        {
+            let tool_name = self
+                .item_registry
+                .get(tool)
+                .map(|d| d.display_name.as_str())
+                .unwrap_or(tool.as_str());
+            drop(players);
+            self.send_to_player(
+                player_id,
+                ServerMessage::CraftingCancelled {
+                    reason: format!("You need a {} to do that", tool_name),
+                },
+            )
+            .await;
+            return;
         }
 
         if recipe.requires_discovery && !player.discovered_recipes.contains(recipe_id) {
@@ -1198,8 +1197,7 @@ mod tests {
         player.inventory.add_item("ore", 2, &registry);
         assert!(can_continue_batch(&player, &recipe, &registry));
 
-        let mut missing_ingredients =
-            Player::new("char_2", "Tester", 0, 0, "m", "skin1", None, None);
+        let missing_ingredients = Player::new("char_2", "Tester", 0, 0, "m", "skin1", None, None);
         assert!(!can_continue_batch(
             &missing_ingredients,
             &recipe,

@@ -21,10 +21,10 @@ fn chest_positions_for_context(
             if key.starts_with(&prefix) {
                 let rest = &key[prefix.len()..];
                 let parts: Vec<&str> = rest.splitn(2, '_').collect();
-                if parts.len() == 2 {
-                    if let (Ok(x), Ok(y)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>()) {
-                        return Some((x, y));
-                    }
+                if parts.len() == 2
+                    && let (Ok(x), Ok(y)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>())
+                {
+                    return Some((x, y));
                 }
             }
             None
@@ -331,14 +331,13 @@ impl GameRoom {
                 None => return,
             };
 
-            if let Some(definition) = self.chest_registry.get(&chest.chest_def_id) {
-                if definition
+            if let Some(definition) = self.chest_registry.get(&chest.chest_def_id)
+                && definition
                     .spawn_items
                     .iter()
                     .any(|spawn| spawn.slot == slot)
-                {
-                    chest.spawn_timers.insert(slot, std::time::Instant::now());
-                }
+            {
+                chest.spawn_timers.insert(slot, std::time::Instant::now());
             }
 
             (

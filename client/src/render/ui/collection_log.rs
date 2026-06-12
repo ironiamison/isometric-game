@@ -172,7 +172,7 @@ impl Renderer {
 
         // Calculate total content height for scroll clamping
         let mut total_content_h = pad;
-        for (_, (key, _)) in categories.iter().enumerate() {
+        for (key, _) in categories.iter() {
             total_content_h += line_height + 6.0 * s; // category header
             let is_expanded =
                 state.ui_state.collection_log_selected_category.as_deref() == Some(*key);
@@ -431,7 +431,7 @@ impl Renderer {
         let grid_clip_h = y + h - grid_y_start;
 
         // Calculate total grid content height for scroll clamping
-        let rows = (items.len() + cols - 1) / cols;
+        let rows = items.len().div_ceil(cols);
         let total_grid_h = rows as f32 * (slot_size + slot_gap);
         let max_grid_scroll = (total_grid_h - grid_clip_h).max(0.0);
         layout.set_max_scroll(UiElementId::CollectionLogGridScrollbar, max_grid_scroll);

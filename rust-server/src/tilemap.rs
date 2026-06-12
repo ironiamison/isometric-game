@@ -1,7 +1,6 @@
-/// Server-side tilemap for collision detection
-/// Must generate the same collision data as the client
-
-/// Tilemap for collision detection
+/// Server-side tilemap for collision detection.
+///
+/// Must generate the same collision data as the client.
 pub struct Tilemap {
     pub width: u32,
     pub height: u32,
@@ -53,7 +52,7 @@ impl Tilemap {
     }
 
     /// Check collision for an NPC with a radius (float positions)
-    pub fn check_collision(&self, x: f32, y: f32, radius: f32) -> bool {
+    pub fn check_collision(&self, x: f32, y: f32, _radius: f32) -> bool {
         // Check the tile at rounded position
         let tile_x = x.round() as i32;
         let tile_y = y.round() as i32;

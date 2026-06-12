@@ -358,14 +358,14 @@ impl Npc {
             true
         } else {
             // Being damaged should immediately interrupt current behavior and chase attacker.
-            if self.is_attackable() {
-                if let Some(attacker) = attacker_id {
-                    self.target_id = Some(attacker.to_string());
-                    self.state = NpcState::Chasing;
-                    self.wander_target = None;
-                    self.wander_best_distance = i32::MAX;
-                    self.wander_stuck_count = 0;
-                }
+            if self.is_attackable()
+                && let Some(attacker) = attacker_id
+            {
+                self.target_id = Some(attacker.to_string());
+                self.state = NpcState::Chasing;
+                self.wander_target = None;
+                self.wander_best_distance = i32::MAX;
+                self.wander_stuck_count = 0;
             }
             false
         }
@@ -634,10 +634,10 @@ impl Npc {
                                 self.tile_offset().0,
                                 self.tile_offset().1,
                             );
-                            if dist <= aggro_range {
-                                if nearest.is_none() || dist < nearest.as_ref().unwrap().1 {
-                                    nearest = Some((player_id.clone(), dist));
-                                }
+                            if dist <= aggro_range
+                                && (nearest.is_none() || dist < nearest.as_ref().unwrap().1)
+                            {
+                                nearest = Some((player_id.clone(), dist));
                             }
                         }
 

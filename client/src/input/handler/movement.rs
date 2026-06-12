@@ -120,12 +120,10 @@ impl InputHandler {
                         } else {
                             MoveDir::Right
                         }
+                    } else if dy {
+                        MoveDir::Up
                     } else {
-                        if dy {
-                            MoveDir::Up
-                        } else {
-                            MoveDir::Down
-                        }
+                        MoveDir::Down
                     }
                 }
                 DPadDirection::None => keyboard_dir,
@@ -161,7 +159,7 @@ impl InputHandler {
                 } else {
                     // Never sent a move (quick tap or frame timing edge case) - send Face command
                     // But not if attacking - player must finish attack first
-                    let attack_anim = state.get_local_player().map_or(false, |p| {
+                    let attack_anim = state.get_local_player().is_some_and(|p| {
                         matches!(
                             p.animation.state,
                             AnimationState::Attacking
@@ -200,7 +198,7 @@ impl InputHandler {
                 if self.touch_controls.was_dpad_move_sent() {
                     commands.push(InputCommand::Move { dx: 0.0, dy: 0.0 });
                 }
-                let attack_anim = state.get_local_player().map_or(false, |p| {
+                let attack_anim = state.get_local_player().is_some_and(|p| {
                     matches!(
                         p.animation.state,
                         AnimationState::Attacking

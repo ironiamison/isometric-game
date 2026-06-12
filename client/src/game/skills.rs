@@ -62,7 +62,7 @@ impl SkillType {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<SkillType> {
+    pub fn parse_name(s: &str) -> Option<SkillType> {
         match s.to_lowercase().as_str() {
             "hitpoints" => Some(SkillType::Hitpoints),
             "attack" => Some(SkillType::Attack),

@@ -1,7 +1,18 @@
-use super::*;
+use macroquad::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::audio::AudioManager;
+use crate::game::GameState;
+use crate::input::{InputCommand, InputHandler};
+use crate::network::{self, NetworkClient};
+use crate::render::animation::AnimationState;
+use crate::render::Renderer;
+use crate::{game, settings};
+
+static FULLSCREEN: AtomicBool = AtomicBool::new(false);
 
 /// Run a single frame of gameplay
-pub(super) fn run_game_frame(
+pub(crate) fn run_game_frame(
     game_state: &mut GameState,
     network: &mut NetworkClient,
     input_handler: &mut InputHandler,
@@ -157,7 +168,7 @@ pub(super) fn run_game_frame(
         let msg = match cmd {
             InputCommand::Move { dx, dy } => {
                 // Notify tutorial of player movement
-                if (*dx != 0.0 || *dy != 0.0) {
+                if *dx != 0.0 || *dy != 0.0 {
                     if let Some(tutorial) = &mut game_state.tutorial {
                         tutorial.on_player_moved();
                     }
@@ -166,7 +177,7 @@ pub(super) fn run_game_frame(
                 ClientMessage::Move {
                     dx: *dx,
                     dy: *dy,
-                    seq,
+                    seq: Some(seq),
                 }
             }
             InputCommand::Face { direction } => {
@@ -219,8 +230,7 @@ pub(super) fn run_game_frame(
                     // For ranged weapons, check if player has arrows
                     if is_ranged {
                         let has_arrows = game_state.inventory.slots.iter().any(|slot| {
-                            slot.as_ref()
-                                .map_or(false, |s| s.item_id.ends_with("_arrow"))
+                            slot.as_ref().is_some_and(|s| s.item_id.ends_with("_arrow"))
                         });
                         if !has_arrows {
                             // No arrows - play error sound and show message
@@ -273,10 +283,10 @@ pub(super) fn run_game_frame(
                 item_id: item_id.clone(),
             },
             InputCommand::UseItem { slot_index } => ClientMessage::UseItem {
-                slot_index: *slot_index as u32,
+                slot_index: *slot_index,
             },
             InputCommand::UseItemOnEntity { slot_index, npc_id } => ClientMessage::UseItemOn {
-                slot_index: *slot_index as u32,
+                slot_index: *slot_index,
                 target_npc_id: npc_id.clone(),
             },
             // Quest-related commands
@@ -338,7 +348,7 @@ pub(super) fn run_game_frame(
                         instance_id: String::new(),
                     };
                 }
-                ClientMessage::DialogueChoice {
+                ClientMessage::DialogueChoiceMsg {
                     quest_id: quest_id.clone(),
                     choice_id: choice_id.clone(),
                 }
@@ -388,7 +398,7 @@ pub(super) fn run_game_frame(
             } => ClientMessage::ShopBuy {
                 npc_id: npc_id.clone(),
                 item_id: item_id.clone(),
-                quantity: *quantity,
+                quantity: (*quantity).min(i32::MAX as u32) as i32,
             },
             InputCommand::ShopSell {
                 npc_id,
@@ -397,7 +407,7 @@ pub(super) fn run_game_frame(
             } => ClientMessage::ShopSell {
                 npc_id: npc_id.clone(),
                 item_id: item_id.clone(),
-                quantity: *quantity,
+                quantity: (*quantity).min(i32::MAX as u32) as i32,
             },
             // Bank commands
             InputCommand::BankDeposit { item_id, quantity } => ClientMessage::BankDeposit {
@@ -695,18 +705,16 @@ pub(super) fn run_game_frame(
 
     // 3.5. Tutorial: check if we should start, and update phase progress
     // maybe_start_tutorial
-    if game_state.tutorial_pending {
-        if game_state.ui_state.active_dialogue.is_none() {
-            log::warn!("TUTORIAL: auto-starting tutorial now!");
-            game_state.tutorial_pending = false;
-            let mut tutorial =
-                game::tutorial::TutorialManager::new(game_state.ui_state.classic_controls);
-            if let Some(dialogue) = tutorial.phase_dialogue() {
-                game_state.ui_state.active_dialogue = Some(dialogue);
-            }
-            tutorial.hint_visible = false;
-            game_state.tutorial = Some(tutorial);
+    if game_state.tutorial_pending && game_state.ui_state.active_dialogue.is_none() {
+        log::warn!("TUTORIAL: auto-starting tutorial now!");
+        game_state.tutorial_pending = false;
+        let mut tutorial =
+            game::tutorial::TutorialManager::new(game_state.ui_state.classic_controls);
+        if let Some(dialogue) = tutorial.phase_dialogue() {
+            game_state.ui_state.active_dialogue = Some(dialogue);
         }
+        tutorial.hint_visible = false;
+        game_state.tutorial = Some(tutorial);
     }
     // update_tutorial
     if let Some(tutorial) = &mut game_state.tutorial {
@@ -1098,7 +1106,55 @@ pub(super) fn run_game_frame(
         );
     }
 
-    // 6. Render overlays (must be last, covers everything)
+    // 6. Render touch controls where the platform exposes them.
+    let weapon_sprite_key = game_state
+        .get_local_player()
+        .and_then(|player| player.equipped_weapon.as_deref())
+        .map(|id| game_state.item_registry.get_sprite_key(id));
+    input_handler.update_attack_button_icon(weapon_sprite_key, &renderer.item_sprites);
+
+    let in_dialogue = game_state.ui_state.active_dialogue.is_some();
+    let any_panel_open = game_state.ui_state.inventory_open
+        || game_state.ui_state.character_panel_open
+        || game_state.ui_state.skills_open
+        || game_state.ui_state.prayer_book_open
+        || game_state.ui_state.escape_menu_open
+        || game_state.ui_state.crafting_open
+        || game_state.ui_state.furnace_open
+        || game_state.ui_state.anvil_open
+        || game_state.ui_state.fletching_open
+        || game_state.ui_state.bank_open
+        || game_state.ui_state.chest_open
+        || game_state.ui_state.shop_data.is_some()
+        || game_state.ui_state.quest_log_open
+        || game_state.ui_state.social_open
+        || game_state.ui_state.chat_panel_open
+        || in_dialogue;
+    let hide_direction_controls = if cfg!(target_os = "android") {
+        game_state.ui_state.crafting_open
+            || game_state.ui_state.furnace_open
+            || game_state.ui_state.anvil_open
+            || game_state.ui_state.fletching_open
+            || game_state.ui_state.bank_open
+            || game_state.ui_state.chest_open
+            || game_state.ui_state.shop_data.is_some()
+            || game_state.ui_state.chat_panel_open
+            || in_dialogue
+    } else {
+        game_state.ui_state.escape_menu_open
+            || game_state.ui_state.crafting_open
+            || game_state.ui_state.shop_data.is_some()
+            || game_state.ui_state.quest_log_open
+            || game_state.ui_state.chat_panel_open
+            || in_dialogue
+    };
+    input_handler.render_touch_controls(
+        any_panel_open,
+        hide_direction_controls,
+        game_state.ui_state.use_joystick,
+    );
+
+    // 7. Render overlays last so transitions consistently cover every platform UI.
     renderer.render_world_fade_in(game_state);
     renderer.render_transition_overlay(game_state);
     renderer.render_tutorial_hint(game_state);

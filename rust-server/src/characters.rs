@@ -85,7 +85,8 @@ pub(super) fn extract_auth(
     let auth_header = headers.get("Authorization")?;
     let auth_str = auth_header.to_str().ok()?;
     let token = auth_str.strip_prefix("Bearer ")?;
-    sessions.get(token).map(|r| r.value().clone())
+    let session = get_auth_session(sessions, token)?;
+    Some((session.account_id, session.username))
 }
 
 /// GET /api/characters - List all characters for the authenticated account

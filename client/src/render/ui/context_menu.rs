@@ -79,7 +79,7 @@ impl Renderer {
                 push_option(&mut options, "Follow");
                 push_option(&mut options, "Trade");
                 // Show "Browse Shop" if the player has an active stall
-                if state.players.get(id).map_or(false, |p| p.has_stall) {
+                if state.players.get(id).is_some_and(|p| p.has_stall) {
                     push_option(&mut options, "Browse Shop");
                 }
                 push_option(&mut options, "Add Friend");
@@ -93,28 +93,26 @@ impl Renderer {
                         push_option(&mut options, "Attack");
                         push_option(&mut options, "Target");
                         push_option(&mut options, "Examine");
+                    } else if npc.is_altar {
+                        push_option(&mut options, "Pray");
+                        push_option(&mut options, "Offer Bones");
+                        push_option(&mut options, "Examine");
+                    } else if npc.station_type.is_some() {
+                        push_option(&mut options, "Use");
+                        push_option(&mut options, "Examine");
+                    } else if npc.is_merchant {
+                        push_option(&mut options, "Talk-to");
+                        push_option(&mut options, "Trade");
+                        push_option(&mut options, "Examine");
+                    } else if npc.is_banker {
+                        push_option(&mut options, "Bank");
+                        push_option(&mut options, "Examine");
+                    } else if npc.is_slayer_master {
+                        push_option(&mut options, "Get Task");
+                        push_option(&mut options, "Examine");
                     } else {
-                        if npc.is_altar {
-                            push_option(&mut options, "Pray");
-                            push_option(&mut options, "Offer Bones");
-                            push_option(&mut options, "Examine");
-                        } else if npc.station_type.is_some() {
-                            push_option(&mut options, "Use");
-                            push_option(&mut options, "Examine");
-                        } else if npc.is_merchant {
-                            push_option(&mut options, "Talk-to");
-                            push_option(&mut options, "Trade");
-                            push_option(&mut options, "Examine");
-                        } else if npc.is_banker {
-                            push_option(&mut options, "Bank");
-                            push_option(&mut options, "Examine");
-                        } else if npc.is_slayer_master {
-                            push_option(&mut options, "Get Task");
-                            push_option(&mut options, "Examine");
-                        } else {
-                            push_option(&mut options, "Talk-to");
-                            push_option(&mut options, "Examine");
-                        }
+                        push_option(&mut options, "Talk-to");
+                        push_option(&mut options, "Examine");
                     }
                     name
                 } else {
@@ -339,7 +337,7 @@ impl Renderer {
         let (mouse_x, mouse_y) = mouse_position();
         let mut y = sep_y + padding * 0.5;
 
-        for (_i, (label, element_id)) in options.iter().enumerate() {
+        for (label, element_id) in options.iter() {
             let option_bounds = Rect::new(menu_x, y, menu_width, option_height);
             layout.add(element_id.clone(), option_bounds);
 

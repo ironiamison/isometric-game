@@ -40,6 +40,9 @@ use macroquad::texture::{render_target_ex, RenderTargetParams};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
+type TextMeasureCache = HashMap<i32, HashMap<String, TextDimensions>>;
+type TextWrapCache = HashMap<(i32, i32), HashMap<String, Vec<String>>>;
+
 mod asset_helpers;
 mod asset_loaders;
 mod assets;
@@ -220,6 +223,10 @@ impl SpriteStore {
             SpriteStore::Individual(map) => map.len(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 pub struct WeaponSprite {
@@ -283,6 +290,10 @@ impl SpritesheetStore {
             SpritesheetStore::Atlas { rects, .. } => rects.len(),
             SpritesheetStore::Individual(map) => map.len(),
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -413,9 +424,9 @@ pub struct Renderer {
     /// Cached minimap tint color per tile id.
     minimap_tile_color_cache: RefCell<HashMap<u32, Color>>,
     /// Cached text measurements bucketed by font size.
-    text_measure_cache: RefCell<HashMap<i32, HashMap<String, TextDimensions>>>,
+    text_measure_cache: RefCell<TextMeasureCache>,
     /// Cached wrapped lines bucketed by (max width, font size).
-    text_wrap_cache: RefCell<HashMap<(i32, i32), HashMap<String, Vec<String>>>>,
+    text_wrap_cache: RefCell<TextWrapCache>,
     /// Font scale multiplier for UI text. Set to ui_scale before UI rendering,
     /// reset to 1.0 for world rendering. Snaps to nearest multiple of 8 for
     /// pixel-perfect monogram font rendering.

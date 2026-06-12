@@ -99,7 +99,7 @@ impl GameRoom {
                 player.last_move_input_ms = now_ms;
 
                 // Block movement while stall is active
-                if player.stall.as_ref().map_or(false, |s| s.active) {
+                if player.stall.as_ref().is_some_and(|s| s.active) {
                     return;
                 }
 
@@ -176,10 +176,10 @@ impl GameRoom {
         // Free chair outside of players lock
         if let Some((tx, ty)) = chair_to_free {
             let mut chairs = self.chairs.write().await;
-            if let Some(chair) = chairs.get_mut(&(tx, ty)) {
-                if chair.occupied_by.as_deref() == Some(player_id) {
-                    chair.occupied_by = None;
-                }
+            if let Some(chair) = chairs.get_mut(&(tx, ty))
+                && chair.occupied_by.as_deref() == Some(player_id)
+            {
+                chair.occupied_by = None;
             }
         }
 
@@ -353,15 +353,15 @@ impl GameRoom {
                 } else {
                     break; // Instance not found - stop dash for safety
                 }
-                if let Some(ref player_pos) = inst_player_pos {
-                    if player_pos.contains(&(check_x, check_y)) {
-                        break;
-                    }
+                if let Some(ref player_pos) = inst_player_pos
+                    && player_pos.contains(&(check_x, check_y))
+                {
+                    break;
                 }
-                if let Some(ref npc_pos) = inst_npc_pos {
-                    if npc_pos.contains(&(check_x, check_y)) {
-                        break;
-                    }
+                if let Some(ref npc_pos) = inst_npc_pos
+                    && npc_pos.contains(&(check_x, check_y))
+                {
+                    break;
                 }
             }
 
@@ -391,11 +391,13 @@ impl GameRoom {
 
     pub async fn handle_jump(&self, player_id: &str) {
         let mut players = self.players.write().await;
-        if let Some(player) = players.get_mut(player_id) {
-            if player.grounded && !player.is_dead && player.active {
-                player.grounded = false;
-                player.jump_ticks = 6; // 6 ticks = 300ms airtime at 20Hz
-            }
+        if let Some(player) = players.get_mut(player_id)
+            && player.grounded
+            && !player.is_dead
+            && player.active
+        {
+            player.grounded = false;
+            player.jump_ticks = 6; // 6 ticks = 300ms airtime at 20Hz
         }
     }
 

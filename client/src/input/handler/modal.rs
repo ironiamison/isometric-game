@@ -265,13 +265,13 @@ impl InputHandler {
                             chest_handled = true;
                         }
                         UiElementId::ChestSlot(idx) => {
-                            if (*idx as usize) < state.ui_state.chest_slots.len() {
-                                if state.ui_state.chest_slots[*idx as usize].is_some() {
-                                    commands.push(InputCommand::ChestTake {
-                                        chest_id: state.ui_state.chest_id.clone(),
-                                        slot: *idx,
-                                    });
-                                }
+                            if (*idx as usize) < state.ui_state.chest_slots.len()
+                                && state.ui_state.chest_slots[*idx as usize].is_some()
+                            {
+                                commands.push(InputCommand::ChestTake {
+                                    chest_id: state.ui_state.chest_id.clone(),
+                                    slot: *idx,
+                                });
                             }
                             chest_handled = true;
                         }
@@ -557,22 +557,20 @@ impl InputHandler {
                     return true;
                 }
 
-                if is_key_pressed(KeyCode::Backspace) {
-                    if state.ui_state.stall_name_cursor > 0 {
-                        state.ui_state.stall_name_cursor -= 1;
-                        state
-                            .ui_state
-                            .stall_my_name
-                            .remove(state.ui_state.stall_name_cursor);
-                    }
+                if is_key_pressed(KeyCode::Backspace) && state.ui_state.stall_name_cursor > 0 {
+                    state.ui_state.stall_name_cursor -= 1;
+                    state
+                        .ui_state
+                        .stall_my_name
+                        .remove(state.ui_state.stall_name_cursor);
                 }
-                if is_key_pressed(KeyCode::Delete) {
-                    if state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len() {
-                        state
-                            .ui_state
-                            .stall_my_name
-                            .remove(state.ui_state.stall_name_cursor);
-                    }
+                if is_key_pressed(KeyCode::Delete)
+                    && state.ui_state.stall_name_cursor < state.ui_state.stall_my_name.len()
+                {
+                    state
+                        .ui_state
+                        .stall_my_name
+                        .remove(state.ui_state.stall_name_cursor);
                 }
                 if is_key_pressed(KeyCode::Left) && state.ui_state.stall_name_cursor > 0 {
                     state.ui_state.stall_name_cursor -= 1;

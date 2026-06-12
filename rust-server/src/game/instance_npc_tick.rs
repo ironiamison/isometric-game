@@ -44,13 +44,14 @@ impl GameRoom {
         let mut instance_players: HashMap<String, Vec<InstancePlayerPosition>> = HashMap::new();
 
         for (player_id, instance_id) in player_inst.iter() {
-            if let Some(player) = players.get(player_id) {
-                if player.active && player.is_alive() {
-                    instance_players
-                        .entry(instance_id.clone())
-                        .or_default()
-                        .push((player_id.clone(), player.x, player.y));
-                }
+            if let Some(player) = players.get(player_id)
+                && player.active
+                && player.is_alive()
+            {
+                instance_players
+                    .entry(instance_id.clone())
+                    .or_default()
+                    .push((player_id.clone(), player.x, player.y));
             }
         }
 

@@ -15,16 +15,11 @@ const SESSION_TOKEN_EXPIRY_SECS: u64 = 300; // 5 minutes
 /// Signed session token generator/validator
 #[derive(Clone)]
 pub(super) struct SessionTokenSigner {
-    /// Secret key for HMAC signing (generated at startup)
-    secret: Vec<u8>,
+    secret: Arc<[u8]>,
 }
 
 impl SessionTokenSigner {
-    pub(super) fn new() -> Self {
-        // Generate a random 32-byte secret at startup
-        use rand::RngCore;
-        let mut secret = vec![0u8; 32];
-        rand::thread_rng().fill_bytes(&mut secret);
+    pub(super) fn new(secret: Arc<[u8]>) -> Self {
         Self { secret }
     }
 
@@ -41,8 +36,7 @@ impl SessionTokenSigner {
 
         let payload = format!("{}:{}:{}", session_id, room_id, expiry);
 
-        let mut mac =
-            HmacSha256::new_from_slice(&self.secret).expect("HMAC can take key of any size");
+        let mut mac = HmacSha256::new_from_slice(&self.secret).expect("validated HMAC secret");
         mac.update(payload.as_bytes());
         let signature = mac.finalize().into_bytes();
 
@@ -92,8 +86,7 @@ impl SessionTokenSigner {
             .decode(signature_b64)
             .ok()?;
 
-        let mut mac =
-            HmacSha256::new_from_slice(&self.secret).expect("HMAC can take key of any size");
+        let mut mac = HmacSha256::new_from_slice(&self.secret).expect("validated HMAC secret");
         mac.update(payload.as_bytes());
 
         if mac.verify_slice(&expected_sig).is_err() {

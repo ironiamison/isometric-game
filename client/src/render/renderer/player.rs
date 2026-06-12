@@ -68,7 +68,7 @@ impl Renderer {
             let draw_y = screen_y - scaled_sprite_height + 16.0 * zoom + sit_offset_y; // Offset to align feet with tile (8px base + 8px centering adjustment)
 
             // Get player gender for gender-specific offsets
-            let player_gender = Gender::from_str(&player.gender);
+            let player_gender = Gender::from_wire(&player.gender);
 
             // Calculate weapon frame info if weapon is equipped (hidden when sitting)
             let is_sitting = matches!(
@@ -291,8 +291,8 @@ impl Renderer {
                             // Head source rect in normalized UV (including atlas offset)
                             let head_uv_x = (head_atlas_x + head_src_x) / head_full_tex_w;
                             let head_uv_y = head_atlas_y / head_full_tex_h;
-                            let head_uv_w = HEAD_SPRITE_WIDTH / head_full_tex_w;
-                            let head_uv_h = HEAD_SPRITE_HEIGHT / head_full_tex_h;
+                            let _head_uv_w = HEAD_SPRITE_WIDTH / head_full_tex_w;
+                            let _head_uv_h = HEAD_SPRITE_HEIGHT / head_full_tex_h;
 
                             // Hair source rect in normalized UV (including atlas offset)
                             let hair_uv_x = (hair_atlas_x + hair_src_x) / hair_full_tex_w;
@@ -953,7 +953,7 @@ impl Renderer {
             // Draw at anchor position in the RT (1x scale, no zoom)
             let draw_x = SILHOUETTE_ANCHOR_X;
             let draw_y = SILHOUETTE_ANCHOR_Y;
-            let player_gender = Gender::from_str(&player.gender);
+            let player_gender = Gender::from_wire(&player.gender);
 
             // Calculate weapon frame info (hidden when sitting)
             let is_sitting_sil = matches!(
@@ -1140,47 +1140,45 @@ impl Renderer {
                         },
                     );
                 }
-            } else {
-                if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
-                    let hair_key = format!("{}_{}", player.gender, style);
-                    if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
-                        let is_back = crate::render::animation::is_up_or_left_direction(
-                            player.animation.direction,
-                        );
-                        let frame_index = color * 2 + if is_back { 1 } else { 0 };
-                        let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
-                        let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
+            } else if let (Some(style), Some(color)) = (player.hair_style, player.hair_color) {
+                let hair_key = format!("{}_{}", player.gender, style);
+                if let Some((hair_tex, hair_atlas_offset)) = self.hair_sprites.get(&hair_key) {
+                    let is_back = crate::render::animation::is_up_or_left_direction(
+                        player.animation.direction,
+                    );
+                    let frame_index = color * 2 + if is_back { 1 } else { 0 };
+                    let (hair_atlas_x, hair_atlas_y) = hair_atlas_offset.unwrap_or((0.0, 0.0));
+                    let hair_src_x = hair_atlas_x + frame_index as f32 * HAIR_SPRITE_WIDTH;
 
-                        let anim_frame = player.animation.frame as u32;
-                        let (hair_pos_offset_x, hair_pos_offset_y) = get_hair_offset(
-                            player.animation.state,
-                            player.animation.direction,
-                            anim_frame,
-                            player_gender,
-                            coords.flip_h,
-                        );
-                        let hair_draw_x =
-                            draw_x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_pos_offset_x;
-                        let hair_draw_y = draw_y + hair_pos_offset_y;
+                    let anim_frame = player.animation.frame as u32;
+                    let (hair_pos_offset_x, hair_pos_offset_y) = get_hair_offset(
+                        player.animation.state,
+                        player.animation.direction,
+                        anim_frame,
+                        player_gender,
+                        coords.flip_h,
+                    );
+                    let hair_draw_x =
+                        draw_x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_pos_offset_x;
+                    let hair_draw_y = draw_y + hair_pos_offset_y;
 
-                        draw_texture_ex(
-                            hair_tex,
-                            hair_draw_x,
-                            hair_draw_y,
-                            WHITE,
-                            DrawTextureParams {
-                                source: Some(Rect::new(
-                                    hair_src_x,
-                                    hair_atlas_y,
-                                    HAIR_SPRITE_WIDTH,
-                                    HAIR_SPRITE_HEIGHT,
-                                )),
-                                dest_size: Some(Vec2::new(HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
-                                flip_x: coords.flip_h,
-                                ..Default::default()
-                            },
-                        );
-                    }
+                    draw_texture_ex(
+                        hair_tex,
+                        hair_draw_x,
+                        hair_draw_y,
+                        WHITE,
+                        DrawTextureParams {
+                            source: Some(Rect::new(
+                                hair_src_x,
+                                hair_atlas_y,
+                                HAIR_SPRITE_WIDTH,
+                                HAIR_SPRITE_HEIGHT,
+                            )),
+                            dest_size: Some(Vec2::new(HAIR_SPRITE_WIDTH, HAIR_SPRITE_HEIGHT)),
+                            flip_x: coords.flip_h,
+                            ..Default::default()
+                        },
+                    );
                 }
             }
 

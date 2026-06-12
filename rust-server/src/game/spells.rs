@@ -208,19 +208,19 @@ impl GameRoom {
                 return;
             }
             // Check cooldown
-            if let Some(&last_cast) = player.spell_cooldowns.get(&resolved.id) {
-                if current_time < last_cast + resolved.cooldown_ms {
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::SpellResult {
-                            success: false,
-                            reason: Some("Spell on cooldown".to_string()),
-                            spell_id: Some(resolved.id.clone()),
-                        },
-                    )
-                    .await;
-                    return;
-                }
+            if let Some(&last_cast) = player.spell_cooldowns.get(&resolved.id)
+                && current_time < last_cast + resolved.cooldown_ms
+            {
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SpellResult {
+                        success: false,
+                        reason: Some("Spell on cooldown".to_string()),
+                        spell_id: Some(resolved.id.clone()),
+                    },
+                )
+                .await;
+                return;
             }
         }
 
@@ -310,25 +310,27 @@ impl GameRoom {
         if let Some(ref inst_id) = caster_instance {
             if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
                 let npcs = instance.npcs.read().await;
-                if let Some(npc) = npcs.get(&target_id) {
-                    if npc.is_alive() && npc.is_attackable() {
-                        is_npc = true;
-                        is_instance_npc = true;
-                        target_x = npc.x;
-                        target_y = npc.y;
-                        target_exists = true;
-                    }
-                }
-            }
-        } else {
-            let npcs = self.npcs.read().await;
-            if let Some(npc) = npcs.get(&target_id) {
-                if npc.is_alive() && npc.is_attackable() {
+                if let Some(npc) = npcs.get(&target_id)
+                    && npc.is_alive()
+                    && npc.is_attackable()
+                {
                     is_npc = true;
+                    is_instance_npc = true;
                     target_x = npc.x;
                     target_y = npc.y;
                     target_exists = true;
                 }
+            }
+        } else {
+            let npcs = self.npcs.read().await;
+            if let Some(npc) = npcs.get(&target_id)
+                && npc.is_alive()
+                && npc.is_attackable()
+            {
+                is_npc = true;
+                target_x = npc.x;
+                target_y = npc.y;
+                target_exists = true;
             }
         }
 
@@ -339,19 +341,17 @@ impl GameRoom {
             let target_instance = instances.get(target_id.as_str()).cloned();
             // PVP must be allowed at caster's location
             let pvp_ok = self.is_pvp_allowed(player_id, caster_x, caster_y).await;
-            if pvp_ok {
-                if let Some(target) = players.get(&target_id) {
-                    if target.active
-                        && target.hp > 0
-                        && !target.is_dead
-                        && target_instance == caster_instance
-                    {
-                        is_npc = false;
-                        target_x = target.x;
-                        target_y = target.y;
-                        target_exists = true;
-                    }
-                }
+            if pvp_ok
+                && let Some(target) = players.get(&target_id)
+                && target.active
+                && target.hp > 0
+                && !target.is_dead
+                && target_instance == caster_instance
+            {
+                is_npc = false;
+                target_x = target.x;
+                target_y = target.y;
+                target_exists = true;
             }
         }
 
@@ -988,14 +988,14 @@ impl GameRoom {
                         {
                             let mut players = self.players.write().await;
                             for placement in &placements {
-                                if placement.gold_reward > 0 {
-                                    if let Some(p) = players.get_mut(&placement.player_id) {
-                                        p.inventory.gold = item::checked_gold_credit(
-                                            p.inventory.gold,
-                                            placement.gold_reward,
-                                        )
-                                        .unwrap_or(item::MAX_GOLD);
-                                    }
+                                if placement.gold_reward > 0
+                                    && let Some(p) = players.get_mut(&placement.player_id)
+                                {
+                                    p.inventory.gold = item::checked_gold_credit(
+                                        p.inventory.gold,
+                                        placement.gold_reward,
+                                    )
+                                    .unwrap_or(item::MAX_GOLD);
                                 }
                             }
                         }
@@ -1282,20 +1282,20 @@ impl GameRoom {
             };
 
             // Check cooldown
-            if let Some(&last_cast) = player.spell_cooldowns.get(spell_def.id) {
-                if current_time < last_cast + spell_def.cooldown_ms {
-                    drop(players);
-                    self.send_to_player(
-                        player_id,
-                        ServerMessage::SpellResult {
-                            success: false,
-                            reason: Some("Spell on cooldown".to_string()),
-                            spell_id: Some(spell_def.id.to_string()),
-                        },
-                    )
-                    .await;
-                    return false;
-                }
+            if let Some(&last_cast) = player.spell_cooldowns.get(spell_def.id)
+                && current_time < last_cast + spell_def.cooldown_ms
+            {
+                drop(players);
+                self.send_to_player(
+                    player_id,
+                    ServerMessage::SpellResult {
+                        success: false,
+                        reason: Some("Spell on cooldown".to_string()),
+                        spell_id: Some(spell_def.id.to_string()),
+                    },
+                )
+                .await;
+                return false;
             }
 
             // Set cooldown and move player to spawn

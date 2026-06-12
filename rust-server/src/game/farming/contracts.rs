@@ -213,8 +213,7 @@ impl GameRoom {
 
             if let Some((difficulty, crop_id, amount_required, amount_harvested, created_at)) =
                 contract
-            {
-                if let Err(e) = db
+                && let Err(e) = db
                     .save_farming_contract(
                         player_id,
                         &difficulty,
@@ -224,9 +223,8 @@ impl GameRoom {
                         created_at,
                     )
                     .await
-                {
-                    tracing::error!("Failed to save farming contract: {}", e);
-                }
+            {
+                tracing::error!("Failed to save farming contract: {}", e);
             }
         }
 
@@ -328,10 +326,10 @@ impl GameRoom {
             )
         };
 
-        if let Some(ref db) = self.db {
-            if let Err(e) = db.delete_farming_contract(player_id).await {
-                tracing::error!("Failed to delete farming contract: {}", e);
-            }
+        if let Some(ref db) = self.db
+            && let Err(e) = db.delete_farming_contract(player_id).await
+        {
+            tracing::error!("Failed to delete farming contract: {}", e);
         }
 
         self.send_to_player(player_id, inv_msg).await;
@@ -376,10 +374,10 @@ impl GameRoom {
             return;
         }
 
-        if let Some(ref db) = self.db {
-            if let Err(e) = db.delete_farming_contract(player_id).await {
-                tracing::error!("Failed to delete farming contract: {}", e);
-            }
+        if let Some(ref db) = self.db
+            && let Err(e) = db.delete_farming_contract(player_id).await
+        {
+            tracing::error!("Failed to delete farming contract: {}", e);
         }
 
         self.send_system_message(player_id, "Contract abandoned.")

@@ -56,7 +56,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                 // this server event. set_state is idempotent (no-op if already in
                 // same state), so always triggering the animation is safe.
                 let already_attacking = is_local
-                    && state.players.get(&player_id).map_or(false, |p| {
+                    && state.players.get(&player_id).is_some_and(|p| {
                         matches!(
                             p.animation.state,
                             crate::render::animation::AnimationState::Attacking
@@ -159,10 +159,11 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                             // Get source position + Z (check players then NPCs)
                             let source_pos = if let Some(player) = state.players.get(source_id) {
                                 Some((player.x.round(), player.y.round(), player.z))
-                            } else if let Some(npc) = state.npcs.get(source_id) {
-                                Some((npc.x.round(), npc.y.round(), npc.z))
                             } else {
-                                None
+                                state
+                                    .npcs
+                                    .get(source_id)
+                                    .map(|npc| (npc.x.round(), npc.y.round(), npc.z))
                             };
 
                             if let Some((src_x, src_y, src_z)) = source_pos {
@@ -308,7 +309,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
 
                 if let Some(player) = state.players.get_mut(&player_id) {
                     // Update the specific skill
-                    if let Some(skill_type) = SkillType::from_str(&skill_name) {
+                    if let Some(skill_type) = SkillType::parse_name(&skill_name) {
                         let skill = player.skills.get_mut(skill_type);
                         skill.xp = total_xp;
                         skill.level = level;
@@ -340,7 +341,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                         });
 
                         // Update XP globes and drop feed
-                        if let Some(skill_type) = SkillType::from_str(&skill_name) {
+                        if let Some(skill_type) = SkillType::parse_name(&skill_name) {
                             let xp_for_next = crate::game::skills::total_xp_for_level(level + 1);
                             state
                                 .xp_globes
@@ -502,7 +503,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                 // Get player position for floating text
                 if let Some(player) = state.players.get_mut(&player_id) {
                     // Update the specific skill level
-                    if let Some(skill_type) = SkillType::from_str(&skill_name) {
+                    if let Some(skill_type) = SkillType::parse_name(&skill_name) {
                         let skill = player.skills.get_mut(skill_type);
                         skill.level = new_level;
 

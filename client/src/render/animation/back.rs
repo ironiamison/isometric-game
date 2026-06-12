@@ -171,12 +171,10 @@ pub fn get_offhand_frame(
                 } else {
                     0
                 }
+            } else if use_back {
+                11
             } else {
-                if use_back {
-                    11
-                } else {
-                    10
-                }
+                10
             }
         }
         AnimationState::Casting => {
@@ -337,12 +335,10 @@ pub fn get_hair_offset(
             } else {
                 -5.0
             }
+        } else if flip_h {
+            6.0
         } else {
-            if flip_h {
-                6.0
-            } else {
-                -6.0
-            }
+            -6.0
         };
         (x_offset, y_offset)
     } else if is_shooting_bow {
@@ -352,12 +348,10 @@ pub fn get_hair_offset(
             } else {
                 -1.0
             }
+        } else if flip_h {
+            2.0
         } else {
-            if flip_h {
-                2.0
-            } else {
-                -2.0
-            }
+            -2.0
         };
         (x_offset, -3.0)
     } else {
@@ -367,12 +361,10 @@ pub fn get_hair_offset(
             } else {
                 -2.0
             }
+        } else if flip_h {
+            1.0
         } else {
-            if flip_h {
-                1.0
-            } else {
-                -1.0
-            }
+            -1.0
         };
         (x_offset, -3.0)
     };

@@ -351,17 +351,12 @@ pub struct OnlinePlayerInfo {
 }
 
 /// Social panel tab
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum SocialTab {
+    #[default]
     Nearby,
     Online,
     Friends,
-}
-
-impl Default for SocialTab {
-    fn default() -> Self {
-        Self::Nearby
-    }
 }
 
 /// Social panel state

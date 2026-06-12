@@ -86,16 +86,15 @@ impl GameRoom {
             return false;
         }
 
-        if prototype.behaviors.quest_giver {
-            if !quests.is_empty()
-                && !quest_state.is_some_and(|state| {
-                    quests
-                        .iter()
-                        .all(|quest| state.is_quest_completed(&quest.id))
-                })
-            {
-                return false;
-            }
+        if prototype.behaviors.quest_giver
+            && !quests.is_empty()
+            && !quest_state.is_some_and(|state| {
+                quests
+                    .iter()
+                    .all(|quest| state.is_quest_completed(&quest.id))
+            })
+        {
+            return false;
         }
         true
     }
@@ -175,25 +174,25 @@ impl GameRoom {
         // Stop any in-progress gathering/woodcutting action
         self.handle_stop_gathering(player_id).await;
 
-        if let Some(proto) = prototype {
-            if let Some(merchant_config) = &proto.merchant {
-                let shop_registry = self.shop_registry.read().await;
-                if let Some(shop_def) = shop_registry.get(&merchant_config.shop_id) {
-                    let msg = ServerMessage::ShopData {
-                        npc_id: npc_id.to_string(),
-                        shop: build_shop_data(shop_def, merchant_config, &self.item_registry),
-                    };
-                    drop(shop_registry);
-                    self.send_to_player(player_id, msg).await;
-                    return true;
-                }
-
-                tracing::warn!(
-                    "Shop '{}' not found for merchant NPC {}",
-                    merchant_config.shop_id,
-                    npc_id
-                );
+        if let Some(proto) = prototype
+            && let Some(merchant_config) = &proto.merchant
+        {
+            let shop_registry = self.shop_registry.read().await;
+            if let Some(shop_def) = shop_registry.get(&merchant_config.shop_id) {
+                let msg = ServerMessage::ShopData {
+                    npc_id: npc_id.to_string(),
+                    shop: build_shop_data(shop_def, merchant_config, &self.item_registry),
+                };
+                drop(shop_registry);
+                self.send_to_player(player_id, msg).await;
+                return true;
             }
+
+            tracing::warn!(
+                "Shop '{}' not found for merchant NPC {}",
+                merchant_config.shop_id,
+                npc_id
+            );
         }
 
         self.send_to_player(
@@ -868,7 +867,7 @@ impl GameRoom {
 mod tests {
     use super::*;
     use crate::entity::prototype::MerchantConfig;
-    use crate::shop::ShopStockItem;
+    use crate::shop::definition::ShopStockItem;
     use tempfile::TempDir;
 
     fn test_item_registry() -> ItemRegistry {

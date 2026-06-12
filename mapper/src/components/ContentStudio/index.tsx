@@ -245,13 +245,16 @@ export function ContentStudio({ onOpenMap }: ContentStudioProps) {
     [entries, chunks]
   );
 
-  const refresh = async (preferredKey?: string) => {
+  const refresh = async (selectionKey: string | null = selectedKey) => {
     setLoading(true);
     setError('');
     try {
       const nextCatalog = await loadContentCatalog();
       setCatalog(nextCatalog);
-      if (preferredKey) setSelectedKey(preferredKey);
+      setSelectedKey(selectionKey);
+      const nextEntry = flattenCatalog(nextCatalog)
+        .find((entry) => `${entry.file}:${entry.id}` === selectionKey);
+      setDraft(nextEntry ? structuredClone(nextEntry.data) : null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -260,12 +263,21 @@ export function ContentStudio({ onOpenMap }: ContentStudioProps) {
   };
 
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+    loadContentCatalog()
+      .then((nextCatalog) => {
+        if (!cancelled) setCatalog(nextCatalog);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  useEffect(() => {
-    setDraft(selectedEntry ? structuredClone(selectedEntry.data) : null);
-  }, [selectedEntry]);
 
   const updateDraft = (path: string[], value: unknown) => {
     setDraft((current) => {
@@ -315,7 +327,7 @@ export function ContentStudio({ onOpenMap }: ContentStudioProps) {
       await deleteContentEntry(selectedEntry.file, selectedEntry.id);
       setSelectedKey(null);
       setNotice(`Deleted ${selectedEntry.id}`);
-      await refresh();
+      await refresh(null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -456,7 +468,10 @@ export function ContentStudio({ onOpenMap }: ContentStudioProps) {
                     <button
                       key={key}
                       className={`${styles.entryRow} ${selectedKey === key ? styles.selectedEntry : ''}`}
-                      onClick={() => setSelectedKey(key)}
+                      onClick={() => {
+                        setSelectedKey(key);
+                        setDraft(structuredClone(entry.data));
+                      }}
                     >
                       <span className={styles.spriteBox}>
                         {image ? <img src={image} alt="" /> : <Package size={17} />}

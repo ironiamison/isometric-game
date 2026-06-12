@@ -937,10 +937,9 @@ impl Renderer {
         let s = state.ui_state.ui_scale;
         let line_height = 18.0 * s;
         let objective_line_height = line_height - 2.0 * s;
-        let inner_pad = 12.0 * s;
         let font_size = 16.0;
 
-        // First pass: collect all rendered lines and measure the widest one
+        // First pass: collect all rendered lines.
         struct TrackerLine {
             text: String,
             color: Color,
@@ -949,11 +948,9 @@ impl Renderer {
         }
 
         let mut lines: Vec<TrackerLine> = Vec::new();
-        let mut max_text_width: f32 = 0.0;
 
         // Header
         let header = "Quests";
-        max_text_width = max_text_width.max(self.measure_text_sharp(header, font_size).width);
         lines.push(TrackerLine {
             text: header.to_string(),
             color: Color::from_rgba(255, 220, 100, 255),
@@ -963,8 +960,6 @@ impl Renderer {
 
         // Quest content (no wrapping — measure actual widths)
         for quest in state.ui_state.active_quests.iter().take(2) {
-            let w = self.measure_text_sharp(&quest.name, font_size).width;
-            max_text_width = max_text_width.max(w);
             lines.push(TrackerLine {
                 text: quest.name.clone(),
                 color: WHITE,
@@ -983,8 +978,6 @@ impl Renderer {
                     "{} {} ({}/{})",
                     check, obj.description, obj.current, obj.target
                 );
-                let w = self.measure_text_sharp(&obj_text, font_size).width;
-                max_text_width = max_text_width.max(w);
                 lines.push(TrackerLine {
                     text: obj_text,
                     color: status_color,
@@ -1012,8 +1005,6 @@ impl Renderer {
                 "...and {} more (Q to view)",
                 state.ui_state.active_quests.len() - 2
             );
-            let w = self.measure_text_sharp(&more, font_size).width;
-            max_text_width = max_text_width.max(w);
             lines.push(TrackerLine {
                 text: more,
                 color: LIGHTGRAY,

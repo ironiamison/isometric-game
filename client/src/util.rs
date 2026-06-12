@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 // Cache for virtual screen size to avoid recalculating hundreds of times per frame
 thread_local! {
-    static CACHED_VIRTUAL_SIZE: Cell<(f32, f32, f64)> = Cell::new((0.0, 0.0, -1.0));
+    static CACHED_VIRTUAL_SIZE: Cell<(f32, f32, f64)> = const { Cell::new((0.0, 0.0, -1.0)) };
 }
 
 /// Get virtual screen dimensions for layout (cached per frame)
@@ -222,6 +222,7 @@ pub async fn load_sprites_with_progress(
 
     #[cfg(any(target_os = "android", target_arch = "wasm32"))]
     {
+        let _ = dir_path;
         let total = manifest_items.len();
         // On Android/WASM, use the manifest
         for (i, item) in manifest_items.iter().enumerate() {
@@ -252,7 +253,7 @@ pub async fn load_sprites_with_progress(
                     let path = entry.path();
                     if path.is_dir() {
                         scan_dir(&path.to_string_lossy(), sprites);
-                    } else if path.extension().map_or(false, |ext| ext == "png") {
+                    } else if path.extension().is_some_and(|ext| ext == "png") {
                         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                             sprites.push((stem.to_string(), path.to_string_lossy().to_string()));
                         }

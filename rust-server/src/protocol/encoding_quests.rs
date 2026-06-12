@@ -659,7 +659,7 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
                 Value::Integer((*tasks_completed as i64).into()),
             ));
             let reward_values: Vec<Value> =
-                rewards.iter().map(|r| slayer_reward_to_value(r)).collect();
+                rewards.iter().map(slayer_reward_to_value).collect();
             map.push((Value::String("rewards".into()), Value::Array(reward_values)));
             let blocked: Vec<Value> = blocked_monsters
                 .iter()

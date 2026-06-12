@@ -68,8 +68,8 @@ pub(super) fn process_chat_keyboard_input(
             state.ui_state.chat_scroll_offset = 0;
         } else {
             let text = state.ui_state.chat_input.trim().to_string();
-            let (send_text, channel) = if text.starts_with('~') {
-                let trimmed = text[1..].trim().to_string();
+            let (send_text, channel) = if let Some(global_text) = text.strip_prefix('~') {
+                let trimmed = global_text.trim().to_string();
                 (trimmed, "global".to_string())
             } else {
                 let ch = match state.ui_state.chat_active_tab {
@@ -165,13 +165,13 @@ pub(super) fn process_chat_keyboard_input(
     }
 
     // Backspace removes character before cursor
-    if chat_key_should_fire(KeyCode::Backspace, state, current_time) {
-        if state.ui_state.chat_cursor > 0 {
-            let byte_idx =
-                char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor - 1);
-            state.ui_state.chat_input.remove(byte_idx);
-            state.ui_state.chat_cursor -= 1;
-        }
+    if chat_key_should_fire(KeyCode::Backspace, state, current_time)
+        && state.ui_state.chat_cursor > 0
+    {
+        let byte_idx =
+            char_to_byte_index(&state.ui_state.chat_input, state.ui_state.chat_cursor - 1);
+        state.ui_state.chat_input.remove(byte_idx);
+        state.ui_state.chat_cursor -= 1;
     }
 
     // Delete removes character at cursor
@@ -307,7 +307,7 @@ pub(super) fn auto_action_target_settled(
     if aa.target_type != "npc" {
         return true;
     }
-    state.npcs.get(&aa.target_id).map_or(true, |npc| {
+    state.npcs.get(&aa.target_id).is_none_or(|npc| {
         let dx = (npc.x - npc.target_x).abs();
         let dy = (npc.y - npc.target_y).abs();
         dx.max(dy) <= AUTO_ACTION_NPC_SETTLE_EPS
@@ -373,7 +373,7 @@ pub(super) fn activate_hotkey_slot(state: &mut GameState, slot_idx: usize) -> Ve
             let on_cooldown = state
                 .spell_cooldowns
                 .get(spell_id.as_str())
-                .map_or(false, |&t| now < t);
+                .is_some_and(|&t| now < t);
             if !on_cooldown {
                 // Look up spell def for cooldown duration (check static spells, then scroll spells)
                 let cooldown_ms = crate::game::spell::SPELLS

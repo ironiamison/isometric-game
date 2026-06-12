@@ -397,7 +397,7 @@ impl InputHandler {
                             // animations — the playerAttack message already set the
                             // authoritative direction and re-computing from visual
                             // positions causes rapid flip-flop on diagonal angles.
-                            let in_attack_anim = state.get_local_player().map_or(false, |p| {
+                            let in_attack_anim = state.get_local_player().is_some_and(|p| {
                                 matches!(
                                     p.animation.state,
                                     AnimationState::Attacking
@@ -969,14 +969,7 @@ impl InputHandler {
                 commands.push(InputCommand::CancelAutoAction);
             }
 
-            let attack_cooldown = {
-                let weapon_range = get_local_weapon_range(state);
-                if weapon_range > 1 {
-                    0.8
-                } else {
-                    0.8
-                }
-            };
+            let attack_cooldown = 0.8;
             if current_time - self.last_attack_time >= attack_cooldown {
                 // Check if we should gather instead of attack
                 let should_gather = if let Some(player) = state.get_local_player() {
@@ -1025,11 +1018,7 @@ impl InputHandler {
                             if !state.depleted_trees.contains_key(&(face_x, face_y)) {
                                 let obj_result =
                                     state.chunk_manager.get_object_at_exact(face_x, face_y);
-                                if let Some(obj) = obj_result {
-                                    Some((face_x, face_y, obj.gid))
-                                } else {
-                                    None
-                                }
+                                obj_result.map(|obj| (face_x, face_y, obj.gid))
                             } else {
                                 None
                             }
@@ -1066,11 +1055,7 @@ impl InputHandler {
                             if !state.depleted_rocks.contains_key(&(face_x, face_y)) {
                                 let obj_result =
                                     state.chunk_manager.get_object_at_exact(face_x, face_y);
-                                if let Some(obj) = obj_result {
-                                    Some((face_x, face_y, obj.gid))
-                                } else {
-                                    None
-                                }
+                                obj_result.map(|obj| (face_x, face_y, obj.gid))
                             } else {
                                 None
                             }

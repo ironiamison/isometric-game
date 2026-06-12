@@ -8,36 +8,25 @@ type Category = 'objects' | 'walls';
 type WallTool = 'wallDown' | 'wallRight';
 
 export function ObjectPalette() {
-  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool, openAssetManager, assetManagerOpen, selectedBlockTypeDown, selectedBlockTypeRight, setSelectedBlockTypeDown, setSelectedBlockTypeRight } = useEditorStore();
-  const [objects, setObjects] = useState<ObjectDefinition[]>([]);
-  const [walls, setWalls] = useState<ObjectDefinition[]>([]);
+  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool, openAssetManager, refreshAssets, selectedBlockTypeDown, selectedBlockTypeRight, setSelectedBlockTypeDown, setSelectedBlockTypeRight } = useEditorStore();
   const [category, setCategory] = useState<Category>('objects');
   const [filter, setFilter] = useState('');
-  const [lastWallTool, setLastWallTool] = useState<WallTool>('wallDown');
+  const lastWallTool = useRef<WallTool>('wallDown');
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const isBlockTypeTool = activeTool === 'blockType';
-
-  // Load objects and walls when component mounts
-  useEffect(() => {
-    const loadedObjects = objectLoader.getObjectsWithImages();
-    const loadedWalls = objectLoader.getWallsWithImages();
-    setObjects(loadedObjects);
-    setWalls(loadedWalls);
-  }, []);
+  const effectiveCategory = isBlockTypeTool ? 'walls' : category;
+  const objects = objectLoader.getObjectsWithImages();
+  const walls = objectLoader.getWallsWithImages();
 
   // Track when wall tools are used so we remember the last one
   useEffect(() => {
     if (activeTool === 'wallDown' || activeTool === 'wallRight') {
-      setLastWallTool(activeTool as WallTool);
-    }
-    // Auto-switch to walls tab when block type tool is active
-    if (activeTool === 'blockType') {
-      setCategory('walls');
+      lastWallTool.current = activeTool;
     }
   }, [activeTool]);
 
   // Get current items based on category
-  const currentItems = category === 'objects' ? objects : walls;
+  const currentItems = effectiveCategory === 'objects' ? objects : walls;
 
   // Draw object previews (static once, animated via rAF)
   useEffect(() => {
@@ -108,19 +97,18 @@ export function ObjectPalette() {
 
   const handleDelete = async (e: React.MouseEvent, obj: ObjectDefinition) => {
     e.stopPropagation();
-    if (!confirm(`Delete "${obj.name}" from ${category}?`)) return;
+    if (!confirm(`Delete "${obj.name}" from ${effectiveCategory}?`)) return;
 
     try {
-      const res = await fetch(`/mapper/api/assets/${category}/${obj.id}`, { method: 'DELETE' });
+      const res = await fetch(`/mapper/api/assets/${effectiveCategory}/${obj.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
 
-      if (category === 'objects') {
+      if (effectiveCategory === 'objects') {
         objectLoader.removeObject(obj.id);
-        setObjects(objectLoader.getObjectsWithImages());
       } else {
         objectLoader.removeWall(obj.id);
-        setWalls(objectLoader.getWallsWithImages());
       }
+      refreshAssets();
       if (selectedObjectId === obj.id) {
         setSelectedObjectId(null);
       }
@@ -141,33 +129,25 @@ export function ObjectPalette() {
     }
   };
 
-  // Refresh when asset manager closes (new assets may have been imported)
-  useEffect(() => {
-    if (!assetManagerOpen) {
-      setObjects(objectLoader.getObjectsWithImages());
-      setWalls(objectLoader.getWallsWithImages());
-    }
-  }, [assetManagerOpen]);
-
   return (
     <div className={styles.palette}>
       <div className={styles.header}>
         <div className={styles.title}>Objects & Walls</div>
         <button
           className={styles.addButton}
-          onClick={() => openAssetManager(category)}
+          onClick={() => openAssetManager(effectiveCategory)}
           title="Import assets..."
         >+</button>
       </div>
       <div className={styles.tabs}>
         <button
-          className={`${styles.tab} ${category === 'objects' ? styles.activeTab : ''}`}
+          className={`${styles.tab} ${effectiveCategory === 'objects' ? styles.activeTab : ''}`}
           onClick={() => setCategory('objects')}
         >
           Objects ({objects.length})
         </button>
         <button
-          className={`${styles.tab} ${category === 'walls' ? styles.activeTab : ''}`}
+          className={`${styles.tab} ${effectiveCategory === 'walls' ? styles.activeTab : ''}`}
           onClick={() => setCategory('walls')}
         >
           Walls ({walls.length})
@@ -181,7 +161,7 @@ export function ObjectPalette() {
         onChange={(e) => setFilter(e.target.value)}
       />
       <div className={styles.info}>
-        {isBlockTypeTool && category === 'walls' ? (
+        {isBlockTypeTool && effectiveCategory === 'walls' ? (
           <>
             Down: {selectedBlockTypeDown ? (walls.find(w => w.id === selectedBlockTypeDown)?.name || selectedBlockTypeDown) : 'none'}
             {' | '}
@@ -194,27 +174,27 @@ export function ObjectPalette() {
       <div className={styles.grid}>
         {filteredObjects.map((obj) => {
           const wallId = obj.id;
-          const isDownSelected = isBlockTypeTool && category === 'walls' && selectedBlockTypeDown === wallId;
-          const isRightSelected = isBlockTypeTool && category === 'walls' && selectedBlockTypeRight === wallId;
+          const isDownSelected = isBlockTypeTool && effectiveCategory === 'walls' && selectedBlockTypeDown === wallId;
+          const isRightSelected = isBlockTypeTool && effectiveCategory === 'walls' && selectedBlockTypeRight === wallId;
           return (
           <div key={obj.id} className={styles.itemWrapper}>
             <button
-              className={`${styles.item} ${isBlockTypeTool && category === 'walls' ? `${isDownSelected ? styles.selectedDown : ''} ${isRightSelected ? styles.selectedRight : ''}` : selectedObjectId === obj.id ? styles.selected : ''}`}
+              className={`${styles.item} ${isBlockTypeTool && effectiveCategory === 'walls' ? `${isDownSelected ? styles.selectedDown : ''} ${isRightSelected ? styles.selectedRight : ''}` : selectedObjectId === obj.id ? styles.selected : ''}`}
               onClick={() => {
-                if (isBlockTypeTool && category === 'walls') {
+                if (isBlockTypeTool && effectiveCategory === 'walls') {
                   setSelectedBlockTypeDown(wallId);
                 } else {
                   setSelectedObjectId(obj.id);
-                  setActiveTool(category === 'walls' ? lastWallTool : 'object');
+                  setActiveTool(effectiveCategory === 'walls' ? lastWallTool.current : 'object');
                 }
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
-                if (isBlockTypeTool && category === 'walls') {
+                if (isBlockTypeTool && effectiveCategory === 'walls') {
                   setSelectedBlockTypeRight(wallId);
                 }
               }}
-              title={isBlockTypeTool && category === 'walls'
+              title={isBlockTypeTool && effectiveCategory === 'walls'
                 ? `${obj.name} — LMB: Down face, RMB: Right face`
                 : `${obj.name} (${obj.width}x${obj.height})`}
             >
@@ -225,7 +205,7 @@ export function ObjectPalette() {
                 height={64}
               />
               <span className={styles.name}>{obj.name}</span>
-              {isBlockTypeTool && category === 'walls' && (isDownSelected || isRightSelected) && (
+              {isBlockTypeTool && effectiveCategory === 'walls' && (isDownSelected || isRightSelected) && (
                 <span className={styles.blockTypeLabel}>
                   {isDownSelected && <span className={styles.labelDown}>Down</span>}
                   {isDownSelected && isRightSelected && ' '}

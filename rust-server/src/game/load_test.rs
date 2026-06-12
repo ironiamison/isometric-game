@@ -57,6 +57,52 @@ async fn build_room() -> GameRoom {
     .await
 }
 
+#[tokio::test]
+async fn production_content_registries_load() {
+    let data_dir = std::path::Path::new("data");
+
+    let mut entity_registry = EntityRegistry::new();
+    entity_registry
+        .load_from_directory(data_dir)
+        .expect("entity registry");
+    assert!(!entity_registry.is_empty(), "entity registry is empty");
+
+    let mut item_registry = ItemRegistry::new();
+    item_registry
+        .load_from_directory(data_dir)
+        .expect("item registry");
+    assert!(!item_registry.is_empty(), "item registry is empty");
+
+    let mut prayer_registry = PrayerRegistry::new();
+    prayer_registry
+        .load_from_directory(data_dir)
+        .expect("prayer registry");
+    assert!(!prayer_registry.is_empty(), "prayer registry is empty");
+
+    let quest_registry = QuestRegistry::new(data_dir);
+    quest_registry.load_all().await.expect("quest registry");
+    assert!(quest_registry.count().await > 0, "quest registry is empty");
+
+    let mut crafting_registry = CraftingRegistry::new();
+    crafting_registry
+        .load_from_directory(data_dir)
+        .expect("crafting registry");
+    assert!(!crafting_registry.is_empty(), "crafting registry is empty");
+
+    InteriorRegistry::load_from_directory("maps/interiors").expect("interior registry");
+
+    for directory in ["maps/world_0", "maps/world_1", "maps/interiors"] {
+        for entry in std::fs::read_dir(directory).expect("map directory") {
+            let path = entry.expect("map directory entry").path();
+            if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
+                let source = std::fs::read_to_string(&path).expect("map file");
+                serde_json::from_str::<serde_json::Value>(&source)
+                    .unwrap_or_else(|error| panic!("invalid JSON in {}: {error}", path.display()));
+            }
+        }
+    }
+}
+
 fn percentile(sorted: &[f64], percentile: f64) -> f64 {
     let index = ((sorted.len() - 1) as f64 * percentile).round() as usize;
     sorted[index.min(sorted.len() - 1)]

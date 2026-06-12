@@ -2,27 +2,36 @@ use super::state_sync::{slayer_reward_to_value, slayer_task_to_value};
 use super::*;
 use rmpv::Value;
 
+// Wire maps are appended in protocol order and may include conditional fields.
+#[allow(clippy::vec_init_then_push)]
 mod core {
     include!("encoding_core.rs");
 }
+#[allow(clippy::vec_init_then_push)]
 mod combat {
     include!("encoding_combat.rs");
 }
+#[allow(clippy::vec_init_then_push)]
 mod items {
     include!("encoding_items.rs");
 }
+#[allow(clippy::vec_init_then_push)]
 mod quests {
     include!("encoding_quests.rs");
 }
+#[allow(clippy::vec_init_then_push)]
 mod world {
     include!("encoding_world.rs");
 }
+#[allow(clippy::vec_init_then_push)]
 mod commerce {
     include!("encoding_commerce.rs");
 }
+#[allow(clippy::vec_init_then_push)]
 mod gathering {
     include!("encoding_gathering.rs");
 }
+#[allow(clippy::vec_init_then_push)]
 mod events {
     include!("encoding_events.rs");
 }

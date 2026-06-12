@@ -152,8 +152,8 @@ impl Renderer {
         let inv_height_full = INV_HEIGHT * scale;
         let frame_thickness = FRAME_THICKNESS * scale;
         let header_height = HEADER_HEIGHT * scale;
-        let button_size = MENU_BUTTON_SIZE * scale;
-        let exp_bar_gap = EXP_BAR_GAP * scale;
+        let _button_size = MENU_BUTTON_SIZE * scale;
+        let _exp_bar_gap = EXP_BAR_GAP * scale;
 
         // Position panel on right side, above the menu buttons (align with button right edge)
         let inv_x = screen_w - inv_width - 8.0;

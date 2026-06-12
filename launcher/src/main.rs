@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![forbid(unsafe_code)]
 
 use std::collections::HashMap;
 use std::env;
@@ -180,9 +181,15 @@ struct LiveStats {
 #[derive(Debug)]
 enum UpdateMsg {
     Status(String),
-    Progress { downloaded: u64, total: u64 },
+    Progress {
+        downloaded: u64,
+        total: u64,
+    },
     Version(String),
-    Done { entrypoint: PathBuf, work_dir: PathBuf },
+    Done {
+        entrypoint: PathBuf,
+        work_dir: PathBuf,
+    },
     Error(String),
 }
 
@@ -260,7 +267,10 @@ impl LauncherApp {
                     self.progress = Some((downloaded, total));
                 }
                 UpdateMsg::Version(v) => self.client_version = Some(v),
-                UpdateMsg::Done { entrypoint, work_dir } => {
+                UpdateMsg::Done {
+                    entrypoint,
+                    work_dir,
+                } => {
                     self.progress = None;
                     if !self.launch_done && self.auto_launch {
                         match launch_client(&entrypoint, &work_dir) {
@@ -299,13 +309,9 @@ impl LauncherApp {
                 let rgba = img.to_rgba8();
                 let size = [rgba.width() as usize, rgba.height() as usize];
                 let pixels = rgba.into_raw();
-                let color_image =
-                    egui::ColorImage::from_rgba_unmultiplied(size, &pixels);
-                self.logo_texture = Some(ctx.load_texture(
-                    "logo",
-                    color_image,
-                    egui::TextureOptions::NEAREST,
-                ));
+                let color_image = egui::ColorImage::from_rgba_unmultiplied(size, &pixels);
+                self.logo_texture =
+                    Some(ctx.load_texture("logo", color_image, egui::TextureOptions::NEAREST));
             }
         }
     }
@@ -355,16 +361,24 @@ impl eframe::App for LauncherApp {
                 let w = ui.available_width();
 
                 // ── Close button (top-right X) ──
-                let close_rect = egui::Rect::from_min_size(
-                    egui::pos2(w - 28.0, 4.0),
-                    egui::vec2(24.0, 24.0),
-                );
+                let close_rect =
+                    egui::Rect::from_min_size(egui::pos2(w - 28.0, 4.0), egui::vec2(24.0, 24.0));
                 let close_resp = ui.allocate_rect(close_rect, egui::Sense::click());
-                let x_color = if close_resp.hovered() { TEXT_PRIMARY } else { TEXT_MUTED };
+                let x_color = if close_resp.hovered() {
+                    TEXT_PRIMARY
+                } else {
+                    TEXT_MUTED
+                };
                 let c = close_rect.center();
                 let d = 5.0;
-                ui.painter().line_segment([egui::pos2(c.x - d, c.y - d), egui::pos2(c.x + d, c.y + d)], egui::Stroke::new(1.5, x_color));
-                ui.painter().line_segment([egui::pos2(c.x + d, c.y - d), egui::pos2(c.x - d, c.y + d)], egui::Stroke::new(1.5, x_color));
+                ui.painter().line_segment(
+                    [egui::pos2(c.x - d, c.y - d), egui::pos2(c.x + d, c.y + d)],
+                    egui::Stroke::new(1.5, x_color),
+                );
+                ui.painter().line_segment(
+                    [egui::pos2(c.x + d, c.y - d), egui::pos2(c.x - d, c.y + d)],
+                    egui::Stroke::new(1.5, x_color),
+                );
                 if close_resp.clicked() {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
@@ -383,7 +397,10 @@ impl eframe::App for LauncherApp {
                     }
                     ui.add_space(2.0);
                     if let Some(ver) = &self.client_version {
-                        ui.colored_label(TEXT_MUTED, egui::RichText::new(format!("v{ver}")).size(11.0));
+                        ui.colored_label(
+                            TEXT_MUTED,
+                            egui::RichText::new(format!("v{ver}")).size(11.0),
+                        );
                     }
                 });
 
@@ -394,22 +411,38 @@ impl eframe::App for LauncherApp {
 
                     if let Some((downloaded, total)) = self.progress {
                         ui.add_space(4.0);
-                        let frac = if total > 0 { downloaded as f32 / total as f32 } else { 0.0 };
+                        let frac = if total > 0 {
+                            downloaded as f32 / total as f32
+                        } else {
+                            0.0
+                        };
                         let bar_w = w - 40.0;
                         let bar_h = 14.0;
-                        let (bar_rect, _) = ui.allocate_exact_size(egui::vec2(bar_w, bar_h), egui::Sense::hover());
+                        let (bar_rect, _) =
+                            ui.allocate_exact_size(egui::vec2(bar_w, bar_h), egui::Sense::hover());
                         ui.painter().rect_filled(bar_rect, 4.0, BG_HEADER);
-                        let fill = egui::Rect::from_min_size(bar_rect.min, egui::vec2(bar_w * frac, bar_h));
+                        let fill = egui::Rect::from_min_size(
+                            bar_rect.min,
+                            egui::vec2(bar_w * frac, bar_h),
+                        );
                         ui.painter().rect_filled(fill, 4.0, ACCENT_GREEN);
                         ui.painter().text(
-                            bar_rect.center(), egui::Align2::CENTER_CENTER,
-                            format!("{:.0}%", frac * 100.0), egui::FontId::proportional(9.0),
+                            bar_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            format!("{:.0}%", frac * 100.0),
+                            egui::FontId::proportional(9.0),
                             if frac > 0.5 { BG_DARK } else { TEXT_PRIMARY },
                         );
                         ui.add_space(2.0);
-                        ui.colored_label(TEXT_MUTED, egui::RichText::new(format!(
-                            "{} / {} MB", bytes_to_mb(downloaded), bytes_to_mb(total)
-                        )).size(10.0));
+                        ui.colored_label(
+                            TEXT_MUTED,
+                            egui::RichText::new(format!(
+                                "{} / {} MB",
+                                bytes_to_mb(downloaded),
+                                bytes_to_mb(total)
+                            ))
+                            .size(10.0),
+                        );
                     }
 
                     if let Some(err) = &self.last_error {
@@ -422,13 +455,29 @@ impl eframe::App for LauncherApp {
                     // Button
                     let bw = 200.0;
                     if self.last_error.is_some() {
-                        let b = egui::Button::new(egui::RichText::new("RETRY").size(14.0).strong().color(BG_DARK))
-                            .fill(ACCENT_GREEN).corner_radius(4.0).min_size(egui::vec2(bw, 36.0));
-                        if ui.add(b).clicked() { self.start_update(); }
+                        let b = egui::Button::new(
+                            egui::RichText::new("RETRY")
+                                .size(14.0)
+                                .strong()
+                                .color(BG_DARK),
+                        )
+                        .fill(ACCENT_GREEN)
+                        .corner_radius(4.0)
+                        .min_size(egui::vec2(bw, 36.0));
+                        if ui.add(b).clicked() {
+                            self.start_update();
+                        }
                     } else if self.ready_to_launch.is_some() {
-                        let b = egui::Button::new(egui::RichText::new("PLAY").size(14.0).strong().color(ACCENT_GREEN))
-                            .fill(ACCENT_GREEN_DIM).stroke(egui::Stroke::new(1.5, ACCENT_GREEN))
-                            .corner_radius(4.0).min_size(egui::vec2(bw, 36.0));
+                        let b = egui::Button::new(
+                            egui::RichText::new("PLAY")
+                                .size(14.0)
+                                .strong()
+                                .color(ACCENT_GREEN),
+                        )
+                        .fill(ACCENT_GREEN_DIM)
+                        .stroke(egui::Stroke::new(1.5, ACCENT_GREEN))
+                        .corner_radius(4.0)
+                        .min_size(egui::vec2(bw, 36.0));
                         if ui.add(b).clicked() {
                             if let Some((ref ep, ref wd)) = self.ready_to_launch {
                                 if launch_client(ep, wd).is_ok() && self.close_on_launch {
@@ -437,8 +486,15 @@ impl eframe::App for LauncherApp {
                             }
                         }
                     } else {
-                        let b = egui::Button::new(egui::RichText::new("UPDATING...").size(14.0).strong().color(TEXT_MUTED))
-                            .fill(BG_HEADER).corner_radius(4.0).min_size(egui::vec2(bw, 36.0));
+                        let b = egui::Button::new(
+                            egui::RichText::new("UPDATING...")
+                                .size(14.0)
+                                .strong()
+                                .color(TEXT_MUTED),
+                        )
+                        .fill(BG_HEADER)
+                        .corner_radius(4.0)
+                        .min_size(egui::vec2(bw, 36.0));
                         ui.add_enabled(false, b);
                     }
 
@@ -449,10 +505,15 @@ impl eframe::App for LauncherApp {
                     let cb_text = "Close launcher when game opens";
                     let box_size = 14.0;
                     let gap = 6.0;
-                    let text_galley = ui.painter().layout_no_wrap(cb_text.to_string(), egui::FontId::proportional(11.0), TEXT_DIM);
+                    let text_galley = ui.painter().layout_no_wrap(
+                        cb_text.to_string(),
+                        egui::FontId::proportional(11.0),
+                        TEXT_DIM,
+                    );
                     let row_w = box_size + gap + text_galley.size().x;
                     let row_h = box_size.max(text_galley.size().y);
-                    let (row_rect, resp) = ui.allocate_exact_size(egui::vec2(row_w, row_h), egui::Sense::click());
+                    let (row_rect, resp) =
+                        ui.allocate_exact_size(egui::vec2(row_w, row_h), egui::Sense::click());
                     if resp.clicked() {
                         self.close_on_launch = !self.close_on_launch;
                     }
@@ -460,18 +521,38 @@ impl eframe::App for LauncherApp {
                         egui::pos2(row_rect.left(), row_rect.center().y - box_size * 0.5),
                         egui::vec2(box_size, box_size),
                     );
-                    let border = if resp.hovered() { ACCENT_GREEN } else { TEXT_MUTED };
-                    ui.painter().rect_stroke(box_rect, 2.0, egui::Stroke::new(1.0, border), egui::StrokeKind::Inside);
+                    let border = if resp.hovered() {
+                        ACCENT_GREEN
+                    } else {
+                        TEXT_MUTED
+                    };
+                    ui.painter().rect_stroke(
+                        box_rect,
+                        2.0,
+                        egui::Stroke::new(1.0, border),
+                        egui::StrokeKind::Inside,
+                    );
                     if self.close_on_launch {
-                        ui.painter().rect_filled(box_rect.shrink(3.0), 1.0, ACCENT_GREEN);
+                        ui.painter()
+                            .rect_filled(box_rect.shrink(3.0), 1.0, ACCENT_GREEN);
                     }
-                    let label_color = if resp.hovered() { TEXT_PRIMARY } else { TEXT_DIM };
+                    let label_color = if resp.hovered() {
+                        TEXT_PRIMARY
+                    } else {
+                        TEXT_DIM
+                    };
                     ui.painter().text(
                         egui::pos2(box_rect.right() + gap, row_rect.center().y),
-                        egui::Align2::LEFT_CENTER, cb_text, egui::FontId::proportional(11.0), label_color,
+                        egui::Align2::LEFT_CENTER,
+                        cb_text,
+                        egui::FontId::proportional(11.0),
+                        label_color,
                     );
                     if self.close_on_launch != prev {
-                        UserSettings { close_on_launch: self.close_on_launch }.save();
+                        UserSettings {
+                            close_on_launch: self.close_on_launch,
+                        }
+                        .save();
                     }
                 });
 
@@ -490,18 +571,30 @@ impl eframe::App for LauncherApp {
                     ui.add_space(20.0);
                     let dot_center = egui::pos2(ui.cursor().left() + 5.0, ui.cursor().top() + 9.0);
                     ui.painter().circle_filled(
-                        dot_center, 4.0,
-                        if stats.overview.online_players > 0 { ONLINE_GREEN } else { TEXT_MUTED },
+                        dot_center,
+                        4.0,
+                        if stats.overview.online_players > 0 {
+                            ONLINE_GREEN
+                        } else {
+                            TEXT_MUTED
+                        },
                     );
                     ui.add_space(14.0);
-                    ui.colored_label(TEXT_PRIMARY, egui::RichText::new(format!(
-                        "{} online", stats.overview.online_players
-                    )).size(13.0).strong());
+                    ui.colored_label(
+                        TEXT_PRIMARY,
+                        egui::RichText::new(format!("{} online", stats.overview.online_players))
+                            .size(13.0)
+                            .strong(),
+                    );
                     ui.add_space(16.0);
-                    ui.colored_label(TEXT_DIM, egui::RichText::new(format!(
-                        "{} adventurers  ·  {} accounts",
-                        stats.overview.total_characters, stats.overview.total_accounts
-                    )).size(11.0));
+                    ui.colored_label(
+                        TEXT_DIM,
+                        egui::RichText::new(format!(
+                            "{} adventurers  ·  {} accounts",
+                            stats.overview.total_characters, stats.overview.total_accounts
+                        ))
+                        .size(11.0),
+                    );
                 });
 
                 ui.add_space(6.0);
@@ -514,7 +607,12 @@ impl eframe::App for LauncherApp {
                     egui::vec2(w - margin * 2.0, remaining),
                 );
                 ui.painter().rect_filled(lb_rect, 6.0, BG_PANEL);
-                ui.painter().rect_stroke(lb_rect, 6.0, egui::Stroke::new(1.0, BORDER_COLOR), egui::StrokeKind::Outside);
+                ui.painter().rect_stroke(
+                    lb_rect,
+                    6.0,
+                    egui::Stroke::new(1.0, BORDER_COLOR),
+                    egui::StrokeKind::Outside,
+                );
 
                 // Reserve the space in the parent layout
                 ui.allocate_rect(lb_rect, egui::Sense::hover());
@@ -530,9 +628,15 @@ impl eframe::App for LauncherApp {
 
                 // Leaderboard title
                 lb.horizontal(|ui| {
-                    ui.colored_label(ACCENT_GREEN, egui::RichText::new("LEADERBOARD").size(11.0).strong());
+                    ui.colored_label(
+                        ACCENT_GREEN,
+                        egui::RichText::new("LEADERBOARD").size(11.0).strong(),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.colored_label(TEXT_MUTED, egui::RichText::new("Top Players by Total Level").size(10.0));
+                        ui.colored_label(
+                            TEXT_MUTED,
+                            egui::RichText::new("Top Players by Total Level").size(10.0),
+                        );
                     });
                 });
                 lb.add_space(4.0);
@@ -549,14 +653,47 @@ impl eframe::App for LauncherApp {
 
                 // Column headers
                 let hy = lb.cursor().top();
-                let hr = egui::Rect::from_min_size(egui::pos2(content.left(), hy), egui::vec2(content.width(), row_h));
+                let hr = egui::Rect::from_min_size(
+                    egui::pos2(content.left(), hy),
+                    egui::vec2(content.width(), row_h),
+                );
                 lb.painter().rect_filled(hr, 2.0, BG_HEADER);
                 let hcy = hy + row_h * 0.5;
-                lb.painter().text(egui::pos2(col_rank_x, hcy), egui::Align2::LEFT_CENTER, "#", hdr_font.clone(), TEXT_MUTED);
-                lb.painter().text(egui::pos2(col_name_x, hcy), egui::Align2::LEFT_CENTER, "Name", hdr_font.clone(), TEXT_MUTED);
-                lb.painter().text(egui::pos2(col_total_x, hcy), egui::Align2::RIGHT_CENTER, "Total", hdr_font.clone(), TEXT_MUTED);
-                lb.painter().text(egui::pos2(col_cmbt_x, hcy), egui::Align2::RIGHT_CENTER, "Cmbt", hdr_font.clone(), TEXT_MUTED);
-                lb.painter().text(egui::pos2(col_kills_x, hcy), egui::Align2::RIGHT_CENTER, "Kills", hdr_font, TEXT_MUTED);
+                lb.painter().text(
+                    egui::pos2(col_rank_x, hcy),
+                    egui::Align2::LEFT_CENTER,
+                    "#",
+                    hdr_font.clone(),
+                    TEXT_MUTED,
+                );
+                lb.painter().text(
+                    egui::pos2(col_name_x, hcy),
+                    egui::Align2::LEFT_CENTER,
+                    "Name",
+                    hdr_font.clone(),
+                    TEXT_MUTED,
+                );
+                lb.painter().text(
+                    egui::pos2(col_total_x, hcy),
+                    egui::Align2::RIGHT_CENTER,
+                    "Total",
+                    hdr_font.clone(),
+                    TEXT_MUTED,
+                );
+                lb.painter().text(
+                    egui::pos2(col_cmbt_x, hcy),
+                    egui::Align2::RIGHT_CENTER,
+                    "Cmbt",
+                    hdr_font.clone(),
+                    TEXT_MUTED,
+                );
+                lb.painter().text(
+                    egui::pos2(col_kills_x, hcy),
+                    egui::Align2::RIGHT_CENTER,
+                    "Kills",
+                    hdr_font,
+                    TEXT_MUTED,
+                );
                 lb.allocate_space(egui::vec2(content.width(), row_h));
                 lb.add_space(2.0);
 
@@ -564,22 +701,66 @@ impl eframe::App for LauncherApp {
                 if stats.leaderboard.is_empty() {
                     lb.add_space(20.0);
                     lb.vertical_centered(|ui| {
-                        ui.colored_label(TEXT_MUTED, egui::RichText::new(
-                            if stats.error.is_some() { "Could not load leaderboard" } else { "Loading..." }
-                        ).size(11.0));
+                        ui.colored_label(
+                            TEXT_MUTED,
+                            egui::RichText::new(if stats.error.is_some() {
+                                "Could not load leaderboard"
+                            } else {
+                                "Loading..."
+                            })
+                            .size(11.0),
+                        );
                     });
                 } else {
                     for (i, entry) in stats.leaderboard.iter().take(7).enumerate() {
                         let rank = i + 1;
-                        let rc = match rank { 1 => GOLD, 2 => SILVER, 3 => BRONZE, _ => TEXT_MUTED };
-                        let nc = match rank { 1 => GOLD, _ => TEXT_PRIMARY };
+                        let rc = match rank {
+                            1 => GOLD,
+                            2 => SILVER,
+                            3 => BRONZE,
+                            _ => TEXT_MUTED,
+                        };
+                        let nc = match rank {
+                            1 => GOLD,
+                            _ => TEXT_PRIMARY,
+                        };
                         let ry = lb.cursor().top();
                         let rcy = ry + row_h * 0.5;
-                        lb.painter().text(egui::pos2(col_rank_x, rcy), egui::Align2::LEFT_CENTER, format!("{rank}"), row_font.clone(), rc);
-                        lb.painter().text(egui::pos2(col_name_x, rcy), egui::Align2::LEFT_CENTER, &entry.name, row_font.clone(), nc);
-                        lb.painter().text(egui::pos2(col_total_x, rcy), egui::Align2::RIGHT_CENTER, format!("{}", entry.total_level), row_font.clone(), ACCENT_GREEN);
-                        lb.painter().text(egui::pos2(col_cmbt_x, rcy), egui::Align2::RIGHT_CENTER, format!("{}", entry.combat_level), row_font.clone(), TEXT_DIM);
-                        lb.painter().text(egui::pos2(col_kills_x, rcy), egui::Align2::RIGHT_CENTER, format!("{}", entry.monster_kills), row_font.clone(), TEXT_DIM);
+                        lb.painter().text(
+                            egui::pos2(col_rank_x, rcy),
+                            egui::Align2::LEFT_CENTER,
+                            format!("{rank}"),
+                            row_font.clone(),
+                            rc,
+                        );
+                        lb.painter().text(
+                            egui::pos2(col_name_x, rcy),
+                            egui::Align2::LEFT_CENTER,
+                            &entry.name,
+                            row_font.clone(),
+                            nc,
+                        );
+                        lb.painter().text(
+                            egui::pos2(col_total_x, rcy),
+                            egui::Align2::RIGHT_CENTER,
+                            format!("{}", entry.total_level),
+                            row_font.clone(),
+                            ACCENT_GREEN,
+                        );
+                        lb.painter().text(
+                            egui::pos2(col_cmbt_x, rcy),
+                            egui::Align2::RIGHT_CENTER,
+                            format!("{}", entry.combat_level),
+                            row_font.clone(),
+                            TEXT_DIM,
+                        );
+                        lb.painter().text(
+                            egui::pos2(col_kills_x, rcy),
+                            egui::Align2::RIGHT_CENTER,
+                            format!("{}", entry.monster_kills),
+                            row_font.clone(),
+                            TEXT_DIM,
+                        );
                         lb.allocate_space(egui::vec2(content.width(), row_h));
                     }
                 }
@@ -588,8 +769,15 @@ impl eframe::App for LauncherApp {
                 if let Some(last) = stats.last_fetched {
                     lb.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
                         let ago = last.elapsed().as_secs();
-                        let t = if ago < 5 { "just now".into() } else { format!("{}s ago", ago) };
-                        ui.colored_label(TEXT_MUTED, egui::RichText::new(format!("Updated {t}")).size(9.0));
+                        let t = if ago < 5 {
+                            "just now".into()
+                        } else {
+                            format!("{}s ago", ago)
+                        };
+                        ui.colored_label(
+                            TEXT_MUTED,
+                            egui::RichText::new(format!("Updated {t}")).size(9.0),
+                        );
                     });
                 }
             });
@@ -608,10 +796,18 @@ fn stats_poll_loop(server_url: String, stats: Arc<Mutex<LiveStats>>) {
 
     loop {
         let overview_url = format!("{}/api/stats/overview", server_url);
-        let lb_url = format!("{}/api/stats/leaderboard?sort=total_level&limit=7", server_url);
+        let lb_url = format!(
+            "{}/api/stats/leaderboard?sort=total_level&limit=7",
+            server_url
+        );
 
-        let overview: Option<StatsOverview> = client.get(&overview_url).send().ok().and_then(|r| r.json().ok());
-        let leaderboard: Option<Vec<LeaderboardEntry>> = client.get(&lb_url).send().ok().and_then(|r| r.json().ok());
+        let overview: Option<StatsOverview> = client
+            .get(&overview_url)
+            .send()
+            .ok()
+            .and_then(|r| r.json().ok());
+        let leaderboard: Option<Vec<LeaderboardEntry>> =
+            client.get(&lb_url).send().ok().and_then(|r| r.json().ok());
 
         if let Ok(mut s) = stats.lock() {
             if let Some(ref o) = overview {
@@ -639,7 +835,8 @@ fn run_update(tx: mpsc::Sender<UpdateMsg>) -> Result<(), String> {
     let install_dir = client_install_dir(&config)?;
     fs::create_dir_all(&install_dir).map_err(|e| format!("Failed to create install dir: {e}"))?;
 
-    tx.send(UpdateMsg::Status("Fetching manifest...".to_string())).ok();
+    tx.send(UpdateMsg::Status("Fetching manifest...".to_string()))
+        .ok();
 
     let manifest_url = config.manifest_url();
     let client = reqwest::blocking::Client::new();
@@ -653,7 +850,9 @@ fn run_update(tx: mpsc::Sender<UpdateMsg>) -> Result<(), String> {
     tx.send(UpdateMsg::Version(manifest.version.clone())).ok();
 
     let platform_key = platform_key();
-    let platform = manifest.platforms.get(&platform_key)
+    let platform = manifest
+        .platforms
+        .get(&platform_key)
         .ok_or_else(|| format!("No build for platform {platform_key}"))?;
 
     let mut to_download: Vec<FileEntry> = Vec::new();
@@ -666,35 +865,60 @@ fn run_update(tx: mpsc::Sender<UpdateMsg>) -> Result<(), String> {
     }
 
     if to_download.is_empty() {
-        tx.send(UpdateMsg::Status("Client is up to date".to_string())).ok();
+        tx.send(UpdateMsg::Status("Client is up to date".to_string()))
+            .ok();
     } else {
         let n = to_download.len();
-        tx.send(UpdateMsg::Status(format!("Downloading {} file{}...", n, if n == 1 { "" } else { "s" }))).ok();
+        tx.send(UpdateMsg::Status(format!(
+            "Downloading {} file{}...",
+            n,
+            if n == 1 { "" } else { "s" }
+        )))
+        .ok();
 
         let mut downloaded: u64 = 0;
         for (i, file) in to_download.iter().enumerate() {
             let url = file_url(&config, &platform_key, file);
-            tx.send(UpdateMsg::Status(format!("Downloading ({}/{}) {}", i + 1, n, file.path))).ok();
+            tx.send(UpdateMsg::Status(format!(
+                "Downloading ({}/{}) {}",
+                i + 1,
+                n,
+                file.path
+            )))
+            .ok();
 
             let dest_path = install_dir.join(&file.path);
             if let Some(parent) = dest_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| format!("Failed to create dirs: {e}"))?;
             }
 
-            let mut response = client.get(url).send().and_then(|r| r.error_for_status())
+            let mut response = client
+                .get(url)
+                .send()
+                .and_then(|r| r.error_for_status())
                 .map_err(|e| format!("Download failed: {e}"))?;
 
             let tmp_path = dest_path.with_extension("download");
-            let mut out = File::create(&tmp_path).map_err(|e| format!("Failed to write file: {e}"))?;
+            let mut out =
+                File::create(&tmp_path).map_err(|e| format!("Failed to write file: {e}"))?;
             let mut hasher = sha2::Sha256::new();
             let mut buffer = [0u8; 1024 * 64];
             loop {
-                let read = response.read(&mut buffer).map_err(|e| format!("Download error: {e}"))?;
-                if read == 0 { break; }
-                out.write_all(&buffer[..read]).map_err(|e| format!("Write failed: {e}"))?;
+                let read = response
+                    .read(&mut buffer)
+                    .map_err(|e| format!("Download error: {e}"))?;
+                if read == 0 {
+                    break;
+                }
+                out.write_all(&buffer[..read])
+                    .map_err(|e| format!("Write failed: {e}"))?;
                 hasher.update(&buffer[..read]);
                 downloaded += read as u64;
-                tx.send(UpdateMsg::Progress { downloaded, total: total_bytes }).ok();
+                tx.send(UpdateMsg::Progress {
+                    downloaded,
+                    total: total_bytes,
+                })
+                .ok();
             }
 
             let digest = hex::encode(hasher.finalize());
@@ -706,7 +930,8 @@ fn run_update(tx: mpsc::Sender<UpdateMsg>) -> Result<(), String> {
             if dest_path.exists() {
                 fs::remove_file(&dest_path).map_err(|e| format!("Failed to replace file: {e}"))?;
             }
-            fs::rename(&tmp_path, &dest_path).map_err(|e| format!("Failed to finalize file: {e}"))?;
+            fs::rename(&tmp_path, &dest_path)
+                .map_err(|e| format!("Failed to finalize file: {e}"))?;
 
             if file.executable.unwrap_or(false) {
                 set_executable(&dest_path)?;
@@ -716,10 +941,17 @@ fn run_update(tx: mpsc::Sender<UpdateMsg>) -> Result<(), String> {
 
     let entrypoint_path = install_dir.join(&platform.entrypoint);
     if !entrypoint_path.exists() {
-        return Err(format!("Entry point missing after update: {}", entrypoint_path.display()));
+        return Err(format!(
+            "Entry point missing after update: {}",
+            entrypoint_path.display()
+        ));
     }
 
-    tx.send(UpdateMsg::Done { entrypoint: entrypoint_path, work_dir: install_dir }).ok();
+    tx.send(UpdateMsg::Done {
+        entrypoint: entrypoint_path,
+        work_dir: install_dir,
+    })
+    .ok();
     Ok(())
 }
 
@@ -727,7 +959,9 @@ fn run_update(tx: mpsc::Sender<UpdateMsg>) -> Result<(), String> {
 
 fn needs_download(install_dir: &Path, file: &FileEntry) -> Result<bool, String> {
     let path = install_dir.join(&file.path);
-    if !path.exists() { return Ok(true); }
+    if !path.exists() {
+        return Ok(true);
+    }
     let digest = sha256_file(&path)?;
     Ok(normalize_hash(&digest) != normalize_hash(&file.sha256))
 }
@@ -737,17 +971,25 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     let mut hasher = sha2::Sha256::new();
     let mut buffer = [0u8; 1024 * 64];
     loop {
-        let read = file.read(&mut buffer).map_err(|e| format!("Read error: {e}"))?;
-        if read == 0 { break; }
+        let read = file
+            .read(&mut buffer)
+            .map_err(|e| format!("Read error: {e}"))?;
+        if read == 0 {
+            break;
+        }
         hasher.update(&buffer[..read]);
     }
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn normalize_hash(hash: &str) -> String { hash.trim().to_lowercase() }
+fn normalize_hash(hash: &str) -> String {
+    hash.trim().to_lowercase()
+}
 
 fn file_url(config: &LauncherConfig, platform_key: &str, file: &FileEntry) -> String {
-    if let Some(url) = &file.url { return url.clone(); }
+    if let Some(url) = &file.url {
+        return url.clone();
+    }
     let mut base = config.base_url.trim_end_matches('/').to_string();
     base.push('/');
     base.push_str(platform_key);
@@ -787,11 +1029,15 @@ fn launch_client(entrypoint: &Path, work_dir: &Path) -> Result<(), String> {
         .map_err(|e| format!("Failed to launch: {e}"))
 }
 
-fn bytes_to_mb(bytes: u64) -> String { format!("{:.1}", bytes as f64 / 1_048_576.0) }
+fn bytes_to_mb(bytes: u64) -> String {
+    format!("{:.1}", bytes as f64 / 1_048_576.0)
+}
 
 fn load_logo_bytes() -> Option<Vec<u8>> {
     for path in asset_candidates("logo.png") {
-        if let Ok(bytes) = fs::read(&path) { return Some(bytes); }
+        if let Ok(bytes) = fs::read(&path) {
+            return Some(bytes);
+        }
     }
     None
 }
@@ -800,7 +1046,9 @@ fn load_icon_data() -> Option<egui::IconData> {
     for name in &["app-icon.png", "logo.png"] {
         for path in asset_candidates(name) {
             if let Ok(bytes) = fs::read(&path) {
-                if let Some(icon) = decode_icon(&bytes) { return Some(icon); }
+                if let Some(icon) = decode_icon(&bytes) {
+                    return Some(icon);
+                }
             }
         }
     }
@@ -810,13 +1058,19 @@ fn load_icon_data() -> Option<egui::IconData> {
 fn decode_icon(png_bytes: &[u8]) -> Option<egui::IconData> {
     let img = image::load_from_memory(png_bytes).ok()?;
     let rgba = img.to_rgba8();
-    Some(egui::IconData { rgba: rgba.as_raw().to_vec(), width: rgba.width(), height: rgba.height() })
+    Some(egui::IconData {
+        rgba: rgba.as_raw().to_vec(),
+        width: rgba.width(),
+        height: rgba.height(),
+    })
 }
 
 fn asset_candidates(file_name: &str) -> Vec<PathBuf> {
     let mut c: Vec<PathBuf> = Vec::new();
     if let Ok(exe) = env::current_exe() {
-        if let Some(dir) = exe.parent() { c.push(dir.join("assets").join(file_name)); }
+        if let Some(dir) = exe.parent() {
+            c.push(dir.join("assets").join(file_name));
+        }
     }
     c.push(PathBuf::from("assets").join(file_name));
     c
@@ -825,13 +1079,17 @@ fn asset_candidates(file_name: &str) -> Vec<PathBuf> {
 #[cfg(unix)]
 fn set_executable(path: &Path) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
-    let mut perms = fs::metadata(path).map_err(|e| format!("Failed to read metadata: {e}"))?.permissions();
+    let mut perms = fs::metadata(path)
+        .map_err(|e| format!("Failed to read metadata: {e}"))?
+        .permissions();
     perms.set_mode(0o755);
     fs::set_permissions(path, perms).map_err(|e| format!("Failed to set permissions: {e}"))
 }
 
 #[cfg(not(unix))]
-fn set_executable(_path: &Path) -> Result<(), String> { Ok(()) }
+fn set_executable(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
 
 // ── Entry point ─────────────────────────────────────────────────────────────
 
@@ -844,7 +1102,10 @@ fn main() -> eframe::Result {
     if let Some(icon) = load_icon_data() {
         viewport = viewport.with_icon(icon);
     }
-    let options = eframe::NativeOptions { viewport, ..Default::default() };
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
     eframe::run_native(
         "New Aeven",
         options,

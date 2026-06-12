@@ -72,7 +72,7 @@ impl GameRoom {
         let marks = db.get_commission_marks(character_id).await.unwrap_or(0);
         let unlocked_titles = db.get_player_titles(character_id).await.unwrap_or_default();
 
-        let mut text = format!(
+        let text = format!(
             "Welcome, artisan! I trade in Commission Marks earned from masterwork orders.\n\nYour Commission Marks: {}",
             marks
         );
@@ -200,7 +200,7 @@ impl GameRoom {
                         }
                         let display_name = self
                             .item_registry
-                            .get(*item_id)
+                            .get(item_id)
                             .map(|d| d.display_name.as_str())
                             .unwrap_or(item_id);
                         self.send_system_message(

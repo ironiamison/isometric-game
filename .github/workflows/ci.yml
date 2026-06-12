@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.92.0
+        with:
+          components: clippy,rustfmt
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install native client dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev \
+            libudev-dev libxcursor-dev libxrandr-dev libxinerama-dev \
+            libxkbcommon-dev libwayland-dev libwayland-cursor0 \
+            libwayland-egl1 libxkbcommon-x11-dev libatk1.0-dev \
+            libgtk-3-dev
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Native checks
+        run: cargo check --locked --workspace --all-targets
+
+      - name: WASM check
+        env:
+          AEVEN_SERVER_URL: https://aeven.xyz
+          AEVEN_WS_URL: wss://aeven.xyz
+        run: cargo check --locked -p new-aeven-client --target wasm32-unknown-unknown --lib
+
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets
+
+      - name: Tests
+        run: cargo test --locked --workspace
+
+  capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.92.0
+      - uses: Swatinem/rust-cache@v2
+      - name: 128-player tick budget
+        working-directory: rust-server
+        run: >-
+          cargo test --locked --release -p isometric-server
+          full_tick_stays_within_budget_for_128_players
+          -- --ignored --nocapture
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - directory: mapper
+            command: npm run lint && npm run build
+          - directory: mapper/server
+            command: npm run build
+          - directory: site
+            command: npm run check && npm run build
+          - directory: web-stats
+            command: npm run lint && npm run build
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+      - run: npm ci
+      - run: ${{ matrix.command }}
+      - run: npm audit --audit-level=moderate

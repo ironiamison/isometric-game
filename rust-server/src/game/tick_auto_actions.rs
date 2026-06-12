@@ -136,7 +136,7 @@ impl GameRoom {
                         let players = self.players.read().await;
                         players
                             .get(target_pid.as_str())
-                            .map_or(false, |p| p.active && !p.is_dead)
+                            .is_some_and(|p| p.active && !p.is_dead)
                     };
                     if !target_valid {
                         self.clear_auto_action(&pid, "target_dead").await;
@@ -144,7 +144,7 @@ impl GameRoom {
                     }
 
                     // Check same instance context
-                    let (same_context, attacker_instance) = {
+                    let (same_context, _attacker_instance) = {
                         let instances = self.player_instances.read().await;
                         let ai = instances.get(pid.as_str()).cloned();
                         let ti = instances.get(target_pid.as_str()).cloned();
@@ -161,11 +161,11 @@ impl GameRoom {
                             let players = self.players.read().await;
                             players.get(pid.as_str()).map(|p| (p.x, p.y))
                         };
-                        if let Some((ax, ay)) = attacker_pos {
-                            if !self.is_pvp_allowed(&pid, ax, ay).await {
-                                self.clear_auto_action(&pid, "interrupted").await;
-                                continue;
-                            }
+                        if let Some((ax, ay)) = attacker_pos
+                            && !self.is_pvp_allowed(&pid, ax, ay).await
+                        {
+                            self.clear_auto_action(&pid, "interrupted").await;
+                            continue;
                         }
                     }
 

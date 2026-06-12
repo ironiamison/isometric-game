@@ -58,8 +58,8 @@ impl GameRoom {
         } else {
             sender.name.clone()
         };
-        let sender_x = sender.x as i32;
-        let sender_y = sender.y as i32;
+        let sender_x = sender.x;
+        let sender_y = sender.y;
         drop(players);
 
         let timestamp = chat_timestamp_ms();
@@ -82,10 +82,10 @@ impl GameRoom {
                 channel: "public".to_string(),
             };
 
+            let senders = self.transport.player_senders().await;
             let player_instances = self.player_instances.read().await;
             let sender_instance = player_instances.get(player_id).cloned();
             let all_players = self.players.read().await;
-            let senders = self.player_senders.read().await;
 
             if let Ok(bytes) = crate::protocol::encode_server_message(&msg) {
                 for (pid, sender_ch) in senders.iter() {
@@ -97,8 +97,8 @@ impl GameRoom {
                         continue;
                     }
                     if let Some(other) = all_players.get(pid) {
-                        let dx = (other.x as i32 - sender_x).abs();
-                        let dy = (other.y as i32 - sender_y).abs();
+                        let dx = (other.x - sender_x).abs();
+                        let dy = (other.y - sender_y).abs();
                         if dx.max(dy) <= VIEW_DISTANCE {
                             let _ = sender_ch.try_send(bytes.clone());
                         }
@@ -644,14 +644,14 @@ impl GameRoom {
                                 {
                                     let mut players = self.players.write().await;
                                     for placement in &placements {
-                                        if placement.gold_reward > 0 {
-                                            if let Some(p) = players.get_mut(&placement.player_id) {
-                                                p.inventory.gold = item::checked_gold_credit(
-                                                    p.inventory.gold,
-                                                    placement.gold_reward,
-                                                )
-                                                .unwrap_or(item::MAX_GOLD);
-                                            }
+                                        if placement.gold_reward > 0
+                                            && let Some(p) = players.get_mut(&placement.player_id)
+                                        {
+                                            p.inventory.gold = item::checked_gold_credit(
+                                                p.inventory.gold,
+                                                placement.gold_reward,
+                                            )
+                                            .unwrap_or(item::MAX_GOLD);
                                         }
                                     }
                                 }
@@ -952,12 +952,11 @@ impl GameRoom {
 
                 // Spawn NPCs and set collision if new instance
                 if is_new || !*instance.npcs_spawned.read().await {
-                    if !interior.collision.is_empty() {
-                        if let Ok(bytes) =
+                    if !interior.collision.is_empty()
+                        && let Ok(bytes) =
                             base64::engine::general_purpose::STANDARD.decode(&interior.collision)
-                        {
-                            instance.set_collision(&bytes).await;
-                        }
+                    {
+                        instance.set_collision(&bytes).await;
                     }
                     instance
                         .spawn_npcs(&interior.entities, &self.entity_registry)
@@ -980,7 +979,7 @@ impl GameRoom {
                 }
 
                 // Save current overworld position for return
-                let (entrance_x, entrance_y) =
+                let (_entrance_x, _entrance_y) =
                     self.get_player_position(player_id).await.unwrap_or((0, 0));
 
                 // Track player's instance
@@ -1030,8 +1029,8 @@ impl GameRoom {
                                 y: spawn.y as i32,
                                 gender: gender.clone(),
                                 skin: skin.clone(),
-                                hair_style: hair_style.clone(),
-                                hair_color: hair_color.clone(),
+                                hair_style,
+                                hair_color,
                             },
                         )
                         .await;
@@ -1320,7 +1319,7 @@ impl GameRoom {
                     }
                 };
 
-                if let Some((tid, account_id, ip)) = online_info {
+                if let Some((tid, account_id, _ip)) = online_info {
                     if tid == player_id {
                         self.send_system_message(player_id, "You cannot ban yourself.")
                             .await;

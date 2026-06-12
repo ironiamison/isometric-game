@@ -148,6 +148,7 @@ interface EditorState {
   // Asset manager state
   assetManagerOpen: boolean;
   assetManagerTab: 'objects' | 'walls' | 'tiles';
+  assetRevision: number;
 }
 
 interface EditorActions {
@@ -2299,11 +2300,14 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   // Asset manager
   assetManagerOpen: false,
   assetManagerTab: 'objects' as const,
+  assetRevision: 0,
   openAssetManager: (tab) => set({ assetManagerOpen: true, assetManagerTab: tab || 'objects' }),
   closeAssetManager: () => set({ assetManagerOpen: false }),
   refreshAssets: () => {
-    // Trigger a re-render by updating tilesets with a new array reference
     const state = get();
-    set({ tilesets: [...state.tilesets] });
+    set({
+      assetRevision: state.assetRevision + 1,
+      tilesets: [...state.tilesets],
+    });
   },
 }));

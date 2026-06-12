@@ -786,12 +786,10 @@ impl Renderer {
                     } else {
                         "Can't Cook"
                     }
+                } else if can_craft {
+                    "[ SMELT ]"
                 } else {
-                    if can_craft {
-                        "[ SMELT ]"
-                    } else {
-                        "Can't Smelt"
-                    }
+                    "Can't Smelt"
                 };
                 let smelt_text_w = self.measure_text_sharp(smelt_text, 16.0).width;
                 let smelt_text_color = if !can_craft {
@@ -887,7 +885,7 @@ impl Renderer {
         let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
         let base_text = if is_fire_pit { "COOKING" } else { "SMELTING" };
         let dots = match ((time * 2.0) as i32) % 4 {
-            0 => format!("{}", base_text),
+            0 => base_text.to_string(),
             1 => format!("{}.", base_text),
             2 => format!("{}..", base_text),
             _ => format!("{}...", base_text),

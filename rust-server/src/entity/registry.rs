@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use super::prototype::{
-    AnimationType, DialogueConfig, EntityBehaviors, EntityPrototype, LootEntry, LootTable,
-    RawEntityPrototype, ResolvedRewards, ResolvedStats, SpeechConfig,
+    AnimationType, EntityBehaviors, EntityPrototype, LootEntry, LootTable, RawEntityPrototype,
+    ResolvedRewards, ResolvedStats, SpeechConfig,
 };
 
 /// Registry for all entity prototypes
@@ -60,7 +60,7 @@ impl EntityRegistry {
             let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
             let path = entry.path();
 
-            if path.extension().map_or(false, |ext| ext == "toml") {
+            if path.extension().is_some_and(|ext| ext == "toml") {
                 let content = std::fs::read_to_string(&path)
                     .map_err(|e| format!("Failed to read {:?}: {}", path, e))?;
 
@@ -121,16 +121,16 @@ impl EntityRegistry {
 
             visiting.insert(id.to_string());
 
-            if let Some(raw) = raw_prototypes.get(id) {
-                if let Some(parent_id) = &raw.extends {
-                    if !raw_prototypes.contains_key(parent_id) {
-                        return Err(format!(
-                            "Entity '{}' extends unknown parent '{}'",
-                            id, parent_id
-                        ));
-                    }
-                    visit(parent_id, raw_prototypes, sorted, visited, visiting)?;
+            if let Some(raw) = raw_prototypes.get(id)
+                && let Some(parent_id) = &raw.extends
+            {
+                if !raw_prototypes.contains_key(parent_id) {
+                    return Err(format!(
+                        "Entity '{}' extends unknown parent '{}'",
+                        id, parent_id
+                    ));
                 }
+                visit(parent_id, raw_prototypes, sorted, visited, visiting)?;
             }
 
             visiting.remove(id);

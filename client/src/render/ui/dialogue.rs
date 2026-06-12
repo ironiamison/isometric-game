@@ -500,7 +500,7 @@ impl Renderer {
         // Clamp height to screen bounds (leave 40px top margin minimum)
         let max_box_height = sh - 40.0 - bottom_margin;
         let box_height = ideal_box_height.min(max_box_height);
-        let is_clamped = ideal_box_height > max_box_height;
+        let _is_clamped = ideal_box_height > max_box_height;
 
         let box_x = (sw - box_width) / 2.0;
         let box_y = sh - box_height - bottom_margin;
@@ -1447,41 +1447,39 @@ impl Renderer {
                     btn_y += 34.0 * s;
                 }
             }
-        } else {
-            if actions_locked_by_active_task {
+        } else if actions_locked_by_active_task {
+            self.draw_text_sharp(
+                "Finish your active Adventurer task first.",
+                right_x + right_w - 300.0 * s,
+                action_base_y + 20.0 * s,
+                16.0,
+                TEXT_DIM,
+            );
+        } else if unlocked && !completed {
+            if !selected_track.no_action_hint.is_empty() {
+                let hint =
+                    self.truncate_text_to_width(selected_track.no_action_hint, 268.0 * s, 16.0);
                 self.draw_text_sharp(
-                    "Finish your active Adventurer task first.",
-                    right_x + right_w - 300.0 * s,
+                    &hint,
+                    right_x + right_w - 280.0 * s,
                     action_base_y + 20.0 * s,
                     16.0,
                     TEXT_DIM,
                 );
-            } else if unlocked && !completed {
-                if !selected_track.no_action_hint.is_empty() {
-                    let hint =
-                        self.truncate_text_to_width(selected_track.no_action_hint, 268.0 * s, 16.0);
-                    self.draw_text_sharp(
-                        &hint,
-                        right_x + right_w - 280.0 * s,
-                        action_base_y + 20.0 * s,
-                        16.0,
-                        TEXT_DIM,
-                    );
-                }
-            } else if !unlocked && selected_track_idx == 1 {
-                let missing =
-                    skilling_missing_unlock_requirements(state, selected_track.tiers, selected_idx);
-                if !missing.is_empty() {
-                    let missing_text = format!("Missing: {}", missing.join(", "));
-                    let hint = self.truncate_text_to_width(&missing_text, 268.0 * s, 16.0);
-                    self.draw_text_sharp(
-                        &hint,
-                        right_x + right_w - 280.0 * s,
-                        action_base_y + 20.0 * s,
-                        16.0,
-                        TEXT_DIM,
-                    );
-                }
+            }
+        } else if !unlocked && selected_track_idx == 1 {
+            let missing =
+                skilling_missing_unlock_requirements(state, selected_track.tiers, selected_idx);
+            if !missing.is_empty() {
+                let missing_text = format!("Missing: {}", missing.join(", "));
+                let hint = self.truncate_text_to_width(&missing_text, 268.0 * s, 16.0);
+                self.draw_text_sharp(
+                    &hint,
+                    right_x + right_w - 280.0 * s,
+                    action_base_y + 20.0 * s,
+                    16.0,
+                    TEXT_DIM,
+                );
             }
         }
     }

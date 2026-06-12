@@ -47,11 +47,7 @@ impl InputHandler {
                     .npcs
                     .get(id)
                     .map(|npc| {
-                        if npc.is_attackable() {
-                            3
-                        } else if npc.is_altar {
-                            3
-                        } else if npc.is_merchant {
+                        if npc.is_attackable() || npc.is_altar || npc.is_merchant {
                             3
                         } else {
                             2
@@ -275,7 +271,7 @@ impl InputHandler {
                                 ContextMenuTarget::Player { id } => {
                                     // Options: 0=Attack, 1=Follow, 2=Trade, [3=Browse Shop if stall], N=Add Friend, N+1=Examine
                                     let player_has_stall =
-                                        state.players.get(id).map_or(false, |p| p.has_stall);
+                                        state.players.get(id).is_some_and(|p| p.has_stall);
                                     let mut ci = 0usize;
                                     let attack_idx = {
                                         let idx = ci;
@@ -473,8 +469,8 @@ impl InputHandler {
                                                     );
                                                 }
                                                 2 => {
-                                                    let msg =
-                                                        format!("An altar dedicated to the gods.");
+                                                    let msg = "An altar dedicated to the gods."
+                                                        .to_string();
                                                     state.push_system_chat(msg);
                                                 }
                                                 _ => {}

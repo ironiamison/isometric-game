@@ -103,13 +103,12 @@ impl GameRoom {
                     self.process_quest_progression_snapshot(player_id).await;
                 }
 
-                if let Some(ref db) = self.db {
-                    if let Err(e) = db
+                if let Some(ref db) = self.db
+                    && let Err(e) = db
                         .save_farming_patch(patch_id, player_id, &crop_id, current_time)
                         .await
-                    {
-                        tracing::warn!("Failed to save farming patch {}: {}", patch_id, e);
-                    }
+                {
+                    tracing::warn!("Failed to save farming patch {}: {}", patch_id, e);
                 }
 
                 self.send_to_player(
@@ -231,10 +230,10 @@ impl GameRoom {
                 self.send_to_player(player_id, patch_state_update(patch_id, "empty", "", 0, ""))
                     .await;
 
-                if let Some(ref db) = self.db {
-                    if let Err(e) = db.delete_farming_patch(patch_id, player_id).await {
-                        tracing::warn!("Failed to delete farming patch {}: {}", patch_id, e);
-                    }
+                if let Some(ref db) = self.db
+                    && let Err(e) = db.delete_farming_patch(patch_id, player_id).await
+                {
+                    tracing::warn!("Failed to delete farming patch {}: {}", patch_id, e);
                 }
 
                 self.process_quest_item_collect(
@@ -370,10 +369,10 @@ impl GameRoom {
             farming.unlock_plot(player_id, plot_id);
         }
 
-        if let Some(ref db) = self.db {
-            if let Err(e) = db.save_plot_unlock(player_id, plot_id).await {
-                tracing::error!("Failed to save plot unlock: {}", e);
-            }
+        if let Some(ref db) = self.db
+            && let Err(e) = db.save_plot_unlock(player_id, plot_id).await
+        {
+            tracing::error!("Failed to save plot unlock: {}", e);
         }
 
         self.send_system_message(

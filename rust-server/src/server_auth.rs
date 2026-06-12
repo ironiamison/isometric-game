@@ -24,9 +24,10 @@ struct AuthResponse {
 pub(super) async fn register_account(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<RegisterRequest>,
 ) -> impl IntoResponse {
-    let client_ip = addr.ip().to_string();
+    let client_ip = state.config.client_ip(&headers, addr).to_string();
 
     if !state.auth_rate_limiter.check(&client_ip) {
         warn!("Rate limit exceeded for registration from {}", client_ip);
@@ -61,11 +62,15 @@ pub(super) async fn register_account(
 
     match state.db.create_account(&req.username, &req.password).await {
         Ok(account_id) => {
-            // Create auth token - note: (account_id, username) order now
             let token = Uuid::new_v4().to_string();
-            state
-                .auth_sessions
-                .insert(token.clone(), (account_id, req.username.clone()));
+            state.auth_sessions.insert(
+                token.clone(),
+                AuthSession::new(
+                    account_id,
+                    req.username.clone(),
+                    state.config.auth_session_ttl,
+                ),
+            );
 
             info!(
                 "Account registered: {} (id: {}) from {}",
@@ -93,9 +98,10 @@ pub(super) async fn register_account(
 pub(super) async fn login_account(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: axum::http::HeaderMap,
     Json(req): Json<LoginRequest>,
 ) -> impl IntoResponse {
-    let client_ip = addr.ip().to_string();
+    let client_ip = state.config.client_ip(&headers, addr).to_string();
 
     if !state.auth_rate_limiter.check(&client_ip) {
         warn!("Rate limit exceeded for login from {}", client_ip);
@@ -113,7 +119,7 @@ pub(super) async fn login_account(
         .verify_account_password(&req.username, &req.password)
         .await
     {
-        Some(account) => {
+        Ok(Some(account)) => {
             // Check for active ban on this account
             if let Some((reason, expires_at)) = state.db.check_ban_by_account(account.id).await {
                 let msg = match reason {
@@ -128,11 +134,15 @@ pub(super) async fn login_account(
                     error: Some(msg),
                 });
             }
-            // Create auth token - note: (account_id, username) order now
             let token = Uuid::new_v4().to_string();
-            state
-                .auth_sessions
-                .insert(token.clone(), (account.id, req.username.clone()));
+            state.auth_sessions.insert(
+                token.clone(),
+                AuthSession::new(
+                    account.id,
+                    req.username.clone(),
+                    state.config.auth_session_ttl,
+                ),
+            );
 
             info!(
                 "Account logged in: {} (id: {}) from {}",
@@ -205,7 +215,7 @@ pub(super) async fn login_account(
                 error: None,
             })
         }
-        None => {
+        Ok(None) => {
             state.auth_rate_limiter.record_failure(&client_ip);
             warn!(
                 "Failed login attempt for '{}' from {}",
@@ -220,6 +230,19 @@ pub(super) async fn login_account(
                 error: Some("Invalid username or password".to_string()),
             })
         }
+        Err(error) => {
+            error!(
+                "Database error during login for {}: {}",
+                req.username, error
+            );
+            Json(AuthResponse {
+                success: false,
+                token: None,
+                username: None,
+                characters: None,
+                error: Some("Login service temporarily unavailable".to_string()),
+            })
+        }
     }
 }
 
@@ -227,22 +250,21 @@ pub(super) async fn logout_account(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
 ) -> impl IntoResponse {
-    if let Some(auth) = headers.get("Authorization") {
-        if let Ok(auth_str) = auth.to_str() {
-            if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                let command_gates: Vec<Arc<RwLock<bool>>> = state
-                    .sessions
-                    .iter()
-                    .filter(|session| session.auth_token == token)
-                    .map(|session| session.command_gate.clone())
-                    .collect();
-                for command_gate in command_gates {
-                    let mut active = command_gate.write().await;
-                    *active = false;
-                }
-                state.auth_sessions.remove(token);
-            }
+    if let Some(auth) = headers.get("Authorization")
+        && let Ok(auth_str) = auth.to_str()
+        && let Some(token) = auth_str.strip_prefix("Bearer ")
+    {
+        let command_gates: Vec<Arc<RwLock<bool>>> = state
+            .sessions
+            .iter()
+            .filter(|session| session.auth_token == token)
+            .map(|session| session.command_gate.clone())
+            .collect();
+        for command_gate in command_gates {
+            let mut active = command_gate.write().await;
+            *active = false;
         }
+        state.auth_sessions.remove(token);
     }
     Json(serde_json::json!({ "success": true }))
 }

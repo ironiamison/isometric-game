@@ -1,7 +1,8 @@
 // Library crate for Android builds
 
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use macroquad::prelude::*;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(target_os = "android")]
 use std::time::{Duration, Instant};
 
 pub mod util;
@@ -13,25 +14,39 @@ pub use mobile_scale::MobileScaler;
 mod app;
 pub mod audio;
 pub mod auth;
+pub mod config;
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+mod desktop;
 pub mod game;
+mod gameplay;
 pub mod input;
 pub mod network;
 pub mod render;
 pub mod settings;
 pub mod ui;
 
-use audio::AudioManager;
-use game::GameState;
-use input::InputHandler;
-use network::NetworkClient;
-use render::Renderer;
+pub use app::window_conf;
 
-use auth::AuthSession;
-use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
-
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(target_os = "android")]
 use app::AppState;
-use app::{run_game_frame, window_conf, DEV_MODE, SERVER_URL, WS_URL};
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use audio::AudioManager;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use auth::AuthSession;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use config::{SERVER_URL, WS_URL};
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use game::GameState;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use gameplay::run_game_frame;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use input::InputHandler;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use network::NetworkClient;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use render::Renderer;
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};
 
 // For Android, we need to export quad_main as the entry point
 // miniquad's JNI code (in MainActivity.java) spawns a thread that calls quad_main
@@ -48,13 +63,12 @@ pub extern "C" fn main() {
     macroquad::Window::from_config(window_conf(), async_main());
 }
 
-// Desktop entry point (not used when building as library, but needed for binary builds)
-#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-#[macroquad::main(window_conf)]
-async fn main() {
-    async_main().await;
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
+pub async fn run_desktop() {
+    desktop::run().await;
 }
 
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 async fn async_main() {
     // Initialize logging (skip on Android - use logcat instead)
     #[cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))]
@@ -80,6 +94,7 @@ async fn async_main() {
     let mut audio = AudioManager::new_without_preload();
     // Renderer shows loading screen and loads all assets including audio
     let renderer = Renderer::new(&mut audio).await;
+    #[cfg(target_os = "android")]
     let scaler = MobileScaler::new();
 
     // Native build with auth flow

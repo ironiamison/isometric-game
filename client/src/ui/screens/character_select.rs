@@ -76,7 +76,7 @@ impl CharacterSelectScreen {
     /// Load font and sprites asynchronously - call this after creating the screen
     pub async fn load_font(&mut self) {
         // If assets were pre-loaded via use_renderer_assets(), skip loading
-        if self.player_sprites.len() > 0 {
+        if !self.player_sprites.is_empty() {
             return;
         }
 
@@ -94,7 +94,7 @@ impl CharacterSelectScreen {
                 };
             }
         }
-        if self.player_sprites.len() == 0 {
+        if self.player_sprites.is_empty() {
             self.player_sprites = load_player_sprites().await;
         }
 
@@ -106,7 +106,7 @@ impl CharacterSelectScreen {
                 };
             }
         }
-        if self.hair_sprites.len() == 0 {
+        if self.hair_sprites.is_empty() {
             let mut hair_map = HashMap::new();
             for style in 0..6i32 {
                 let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
@@ -141,17 +141,18 @@ impl CharacterSelectScreen {
         // Fallback: load individual equipment sprites
         let mut sprite_keys: Vec<String> = Vec::new();
         for c in &self.characters {
-            for slot in [
+            for key in [
                 &c.sprite_head,
                 &c.sprite_body,
                 &c.sprite_weapon,
                 &c.sprite_back,
                 &c.sprite_feet,
-            ] {
-                if let Some(key) = slot {
-                    if !sprite_keys.contains(key) && !self.equipment_sprites.contains(key) {
-                        sprite_keys.push(key.clone());
-                    }
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if !sprite_keys.contains(key) && !self.equipment_sprites.contains(key) {
+                    sprite_keys.push(key.clone());
                 }
             }
         }
@@ -432,29 +433,29 @@ impl Screen for CharacterSelectScreen {
         // Mouse: Click on buttons at bottom
         if clicked {
             // Play button
-            if point_in_rect(mx, my, list_x, inst_y - 10.0, 100.0, 30.0) {
-                if !self.characters.is_empty() {
-                    let character = &self.characters[self.selected_index];
-                    return ScreenState::StartGame {
-                        session: self.session.clone(),
-                        character_id: character.id,
-                        character_name: character.name.clone(),
-                    };
-                }
+            if point_in_rect(mx, my, list_x, inst_y - 10.0, 100.0, 30.0)
+                && !self.characters.is_empty()
+            {
+                let character = &self.characters[self.selected_index];
+                return ScreenState::StartGame {
+                    session: self.session.clone(),
+                    character_id: character.id,
+                    character_name: character.name.clone(),
+                };
             }
 
             // New button
-            if self.characters.len() < MAX_CHARACTERS {
-                if point_in_rect(mx, my, list_x + 120.0, inst_y - 10.0, 70.0, 30.0) {
-                    return ScreenState::ToCharacterCreate(self.session.clone());
-                }
+            if self.characters.len() < MAX_CHARACTERS
+                && point_in_rect(mx, my, list_x + 120.0, inst_y - 10.0, 70.0, 30.0)
+            {
+                return ScreenState::ToCharacterCreate(self.session.clone());
             }
 
             // Delete button
-            if point_in_rect(mx, my, list_x + 210.0, inst_y - 10.0, 90.0, 30.0) {
-                if !self.characters.is_empty() {
-                    self.confirm_delete = true;
-                }
+            if point_in_rect(mx, my, list_x + 210.0, inst_y - 10.0, 90.0, 30.0)
+                && !self.characters.is_empty()
+            {
+                self.confirm_delete = true;
             }
 
             // Logout button
@@ -468,15 +469,13 @@ impl Screen for CharacterSelectScreen {
         }
 
         // Keyboard: Navigate characters
-        if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-            if self.selected_index > 0 {
-                self.selected_index -= 1;
-            }
+        if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W)) && self.selected_index > 0 {
+            self.selected_index -= 1;
         }
-        if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-            if self.selected_index < self.characters.len().saturating_sub(1) {
-                self.selected_index += 1;
-            }
+        if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+            && self.selected_index < self.characters.len().saturating_sub(1)
+        {
+            self.selected_index += 1;
         }
 
         // Keyboard: Create new character
@@ -485,10 +484,10 @@ impl Screen for CharacterSelectScreen {
         }
 
         // Keyboard: Delete character
-        if is_key_pressed(KeyCode::Delete) || is_key_pressed(KeyCode::X) {
-            if !self.characters.is_empty() {
-                self.confirm_delete = true;
-            }
+        if (is_key_pressed(KeyCode::Delete) || is_key_pressed(KeyCode::X))
+            && !self.characters.is_empty()
+        {
+            self.confirm_delete = true;
         }
 
         // Keyboard: Logout
@@ -501,15 +500,13 @@ impl Screen for CharacterSelectScreen {
         }
 
         // Keyboard: Select character and start game
-        if is_key_pressed(KeyCode::Enter) {
-            if !self.characters.is_empty() {
-                let character = &self.characters[self.selected_index];
-                return ScreenState::StartGame {
-                    session: self.session.clone(),
-                    character_id: character.id,
-                    character_name: character.name.clone(),
-                };
-            }
+        if is_key_pressed(KeyCode::Enter) && !self.characters.is_empty() {
+            let character = &self.characters[self.selected_index];
+            return ScreenState::StartGame {
+                session: self.session.clone(),
+                character_id: character.id,
+                character_name: character.name.clone(),
+            };
         }
 
         ScreenState::Continue

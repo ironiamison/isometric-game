@@ -21,9 +21,7 @@ pub fn checked_gold_credit(balance: i32, amount: i32) -> Option<i32> {
     if balance < 0 || amount < 0 {
         return None;
     }
-    balance
-        .checked_add(amount)
-        .filter(|total| *total <= MAX_GOLD)
+    balance.checked_add(amount)
 }
 
 pub fn checked_gold_debit(balance: i32, amount: i32) -> Option<i32> {
@@ -89,14 +87,14 @@ impl Inventory {
             if quantity <= 0 {
                 break;
             }
-            if let Some(inv_slot) = slot {
-                if inv_slot.item_id == item_id {
-                    let can_add = max_stack - inv_slot.quantity;
-                    if can_add > 0 {
-                        let add = quantity.min(can_add);
-                        inv_slot.quantity += add;
-                        quantity -= add;
-                    }
+            if let Some(inv_slot) = slot
+                && inv_slot.item_id == item_id
+            {
+                let can_add = max_stack - inv_slot.quantity;
+                if can_add > 0 {
+                    let add = quantity.min(can_add);
+                    inv_slot.quantity += add;
+                    quantity -= add;
                 }
             }
         }
@@ -186,16 +184,16 @@ impl Inventory {
             if count <= 0 {
                 break;
             }
-            if let Some(inv_slot) = slot {
-                if inv_slot.item_id == item_id {
-                    let remove = count.min(inv_slot.quantity);
-                    inv_slot.quantity -= remove;
-                    count -= remove;
+            if let Some(inv_slot) = slot
+                && inv_slot.item_id == item_id
+            {
+                let remove = count.min(inv_slot.quantity);
+                inv_slot.quantity -= remove;
+                count -= remove;
 
-                    // Clear slot if empty
-                    if inv_slot.quantity <= 0 {
-                        *slot = None;
-                    }
+                // Clear slot if empty
+                if inv_slot.quantity <= 0 {
+                    *slot = None;
                 }
             }
         }
@@ -221,11 +219,11 @@ impl Inventory {
             if remaining <= 0 {
                 return true;
             }
-            if let Some(inv_slot) = slot {
-                if inv_slot.item_id == item_id {
-                    let can_add = max_stack - inv_slot.quantity;
-                    remaining -= can_add;
-                }
+            if let Some(inv_slot) = slot
+                && inv_slot.item_id == item_id
+            {
+                let can_add = max_stack - inv_slot.quantity;
+                remaining -= can_add;
             }
         }
 
@@ -311,7 +309,7 @@ impl Bank {
 
     /// Expand bank by appending additional empty slots
     pub fn expand(&mut self, additional: usize) {
-        self.slots.extend(std::iter::repeat(None).take(additional));
+        self.slots.extend(std::iter::repeat_n(None, additional));
     }
 
     /// Try to add an item to the bank. Returns the quantity that couldn't fit.
@@ -327,11 +325,11 @@ impl Bank {
 
         // Find existing slot with this item and add to it
         for slot in &mut self.slots {
-            if let Some(inv_slot) = slot {
-                if inv_slot.item_id == item_id {
-                    inv_slot.quantity = inv_slot.quantity.saturating_add(quantity);
-                    return 0;
-                }
+            if let Some(inv_slot) = slot
+                && inv_slot.item_id == item_id
+            {
+                inv_slot.quantity = inv_slot.quantity.saturating_add(quantity);
+                return 0;
             }
         }
 
@@ -358,14 +356,14 @@ impl Bank {
             if count <= 0 {
                 break;
             }
-            if let Some(inv_slot) = slot {
-                if inv_slot.item_id == item_id {
-                    let remove = count.min(inv_slot.quantity);
-                    inv_slot.quantity -= remove;
-                    count -= remove;
-                    if inv_slot.quantity <= 0 {
-                        *slot = None;
-                    }
+            if let Some(inv_slot) = slot
+                && inv_slot.item_id == item_id
+            {
+                let remove = count.min(inv_slot.quantity);
+                inv_slot.quantity -= remove;
+                count -= remove;
+                if inv_slot.quantity <= 0 {
+                    *slot = None;
                 }
             }
         }
@@ -397,10 +395,10 @@ impl Bank {
 
         // If this item already exists in the bank, it stacks into that slot
         for slot in &self.slots {
-            if let Some(inv_slot) = slot {
-                if inv_slot.item_id == item_id {
-                    return true;
-                }
+            if let Some(inv_slot) = slot
+                && inv_slot.item_id == item_id
+            {
+                return true;
             }
         }
 

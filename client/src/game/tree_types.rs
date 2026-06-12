@@ -37,13 +37,13 @@ pub fn get_tree_info(gid: u32) -> Option<&'static TreeTypeInfo> {
         1263 | 1264 | 1265 | 1448 | 1449 | 1450 | 1451 | 1452 | 1809 | 1810 | 1993 => Some(&OAK),
 
         // Willow trees: sprites 528, 529, 530
-        1690 | 1691 | 1692 => Some(&WILLOW),
+        1690..=1692 => Some(&WILLOW),
 
         // Maple trees: sprites 985-992
-        2147 | 2148 | 2149 | 2150 | 2151 | 2152 | 2153 | 2154 => Some(&MAPLE),
+        2147..=2154 => Some(&MAPLE),
 
         // Yew trees: sprites 993-1000
-        2155 | 2156 | 2157 | 2158 | 2159 | 2160 | 2161 | 2162 => Some(&YEW),
+        2155..=2162 => Some(&YEW),
 
         _ => None,
     }

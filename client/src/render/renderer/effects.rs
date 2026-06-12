@@ -1,52 +1,8 @@
 use super::*;
 
 impl Renderer {
-    pub(super) fn render_click_effects(&self, state: &GameState) {
-        // Temporarily disabled
-        return;
-        use crate::game::state::ClickEffectKind;
-
-        for effect in &state.click_effects {
-            let texture = match effect.kind {
-                ClickEffectKind::Walk => &self.click_walk_texture,
-                ClickEffectKind::Attack => &self.click_attack_texture,
-                ClickEffectKind::Interact => &self.click_interact_texture,
-            };
-            let Some(tex) = texture.as_ref() else {
-                continue;
-            };
-
-            let frame = effect.frame();
-            let frame_size = crate::game::state::ClickEffect::FRAME_SIZE;
-            let source_rect = Rect::new(frame as f32 * frame_size, 0.0, frame_size, frame_size);
-
-            // Convert exact world position to screen space
-            let (screen_x, screen_y) = world_to_screen(effect.tile_x, effect.tile_y, &state.camera);
-
-            let zoom = state.camera.zoom;
-            let draw_size = frame_size * zoom;
-
-            // Fade out over the last quarter of the animation
-            let alpha = if effect.elapsed > crate::game::state::ClickEffect::DURATION * 0.75 {
-                let t = (effect.elapsed - crate::game::state::ClickEffect::DURATION * 0.75)
-                    / (crate::game::state::ClickEffect::DURATION * 0.25);
-                1.0 - t
-            } else {
-                1.0
-            };
-
-            draw_texture_ex(
-                tex,
-                screen_x - draw_size * 0.5,
-                screen_y - draw_size * 0.5,
-                Color::new(1.0, 1.0, 1.0, alpha),
-                DrawTextureParams {
-                    source: Some(source_rect),
-                    dest_size: Some(Vec2::new(draw_size, draw_size)),
-                    ..Default::default()
-                },
-            );
-        }
+    pub(super) fn render_click_effects(&self, _state: &GameState) {
+        // Click markers are intentionally disabled until their visual treatment is finalized.
     }
 
     pub(super) fn render_projectiles(&self, state: &GameState) {

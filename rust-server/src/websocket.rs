@@ -45,7 +45,7 @@ pub(super) async fn ws_handler(
     match session_data {
         Some(session) if session.room_id == room_id => {
             // Verify the auth token is still valid
-            if !state.auth_sessions.contains_key(&session.auth_token) {
+            if !has_valid_auth_session(&state.auth_sessions, &session.auth_token) {
                 warn!(
                     "WebSocket rejected: Auth token expired for session {}",
                     session_id
@@ -129,6 +129,7 @@ pub(super) async fn handle_socket(
     let welcome = ServerMessage::Welcome {
         player_id: player_id.clone(),
         is_new_character,
+        protocol_version: protocol::PROTOCOL_VERSION,
     };
     if let Ok(bytes) = protocol::encode_server_message(&welcome) {
         let _ = sender.send(Message::Binary(bytes)).await;
@@ -200,10 +201,10 @@ pub(super) async fn handle_socket(
     }
 
     // Send crafting order tracker state (if player has an active order)
-    if let Some(order_msg) = room.get_crafting_order_tracker_message(&player_id).await {
-        if let Ok(bytes) = protocol::encode_server_message(&order_msg) {
-            let _ = sender.send(Message::Binary(bytes)).await;
-        }
+    if let Some(order_msg) = room.get_crafting_order_tracker_message(&player_id).await
+        && let Ok(bytes) = protocol::encode_server_message(&order_msg)
+    {
+        let _ = sender.send(Message::Binary(bytes)).await;
     }
 
     // Send chair positions
@@ -219,10 +220,10 @@ pub(super) async fn handle_socket(
     }
 
     // Send prayer state
-    if let Some(prayer_state) = room.get_player_prayer_state(&player_id).await {
-        if let Ok(bytes) = protocol::encode_server_message(&prayer_state) {
-            let _ = sender.send(Message::Binary(bytes)).await;
-        }
+    if let Some(prayer_state) = room.get_player_prayer_state(&player_id).await
+        && let Ok(bytes) = protocol::encode_server_message(&prayer_state)
+    {
+        let _ = sender.send(Message::Binary(bytes)).await;
     }
 
     // Send collection log definitions
@@ -259,10 +260,10 @@ pub(super) async fn handle_socket(
             for dy in -1..=1 {
                 for dx in -1..=1 {
                     let coord = chunk::ChunkCoord::new(player_chunk.x + dx, player_chunk.y + dy);
-                    if let Some(chunk_msg) = room.handle_chunk_request(coord.x, coord.y).await {
-                        if let Ok(bytes) = protocol::encode_server_message(&chunk_msg) {
-                            let _ = sender.send(Message::Binary(bytes)).await;
-                        }
+                    if let Some(chunk_msg) = room.handle_chunk_request(coord.x, coord.y).await
+                        && let Ok(bytes) = protocol::encode_server_message(&chunk_msg)
+                    {
+                        let _ = sender.send(Message::Binary(bytes)).await;
                     }
                 }
             }
@@ -363,24 +364,24 @@ pub(super) async fn handle_socket(
     }
 
     // Send initial inventory to this client
-    if let Some(inv_msg) = room.get_player_inventory_update(&player_id).await {
-        if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {
-            let _ = sender.send(Message::Binary(bytes)).await;
-        }
+    if let Some(inv_msg) = room.get_player_inventory_update(&player_id).await
+        && let Ok(bytes) = protocol::encode_server_message(&inv_msg)
+    {
+        let _ = sender.send(Message::Binary(bytes)).await;
     }
 
     // Send initial skills to this client
-    if let Some(skills_msg) = room.get_player_skills_sync(&player_id).await {
-        if let Ok(bytes) = protocol::encode_server_message(&skills_msg) {
-            let _ = sender.send(Message::Binary(bytes)).await;
-        }
+    if let Some(skills_msg) = room.get_player_skills_sync(&player_id).await
+        && let Ok(bytes) = protocol::encode_server_message(&skills_msg)
+    {
+        let _ = sender.send(Message::Binary(bytes)).await;
     }
 
     // Send active potion buffs
-    if let Some(buffs_msg) = room.get_player_potion_buffs_sync(&player_id).await {
-        if let Ok(bytes) = protocol::encode_server_message(&buffs_msg) {
-            let _ = sender.send(Message::Binary(bytes)).await;
-        }
+    if let Some(buffs_msg) = room.get_player_potion_buffs_sync(&player_id).await
+        && let Ok(bytes) = protocol::encode_server_message(&buffs_msg)
+    {
+        let _ = sender.send(Message::Binary(bytes)).await;
     }
 
     // Send current top total level player (for trophy icon) — refresh from DB and broadcast to all
@@ -582,7 +583,7 @@ pub(super) async fn handle_socket(
     }
     let (_, removed_sess) = removed_session.unwrap();
     let character_id = removed_sess.character_id;
-    let should_save = state.auth_sessions.contains_key(&removed_sess.auth_token);
+    let should_save = has_valid_auth_session(&state.auth_sessions, &removed_sess.auth_token);
 
     info!(
         "Character {} disconnected from room {}",
@@ -609,37 +610,7 @@ pub(super) async fn handle_socket(
             }
             if let Err(e) = state
                 .db
-                .save_character(
-                    character_id,
-                    save_data.x,
-                    save_data.y,
-                    save_data.z,
-                    save_data.hp,
-                    save_data.prayer_points,
-                    save_data.mp,
-                    &save_data.skills,
-                    save_data.gold,
-                    &save_data.inventory_json,
-                    save_data.equipped_head.as_deref(),
-                    save_data.equipped_body.as_deref(),
-                    save_data.equipped_weapon.as_deref(),
-                    save_data.equipped_back.as_deref(),
-                    save_data.equipped_feet.as_deref(),
-                    save_data.equipped_ring.as_deref(),
-                    save_data.equipped_gloves.as_deref(),
-                    save_data.equipped_necklace.as_deref(),
-                    save_data.equipped_belt.as_deref(),
-                    played_time_delta,
-                    save_data.current_map.as_deref(),
-                    save_data.sitting_at_x,
-                    save_data.sitting_at_y,
-                    save_data.entrance_x,
-                    save_data.entrance_y,
-                    &save_data.bank_json,
-                    save_data.bank_gold,
-                    save_data.bank_max_slots,
-                    &save_data.combat_style_prefs,
-                )
+                .save_character(character_id, &save_data, played_time_delta)
                 .await
             {
                 error!(
@@ -655,27 +626,27 @@ pub(super) async fn handle_socket(
         }
 
         // Save quest state to database
-        if character_id > 0 {
-            if let Some(quest_state) = room.get_player_quest_state(&player_id).await {
-                if let Err(e) = state
-                    .db
-                    .save_character_quest_state(character_id, &quest_state)
-                    .await
-                {
-                    error!(
-                        "Failed to save quest state for {} on disconnect: {}",
-                        character_name, e
-                    );
-                } else if !quest_state.active_quests.is_empty()
-                    || !quest_state.completed_quests.is_empty()
-                {
-                    info!(
-                        "Saved quest state for {}: {} active, {} completed",
-                        character_name,
-                        quest_state.active_quests.len(),
-                        quest_state.completed_quests.len()
-                    );
-                }
+        if character_id > 0
+            && let Some(quest_state) = room.get_player_quest_state(&player_id).await
+        {
+            if let Err(e) = state
+                .db
+                .save_character_quest_state(character_id, &quest_state)
+                .await
+            {
+                error!(
+                    "Failed to save quest state for {} on disconnect: {}",
+                    character_name, e
+                );
+            } else if !quest_state.active_quests.is_empty()
+                || !quest_state.completed_quests.is_empty()
+            {
+                info!(
+                    "Saved quest state for {}: {} active, {} completed",
+                    character_name,
+                    quest_state.active_quests.len(),
+                    quest_state.completed_quests.len()
+                );
             }
         }
 
@@ -776,12 +747,13 @@ pub(super) async fn handle_socket(
                     .await;
                 }
 
-                if remaining == 0 && instance.instance_type == InstanceType::Private {
-                    if let Some(owner_id) = &instance.owner_id {
-                        state
-                            .instance_manager
-                            .remove_private(owner_id, &instance.map_id);
-                    }
+                if remaining == 0
+                    && instance.instance_type == InstanceType::Private
+                    && let Some(owner_id) = &instance.owner_id
+                {
+                    state
+                        .instance_manager
+                        .remove_private(owner_id, &instance.map_id);
                 }
             }
         }

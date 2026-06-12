@@ -1,109 +1,138 @@
 use super::*;
 
+const CHARACTER_SELECT: &str = r#"
+    SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp,
+           prayer_points, mp, gold, equipped_head, equipped_body, equipped_weapon,
+           equipped_back, equipped_feet, equipped_ring, equipped_gloves,
+           equipped_necklace, equipped_belt, inventory_json, skills_json, played_time,
+           is_admin, created_at, current_map, sitting_at_x, sitting_at_y, entrance_x,
+           entrance_y, bank_json, bank_gold, bank_max_slots, combat_style_prefs, z
+    FROM characters
+"#;
+
+#[derive(sqlx::FromRow)]
+struct CharacterRow {
+    id: i64,
+    account_id: i64,
+    name: String,
+    gender: String,
+    skin: String,
+    hair_style: Option<i32>,
+    hair_color: Option<i32>,
+    x: f32,
+    y: f32,
+    z: i32,
+    hp: i32,
+    prayer_points: Option<i32>,
+    mp: Option<i32>,
+    gold: i32,
+    equipped_head: Option<String>,
+    equipped_body: Option<String>,
+    equipped_weapon: Option<String>,
+    equipped_back: Option<String>,
+    equipped_feet: Option<String>,
+    equipped_ring: Option<String>,
+    equipped_gloves: Option<String>,
+    equipped_necklace: Option<String>,
+    equipped_belt: Option<String>,
+    inventory_json: String,
+    skills_json: Option<String>,
+    played_time: i64,
+    is_admin: bool,
+    created_at: Option<String>,
+    current_map: Option<String>,
+    sitting_at_x: Option<i32>,
+    sitting_at_y: Option<i32>,
+    entrance_x: Option<f32>,
+    entrance_y: Option<f32>,
+    bank_json: String,
+    bank_gold: i32,
+    bank_max_slots: i64,
+    combat_style_prefs: String,
+}
+
+impl TryFrom<CharacterRow> for CharacterData {
+    type Error = sqlx::Error;
+
+    fn try_from(row: CharacterRow) -> Result<Self, Self::Error> {
+        let skills = Skills::try_from_json(row.skills_json.as_deref().unwrap_or_default())
+            .map_err(|error| {
+                sqlx::Error::Protocol(format!(
+                    "character {} has invalid skills_json: {error}",
+                    row.id
+                ))
+            })?;
+        let bank_max_slots = u32::try_from(row.bank_max_slots).map_err(|_| {
+            sqlx::Error::Protocol(format!(
+                "character {} has invalid bank_max_slots: {}",
+                row.id, row.bank_max_slots
+            ))
+        })?;
+        if bank_max_slots == 0 {
+            return Err(sqlx::Error::Protocol(format!(
+                "character {} has zero bank_max_slots",
+                row.id
+            )));
+        }
+
+        Ok(Self {
+            id: row.id,
+            account_id: row.account_id,
+            name: row.name,
+            gender: row.gender,
+            skin: row.skin,
+            hair_style: row.hair_style,
+            hair_color: row.hair_color,
+            x: row.x,
+            y: row.y,
+            z: row.z,
+            hp: row.hp,
+            prayer_points: row.prayer_points.unwrap_or(10 + skills.prayer.level),
+            mp: row.mp.unwrap_or(10 + skills.magic.level * 2),
+            skills,
+            gold: row.gold,
+            equipped_head: non_empty(row.equipped_head),
+            equipped_body: non_empty(row.equipped_body),
+            equipped_weapon: non_empty(row.equipped_weapon),
+            equipped_back: non_empty(row.equipped_back),
+            equipped_feet: non_empty(row.equipped_feet),
+            equipped_ring: non_empty(row.equipped_ring),
+            equipped_gloves: non_empty(row.equipped_gloves),
+            equipped_necklace: non_empty(row.equipped_necklace),
+            equipped_belt: non_empty(row.equipped_belt),
+            inventory_json: row.inventory_json,
+            played_time: row.played_time,
+            created_at: row.created_at,
+            is_admin: row.is_admin,
+            current_map: row.current_map,
+            sitting_at_x: row.sitting_at_x,
+            sitting_at_y: row.sitting_at_y,
+            entrance_x: row.entrance_x,
+            entrance_y: row.entrance_y,
+            bank_json: row.bank_json,
+            bank_gold: row.bank_gold,
+            bank_max_slots,
+            combat_style_prefs: row.combat_style_prefs,
+        })
+    }
+}
+
+fn non_empty(value: Option<String>) -> Option<String> {
+    value.filter(|value| !value.is_empty())
+}
+
 impl Database {
     pub async fn get_characters_for_account(
         &self,
         account_id: i64,
     ) -> Result<Vec<CharacterData>, sqlx::Error> {
-        let rows = sqlx::query(
-            r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, mp, gold,
-                equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
-                equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
-                inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y, entrance_x, entrance_y,
-                bank_json, bank_gold, bank_max_slots, combat_style_prefs, z
-            FROM characters WHERE account_id = ? ORDER BY created_at DESC"#,
-        )
-        .bind(account_id)
-        .fetch_all(&self.pool)
-        .await?;
+        let query = format!("{CHARACTER_SELECT} WHERE account_id = ? ORDER BY created_at DESC");
+        let rows = sqlx::query_as::<_, CharacterRow>(&query)
+            .bind(account_id)
+            .fetch_all(&self.pool)
+            .await?;
 
-        Ok(rows
-            .into_iter()
-            .map(|r| {
-                let skills =
-                    Skills::from_json(&r.try_get::<String, _>("skills_json").unwrap_or_default());
-
-                CharacterData {
-                    id: r.get("id"),
-                    account_id: r.get("account_id"),
-                    name: r.get("name"),
-                    gender: r.get("gender"),
-                    skin: r.get("skin"),
-                    hair_style: r.try_get::<Option<i32>, _>("hair_style").unwrap_or(None),
-                    hair_color: r.try_get::<Option<i32>, _>("hair_color").unwrap_or(None),
-                    x: r.get("x"),
-                    y: r.get("y"),
-                    z: r.try_get::<i32, _>("z").unwrap_or(0),
-                    hp: r.get("hp"),
-                    prayer_points: r
-                        .try_get::<Option<i32>, _>("prayer_points")
-                        .unwrap_or(None)
-                        .unwrap_or(10 + skills.prayer.level),
-                    mp: r
-                        .try_get::<Option<i32>, _>("mp")
-                        .unwrap_or(None)
-                        .unwrap_or(10 + skills.magic.level * 2),
-                    skills,
-                    gold: r.get("gold"),
-                    equipped_head: r
-                        .try_get::<String, _>("equipped_head")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_body: r
-                        .try_get::<String, _>("equipped_body")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_weapon: r
-                        .try_get::<String, _>("equipped_weapon")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_back: r
-                        .try_get::<String, _>("equipped_back")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_feet: r
-                        .try_get::<String, _>("equipped_feet")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_ring: r
-                        .try_get::<String, _>("equipped_ring")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_gloves: r
-                        .try_get::<String, _>("equipped_gloves")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_necklace: r
-                        .try_get::<String, _>("equipped_necklace")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    equipped_belt: r
-                        .try_get::<String, _>("equipped_belt")
-                        .ok()
-                        .filter(|s| !s.is_empty()),
-                    inventory_json: r.get("inventory_json"),
-                    played_time: r.get("played_time"),
-                    created_at: r.get("created_at"),
-                    is_admin: r.try_get::<bool, _>("is_admin").unwrap_or(false),
-                    current_map: r
-                        .try_get::<Option<String>, _>("current_map")
-                        .unwrap_or(None),
-                    sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
-                    sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
-                    entrance_x: r.try_get::<Option<f32>, _>("entrance_x").unwrap_or(None),
-                    entrance_y: r.try_get::<Option<f32>, _>("entrance_y").unwrap_or(None),
-                    bank_json: r
-                        .try_get::<String, _>("bank_json")
-                        .unwrap_or_else(|_| "[]".to_string()),
-                    bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
-                    bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
-                    combat_style_prefs: r
-                        .try_get::<String, _>("combat_style_prefs")
-                        .unwrap_or_else(|_| "{}".to_string()),
-                }
-            })
-            .collect())
+        rows.into_iter().map(CharacterData::try_from).collect()
     }
 
     pub async fn is_character_name_taken(&self, name: &str) -> Result<bool, sqlx::Error> {
@@ -142,15 +171,15 @@ impl Database {
         }
 
         // Validate hair_style (0-5) and hair_color (0-9) if provided
-        if let Some(style) = hair_style {
-            if style < 0 || style > 5 {
-                return Err(format!("Invalid hair style: {} (must be 0-5)", style));
-            }
+        if let Some(style) = hair_style
+            && (!(0..=5).contains(&style))
+        {
+            return Err(format!("Invalid hair style: {} (must be 0-5)", style));
         }
-        if let Some(color) = hair_color {
-            if color < 0 || color > 9 {
-                return Err(format!("Invalid hair color: {} (must be 0-9)", color));
-            }
+        if let Some(color) = hair_color
+            && (!(0..=9).contains(&color))
+        {
+            return Err(format!("Invalid hair color: {} (must be 0-9)", color));
         }
 
         // Check if name is already taken (case-insensitive)
@@ -216,102 +245,13 @@ impl Database {
         &self,
         character_id: i64,
     ) -> Result<Option<CharacterData>, sqlx::Error> {
-        let row = sqlx::query(
-            r#"SELECT id, account_id, name, gender, skin, hair_style, hair_color, x, y, hp, prayer_points, mp, gold,
-                equipped_head, equipped_body, equipped_weapon, equipped_back, equipped_feet,
-                equipped_ring, equipped_gloves, equipped_necklace, equipped_belt,
-                inventory_json, skills_json, played_time, is_admin, created_at, current_map,
-                sitting_at_x, sitting_at_y, entrance_x, entrance_y,
-                bank_json, bank_gold, bank_max_slots, combat_style_prefs, z
-            FROM characters WHERE id = ?"#,
-        )
-        .bind(character_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let query = format!("{CHARACTER_SELECT} WHERE id = ?");
+        let row = sqlx::query_as::<_, CharacterRow>(&query)
+            .bind(character_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
-        Ok(row.map(|r| {
-            let skills =
-                Skills::from_json(&r.try_get::<String, _>("skills_json").unwrap_or_default());
-
-            CharacterData {
-                id: r.get("id"),
-                account_id: r.get("account_id"),
-                name: r.get("name"),
-                gender: r.get("gender"),
-                skin: r.get("skin"),
-                hair_style: r.try_get::<Option<i32>, _>("hair_style").unwrap_or(None),
-                hair_color: r.try_get::<Option<i32>, _>("hair_color").unwrap_or(None),
-                x: r.get("x"),
-                y: r.get("y"),
-                z: r.try_get::<i32, _>("z").unwrap_or(0),
-                hp: r.get("hp"),
-                prayer_points: r
-                    .try_get::<Option<i32>, _>("prayer_points")
-                    .unwrap_or(None)
-                    .unwrap_or(10 + skills.prayer.level),
-                mp: r
-                    .try_get::<Option<i32>, _>("mp")
-                    .unwrap_or(None)
-                    .unwrap_or(10 + skills.magic.level * 2),
-                skills,
-                gold: r.get("gold"),
-                equipped_head: r
-                    .try_get::<String, _>("equipped_head")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_body: r
-                    .try_get::<String, _>("equipped_body")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_weapon: r
-                    .try_get::<String, _>("equipped_weapon")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_back: r
-                    .try_get::<String, _>("equipped_back")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_feet: r
-                    .try_get::<String, _>("equipped_feet")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_ring: r
-                    .try_get::<String, _>("equipped_ring")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_gloves: r
-                    .try_get::<String, _>("equipped_gloves")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_necklace: r
-                    .try_get::<String, _>("equipped_necklace")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                equipped_belt: r
-                    .try_get::<String, _>("equipped_belt")
-                    .ok()
-                    .filter(|s| !s.is_empty()),
-                inventory_json: r.get("inventory_json"),
-                played_time: r.get("played_time"),
-                created_at: r.get("created_at"),
-                is_admin: r.try_get::<bool, _>("is_admin").unwrap_or(false),
-                current_map: r
-                    .try_get::<Option<String>, _>("current_map")
-                    .unwrap_or(None),
-                sitting_at_x: r.try_get::<Option<i32>, _>("sitting_at_x").unwrap_or(None),
-                sitting_at_y: r.try_get::<Option<i32>, _>("sitting_at_y").unwrap_or(None),
-                entrance_x: r.try_get::<Option<f32>, _>("entrance_x").unwrap_or(None),
-                entrance_y: r.try_get::<Option<f32>, _>("entrance_y").unwrap_or(None),
-                bank_json: r
-                    .try_get::<String, _>("bank_json")
-                    .unwrap_or_else(|_| "[]".to_string()),
-                bank_gold: r.try_get::<i32, _>("bank_gold").unwrap_or(0),
-                bank_max_slots: r.try_get::<i32, _>("bank_max_slots").unwrap_or(50) as u32,
-                combat_style_prefs: r
-                    .try_get::<String, _>("combat_style_prefs")
-                    .unwrap_or_else(|_| "{}".to_string()),
-            }
-        }))
+        row.map(CharacterData::try_from).transpose()
     }
 
     pub async fn delete_character(
@@ -319,43 +259,52 @@ impl Database {
         character_id: i64,
         account_id: i64,
     ) -> Result<bool, sqlx::Error> {
-        // Delete related quest data first
-        sqlx::query("DELETE FROM character_quests WHERE character_id = ?")
-            .bind(character_id)
-            .execute(&self.pool)
-            .await?;
-        sqlx::query("DELETE FROM character_flags WHERE character_id = ?")
-            .bind(character_id)
-            .execute(&self.pool)
-            .await?;
-        sqlx::query("DELETE FROM character_quest_availability WHERE character_id = ?")
-            .bind(character_id)
-            .execute(&self.pool)
-            .await?;
-        sqlx::query("DELETE FROM arena_stats WHERE character_id = ?")
-            .bind(character_id)
-            .execute(&self.pool)
-            .await?;
+        let mut transaction = self.pool.begin().await?;
+        let owned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM characters WHERE id = ? AND account_id = ?)",
+        )
+        .bind(character_id)
+        .bind(account_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        if !owned {
+            transaction.rollback().await?;
+            return Ok(false);
+        }
+
         sqlx::query("DELETE FROM friendships WHERE requester_id = ? OR recipient_id = ?")
             .bind(character_id)
             .bind(character_id)
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await?;
-        sqlx::query("DELETE FROM discovered_recipes WHERE character_id = ?")
-            .bind(character_id)
-            .execute(&self.pool)
-            .await?;
-        sqlx::query("DELETE FROM character_unlocked_spells WHERE character_id = ?")
-            .bind(character_id)
-            .execute(&self.pool)
-            .await?;
+        for table in [
+            "character_quests",
+            "character_flags",
+            "character_quest_availability",
+            "arena_stats",
+            "discovered_recipes",
+            "character_unlocked_spells",
+            "character_slayer",
+            "collection_log",
+            "player_titles",
+            "crafting_orders_available",
+            "crafting_orders_generation",
+            "crafting_orders_active",
+            "crafting_order_stats",
+        ] {
+            // Table names are fixed identifiers owned by this module.
+            sqlx::query(&format!("DELETE FROM {table} WHERE character_id = ?"))
+                .bind(character_id)
+                .execute(&mut *transaction)
+                .await?;
+        }
 
-        // Delete the character (only if owned by this account)
         let result = sqlx::query("DELETE FROM characters WHERE id = ? AND account_id = ?")
             .bind(character_id)
             .bind(account_id)
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await?;
+        transaction.commit().await?;
 
         let deleted = result.rows_affected() > 0;
         if deleted {
@@ -371,41 +320,17 @@ impl Database {
     pub async fn save_character(
         &self,
         character_id: i64,
-        x: f32,
-        y: f32,
-        z: i32,
-        hp: i32,
-        prayer_points: i32,
-        mp: i32,
-        skills: &Skills,
-        gold: i32,
-        inventory_json: &str,
-        equipped_head: Option<&str>,
-        equipped_body: Option<&str>,
-        equipped_weapon: Option<&str>,
-        equipped_back: Option<&str>,
-        equipped_feet: Option<&str>,
-        equipped_ring: Option<&str>,
-        equipped_gloves: Option<&str>,
-        equipped_necklace: Option<&str>,
-        equipped_belt: Option<&str>,
+        save: &crate::game::PlayerSaveData,
         played_time_delta: i64,
-        current_map: Option<&str>,
-        sitting_at_x: Option<i32>,
-        sitting_at_y: Option<i32>,
-        entrance_x: Option<f32>,
-        entrance_y: Option<f32>,
-        bank_json: &str,
-        bank_gold: i32,
-        bank_max_slots: u32,
-        combat_style_prefs: &str,
     ) -> Result<(), sqlx::Error> {
         // Serialize skills to JSON for the skills_json column
-        let skills_json = serde_json::to_string(skills).unwrap_or_else(|_| "{}".to_string());
+        let skills_json = serde_json::to_string(&save.skills).map_err(|error| {
+            sqlx::Error::Protocol(format!("failed to serialize skills: {error}"))
+        })?;
 
         // For backward compatibility, we also write to legacy columns with derived values
-        let max_hp = skills.hitpoints.level;
-        let level = skills.combat_level();
+        let max_hp = save.skills.hitpoints.level;
+        let level = save.skills.combat_level();
 
         sqlx::query(
             r#"UPDATE characters SET
@@ -426,36 +351,36 @@ impl Database {
                 combat_style_prefs = ?
             WHERE id = ?"#,
         )
-        .bind(x)
-        .bind(y)
-        .bind(z)
-        .bind(hp)
-        .bind(prayer_points)
-        .bind(mp)
+        .bind(save.x)
+        .bind(save.y)
+        .bind(save.z)
+        .bind(save.hp)
+        .bind(save.prayer_points)
+        .bind(save.mp)
         .bind(max_hp)
         .bind(level)
-        .bind(gold)
-        .bind(inventory_json)
+        .bind(save.gold)
+        .bind(&save.inventory_json)
         .bind(&skills_json)
-        .bind(equipped_head)
-        .bind(equipped_body)
-        .bind(equipped_weapon)
-        .bind(equipped_back)
-        .bind(equipped_feet)
-        .bind(equipped_ring)
-        .bind(equipped_gloves)
-        .bind(equipped_necklace)
-        .bind(equipped_belt)
+        .bind(save.equipped_head.as_deref())
+        .bind(save.equipped_body.as_deref())
+        .bind(save.equipped_weapon.as_deref())
+        .bind(save.equipped_back.as_deref())
+        .bind(save.equipped_feet.as_deref())
+        .bind(save.equipped_ring.as_deref())
+        .bind(save.equipped_gloves.as_deref())
+        .bind(save.equipped_necklace.as_deref())
+        .bind(save.equipped_belt.as_deref())
         .bind(played_time_delta)
-        .bind(current_map)
-        .bind(sitting_at_x)
-        .bind(sitting_at_y)
-        .bind(entrance_x)
-        .bind(entrance_y)
-        .bind(bank_json)
-        .bind(bank_gold)
-        .bind(bank_max_slots as i32)
-        .bind(combat_style_prefs)
+        .bind(save.current_map.as_deref())
+        .bind(save.sitting_at_x)
+        .bind(save.sitting_at_y)
+        .bind(save.entrance_x)
+        .bind(save.entrance_y)
+        .bind(&save.bank_json)
+        .bind(save.bank_gold)
+        .bind(save.bank_max_slots as i32)
+        .bind(&save.combat_style_prefs)
         .bind(character_id)
         .execute(&self.pool)
         .await?;

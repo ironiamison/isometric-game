@@ -324,11 +324,12 @@ impl GameRoom {
         // Remove player from instance and clean up private instance
         if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
             let remaining = instance.remove_player(player_id).await;
-            if remaining == 0 && instance.instance_type == crate::interior::InstanceType::Private {
-                if let Some(owner_id) = &instance.owner_id {
-                    self.instance_manager
-                        .remove_private(owner_id, &instance.map_id);
-                }
+            if remaining == 0
+                && instance.instance_type == crate::interior::InstanceType::Private
+                && let Some(owner_id) = &instance.owner_id
+            {
+                self.instance_manager
+                    .remove_private(owner_id, &instance.map_id);
             }
         }
 

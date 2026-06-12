@@ -34,10 +34,10 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
     for dy in -2..=2 {
         for dx in -2..=2 {
             let coord = chunk::ChunkCoord::new(spawn_chunk.x + dx, spawn_chunk.y + dy);
-            if let Some(chunk_msg) = room.handle_chunk_request(coord.x, coord.y).await {
-                if let Ok(bytes) = protocol::encode_server_message(&chunk_msg) {
-                    let _ = sender.send(Message::Binary(bytes)).await;
-                }
+            if let Some(chunk_msg) = room.handle_chunk_request(coord.x, coord.y).await
+                && let Ok(bytes) = protocol::encode_server_message(&chunk_msg)
+            {
+                let _ = sender.send(Message::Binary(bytes)).await;
             }
         }
     }
@@ -168,7 +168,10 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                                 };
 
                             // --- Step 3: Verify auth token is still valid ---
-                            if !recv_state.auth_sessions.contains_key(&session.auth_token) {
+                            if !has_valid_auth_session(
+                                &recv_state.auth_sessions,
+                                &session.auth_token,
+                            ) {
                                 warn!(
                                     "Spectator {} upgrade rejected: auth token expired for session {}",
                                     recv_spectator_id, session_id
@@ -213,6 +216,7 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                             let welcome = ServerMessage::Welcome {
                                 player_id: player_id.clone(),
                                 is_new_character,
+                                protocol_version: protocol::PROTOCOL_VERSION,
                             };
                             if let Ok(bytes) = protocol::encode_server_message(&welcome) {
                                 let _ = recv_tx.send(bytes).await;
@@ -305,10 +309,9 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                             // Prayer state
                             if let Some(prayer_state) =
                                 recv_room.get_player_prayer_state(&player_id).await
+                                && let Ok(bytes) = protocol::encode_server_message(&prayer_state)
                             {
-                                if let Ok(bytes) = protocol::encode_server_message(&prayer_state) {
-                                    let _ = recv_tx.send(bytes).await;
-                                }
+                                let _ = recv_tx.send(bytes).await;
                             }
 
                             // Collection log definitions
@@ -358,12 +361,10 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                                             if let Some(chunk_msg) = recv_room
                                                 .handle_chunk_request(coord.x, coord.y)
                                                 .await
-                                            {
-                                                if let Ok(bytes) =
+                                                && let Ok(bytes) =
                                                     protocol::encode_server_message(&chunk_msg)
-                                                {
-                                                    let _ = recv_tx.send(bytes).await;
-                                                }
+                                            {
+                                                let _ = recv_tx.send(bytes).await;
                                             }
                                         }
                                     }
@@ -477,28 +478,25 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                             // Inventory
                             if let Some(inv_msg) =
                                 recv_room.get_player_inventory_update(&player_id).await
+                                && let Ok(bytes) = protocol::encode_server_message(&inv_msg)
                             {
-                                if let Ok(bytes) = protocol::encode_server_message(&inv_msg) {
-                                    let _ = recv_tx.send(bytes).await;
-                                }
+                                let _ = recv_tx.send(bytes).await;
                             }
 
                             // Skills
                             if let Some(skills_msg) =
                                 recv_room.get_player_skills_sync(&player_id).await
+                                && let Ok(bytes) = protocol::encode_server_message(&skills_msg)
                             {
-                                if let Ok(bytes) = protocol::encode_server_message(&skills_msg) {
-                                    let _ = recv_tx.send(bytes).await;
-                                }
+                                let _ = recv_tx.send(bytes).await;
                             }
 
                             // Potion buffs
                             if let Some(buffs_msg) =
                                 recv_room.get_player_potion_buffs_sync(&player_id).await
+                                && let Ok(bytes) = protocol::encode_server_message(&buffs_msg)
                             {
-                                if let Ok(bytes) = protocol::encode_server_message(&buffs_msg) {
-                                    let _ = recv_tx.send(bytes).await;
-                                }
+                                let _ = recv_tx.send(bytes).await;
                             }
 
                             // Top total level player (trophy icon) — refresh from DB and broadcast to all
@@ -646,9 +644,10 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                             }
                             let (_, removed_sess) = removed_session.unwrap();
                             let character_id = removed_sess.character_id;
-                            let should_save = recv_state
-                                .auth_sessions
-                                .contains_key(&removed_sess.auth_token);
+                            let should_save = has_valid_auth_session(
+                                &recv_state.auth_sessions,
+                                &removed_sess.auth_token,
+                            );
 
                             info!(
                                 "Upgraded player {} ({}) disconnected",
@@ -665,22 +664,21 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                                         .await
                                         .get(&player_id)
                                         .cloned();
-                                    if let Some(ref inst_id) = instance_id {
-                                        if let Some((ex, ey)) =
+                                    if let Some(ref inst_id) = instance_id
+                                        && let Some((ex, ey)) =
                                             recv_room.get_koth_entrance(inst_id).await
-                                        {
-                                            // Reset player to overworld position before save
-                                            recv_room
-                                                .set_player_position_and_z(&player_id, ex, ey, 0)
-                                                .await;
-                                            // Remove from instance tracking so save doesn't
-                                            // record the KOTH map as current_map
-                                            recv_state
-                                                .player_instances
-                                                .write()
-                                                .await
-                                                .remove(&player_id);
-                                        }
+                                    {
+                                        // Reset player to overworld position before save
+                                        recv_room
+                                            .set_player_position_and_z(&player_id, ex, ey, 0)
+                                            .await;
+                                        // Remove from instance tracking so save doesn't
+                                        // record the KOTH map as current_map
+                                        recv_state
+                                            .player_instances
+                                            .write()
+                                            .await
+                                            .remove(&player_id);
                                     }
                                 }
 
@@ -706,37 +704,7 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                                     }
                                     if let Err(e) = recv_state
                                         .db
-                                        .save_character(
-                                            character_id,
-                                            save_data.x,
-                                            save_data.y,
-                                            save_data.z,
-                                            save_data.hp,
-                                            save_data.prayer_points,
-                                            save_data.mp,
-                                            &save_data.skills,
-                                            save_data.gold,
-                                            &save_data.inventory_json,
-                                            save_data.equipped_head.as_deref(),
-                                            save_data.equipped_body.as_deref(),
-                                            save_data.equipped_weapon.as_deref(),
-                                            save_data.equipped_back.as_deref(),
-                                            save_data.equipped_feet.as_deref(),
-                                            save_data.equipped_ring.as_deref(),
-                                            save_data.equipped_gloves.as_deref(),
-                                            save_data.equipped_necklace.as_deref(),
-                                            save_data.equipped_belt.as_deref(),
-                                            played_time_delta,
-                                            save_data.current_map.as_deref(),
-                                            save_data.sitting_at_x,
-                                            save_data.sitting_at_y,
-                                            save_data.entrance_x,
-                                            save_data.entrance_y,
-                                            &save_data.bank_json,
-                                            save_data.bank_gold,
-                                            save_data.bank_max_slots,
-                                            &save_data.combat_style_prefs,
-                                        )
+                                        .save_character(character_id, &save_data, played_time_delta)
                                         .await
                                     {
                                         error!(
@@ -752,29 +720,28 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
                                 }
 
                                 // Save quest state
-                                if character_id > 0 {
-                                    if let Some(quest_state) =
+                                if character_id > 0
+                                    && let Some(quest_state) =
                                         recv_room.get_player_quest_state(&player_id).await
+                                {
+                                    if let Err(e) = recv_state
+                                        .db
+                                        .save_character_quest_state(character_id, &quest_state)
+                                        .await
                                     {
-                                        if let Err(e) = recv_state
-                                            .db
-                                            .save_character_quest_state(character_id, &quest_state)
-                                            .await
-                                        {
-                                            error!(
-                                                "Failed to save quest state for {} on disconnect: {}",
-                                                character_name, e
-                                            );
-                                        } else if !quest_state.active_quests.is_empty()
-                                            || !quest_state.completed_quests.is_empty()
-                                        {
-                                            info!(
-                                                "Saved quest state for {}: {} active, {} completed",
-                                                character_name,
-                                                quest_state.active_quests.len(),
-                                                quest_state.completed_quests.len()
-                                            );
-                                        }
+                                        error!(
+                                            "Failed to save quest state for {} on disconnect: {}",
+                                            character_name, e
+                                        );
+                                    } else if !quest_state.active_quests.is_empty()
+                                        || !quest_state.completed_quests.is_empty()
+                                    {
+                                        info!(
+                                            "Saved quest state for {}: {} active, {} completed",
+                                            character_name,
+                                            quest_state.active_quests.len(),
+                                            quest_state.completed_quests.len()
+                                        );
                                     }
                                 }
 
@@ -889,12 +856,11 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
 
                                         if remaining == 0
                                             && instance.instance_type == InstanceType::Private
+                                            && let Some(owner_id) = &instance.owner_id
                                         {
-                                            if let Some(owner_id) = &instance.owner_id {
-                                                recv_state
-                                                    .instance_manager
-                                                    .remove_private(owner_id, &instance.map_id);
-                                            }
+                                            recv_state
+                                                .instance_manager
+                                                .remove_private(owner_id, &instance.map_id);
                                         }
                                     }
                                 }
@@ -958,7 +924,6 @@ pub(super) async fn handle_spectator(socket: WebSocket, state: AppState, room: A
             match tokio::time::timeout(Duration::from_secs(10), recv_task).await {
                 Ok(Ok(true)) => {
                     // recv_task completed and handled player cleanup
-                    return;
                 }
                 _ => {
                     // recv_task didn't complete or wasn't upgraded — clean up spectator

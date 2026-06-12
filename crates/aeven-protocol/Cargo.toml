@@ -1,0 +1,14 @@
+[package]
+name = "aeven-protocol"
+version = "1.0.0"
+edition = "2024"
+description = "Versioned wire contracts shared by the Aeven client and server"
+license = "MIT"
+
+[lints]
+workspace = true
+
+[dependencies]
+rmpv = { version = "1.3", features = ["with-serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -1,5 +1,7 @@
 use super::*;
 
+type SenderRef<'a> = (&'a String, &'a mpsc::Sender<Vec<u8>>);
+
 impl GameRoom {
     pub async fn tick(&self) -> TickTelemetry {
         let mut tick_telemetry = TickTelemetry {
@@ -429,18 +431,8 @@ impl GameRoom {
         let state_sync_start = std::time::Instant::now();
         let tick = *self.tick.read().await;
 
-        let (instance_snapshot, senders_snapshot) = {
-            let player_instances = self.player_instances.read().await;
-            let senders = self.player_senders.read().await;
-
-            // Snapshot instance assignments: player_id -> instance_id
-            let inst: HashMap<String, String> = player_instances.clone();
-            // Snapshot senders (mpsc::Sender is cheap to clone)
-            let send: HashMap<String, mpsc::Sender<Vec<u8>>> = senders.clone();
-
-            (inst, send)
-            // Both read locks released here
-        };
+        let instance_snapshot: HashMap<String, String> = self.player_instances.read().await.clone();
+        let senders_snapshot = self.transport.player_senders().await;
 
         // Build quest lookup snapshots once per tick so StateSync avoids repeated async
         // registry lookups while evaluating per-player quest marker visibility.
@@ -553,9 +545,8 @@ impl GameRoom {
             .collect();
 
         // Separate overworld vs instance senders
-        let mut instance_groups: HashMap<&str, Vec<(&String, &mpsc::Sender<Vec<u8>>)>> =
-            HashMap::new();
-        let mut overworld_senders: Vec<(&String, &mpsc::Sender<Vec<u8>>)> = Vec::new();
+        let mut instance_groups: HashMap<&str, Vec<SenderRef<'_>>> = HashMap::new();
+        let mut overworld_senders: Vec<SenderRef<'_>> = Vec::new();
         for (player_id, sender) in senders_snapshot.iter() {
             match instance_snapshot.get(player_id) {
                 Some(inst_id) => instance_groups
@@ -622,13 +613,13 @@ impl GameRoom {
                     .map(|n| {
                         let mut n_for_player = n.clone();
                         // Hide quest giver icon for merchant NPCs whose quests are all done
-                        if n_for_player.is_quest_giver && n_for_player.is_merchant {
-                            if done_npcs
+                        if n_for_player.is_quest_giver
+                            && n_for_player.is_merchant
+                            && done_npcs
                                 .map(|set| set.contains(n_for_player.prototype_id.as_str()))
                                 .unwrap_or(false)
-                            {
-                                n_for_player.is_quest_giver = false;
-                            }
+                        {
+                            n_for_player.is_quest_giver = false;
                         }
                         n_for_player.can_turn_in_quest = n_for_player.is_quest_giver
                             && ready_turnin_npcs
@@ -638,7 +629,7 @@ impl GameRoom {
                     })
                     .collect();
 
-                let Some(mut sync_state) = self.sync_states.get_mut(pid.as_str()) else {
+                let Some(mut sync_state) = self.transport.sync_state(pid.as_str()) else {
                     continue;
                 };
                 sync_state.ensure_context(inst_id);
@@ -812,31 +803,30 @@ impl GameRoom {
         for (player_id, sender) in &overworld_senders {
             if sender.capacity() < STATE_SYNC_MIN_QUEUE_CAPACITY {
                 tick_telemetry.state_sync_capacity_skips += 1;
-                if sender.capacity() > 0 {
-                    if let Some(self_update) = overworld_player_map.get(player_id.as_str()) {
-                        let self_values =
-                            vec![crate::protocol::player_update_to_value(self_update)];
-                        if let Ok(raw) = crate::protocol::encode_delta_state_sync(
-                            tick,
-                            self_values,
-                            Vec::new(),
-                            "",
-                            false,
-                            &[],
-                            &[],
-                        ) {
-                            let raw_len = raw.len();
-                            let bytes = crate::protocol::maybe_compress(raw);
-                            let bytes_len = bytes.len();
-                            tick_telemetry.state_sync_send_attempts += 1;
-                            tick_telemetry.state_sync_delta_sends += 1;
-                            tick_telemetry.state_sync_fallback_self_only_sends += 1;
-                            tick_telemetry.state_sync_raw_bytes += raw_len;
-                            tick_telemetry.state_sync_bytes_sent += bytes_len;
-                            if let Err(e) = sender.try_send(bytes) {
-                                tick_telemetry.state_sync_try_send_drops += 1;
-                                tracing::debug!("StateSync fallback drop for {}: {}", player_id, e);
-                            }
+                if sender.capacity() > 0
+                    && let Some(self_update) = overworld_player_map.get(player_id.as_str())
+                {
+                    let self_values = vec![crate::protocol::player_update_to_value(self_update)];
+                    if let Ok(raw) = crate::protocol::encode_delta_state_sync(
+                        tick,
+                        self_values,
+                        Vec::new(),
+                        "",
+                        false,
+                        &[],
+                        &[],
+                    ) {
+                        let raw_len = raw.len();
+                        let bytes = crate::protocol::maybe_compress(raw);
+                        let bytes_len = bytes.len();
+                        tick_telemetry.state_sync_send_attempts += 1;
+                        tick_telemetry.state_sync_delta_sends += 1;
+                        tick_telemetry.state_sync_fallback_self_only_sends += 1;
+                        tick_telemetry.state_sync_raw_bytes += raw_len;
+                        tick_telemetry.state_sync_bytes_sent += bytes_len;
+                        if let Err(e) = sender.try_send(bytes) {
+                            tick_telemetry.state_sync_try_send_drops += 1;
+                            tracing::debug!("StateSync fallback drop for {}: {}", player_id, e);
                         }
                     }
                 }
@@ -899,7 +889,7 @@ impl GameRoom {
                         .unwrap_or(false);
             }
 
-            let Some(mut sync_state) = self.sync_states.get_mut(player_id.as_str()) else {
+            let Some(mut sync_state) = self.transport.sync_state(player_id.as_str()) else {
                 continue;
             };
             sync_state.ensure_context("");
@@ -914,7 +904,7 @@ impl GameRoom {
                     .collect();
                 let npc_values: Vec<rmpv::Value> = nearby_npcs
                     .values()
-                    .map(|n| crate::protocol::npc_update_to_value(n))
+                    .map(crate::protocol::npc_update_to_value)
                     .collect();
 
                 if let Ok(raw) = crate::protocol::encode_state_sync_from_values(
@@ -1025,7 +1015,7 @@ impl GameRoom {
         // Generate a single StateSync for all spectators, centered on world spawn.
         // Spectators are read-only observers so we skip quest turn-in icons and delta
         // compression — one full encode shared across every spectator connection.
-        let spectator_senders = self.spectator_senders.read().await;
+        let spectator_senders = self.transport.spectator_senders().await;
         let spectator_count = spectator_senders.len();
         if !spectator_senders.is_empty() {
             // Gather players near spawn with VIEW_DISTANCE culling
@@ -1061,8 +1051,6 @@ impl GameRoom {
                 }
             }
         }
-        drop(spectator_senders);
-
         let state_sync_ms = state_sync_start.elapsed().as_millis();
 
         // Cancel trades if players moved too far apart
@@ -1129,7 +1117,7 @@ impl GameRoom {
                 let players = self.players.read().await;
                 players
                     .values()
-                    .filter(|p| p.stall.as_ref().map_or(false, |s| s.active) && p.is_dead)
+                    .filter(|p| p.stall.as_ref().is_some_and(|s| s.active) && p.is_dead)
                     .map(|p| p.id.clone())
                     .collect()
             };

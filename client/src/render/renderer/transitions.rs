@@ -49,7 +49,7 @@ impl Renderer {
             return;
         }
 
-        let (sw, sh) = virtual_screen_size();
+        let (sw, _sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
         let font_size = 24.0;
         let skip_font_size = 16.0;

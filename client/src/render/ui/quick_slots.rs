@@ -36,7 +36,7 @@ impl Renderer {
         let arrow_h = (14.0 * scale).max(12.0);
         let preset_num_w = (18.0 * scale).max(16.0);
         let preset_block_w = arrow_w.max(preset_num_w);
-        let preset_block_h = arrow_h * 2.0 + preset_num_w; // up + number + down
+        let _preset_block_h = arrow_h * 2.0 + preset_num_w; // up + number + down
         let left_controls_w = cog_size + spacing + preset_block_w + spacing;
 
         // Center the whole assembly (left controls + slots)
@@ -307,7 +307,7 @@ impl Renderer {
                         );
 
                         // Cooldown overlay
-                        let on_cooldown = state.spell_cooldowns.get(id).map_or(false, |&t| now < t);
+                        let on_cooldown = state.spell_cooldowns.get(id).is_some_and(|&t| now < t);
                         let insufficient_mana = player_mp < mana_cost;
 
                         if on_cooldown {
@@ -414,7 +414,7 @@ impl Renderer {
         }
 
         let (sw, sh) = virtual_screen_size();
-        let scale = state.ui_state.ui_scale;
+        let _scale = state.ui_state.ui_scale;
         let active_preset = state.ui_state.hotkey_bar.active();
         let now = macroquad::time::get_time();
         let player_mp = state.get_local_player().map(|p| p.mp).unwrap_or(0);
@@ -427,8 +427,8 @@ impl Renderer {
                              // 3 slots in an arc: left (170°), upper-left (130°), top (90°)
         let angles: [f32; 3] = [170.0_f32, 130.0, 90.0];
 
-        for i in 0..3 {
-            let angle_rad = angles[i].to_radians();
+        for (i, angle) in angles.iter().enumerate() {
+            let angle_rad = angle.to_radians();
             let cx = attack_cx + arc_dist * angle_rad.cos();
             let cy = attack_cy - arc_dist * angle_rad.sin();
             let slot_rect = Rect::new(cx - radius, cy - radius, radius * 2.0, radius * 2.0);
@@ -569,7 +569,7 @@ impl Renderer {
                         );
 
                         // Cooldown overlay
-                        let on_cooldown = state.spell_cooldowns.get(id).map_or(false, |&t| now < t);
+                        let on_cooldown = state.spell_cooldowns.get(id).is_some_and(|&t| now < t);
                         let insufficient_mana = player_mp < mana_cost;
 
                         if on_cooldown {
@@ -674,7 +674,7 @@ impl Renderer {
         let preview_spacing = (popup_w - 16.0 - 5.0 * preview_slot_size) / 4.0;
         let preview_y = tab_y + tab_h + 8.0;
         let active_preset = state.ui_state.hotkey_bar.active();
-        let now = macroquad::time::get_time();
+        let _now = macroquad::time::get_time();
 
         for i in 0..5 {
             let px = popup_x + 8.0 + i as f32 * (preview_slot_size + preview_spacing);

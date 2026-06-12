@@ -282,8 +282,9 @@ impl InputHandler {
                         let text = state.ui_state.chat_input.trim().to_string();
                         // Determine channel: ~ prefix forces global, otherwise match active tab
                         // System tab sends to public channel
-                        let (send_text, channel) = if text.starts_with('~') {
-                            let trimmed = text[1..].trim().to_string();
+                        let (send_text, channel) = if let Some(global_text) = text.strip_prefix('~')
+                        {
+                            let trimmed = global_text.trim().to_string();
                             (trimmed, "global".to_string())
                         } else {
                             let ch = match state.ui_state.chat_active_tab {

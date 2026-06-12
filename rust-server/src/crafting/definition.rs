@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 /// Recipe categories for UI organization
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum RecipeCategory {
     Consumables,
+    #[default]
     Materials,
     Equipment,
     Tools,
@@ -18,12 +20,6 @@ pub enum RecipeCategory {
     Cooking,
     Fletching,
     Leatherworking,
-}
-
-impl Default for RecipeCategory {
-    fn default() -> Self {
-        RecipeCategory::Materials
-    }
 }
 
 impl RecipeCategory {

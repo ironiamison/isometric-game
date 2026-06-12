@@ -13,11 +13,11 @@ use crate::game::{
     AdventureBoardStatsInfo, CatalogObjective, ChatBubble, ChatChannel, ChatMessage,
     ConnectionStatus, CraftingOrderActiveInfo, CraftingOrderItemInfo, CraftingOrderOfferInfo,
     CraftingOrderStatsInfo, DamageEvent, DialogueChoice, Direction, EquipmentStats, FarmingPatch,
-    FriendInfo, GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot,
-    ItemDefinition, LevelUpEvent, MapObject, OnlinePlayerInfo, PendingRequestInfo, Player, Portal,
-    QuestCatalogEntry, QuestCompletedEvent, QuestObjective, RecipeDefinition, RecipeIngredient,
-    RecipeResult, ShopData, ShopStockItem, SkillType, SkillXpEvent, SpellEffect, TransitionState,
-    Wall, WallEdge, WorldMapBounds, WorldMapChunkSample, WorldMapPoi, WorldMapSnapshot,
+    GameState, GatheringBuff, GatheringMarker, GroundItem, InventorySlot, ItemDefinition,
+    LevelUpEvent, MapObject, Player, Portal, QuestCatalogEntry, QuestCompletedEvent,
+    QuestObjective, RecipeDefinition, RecipeIngredient, RecipeResult, ShopData, ShopStockItem,
+    SkillType, SkillXpEvent, SpellEffect, TransitionState, Wall, WallEdge, WorldMapBounds,
+    WorldMapChunkSample, WorldMapPoi, WorldMapSnapshot,
 };
 use crate::render::animation::{NpcAnimationLayout, NpcAnimationState};
 use crate::render::OVERWORLD_NAME;
@@ -128,19 +128,17 @@ fn extract_slayer_rewards(
     key: &str,
 ) -> Vec<crate::game::slayer::SlayerRewardClientData> {
     let mut rewards = Vec::new();
-    if let Some(arr) = extract_map_field(value, key) {
-        if let rmpv::Value::Array(ref items) = *arr {
-            for item in items {
-                rewards.push(crate::game::slayer::SlayerRewardClientData {
-                    id: extract_string(item, "id").unwrap_or_default(),
-                    display_name: extract_string(item, "display_name").unwrap_or_default(),
-                    description: extract_string(item, "description").unwrap_or_default(),
-                    cost: extract_i32(item, "cost").unwrap_or(0),
-                    category: extract_string(item, "category").unwrap_or_default(),
-                    target_id: extract_string(item, "target_id"),
-                    quantity: extract_i32(item, "quantity").unwrap_or(1),
-                });
-            }
+    if let Some(rmpv::Value::Array(items)) = extract_map_field(value, key) {
+        for item in items {
+            rewards.push(crate::game::slayer::SlayerRewardClientData {
+                id: extract_string(item, "id").unwrap_or_default(),
+                display_name: extract_string(item, "display_name").unwrap_or_default(),
+                description: extract_string(item, "description").unwrap_or_default(),
+                cost: extract_i32(item, "cost").unwrap_or(0),
+                category: extract_string(item, "category").unwrap_or_default(),
+                target_id: extract_string(item, "target_id"),
+                quantity: extract_i32(item, "quantity").unwrap_or(1),
+            });
         }
     }
     rewards
@@ -148,12 +146,10 @@ fn extract_slayer_rewards(
 
 fn extract_string_array(value: &rmpv::Value, key: &str) -> Vec<String> {
     let mut result = Vec::new();
-    if let Some(arr) = extract_map_field(value, key) {
-        if let rmpv::Value::Array(ref items) = *arr {
-            for item in items {
-                if let Some(s) = item.as_str() {
-                    result.push(s.to_string());
-                }
+    if let Some(rmpv::Value::Array(items)) = extract_map_field(value, key) {
+        for item in items {
+            if let Some(s) = item.as_str() {
+                result.push(s.to_string());
             }
         }
     }
@@ -162,14 +158,12 @@ fn extract_string_array(value: &rmpv::Value, key: &str) -> Vec<String> {
 
 fn extract_blockable_monsters(value: &rmpv::Value, key: &str) -> Vec<(String, String)> {
     let mut result = Vec::new();
-    if let Some(arr) = extract_map_field(value, key) {
-        if let rmpv::Value::Array(ref items) = *arr {
-            for item in items {
-                let id = extract_string(item, "id").unwrap_or_default();
-                let name = extract_string(item, "name").unwrap_or_default();
-                if !id.is_empty() {
-                    result.push((id, name));
-                }
+    if let Some(rmpv::Value::Array(items)) = extract_map_field(value, key) {
+        for item in items {
+            let id = extract_string(item, "id").unwrap_or_default();
+            let name = extract_string(item, "name").unwrap_or_default();
+            if !id.is_empty() {
+                result.push((id, name));
             }
         }
     }
@@ -177,6 +171,18 @@ fn extract_blockable_monsters(value: &rmpv::Value, key: &str) -> Vec<(String, St
 }
 
 fn handle_welcome(value: &rmpv::Value, state: &mut GameState) {
+    let protocol_version = extract_u32(value, "protocol_version").unwrap_or(0);
+    if protocol_version != u32::from(aeven_protocol::PROTOCOL_VERSION) {
+        log::error!(
+            "Incompatible protocol version: server={}, client={}",
+            protocol_version,
+            aeven_protocol::PROTOCOL_VERSION
+        );
+        state.connection_status = ConnectionStatus::Disconnected;
+        state.disconnect_requested = true;
+        return;
+    }
+
     if let Some(player_id) = extract_string(value, "player_id") {
         log::info!("Welcome! Player ID: {}", player_id);
         state.local_player_id = Some(player_id);
@@ -756,7 +762,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
             let prev_tile = state.last_portal_check_pos;
 
             // Only check for portal if we moved to a different tile
-            let moved_tiles = prev_tile.map_or(false, |prev| prev != current_tile);
+            let moved_tiles = prev_tile.is_some_and(|prev| prev != current_tile);
 
             // Clear the ignored portal tile once the player steps off it
             if moved_tiles {
@@ -769,9 +775,7 @@ fn handle_state_sync(value: &rmpv::Value, state: &mut GameState) {
 
             if moved_tiles
                 && state.pending_portal_id.is_none()
-                && state
-                    .portal_ignore_tile
-                    .map_or(true, |ignored| current_tile != ignored)
+                && (state.portal_ignore_tile != Some(current_tile))
                 && matches!(state.map_transition.state, TransitionState::None)
             {
                 if let Some(portal) = state
@@ -1021,6 +1025,10 @@ mod tests {
         let welcome = map(vec![
             ("player_id", Value::from("player-1")),
             ("is_new_character", Value::from(false)),
+            (
+                "protocol_version",
+                Value::from(aeven_protocol::PROTOCOL_VERSION),
+            ),
         ]);
 
         handle_room_data("welcome", Some(&welcome), &mut state);
@@ -1034,6 +1042,22 @@ mod tests {
         assert_eq!(state.last_acked_move_seq, 0);
         assert!(!state.has_pending_move_sequences());
         assert!(!state.tutorial_pending);
+    }
+
+    #[test]
+    fn welcome_rejects_an_incompatible_protocol() {
+        let mut state = GameState::new();
+        let welcome = map(vec![
+            ("player_id", Value::from("player-1")),
+            ("is_new_character", Value::from(false)),
+            ("protocol_version", Value::from(999)),
+        ]);
+
+        handle_room_data("welcome", Some(&welcome), &mut state);
+
+        assert!(state.local_player_id.is_none());
+        assert!(state.disconnect_requested);
+        assert_eq!(state.connection_status, ConnectionStatus::Disconnected);
     }
 
     #[test]

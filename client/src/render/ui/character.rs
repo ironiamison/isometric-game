@@ -83,8 +83,8 @@ impl Renderer {
         let panel_padding = CHARACTER_PANEL_PADDING * scale;
         let slot_size = (EQUIP_SLOT_SIZE * scale).max(MIN_SLOT_SIZE); // Ensure icons fit
         let slot_spacing = EQUIP_SLOT_SPACING * scale;
-        let button_size = MENU_BUTTON_SIZE * scale;
-        let exp_bar_gap = EXP_BAR_GAP * scale;
+        let _button_size = MENU_BUTTON_SIZE * scale;
+        let _exp_bar_gap = EXP_BAR_GAP * scale;
         let stats_gap = STATS_SECTION_GAP * scale;
         let grid_width = CHARACTER_GRID_WIDTH * scale;
 

@@ -1,0 +1,3 @@
+# Rendering and simulation entry points often pass a complete coordinate/state
+# context. Larger APIs must use a named payload instead.
+too-many-arguments-threshold = 14

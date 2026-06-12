@@ -2,14 +2,18 @@ use super::chunk::ChunkManager;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
+pub type GridPosition = (i32, i32);
+pub type Path = Vec<GridPosition>;
+pub type DestinationPath = (GridPosition, Path);
+
 /// State for tracking automated pathfinding movement
 #[derive(Debug, Clone)]
 pub struct PathState {
-    pub path: Vec<(i32, i32)>,           // Waypoints (grid coordinates)
-    pub current_index: usize,            // Current waypoint being targeted
-    pub destination: (i32, i32),         // Final target
-    pub pickup_target: Option<String>,   // Item ID to pick up when path completes
-    pub interact_target: Option<String>, // NPC ID to interact with on path completion
+    pub path: Path,                                 // Waypoints (grid coordinates)
+    pub current_index: usize,                       // Current waypoint being targeted
+    pub destination: (i32, i32),                    // Final target
+    pub pickup_target: Option<String>,              // Item ID to pick up when path completes
+    pub interact_target: Option<String>,            // NPC ID to interact with on path completion
     pub interact_object_target: Option<(i32, i32)>, // Map object (x,y) to interact with on path completion
     pub waystone_target: Option<(i32, i32)>, // Waystone (x,y) to teleport directly on path completion
     pub browse_stall_target: Option<String>, // Player ID to browse stall on path completion
@@ -69,7 +73,7 @@ pub fn find_path(
     chunk_manager: &ChunkManager,
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
-) -> Option<Vec<(i32, i32)>> {
+) -> Option<Path> {
     // Early exit: already at goal
     if start == goal {
         return Some(vec![goal]);
@@ -178,7 +182,7 @@ pub fn find_path_to_adjacent(
     chunk_manager: &ChunkManager,
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
-) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+) -> Option<DestinationPath> {
     // Check all 4 cardinal directions
     let adjacent_tiles = [
         (target.0, target.1 - 1), // North
@@ -187,7 +191,7 @@ pub fn find_path_to_adjacent(
         (target.0 + 1, target.1), // East
     ];
 
-    let mut best_path: Option<((i32, i32), Vec<(i32, i32)>)> = None;
+    let mut best_path: Option<DestinationPath> = None;
     let mut best_length = i32::MAX;
 
     for adj in adjacent_tiles {
@@ -224,7 +228,7 @@ pub fn find_path_within_range(
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
     range: i32,
-) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+) -> Option<DestinationPath> {
     // Already in range?
     let dx = (start.0 - target.0).abs();
     let dy = (start.1 - target.1).abs();
@@ -336,7 +340,7 @@ pub fn find_path_to_adjacent_prefer(
     occupied: &HashSet<(i32, i32)>,
     max_distance: i32,
     preferred_adjacent: Option<(i32, i32)>,
-) -> Option<((i32, i32), Vec<(i32, i32)>)> {
+) -> Option<DestinationPath> {
     // Check all 4 cardinal directions
     let adjacent_tiles = [
         (target.0, target.1 - 1), // North
@@ -345,7 +349,7 @@ pub fn find_path_to_adjacent_prefer(
         (target.0 + 1, target.1), // East
     ];
 
-    let mut best_path: Option<((i32, i32), Vec<(i32, i32)>)> = None;
+    let mut best_path: Option<DestinationPath> = None;
     let mut best_length = i32::MAX;
     let mut best_preferred = false;
     let mut best_secondary = i32::MAX;
@@ -363,7 +367,7 @@ pub fn find_path_to_adjacent_prefer(
 
         if let Some(path) = find_path(start, adj, chunk_manager, occupied, max_distance) {
             let path_len = path.len() as i32;
-            let is_preferred = preferred_adjacent.map_or(false, |p| p == adj);
+            let is_preferred = preferred_adjacent == Some(adj);
             let secondary = heuristic(start, adj);
 
             let better = path_len < best_length

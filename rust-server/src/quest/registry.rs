@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use super::definition::{ObjectiveType, Quest, RawQuestFile};
 use super::events::{QuestEvent, QuestEventResult};
@@ -72,7 +72,7 @@ impl QuestRegistry {
 
             if path.is_dir() {
                 self.load_quests_recursive_sync(&path, paths)?;
-            } else if path.extension().map_or(false, |ext| ext == "toml") {
+            } else if path.extension().is_some_and(|ext| ext == "toml") {
                 paths.push(path);
             }
         }
@@ -83,14 +83,23 @@ impl QuestRegistry {
     /// Load all quest files from collected paths
     async fn load_quest_files(&self, paths: Vec<PathBuf>) -> Result<usize, String> {
         let mut count = 0;
+        let mut failures = Vec::new();
         for path in paths {
             if let Err(e) = self.load_quest_file(&path).await {
-                warn!("Failed to load quest {:?}: {}", path, e);
+                failures.push(format!("{path:?}: {e}"));
             } else {
                 count += 1;
             }
         }
-        Ok(count)
+        if failures.is_empty() {
+            Ok(count)
+        } else {
+            Err(format!(
+                "failed to load {} quest file(s):\n{}",
+                failures.len(),
+                failures.join("\n")
+            ))
+        }
     }
 
     /// Load a single quest file
@@ -141,33 +150,33 @@ impl QuestRegistry {
 
         for quest in quests.values() {
             // Check previous quest exists
-            if let Some(ref prev_id) = quest.chain.previous {
-                if !quests.contains_key(prev_id) {
-                    warn!(
-                        "Quest '{}' references non-existent previous quest '{}'",
-                        quest.id, prev_id
-                    );
-                }
+            if let Some(ref prev_id) = quest.chain.previous
+                && !quests.contains_key(prev_id)
+            {
+                warn!(
+                    "Quest '{}' references non-existent previous quest '{}'",
+                    quest.id, prev_id
+                );
             }
 
             // Check next quest exists
-            if let Some(ref next_id) = quest.chain.next {
-                if !quests.contains_key(next_id) {
-                    warn!(
-                        "Quest '{}' references non-existent next quest '{}'",
-                        quest.id, next_id
-                    );
-                }
+            if let Some(ref next_id) = quest.chain.next
+                && !quests.contains_key(next_id)
+            {
+                warn!(
+                    "Quest '{}' references non-existent next quest '{}'",
+                    quest.id, next_id
+                );
             }
 
             // Check branch_from quest exists
-            if let Some(ref branch_id) = quest.chain.branch_from {
-                if !quests.contains_key(branch_id) {
-                    warn!(
-                        "Quest '{}' references non-existent branch_from quest '{}'",
-                        quest.id, branch_id
-                    );
-                }
+            if let Some(ref branch_id) = quest.chain.branch_from
+                && !quests.contains_key(branch_id)
+            {
+                warn!(
+                    "Quest '{}' references non-existent branch_from quest '{}'",
+                    quest.id, branch_id
+                );
             }
         }
 
@@ -226,13 +235,13 @@ impl QuestRegistry {
                     .map(|o| (o.id.clone(), o.count))
                     .collect();
 
-                if let Some(progress) = player_state.active_quests.get_mut(&quest_id) {
-                    if progress.reconcile_objectives(&current_targets) {
-                        tracing::info!(
-                            "Reconciled objectives for quest {} — synced with current definition",
-                            quest_id
-                        );
-                    }
+                if let Some(progress) = player_state.active_quests.get_mut(&quest_id)
+                    && progress.reconcile_objectives(&current_targets)
+                {
+                    tracing::info!(
+                        "Reconciled objectives for quest {} — synced with current definition",
+                        quest_id
+                    );
                 }
             }
         }
@@ -266,17 +275,17 @@ impl QuestRegistry {
         }
 
         // Check prerequisite quest
-        if let Some(ref prev_id) = quest.chain.previous {
-            if !player_state.is_quest_completed(prev_id) {
-                return false;
-            }
+        if let Some(ref prev_id) = quest.chain.previous
+            && !player_state.is_quest_completed(prev_id)
+        {
+            return false;
         }
 
         // Check branch_from quest
-        if let Some(ref branch_id) = quest.chain.branch_from {
-            if !player_state.is_quest_completed(branch_id) {
-                return false;
-            }
+        if let Some(ref branch_id) = quest.chain.branch_from
+            && !player_state.is_quest_completed(branch_id)
+        {
+            return false;
         }
 
         true
@@ -383,10 +392,10 @@ impl QuestRegistry {
                             || objective.aliases.iter().any(|a| a == entity_type))
                     {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
                         if let Some(result) =
                             self.update_single_objective(player_state, &quest_id, &objective.id, 1)
@@ -494,10 +503,10 @@ impl QuestRegistry {
                         && objective.target == item_id
                     {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
                         if let Some(result) = self.update_single_objective(
                             player_state,
@@ -533,10 +542,10 @@ impl QuestRegistry {
                         && objective.target == npc_id
                     {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
 
                         if let Some(result) =
@@ -606,10 +615,10 @@ impl QuestRegistry {
                         && objective.target == location_id
                     {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
                         if let Some(result) =
                             self.force_complete_objective(player_state, &quest_id, &objective.id)
@@ -654,10 +663,10 @@ impl QuestRegistry {
                         && objective.target == tree_type
                     {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
                         info!("Match found! Updating objective '{}'", objective.id);
                         if let Some(result) =
@@ -703,10 +712,10 @@ impl QuestRegistry {
                         && objective.target == rock_type
                     {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
                         info!("Match found! Updating objective '{}'", objective.id);
                         if let Some(result) =
@@ -740,10 +749,10 @@ impl QuestRegistry {
                         && objective.target.eq_ignore_ascii_case(skill)
                     {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
                         if let Some(result) = self.set_objective_progress(
                             player_state,
@@ -776,10 +785,10 @@ impl QuestRegistry {
                 for objective in &quest.objectives {
                     if objective.objective_type == ObjectiveType::ReachGold {
                         // Check sequential prerequisites
-                        if let Some(progress) = player_state.get_quest(&quest_id) {
-                            if !Self::is_objective_available(quest, objective, progress) {
-                                continue;
-                            }
+                        if let Some(progress) = player_state.get_quest(&quest_id)
+                            && !Self::is_objective_available(quest, objective, progress)
+                        {
+                            continue;
                         }
                         if let Some(result) = self.set_objective_progress(
                             player_state,
@@ -806,7 +815,7 @@ impl QuestRegistry {
     /// Reload a specific quest (for hot-reload)
     pub async fn reload_quest(&self, quest_id: &str) -> Result<(), String> {
         // Find the file for this quest
-        let quest = self
+        let _quest = self
             .get(quest_id)
             .await
             .ok_or_else(|| format!("Quest '{}' not found", quest_id))?;
@@ -858,16 +867,16 @@ impl QuestRegistry {
             };
 
             // Watch quest and script directories
-            if data_dir.exists() {
-                if let Err(e) = watcher.watch(&data_dir, RecursiveMode::Recursive) {
-                    tracing::error!("Failed to watch quest directory: {}", e);
-                }
+            if data_dir.exists()
+                && let Err(e) = watcher.watch(&data_dir, RecursiveMode::Recursive)
+            {
+                tracing::error!("Failed to watch quest directory: {}", e);
             }
 
-            if scripts_dir.exists() {
-                if let Err(e) = watcher.watch(&scripts_dir, RecursiveMode::Recursive) {
-                    tracing::error!("Failed to watch scripts directory: {}", e);
-                }
+            if scripts_dir.exists()
+                && let Err(e) = watcher.watch(&scripts_dir, RecursiveMode::Recursive)
+            {
+                tracing::error!("Failed to watch scripts directory: {}", e);
             }
 
             info!(
@@ -876,48 +885,39 @@ impl QuestRegistry {
             );
 
             // Process events
-            loop {
-                match notify_rx.recv() {
-                    Ok(event) => {
-                        // Only process modify/create events
-                        use notify::EventKind;
-                        match event.kind {
-                            EventKind::Modify(_) | EventKind::Create(_) => {
-                                for path in &event.paths {
-                                    let extension =
-                                        path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            while let Ok(event) = notify_rx.recv() {
+                // Only process modify/create events
+                use notify::EventKind;
+                match event.kind {
+                    EventKind::Modify(_) | EventKind::Create(_) => {
+                        for path in &event.paths {
+                            let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
-                                    if extension == "toml" || extension == "lua" {
-                                        info!("Detected change in {:?}, triggering reload", path);
+                            if extension == "toml" || extension == "lua" {
+                                info!("Detected change in {:?}, triggering reload", path);
 
-                                        // Trigger async reload
-                                        let reg = Arc::clone(&registry);
-                                        let tx = tx.clone();
-                                        let path_clone = path.clone();
+                                // Trigger async reload
+                                let reg = Arc::clone(&registry);
+                                let tx = tx.clone();
+                                let path_clone = path.clone();
 
-                                        rt.spawn(async move {
-                                            if let Err(e) = reg.load_all().await {
-                                                tracing::error!("Hot-reload failed: {}", e);
-                                                let _ = tx.send(HotReloadEvent::Error(e)).await;
-                                            } else {
-                                                info!("Hot-reload completed successfully");
-                                                let _ = tx
-                                                    .send(HotReloadEvent::Reloaded(
-                                                        path_clone.to_string_lossy().to_string(),
-                                                    ))
-                                                    .await;
-                                            }
-                                        });
+                                rt.spawn(async move {
+                                    if let Err(e) = reg.load_all().await {
+                                        tracing::error!("Hot-reload failed: {}", e);
+                                        let _ = tx.send(HotReloadEvent::Error(e)).await;
+                                    } else {
+                                        info!("Hot-reload completed successfully");
+                                        let _ = tx
+                                            .send(HotReloadEvent::Reloaded(
+                                                path_clone.to_string_lossy().to_string(),
+                                            ))
+                                            .await;
                                     }
-                                }
+                                });
                             }
-                            _ => {}
                         }
                     }
-                    Err(_) => {
-                        // Channel closed, exit
-                        break;
-                    }
+                    _ => {}
                 }
             }
         });

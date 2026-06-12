@@ -3,6 +3,9 @@ use super::{
 };
 use std::collections::{HashMap, HashSet};
 
+type PendingMove = (String, i32, i32, i32, i32, i32, bool, u32, u32);
+type InstanceCollisionSnapshot = (Vec<bool>, u32, u32, Option<Vec<u8>>);
+
 pub(in crate::game) struct MovementTickState {
     pub gathering_player_ids: HashSet<String>,
     pub moved_players: HashSet<String>,
@@ -94,11 +97,11 @@ impl GameRoom {
             };
             let mut gravity_heightmaps: HashMap<String, Option<Vec<u8>>> = HashMap::new();
             for inst_id in gravity_instance_map.values().flatten() {
-                if !gravity_heightmaps.contains_key(inst_id) {
-                    if let Some(instance) = self.instance_manager.get_by_instance_id(inst_id) {
-                        let hm = instance.heightmap.read().await;
-                        gravity_heightmaps.insert(inst_id.clone(), hm.clone());
-                    }
+                if !gravity_heightmaps.contains_key(inst_id)
+                    && let Some(instance) = self.instance_manager.get_by_instance_id(inst_id)
+                {
+                    let hm = instance.heightmap.read().await;
+                    gravity_heightmaps.insert(inst_id.clone(), hm.clone());
                 }
             }
 
@@ -178,7 +181,7 @@ impl GameRoom {
         }
 
         // (id, target_x, target_y, dx, dy, z, grounded, seq, ghost_player_ticks)
-        let pending_moves: Vec<(String, i32, i32, i32, i32, i32, bool, u32, u32)> = {
+        let pending_moves: Vec<PendingMove> = {
             let players = self.players.read().await;
             players
                 .values()
@@ -253,10 +256,8 @@ impl GameRoom {
                 .collect()
         };
 
-        let mut instance_collision_snapshots: HashMap<
-            String,
-            (Vec<bool>, u32, u32, Option<Vec<u8>>),
-        > = HashMap::new();
+        let mut instance_collision_snapshots: HashMap<String, InstanceCollisionSnapshot> =
+            HashMap::new();
         let mut instance_npc_positions: HashMap<String, HashSet<(i32, i32)>> = HashMap::new();
         {
             let needed_instances: HashSet<&String> = pending_moves
@@ -310,7 +311,7 @@ impl GameRoom {
                               player_grounded: bool,
                               move_dir: Direction,
                               record_telemetry: bool,
-                              ghosting: bool|
+                              _ghosting: bool|
          -> MoveCheck {
             let player_instance = player_instance_map.get(id);
             let is_overworld = player_instance.is_none();
@@ -400,29 +401,27 @@ impl GameRoom {
                 return MoveCheck::BlockedNpc;
             }
 
-            if is_overworld {
-                if let Some((occupied_by, chair_dir)) = chair_snapshot.get(&(target_x, target_y)) {
-                    if record_telemetry {
-                        tick_telemetry.rejected_chair_blocked += 1;
-                    }
-                    if occupied_by.is_none()
-                        && is_approaching_chair_from_front(move_dir, *chair_dir)
-                    {
-                        return MoveCheck::AutoSit;
-                    }
-                    return MoveCheck::BlockedChair;
+            if is_overworld
+                && let Some((occupied_by, chair_dir)) = chair_snapshot.get(&(target_x, target_y))
+            {
+                if record_telemetry {
+                    tick_telemetry.rejected_chair_blocked += 1;
                 }
+                if occupied_by.is_none() && is_approaching_chair_from_front(move_dir, *chair_dir) {
+                    return MoveCheck::AutoSit;
+                }
+                return MoveCheck::BlockedChair;
             }
 
-            if arena_fighting && arena_fighters.contains(id) {
-                if let Some(ring_zone) = &arena_ring_zone {
-                    if !ring_zone.contains(target_x, target_y) {
-                        if record_telemetry {
-                            tick_telemetry.rejected_arena_blocked += 1;
-                        }
-                        return MoveCheck::BlockedArena;
-                    }
+            if arena_fighting
+                && arena_fighters.contains(id)
+                && let Some(ring_zone) = &arena_ring_zone
+                && !ring_zone.contains(target_x, target_y)
+            {
+                if record_telemetry {
+                    tick_telemetry.rejected_arena_blocked += 1;
                 }
+                return MoveCheck::BlockedArena;
             }
 
             // Compute resulting Z and grounded state after move
@@ -430,11 +429,8 @@ impl GameRoom {
                 let target_height =
                     self.world
                         .get_height_at_sync(target_x, target_y, &chunks_guard);
-                if !player_grounded && player_z > target_height + 1 {
-                    // Player is airborne (jumping over a gap) - keep current z, gravity handles landing
-                    (player_z, false)
-                } else if player_grounded && player_z > target_height + 1 {
-                    // Walking off an edge - keep current z but start falling
+                if player_z > target_height + 1 {
+                    // Keep current height while airborne or walking off an edge.
                     (player_z, false)
                 } else {
                     // On ground or stepping up/down 1 block - snap to terrain height
@@ -446,9 +442,7 @@ impl GameRoom {
                 {
                     let index = (target_y as u32 * map_width + target_x as u32) as usize;
                     let target_height = hm.get(index).copied().unwrap_or(0) as i32;
-                    if !player_grounded && player_z > target_height + 1 {
-                        (player_z, false)
-                    } else if player_grounded && player_z > target_height + 1 {
+                    if player_z > target_height + 1 {
                         (player_z, false)
                     } else {
                         (target_height, true)
@@ -560,59 +554,59 @@ impl GameRoom {
             {
                 if let Some(player) = players.get_mut(&id) {
                     if player.pending_move_seq != Some(sampled_seq) {
-                        if let Some(new_seq) = player.pending_move_seq {
-                            if current_tick - player.last_move_tick >= MOVE_COOLDOWN_TICKS {
-                                let new_dx = player.move_dx;
-                                let new_dy = player.move_dy;
-                                if new_dx != 0 || new_dy != 0 {
-                                    let new_target_x = player.x + new_dx;
-                                    let new_target_y = player.y + new_dy;
-                                    let move_dir =
-                                        Direction::from_velocity(new_dx as f32, new_dy as f32);
-                                    let re_ghost =
-                                        player.ghost_player_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
-                                    match check_move(
-                                        &id,
-                                        new_target_x,
-                                        new_target_y,
-                                        player.z,
-                                        player.grounded,
-                                        move_dir,
-                                        true,
-                                        re_ghost,
-                                    ) {
-                                        MoveCheck::Valid(new_z, new_grounded) => {
-                                            player.direction = move_dir;
-                                            player.x = new_target_x;
-                                            player.y = new_target_y;
-                                            player.z = new_z;
-                                            player.grounded = new_grounded;
-                                            player.last_move_tick = current_tick;
-                                            player.last_move_vel_x = new_dx;
-                                            player.last_move_vel_y = new_dy;
-                                            player.mark_move_seq_processed(new_seq);
-                                            moved_players.insert(id.clone());
-                                            if !self.quest_locations.is_empty() {
-                                                moved_positions.push((
-                                                    id.clone(),
-                                                    new_target_x,
-                                                    new_target_y,
-                                                ));
-                                            }
-                                            if player.pending_move_seq == Some(new_seq) {
-                                                player.clear_move_intent();
-                                            }
-                                        }
-                                        MoveCheck::AutoSit => {
-                                            auto_sit_requests.push((
+                        if let Some(new_seq) = player.pending_move_seq
+                            && current_tick - player.last_move_tick >= MOVE_COOLDOWN_TICKS
+                        {
+                            let new_dx = player.move_dx;
+                            let new_dy = player.move_dy;
+                            if new_dx != 0 || new_dy != 0 {
+                                let new_target_x = player.x + new_dx;
+                                let new_target_y = player.y + new_dy;
+                                let move_dir =
+                                    Direction::from_velocity(new_dx as f32, new_dy as f32);
+                                let re_ghost =
+                                    player.ghost_player_ticks >= GHOST_PLAYER_TICKS_THRESHOLD;
+                                match check_move(
+                                    &id,
+                                    new_target_x,
+                                    new_target_y,
+                                    player.z,
+                                    player.grounded,
+                                    move_dir,
+                                    true,
+                                    re_ghost,
+                                ) {
+                                    MoveCheck::Valid(new_z, new_grounded) => {
+                                        player.direction = move_dir;
+                                        player.x = new_target_x;
+                                        player.y = new_target_y;
+                                        player.z = new_z;
+                                        player.grounded = new_grounded;
+                                        player.last_move_tick = current_tick;
+                                        player.last_move_vel_x = new_dx;
+                                        player.last_move_vel_y = new_dy;
+                                        player.mark_move_seq_processed(new_seq);
+                                        moved_players.insert(id.clone());
+                                        if !self.quest_locations.is_empty() {
+                                            moved_positions.push((
                                                 id.clone(),
                                                 new_target_x,
                                                 new_target_y,
-                                                new_seq,
                                             ));
                                         }
-                                        _ => {}
+                                        if player.pending_move_seq == Some(new_seq) {
+                                            player.clear_move_intent();
+                                        }
                                     }
+                                    MoveCheck::AutoSit => {
+                                        auto_sit_requests.push((
+                                            id.clone(),
+                                            new_target_x,
+                                            new_target_y,
+                                            new_seq,
+                                        ));
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -651,19 +645,19 @@ impl GameRoom {
                     // they need to keep their intent alive so ghost_player_ticks
                     // can accumulate across ticks until ghosting kicks in.
                     if blocked_by_player.contains(player_id) {
-                        if let Some(player) = players.get_mut(player_id) {
-                            if let Some(sampled_seq) = pending_move_sequences.get(player_id) {
-                                player.mark_move_seq_processed(*sampled_seq);
-                            }
+                        if let Some(player) = players.get_mut(player_id)
+                            && let Some(sampled_seq) = pending_move_sequences.get(player_id)
+                        {
+                            player.mark_move_seq_processed(*sampled_seq);
                         }
                         continue;
                     }
-                    if let Some(player) = players.get_mut(player_id) {
-                        if let Some(sampled_seq) = pending_move_sequences.get(player_id) {
-                            player.mark_move_seq_processed(*sampled_seq);
-                            if player.pending_move_seq == Some(*sampled_seq) {
-                                player.clear_move_intent();
-                            }
+                    if let Some(player) = players.get_mut(player_id)
+                        && let Some(sampled_seq) = pending_move_sequences.get(player_id)
+                    {
+                        player.mark_move_seq_processed(*sampled_seq);
+                        if player.pending_move_seq == Some(*sampled_seq) {
+                            player.clear_move_intent();
                         }
                     }
                 }
@@ -676,13 +670,11 @@ impl GameRoom {
             }
 
             for player in players.values_mut() {
-                if player.active {
-                    if player.tick_buffs(current_time) {
-                        buff_sync_messages.push((
-                            player.id.clone(),
-                            Self::build_potion_buffs_sync(&player.id, player),
-                        ));
-                    }
+                if player.active && player.tick_buffs(current_time) {
+                    buff_sync_messages.push((
+                        player.id.clone(),
+                        Self::build_potion_buffs_sync(&player.id, player),
+                    ));
                 }
             }
         }

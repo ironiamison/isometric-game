@@ -1,17 +1,6 @@
 use super::messages::ClientMessage;
-use super::protocol::{
-    self, extract_array, extract_bool, extract_f32, extract_i32, extract_string, extract_u32,
-    extract_u64, extract_u8, DecodedMessage,
-};
-use crate::game::npc::{Npc, NpcState};
-use crate::game::{
-    ActiveDialogue, ActiveQuest, ChatBubble, ChatChannel, ChatMessage, ConnectionStatus,
-    DamageEvent, DialogueChoice, Direction, EquipmentStats, GameState, GroundItem, InventorySlot,
-    ItemDefinition, LevelUpEvent, MapObject, Player, Portal, QuestCompletedEvent, QuestObjective,
-    RecipeDefinition, RecipeIngredient, RecipeResult, ShopData, ShopStockItem, SkillType,
-    SkillXpEvent, TransitionState, Wall, WallEdge,
-};
-use crate::render::OVERWORLD_NAME;
+use super::protocol::{self, DecodedMessage};
+use crate::game::{ConnectionStatus, GameState};
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 use serde::{Deserialize, Serialize};
 
@@ -563,8 +552,7 @@ impl NetworkClient {
     pub fn send(&mut self, msg: &ClientMessage) {
         if let Some(sender) = &mut self.sender {
             if self.connection_state == ConnectionState::Connected {
-                let (msg_type, msg_data) = msg.to_protocol();
-                match protocol::encode_message(msg_type, &msg_data) {
+                match aeven_protocol::encode_client_message(msg) {
                     Ok(bytes) => {
                         sender.send(WsMessage::Binary(bytes));
                     }

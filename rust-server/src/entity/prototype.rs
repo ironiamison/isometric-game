@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ============================================================================
 // Animation Types
@@ -7,17 +6,13 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum AnimationType {
+    #[default]
     Blob = 0,
     Humanoid = 1,
     Quadruped = 2,
     Flying = 3,
-}
-
-impl Default for AnimationType {
-    fn default() -> Self {
-        AnimationType::Blob
-    }
 }
 
 impl AnimationType {

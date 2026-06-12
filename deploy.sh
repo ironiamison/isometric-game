@@ -10,7 +10,7 @@ cd "$REPO_DIR"
 BEFORE=$(git rev-parse HEAD)
 
 # Pull latest changes
-git pull origin master
+git pull --ff-only origin master
 
 # Get new commit after pull
 AFTER=$(git rev-parse HEAD)
@@ -24,6 +24,8 @@ fi
 CLIENT_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- client/ | head -1)
 SERVER_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- rust-server/ | head -1)
 SITE_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- site/ homepage/ | head -1)
+SHARED_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- \
+    crates/aeven-protocol/ Cargo.toml Cargo.lock rust-toolchain.toml | head -1)
 
 deploy_site() {
     if ! command -v npm >/dev/null 2>&1; then
@@ -37,7 +39,10 @@ deploy_site() {
     echo "Building WASM client..."
     cd "$REPO_DIR/client"
     rustup target add wasm32-unknown-unknown 2>/dev/null || true
-    cargo build --target wasm32-unknown-unknown --profile release-wasm
+    AEVEN_SERVER_URL="${AEVEN_SERVER_URL:-https://aeven.xyz}" \
+    AEVEN_WS_URL="${AEVEN_WS_URL:-wss://aeven.xyz}" \
+        cargo build --locked --target wasm32-unknown-unknown --profile release-wasm \
+            --target-dir "$REPO_DIR/client/target"
     WASM_DIR="$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm"
     if [ -f "$WASM_DIR/isometric_client.wasm" ]; then
         cp "$WASM_DIR/isometric_client.wasm" "$PLAY_DIR/"
@@ -71,14 +76,14 @@ deploy_site() {
     echo "Site deployed to $SITE_DEPLOY_DIR"
 }
 
-if [ -n "$CLIENT_CHANGED" ] || [ -n "$SITE_CHANGED" ]; then
+if [ -n "$CLIENT_CHANGED" ] || [ -n "$SITE_CHANGED" ] || [ -n "$SHARED_CHANGED" ]; then
     deploy_site
 fi
 
-if [ -n "$SERVER_CHANGED" ]; then
+if [ -n "$SERVER_CHANGED" ] || [ -n "$SHARED_CHANGED" ]; then
     echo "Server changes detected, rebuilding..."
     cd "$REPO_DIR/rust-server"
-    cargo build --release
+    cargo build --locked --release --target-dir "$REPO_DIR/rust-server/target"
     echo "Restarting game server..."
     systemctl restart isometric-server
     echo "Server restarted."

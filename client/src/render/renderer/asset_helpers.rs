@@ -1,5 +1,7 @@
 use super::*;
 
+type SpritePixelBounds = (String, f32, f32, f32, f32);
+
 impl Renderer {
     pub(super) fn build_animated_map(atlas_info: &Option<SpriteAtlasInfo>) -> HashMap<u32, u32> {
         let mut map = HashMap::new();
@@ -24,42 +26,41 @@ impl Renderer {
         let mut set = HashSet::new();
 
         // Get the image data we need to sample pixels from
-        let (image, keys_and_rects): (Option<Image>, Vec<(String, f32, f32, f32, f32)>) =
-            match npc_sprites {
-                SpritesheetStore::Atlas { texture, rects } => {
-                    let img = texture.get_texture_data();
-                    let entries: Vec<_> = rects
-                        .iter()
-                        .map(|(key, rect)| (key.clone(), rect.x, rect.y, rect.w, rect.h))
-                        .collect();
-                    (Some(img), entries)
-                }
-                SpritesheetStore::Individual(map) => {
-                    // For individual textures, check each one separately
-                    for (key, tex) in map {
-                        let w = tex.width();
-                        let h = tex.height();
-                        let frame_w = w / 16.0;
-                        let img = tex.get_texture_data();
-                        if Self::frame_has_visible_pixels(
-                            &img,
-                            frame_w as u32 * 1,
-                            0,
-                            frame_w as u32,
-                            h as u32,
-                        ) || Self::frame_has_visible_pixels(
-                            &img,
-                            frame_w as u32 * 3,
-                            0,
-                            frame_w as u32,
-                            h as u32,
-                        ) {
-                            set.insert(key.clone());
-                        }
+        let (image, keys_and_rects): (Option<Image>, Vec<SpritePixelBounds>) = match npc_sprites {
+            SpritesheetStore::Atlas { texture, rects } => {
+                let img = texture.get_texture_data();
+                let entries: Vec<_> = rects
+                    .iter()
+                    .map(|(key, rect)| (key.clone(), rect.x, rect.y, rect.w, rect.h))
+                    .collect();
+                (Some(img), entries)
+            }
+            SpritesheetStore::Individual(map) => {
+                // For individual textures, check each one separately
+                for (key, tex) in map {
+                    let w = tex.width();
+                    let h = tex.height();
+                    let frame_w = w / 16.0;
+                    let img = tex.get_texture_data();
+                    if Self::frame_has_visible_pixels(
+                        &img,
+                        frame_w as u32,
+                        0,
+                        frame_w as u32,
+                        h as u32,
+                    ) || Self::frame_has_visible_pixels(
+                        &img,
+                        frame_w as u32 * 3,
+                        0,
+                        frame_w as u32,
+                        h as u32,
+                    ) {
+                        set.insert(key.clone());
                     }
-                    return set;
                 }
-            };
+                return set;
+            }
+        };
 
         if let Some(ref img) = image {
             for (key, atlas_x, atlas_y, w, h) in &keys_and_rects {
@@ -68,7 +69,7 @@ impl Renderer {
                 let ay = *atlas_y as u32;
                 let fh = *h as u32;
                 // Check frame 1 (2nd idle down/right) and frame 3 (2nd idle up/left)
-                if Self::frame_has_visible_pixels(img, ax + frame_w * 1, ay, frame_w, fh)
+                if Self::frame_has_visible_pixels(img, ax + frame_w, ay, frame_w, fh)
                     || Self::frame_has_visible_pixels(img, ax + frame_w * 3, ay, frame_w, fh)
                 {
                     set.insert(key.clone());
@@ -88,10 +89,8 @@ impl Renderer {
             for px in 0..w {
                 let sx = x + px;
                 let sy = y + py;
-                if sx < img_w && sy < img_h {
-                    if img.get_pixel(sx, sy).a > 0.0 {
-                        return true;
-                    }
+                if sx < img_w && sy < img_h && img.get_pixel(sx, sy).a > 0.0 {
+                    return true;
                 }
             }
         }

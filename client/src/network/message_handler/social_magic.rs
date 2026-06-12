@@ -246,11 +246,10 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
 
                 // Blast spell: spawn a projectile instead of on-target effect
                 if spell_id.ends_with("_blast") {
-                    let source_pos = if let Some(player) = state.players.get(&caster_id) {
-                        Some((player.x.round(), player.y.round(), player.z))
-                    } else {
-                        None
-                    };
+                    let source_pos = state
+                        .players
+                        .get(&caster_id)
+                        .map(|player| (player.x.round(), player.y.round(), player.z));
 
                     if let Some((src_x, src_y, src_z)) = source_pos {
                         let end_z = state.chunk_manager.get_height(target_x, target_y) as f32;

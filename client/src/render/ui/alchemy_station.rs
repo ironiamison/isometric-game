@@ -372,15 +372,13 @@ impl Renderer {
             if let Some(player) = state.get_local_player() {
                 let skill = &player.skills.alchemy;
                 let progress = skill.level_progress();
-                let to_next = skill.xp_to_next_level();
+                let _to_next = skill.xp_to_next_level();
                 let current_in_level = if skill.level >= 99 {
                     0
                 } else {
                     let total_for_level = crate::game::skills::total_xp_for_level(skill.level);
-                    let total_for_next = crate::game::skills::total_xp_for_level(skill.level + 1);
                     let xp_in_level = skill.xp - total_for_level;
-                    let xp_range = total_for_next - total_for_level;
-                    xp_in_level.max(0) as u64 + 0 * xp_range as u64 // just the current XP in level
+                    xp_in_level.max(0) as u64
                 };
                 let total_for_next = if skill.level >= 99 {
                     0

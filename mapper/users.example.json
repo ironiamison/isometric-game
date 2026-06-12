@@ -1,0 +1,6 @@
+{
+  "editor": {
+    "passwordHash": "replace-with-output-from-npm-run-hash-password",
+    "worlds": ["world_0"]
+  }
+}

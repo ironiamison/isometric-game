@@ -204,23 +204,22 @@ impl InputHandler {
                 let max_scroll = (total_content - recipe_list_h).max(0.0);
 
                 // W/S or Up/Down to navigate recipes
-                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                    if state.ui_state.workbench_selected_recipe > 0 {
-                        state.ui_state.workbench_selected_recipe -= 1;
-                        let item_top = state.ui_state.workbench_selected_recipe as f32 * row_h;
-                        if item_top < state.ui_state.workbench_scroll_offset {
-                            state.ui_state.workbench_scroll_offset = item_top;
-                        }
+                if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                    && state.ui_state.workbench_selected_recipe > 0
+                {
+                    state.ui_state.workbench_selected_recipe -= 1;
+                    let item_top = state.ui_state.workbench_selected_recipe as f32 * row_h;
+                    if item_top < state.ui_state.workbench_scroll_offset {
+                        state.ui_state.workbench_scroll_offset = item_top;
                     }
                 }
-                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                    if state.ui_state.workbench_selected_recipe < recipe_count.saturating_sub(1) {
-                        state.ui_state.workbench_selected_recipe += 1;
-                        let item_bottom =
-                            (state.ui_state.workbench_selected_recipe + 1) as f32 * row_h;
-                        if item_bottom > state.ui_state.workbench_scroll_offset + recipe_list_h {
-                            state.ui_state.workbench_scroll_offset = item_bottom - recipe_list_h;
-                        }
+                if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                    && state.ui_state.workbench_selected_recipe < recipe_count.saturating_sub(1)
+                {
+                    state.ui_state.workbench_selected_recipe += 1;
+                    let item_bottom = (state.ui_state.workbench_selected_recipe + 1) as f32 * row_h;
+                    if item_bottom > state.ui_state.workbench_scroll_offset + recipe_list_h {
+                        state.ui_state.workbench_scroll_offset = item_bottom - recipe_list_h;
                     }
                 }
 
@@ -229,10 +228,10 @@ impl InputHandler {
                     state.ui_state.workbench_quantity =
                         (state.ui_state.workbench_quantity + 1).min(99);
                 }
-                if is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract) {
-                    if state.ui_state.workbench_quantity > 1 {
-                        state.ui_state.workbench_quantity -= 1;
-                    }
+                if (is_key_pressed(KeyCode::Minus) || is_key_pressed(KeyCode::KpSubtract))
+                    && state.ui_state.workbench_quantity > 1
+                {
+                    state.ui_state.workbench_quantity -= 1;
                 }
 
                 // Enter or C to craft

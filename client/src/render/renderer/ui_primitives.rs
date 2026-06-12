@@ -132,10 +132,10 @@ impl Renderer {
                 UiElementId::ChatTabGlobal,
                 UiElementId::ChatTabSystem,
             ];
-            for i in 0..3 {
+            for (i, tab_id) in tab_ids.iter().enumerate() {
                 let tx = chat_x + i as f32 * tab_w;
                 layout.add(
-                    tab_ids[i].clone(),
+                    tab_id.clone(),
                     macroquad::prelude::Rect::new(tx, tab_bar_y, tab_w, tab_h),
                 );
             }
@@ -512,7 +512,7 @@ impl Renderer {
 
             // Specular shine (small white gleam)
             if fill_width > 4.0 && height > 2.0 {
-                let shine_width = (fill_width * 0.3).min(6.0).max(2.0).floor();
+                let shine_width = (fill_width * 0.3).clamp(2.0, 6.0).floor();
                 let shine_color = Color::new(1.0, 1.0, 1.0, 0.4);
                 draw_rectangle(x + 1.0, y + 1.0, shine_width, 1.0, shine_color);
             }
@@ -597,11 +597,6 @@ impl Renderer {
             _ => {}
         }
     }
-
-    /// Draw an item icon using sprite or fallback color
-    /// Uses the full texture, centered in the slot
-
-    /// Render a dragged item following the cursor
 
     /// Word-wrap text to fit within a given width (approximate, assumes ~8px per char at size 16)
     /// Prefers breaking on word boundaries, but will break long words if necessary

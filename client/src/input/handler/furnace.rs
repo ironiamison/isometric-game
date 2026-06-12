@@ -182,37 +182,36 @@ impl InputHandler {
                 let recipe_count = furnace_recipes.len();
 
                 // W/S or Up/Down to navigate recipes
-                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                    if state.ui_state.furnace_selected_recipe > 0 {
-                        state.ui_state.furnace_selected_recipe -= 1;
-                        // Auto-scroll to keep selected in view
-                        let s = state.ui_state.ui_scale;
-                        let row_h = 72.0 * s;
-                        let item_top = state.ui_state.furnace_selected_recipe as f32 * row_h;
-                        if item_top < state.ui_state.furnace_scroll_offset {
-                            state.ui_state.furnace_scroll_offset = item_top;
-                        }
+                if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                    && state.ui_state.furnace_selected_recipe > 0
+                {
+                    state.ui_state.furnace_selected_recipe -= 1;
+                    // Auto-scroll to keep selected in view
+                    let s = state.ui_state.ui_scale;
+                    let row_h = 72.0 * s;
+                    let item_top = state.ui_state.furnace_selected_recipe as f32 * row_h;
+                    if item_top < state.ui_state.furnace_scroll_offset {
+                        state.ui_state.furnace_scroll_offset = item_top;
                     }
                 }
-                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                    if state.ui_state.furnace_selected_recipe < recipe_count.saturating_sub(1) {
-                        state.ui_state.furnace_selected_recipe += 1;
-                        // Auto-scroll to keep selected in view
-                        let s = state.ui_state.ui_scale;
-                        let row_h = 72.0 * s;
-                        let item_bottom =
-                            (state.ui_state.furnace_selected_recipe + 1) as f32 * row_h;
-                        let (_, sh) = crate::util::virtual_screen_size();
-                        let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
-                        let panel_h = (450.0 * s).min(sh - 16.0);
-                        let content_h = if is_fire_pit {
-                            panel_h - 10.0 - 78.0 * s
-                        } else {
-                            panel_h - 10.0 - 106.0 * s
-                        };
-                        if item_bottom > state.ui_state.furnace_scroll_offset + content_h {
-                            state.ui_state.furnace_scroll_offset = item_bottom - content_h;
-                        }
+                if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                    && state.ui_state.furnace_selected_recipe < recipe_count.saturating_sub(1)
+                {
+                    state.ui_state.furnace_selected_recipe += 1;
+                    // Auto-scroll to keep selected in view
+                    let s = state.ui_state.ui_scale;
+                    let row_h = 72.0 * s;
+                    let item_bottom = (state.ui_state.furnace_selected_recipe + 1) as f32 * row_h;
+                    let (_, sh) = crate::util::virtual_screen_size();
+                    let is_fire_pit = state.ui_state.furnace_station_type == "fire_pit";
+                    let panel_h = (450.0 * s).min(sh - 16.0);
+                    let content_h = if is_fire_pit {
+                        panel_h - 10.0 - 78.0 * s
+                    } else {
+                        panel_h - 10.0 - 106.0 * s
+                    };
+                    if item_bottom > state.ui_state.furnace_scroll_offset + content_h {
+                        state.ui_state.furnace_scroll_offset = item_bottom - content_h;
                     }
                 }
 

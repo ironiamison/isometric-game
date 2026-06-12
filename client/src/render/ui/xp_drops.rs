@@ -49,7 +49,7 @@ impl Renderer {
 
             let y = start_y + y_offset;
             let text = format!("+{} XP", drop.xp_gained);
-            let text_w = self.measure_text_sharp(&text, 16.0).width;
+            let _text_w = self.measure_text_sharp(&text, 16.0).width;
             let x = left_edge_x;
 
             self.draw_xp_drop_icon(drop.skill_type, x, y - ICON_SIZE / 2.0 - 2.0, opacity);

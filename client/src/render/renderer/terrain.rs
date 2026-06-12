@@ -189,8 +189,8 @@ impl Renderer {
                                 continue;
                             }
 
-                            let world_x = chunk_offset_x + local_x as i32;
-                            let world_y = chunk_offset_y + local_y as i32;
+                            let world_x = chunk_offset_x + local_x;
+                            let world_y = chunk_offset_y + local_y;
 
                             // Apply ground tile overrides (e.g. farming plot tiles)
                             let tile_id = if chunk_layer_type == ChunkLayerType::Ground {

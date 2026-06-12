@@ -14,7 +14,6 @@ impl GameRoom {
         interior_registry: Arc<crate::interior::InteriorRegistry>,
         chest_registry: Arc<crate::chest::ChestRegistry>,
     ) -> Self {
-        let (tx, _) = broadcast::channel(256);
         let world = Arc::new(World::new("maps/world_0"));
         let (spawn_x, spawn_y) = world.get_spawn_position().await;
         let spawn_chunk = ChunkCoord::from_world(spawn_x, spawn_y);
@@ -443,10 +442,10 @@ impl GameRoom {
         // Load scroll spell registry
         let mut scroll_spell_registry = crate::scroll_spell::ScrollSpellRegistry::new();
         let scroll_spells_path = std::path::Path::new("data/spells/scroll_spells.toml");
-        if scroll_spells_path.exists() {
-            if let Err(e) = scroll_spell_registry.load_from_file(scroll_spells_path) {
-                tracing::error!("Failed to load scroll spell registry: {}", e);
-            }
+        if scroll_spells_path.exists()
+            && let Err(e) = scroll_spell_registry.load_from_file(scroll_spells_path)
+        {
+            tracing::error!("Failed to load scroll spell registry: {}", e);
         }
 
         // Load persistent ground spawn definitions and create initial ground items
@@ -612,9 +611,7 @@ impl GameRoom {
             last_shop_restock: RwLock::new(std::time::Instant::now()),
             player_chunks: RwLock::new(HashMap::new()),
             tick: RwLock::new(0),
-            broadcast_tx: tx,
-            player_senders: RwLock::new(HashMap::new()),
-            sync_states: DashMap::new(),
+            transport: RoomTransport::new(256),
             player_instances,
             npc_interaction_grants: RwLock::new(HashMap::new()),
             dialogue_grants: RwLock::new(HashMap::new()),
@@ -647,7 +644,6 @@ impl GameRoom {
             chest_registry,
             chest_manager: RwLock::new(chest_manager),
             player_open_chests: RwLock::new(HashMap::new()),
-            spectator_senders: RwLock::new(HashMap::new()),
             trades: RwLock::new(HashMap::new()),
             player_trades: RwLock::new(HashMap::new()),
             trade_requests: RwLock::new(HashMap::new()),

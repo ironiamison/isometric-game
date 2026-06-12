@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useEditorStore } from '@/state/store';
 import { objectLoader } from '@/core/ObjectLoader';
 import { tilesetLoader } from '@/core/TilesetLoader';
@@ -18,8 +18,18 @@ interface QueueItem {
 
 type Tab = 'objects' | 'walls' | 'tiles';
 
+type UploadResult = {
+  id?: number;
+  name?: string;
+  width: number;
+  height: number;
+  animation?: { frames: number; fps: number } | null;
+  count?: number;
+  tileIds?: number[];
+};
+
 export function AssetManager() {
-  const { assetManagerOpen, assetManagerTab, closeAssetManager, refreshAssets } = useEditorStore();
+  const { assetManagerTab, closeAssetManager, refreshAssets } = useEditorStore();
   const [tab, setTab] = useState<Tab>(assetManagerTab);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [importing, setImporting] = useState(false);
@@ -28,15 +38,22 @@ export function AssetManager() {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync tab from store when opened
-  useEffect(() => {
-    if (assetManagerOpen) {
-      setTab(assetManagerTab);
-      setQueue([]);
-      setStatus(null);
-      setProgress(0);
+  const detectAnimation = useCallback(async (item: QueueItem) => {
+    setQueue(prev => prev.map(q => q === item ? { ...q, detecting: true } : q));
+
+    try {
+      const formData = new FormData();
+      formData.append('file', item.file);
+      const resp = await fetch('/mapper/api/assets/detect-animation', { method: 'POST', body: formData });
+      const result = await resp.json();
+
+      setQueue(prev => prev.map(q =>
+        q === item ? { ...q, animation: result, detecting: false } : q
+      ));
+    } catch {
+      setQueue(prev => prev.map(q => q === item ? { ...q, detecting: false } : q));
     }
-  }, [assetManagerOpen, assetManagerTab]);
+  }, []);
 
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const newItems: QueueItem[] = [];
@@ -85,27 +102,10 @@ export function AssetManager() {
     // Auto-detect animations for non-tile items
     if (tab !== 'tiles') {
       for (const item of newItems) {
-        detectAnimation(item);
+        void detectAnimation(item);
       }
     }
-  }, [tab]);
-
-  const detectAnimation = async (item: QueueItem) => {
-    setQueue(prev => prev.map(q => q === item ? { ...q, detecting: true } : q));
-
-    try {
-      const formData = new FormData();
-      formData.append('file', item.file);
-      const resp = await fetch('/mapper/api/assets/detect-animation', { method: 'POST', body: formData });
-      const result = await resp.json();
-
-      setQueue(prev => prev.map(q =>
-        q === item ? { ...q, animation: result, detecting: false } : q
-      ));
-    } catch {
-      setQueue(prev => prev.map(q => q === item ? { ...q, detecting: false } : q));
-    }
-  };
+  }, [detectAnimation, tab]);
 
   const removeFromQueue = (index: number) => {
     setQueue(prev => prev.filter((_, i) => i !== index));
@@ -122,7 +122,7 @@ export function AssetManager() {
     setStatus({ text: 'Uploading...', type: 'info' });
 
     try {
-      const results: Array<{ id: number; name: string; width: number; height: number; animation?: { frames: number; fps: number } | null }> = [];
+      const results: UploadResult[] = [];
 
       for (let i = 0; i < queue.length; i++) {
         const item = queue[i];
@@ -146,12 +146,14 @@ export function AssetManager() {
 
         // Optimistic update: add to loaders immediately
         if (tab === 'objects') {
+          if (result.id === undefined) throw new Error('Object upload response is missing an ID');
           await objectLoader.addObject(
             { id: result.id, name: result.name || String(result.id), width: result.width, height: result.height },
             `/mapper/assets/sprites/objects/${result.id}.png`,
             result.animation || undefined
           );
         } else if (tab === 'walls') {
+          if (result.id === undefined) throw new Error('Wall upload response is missing an ID');
           await objectLoader.addWall(
             { id: result.id, name: result.name || String(result.id), width: result.width, height: result.height },
             `/mapper/assets/sprites/walls/${result.id}.png`,
@@ -177,7 +179,7 @@ export function AssetManager() {
       refreshAssets();
 
       const count = tab === 'tiles'
-        ? results.reduce((sum, r) => sum + ((r as any).count || 1), 0)
+        ? results.reduce((sum, result) => sum + (result.count ?? 1), 0)
         : results.length;
       setStatus({ text: `Imported ${count} ${tab} successfully!`, type: 'success' });
       setQueue([]);
@@ -220,8 +222,6 @@ export function AssetManager() {
   const handleDragLeave = useCallback(() => {
     setDragActive(false);
   }, []);
-
-  if (!assetManagerOpen) return null;
 
   return (
     <div className={styles.overlay} onClick={closeAssetManager}>

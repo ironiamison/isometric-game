@@ -166,29 +166,29 @@ impl InputHandler {
                 };
 
                 // Grid navigation: Up/Down moves by row (±columns), Left/Right moves by ±1
-                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                    if state.ui_state.anvil_selected_recipe >= columns {
-                        state.ui_state.anvil_selected_recipe -= columns;
-                        self.auto_scroll_anvil_grid(state);
-                    }
+                if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                    && state.ui_state.anvil_selected_recipe >= columns
+                {
+                    state.ui_state.anvil_selected_recipe -= columns;
+                    self.auto_scroll_anvil_grid(state);
                 }
-                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                    if state.ui_state.anvil_selected_recipe + columns < recipe_count {
-                        state.ui_state.anvil_selected_recipe += columns;
-                        self.auto_scroll_anvil_grid(state);
-                    }
+                if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                    && state.ui_state.anvil_selected_recipe + columns < recipe_count
+                {
+                    state.ui_state.anvil_selected_recipe += columns;
+                    self.auto_scroll_anvil_grid(state);
                 }
-                if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A) {
-                    if state.ui_state.anvil_selected_recipe > 0 {
-                        state.ui_state.anvil_selected_recipe -= 1;
-                        self.auto_scroll_anvil_grid(state);
-                    }
+                if (is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::A))
+                    && state.ui_state.anvil_selected_recipe > 0
+                {
+                    state.ui_state.anvil_selected_recipe -= 1;
+                    self.auto_scroll_anvil_grid(state);
                 }
-                if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D) {
-                    if state.ui_state.anvil_selected_recipe < recipe_count.saturating_sub(1) {
-                        state.ui_state.anvil_selected_recipe += 1;
-                        self.auto_scroll_anvil_grid(state);
-                    }
+                if (is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::D))
+                    && state.ui_state.anvil_selected_recipe < recipe_count.saturating_sub(1)
+                {
+                    state.ui_state.anvil_selected_recipe += 1;
+                    self.auto_scroll_anvil_grid(state);
                 }
 
                 // Quantity keys: 1, X, A (not left/right since those navigate grid)
@@ -230,7 +230,7 @@ impl InputHandler {
                     let s = state.ui_state.ui_scale;
                     let cell_h = 106.0 * s;
                     let gap = 6.0 * s;
-                    let rows = (recipe_count + columns - 1) / columns;
+                    let rows = recipe_count.div_ceil(columns);
                     let total_content = rows as f32 * (cell_h + gap);
                     let (_, sh) = crate::util::virtual_screen_size();
                     // Match renderer: bottom_bar_h reserved, panel capped
@@ -249,7 +249,7 @@ impl InputHandler {
                     let s = state.ui_state.ui_scale;
                     let cell_h = 106.0 * s;
                     let gap = 6.0 * s;
-                    let rows = (recipe_count + columns - 1) / columns;
+                    let rows = recipe_count.div_ceil(columns);
                     let total_content = rows as f32 * (cell_h + gap);
                     let (_, sh) = crate::util::virtual_screen_size();
                     let bottom_bar_h = 53.0 * s + 8.0;

@@ -235,8 +235,8 @@ impl Renderer {
                     .channel(&state.ui_state.chat_active_tab);
                 let hide_system = state.ui_state.hide_system_in_public
                     && matches!(state.ui_state.chat_active_tab, ChatChannel::Local);
-                let mut rebuilt_lines: Vec<(String, Color)> = Vec::new();
-                rebuilt_lines.reserve(active_msgs.len() * 2);
+                let mut rebuilt_lines: Vec<(String, Color)> =
+                    Vec::with_capacity(active_msgs.len() * 2);
 
                 for msg in active_msgs
                     .iter()
@@ -881,7 +881,6 @@ impl Renderer {
                 let (combat_w, combat_h) =
                     self.render_combat_style_chip(state, chip_cursor_x, chip_row_y);
                 if combat_w > 0.0 {
-                    chip_cursor_x += combat_w + chip_gap;
                     crh = crh.max(combat_h);
                 }
 

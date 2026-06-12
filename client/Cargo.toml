@@ -4,11 +4,14 @@ version = "4.4.0"
 edition = "2021"
 description = "Isometric MMORPG client"
 
+[lints]
+workspace = true
+
 # For Android builds, we need a cdylib
 # Desktop builds use the default binary
 [lib]
 name = "isometric_client"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [[bin]]
@@ -16,8 +19,10 @@ name = "new-aeven"
 path = "src/main.rs"
 
 [dependencies]
+aeven-protocol = { path = "../crates/aeven-protocol" }
+
 # Game engine
-macroquad = { version = "0.4", features = ["audio"] }
+macroquad = { version = "=0.4.14", features = ["audio"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -50,21 +55,3 @@ image = { version = "0.24", default-features = false, features = ["png"] }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 quad-storage = "0.1"
 sapp-jsutils = "0.1"
-
-[profile.dev]
-opt-level = 0
-debug = 1
-
-[profile.dev.package."*"]
-opt-level = 2
-
-[profile.release]
-opt-level = 3
-lto = true
-
-[profile.release-wasm]
-inherits = "release"
-opt-level = "z"
-
-[patch.crates-io]
-miniquad = { git = "https://github.com/not-fl3/miniquad", branch = "master" }

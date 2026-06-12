@@ -1,5 +1,26 @@
 use super::*;
 
+#[derive(sqlx::FromRow)]
+struct AccountRow {
+    id: i64,
+    username: String,
+    password_hash: String,
+    created_at: Option<String>,
+    last_login: Option<String>,
+}
+
+impl From<AccountRow> for AccountData {
+    fn from(row: AccountRow) -> Self {
+        Self {
+            id: row.id,
+            username: row.username,
+            password_hash: row.password_hash,
+            created_at: row.created_at,
+            last_login: row.last_login,
+        }
+    }
+}
+
 impl Database {
     pub async fn create_account(&self, username: &str, password: &str) -> Result<i64, String> {
         let password = password.to_owned();
@@ -35,21 +56,15 @@ impl Database {
         &self,
         username: &str,
         password: &str,
-    ) -> Option<AccountData> {
-        let row = sqlx::query(
+    ) -> Result<Option<AccountData>, sqlx::Error> {
+        let row = sqlx::query_as::<_, AccountRow>(
             "SELECT id, username, password_hash, created_at, last_login FROM accounts WHERE username = ?",
         )
         .bind(username)
         .fetch_optional(&self.pool)
-        .await
-        .ok()??;
-
-        let account = AccountData {
-            id: row.get("id"),
-            username: row.get("username"),
-            password_hash: row.get("password_hash"),
-            created_at: row.get("created_at"),
-            last_login: row.get("last_login"),
+        .await?;
+        let Some(account) = row.map(AccountData::from) else {
+            return Ok(None);
         };
 
         let password = password.to_owned();
@@ -67,12 +82,12 @@ impl Database {
         .unwrap_or(false);
 
         if verified {
-            let _ = sqlx::query("UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?")
+            sqlx::query("UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?")
                 .bind(account.id)
                 .execute(&self.pool)
-                .await;
-            return Some(account);
+                .await?;
+            return Ok(Some(account));
         }
-        None
+        Ok(None)
     }
 }

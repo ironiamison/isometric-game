@@ -150,10 +150,10 @@ impl GameRoom {
 
             {
                 let mut chairs = self.chairs.write().await;
-                if let Some(chair) = chairs.get_mut(&(tile_x, tile_y)) {
-                    if chair.occupied_by.as_deref() == Some(player_id) {
-                        chair.occupied_by = None;
-                    }
+                if let Some(chair) = chairs.get_mut(&(tile_x, tile_y))
+                    && chair.occupied_by.as_deref() == Some(player_id)
+                {
+                    chair.occupied_by = None;
                 }
             }
 

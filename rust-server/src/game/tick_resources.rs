@@ -42,7 +42,7 @@ fn prayer_state_update_message(update: &PrayerDrainUpdate) -> ServerMessage {
 
 impl GameRoom {
     pub(in crate::game) async fn process_player_resource_ticks(&self, current_tick: u64) -> u128 {
-        if current_tick % MANA_REGEN_INTERVAL_TICKS == 0 {
+        if current_tick.is_multiple_of(MANA_REGEN_INTERVAL_TICKS) {
             let mut players = self.players.write().await;
             for player in players.values_mut() {
                 if !player.active || player.is_dead {
@@ -54,7 +54,7 @@ impl GameRoom {
             }
         }
 
-        if current_tick % PRAYER_DRAIN_INTERVAL_TICKS != 0 {
+        if !current_tick.is_multiple_of(PRAYER_DRAIN_INTERVAL_TICKS) {
             return 0;
         }
 

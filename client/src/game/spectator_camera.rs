@@ -7,6 +7,12 @@ pub struct SpectatorCamera {
     speed: f32,    // Progress per second (lower = slower drift)
 }
 
+impl Default for SpectatorCamera {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpectatorCamera {
     pub fn new() -> Self {
         // Gentle loop around spawn (15, 4) — radius ~12 tiles

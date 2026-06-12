@@ -180,8 +180,10 @@ pub struct ActivePrayerEffects {
 impl ActivePrayerEffects {
     /// Create new effects from a set of active prayers
     pub fn from_prayers<'a>(prayers: impl Iterator<Item = &'a Prayer>) -> Self {
-        let mut effects = ActivePrayerEffects::default();
-        effects.hp_regen_multiplier = 1.0; // Base multiplier
+        let mut effects = ActivePrayerEffects {
+            hp_regen_multiplier: 1.0,
+            ..ActivePrayerEffects::default()
+        };
 
         for prayer in prayers {
             match prayer.effect_type {
@@ -271,7 +273,7 @@ impl PrayerRegistry {
             // Add to category index
             self.by_category
                 .entry(prayer.category)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id.clone());
 
             self.prayers.insert(id, prayer);
@@ -323,10 +325,7 @@ impl PrayerRegistry {
 
         for prayer in self.prayers.values() {
             if prayer.level_req <= prayer_level {
-                result
-                    .entry(prayer.category)
-                    .or_insert_with(Vec::new)
-                    .push(prayer);
+                result.entry(prayer.category).or_default().push(prayer);
             }
         }
 

@@ -135,12 +135,11 @@ impl CraftingOrderRegistry {
         }
 
         // Pick at least 1 masterwork (if eligible and available)
-        if has_masterwork_eligible_skill {
-            if let Some(order) = masterwork.choose(&mut rng) {
-                if !selected.contains(&order.id) {
-                    selected.push(order.id.clone());
-                }
-            }
+        if has_masterwork_eligible_skill
+            && let Some(order) = masterwork.choose(&mut rng)
+            && !selected.contains(&order.id)
+        {
+            selected.push(order.id.clone());
         }
 
         // Fill remaining slots from both pools
@@ -541,13 +540,12 @@ impl GameRoom {
         };
 
         // 7. Grant commission marks if marks > 0
-        if template.rewards.marks > 0 {
-            if let Err(e) = db
+        if template.rewards.marks > 0
+            && let Err(e) = db
                 .add_commission_marks(character_id, template.rewards.marks)
                 .await
-            {
-                tracing::warn!("Failed to add commission marks: {}", e);
-            }
+        {
+            tracing::warn!("Failed to add commission marks: {}", e);
         }
 
         // 8. Increment crafting order stats

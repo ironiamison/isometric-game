@@ -250,6 +250,12 @@ pub struct GameState {
     pub second_level_player_name: Option<String>,
 }
 
+impl Default for GameState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GameState {
     pub fn new() -> Self {
         // Create a test tilemap (32x32 tiles) - kept for compatibility
@@ -660,7 +666,7 @@ impl GameState {
             .ui_state
             .crafting_complete_animation
             .as_ref()
-            .map_or(false, |(_, t)| *t >= 1.0)
+            .is_some_and(|(_, t)| *t >= 1.0)
         {
             self.ui_state.crafting_complete_animation = None;
         }

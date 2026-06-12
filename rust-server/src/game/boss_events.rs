@@ -1,10 +1,12 @@
 use super::*;
 use crate::boss::BossEvent;
 use crate::chunk::ChunkCoord;
-use crate::item;
 use crate::npc::{Npc, NpcState};
 use crate::protocol::ServerMessage;
 use rand::Rng;
+
+type RolledLootItem = (String, i32, String);
+type RolledLoot = (String, String, i32, Vec<RolledLootItem>);
 
 impl GameRoom {
     pub(super) fn handle_boss_event<'a>(
@@ -110,7 +112,7 @@ impl GameRoom {
                                     let dx = (player.x - boss_x) as i64;
                                     let dy = (player.y - boss_y) as i64;
                                     let dist_sq = dx * dx + dy * dy;
-                                    if closest.as_ref().map_or(true, |(_, _, _, d)| dist_sq < *d) {
+                                    if closest.as_ref().is_none_or(|(_, _, _, d)| dist_sq < *d) {
                                         closest = Some((pid.clone(), player.x, player.y, dist_sq));
                                     }
                                 }
@@ -427,7 +429,7 @@ impl GameRoom {
                         // Remove chain-killed minions and trigger their explosions
                         if !chain_minions.is_empty() {
                             let mut npcs = instance.npcs.write().await;
-                            for (npc_id, mx, my) in &chain_minions {
+                            for (npc_id, _mx, _my) in &chain_minions {
                                 npcs.remove(npc_id);
                                 // Note: chain explosions handled via recursive event processing
                             }
@@ -599,7 +601,7 @@ impl GameRoom {
 
                         // Roll all loot synchronously (ThreadRng is not Send)
                         // Each entry: (player_id, player_name, gold, Vec<(item_id, quantity, display_name)>)
-                        let rolled_loot: Vec<(String, String, i32, Vec<(String, i32, String)>)> = {
+                        let rolled_loot: Vec<RolledLoot> = {
                             let mut rng = rand::thread_rng();
                             damage_dealers
                                 .iter()

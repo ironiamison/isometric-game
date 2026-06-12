@@ -106,7 +106,7 @@ pub(super) async fn handle_client_message(
         ClientMessage::Equip { slot_index } => {
             room.handle_equip(player_id, slot_index).await;
         }
-        ClientMessage::Unequip { slot_type } => {
+        ClientMessage::Unequip { slot_type, .. } => {
             room.handle_unequip(player_id, &slot_type).await;
         }
         ClientMessage::DropItem {
@@ -263,12 +263,13 @@ pub(super) async fn handle_client_message(
                                 .collect();
 
                             let remaining = instance.remove_player(player_id).await;
-                            if remaining == 0 && instance.instance_type == InstanceType::Private {
-                                if let Some(owner_id) = &instance.owner_id {
-                                    state
-                                        .instance_manager
-                                        .remove_private(owner_id, &instance.map_id);
-                                }
+                            if remaining == 0
+                                && instance.instance_type == InstanceType::Private
+                                && let Some(owner_id) = &instance.owner_id
+                            {
+                                state
+                                    .instance_manager
+                                    .remove_private(owner_id, &instance.map_id);
                             }
 
                             for other_id in &other_players {

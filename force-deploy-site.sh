@@ -16,7 +16,10 @@ fi
 echo "Building WASM client..."
 cd "$REPO_DIR/client"
 rustup target add wasm32-unknown-unknown 2>/dev/null || true
-cargo build --target wasm32-unknown-unknown --profile release-wasm
+AEVEN_SERVER_URL="${AEVEN_SERVER_URL:-https://aeven.xyz}" \
+AEVEN_WS_URL="${AEVEN_WS_URL:-wss://aeven.xyz}" \
+    cargo build --locked --target wasm32-unknown-unknown --profile release-wasm \
+        --target-dir "$REPO_DIR/client/target"
 WASM_DIR="$REPO_DIR/client/target/wasm32-unknown-unknown/release-wasm"
 PLAY_DIR="$REPO_DIR/site/static/play"
 mkdir -p "$PLAY_DIR"

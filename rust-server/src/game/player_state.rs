@@ -23,42 +23,42 @@ impl GameRoom {
         chunks.insert(player_id.to_string(), chunk);
     }
 
-    pub async fn reserve_player_with_data(
-        &self,
-        player_id: &str,
-        name: &str,
-        x: i32,
-        y: i32,
-        z: i32,
-        hp: i32,
-        prayer_points: i32,
-        mp: i32,
-        skills: Skills,
-        gold: i32,
-        inventory_json: &str,
-        gender: &str,
-        skin: &str,
-        hair_style: Option<i32>,
-        hair_color: Option<i32>,
-        equipped_head: Option<String>,
-        equipped_body: Option<String>,
-        equipped_weapon: Option<String>,
-        equipped_back: Option<String>,
-        equipped_feet: Option<String>,
-        equipped_ring: Option<String>,
-        equipped_gloves: Option<String>,
-        equipped_necklace: Option<String>,
-        equipped_belt: Option<String>,
-        is_admin: bool,
-        account_id: i64,
-        ip_address: Option<String>,
-        sitting_at_x: Option<i32>,
-        sitting_at_y: Option<i32>,
-        bank_json: &str,
-        bank_gold: i32,
-        bank_max_slots: u32,
-        combat_style_prefs_json: &str,
-    ) {
+    pub async fn reserve_player_with_data(&self, player_id: &str, data: PlayerRestoreData) {
+        let PlayerRestoreData {
+            name,
+            x,
+            y,
+            z,
+            hp,
+            prayer_points,
+            mp,
+            skills,
+            gold,
+            inventory_json,
+            gender,
+            skin,
+            hair_style,
+            hair_color,
+            equipped_head,
+            equipped_body,
+            equipped_weapon,
+            equipped_back,
+            equipped_feet,
+            equipped_ring,
+            equipped_gloves,
+            equipped_necklace,
+            equipped_belt,
+            is_admin,
+            account_id,
+            ip_address,
+            sitting_at_x,
+            sitting_at_y,
+            bank_json,
+            bank_gold,
+            bank_max_slots,
+            combat_style_prefs_json,
+        } = data;
+
         // Validate saved position — if the chunk doesn't exist on disk, reset to spawn
         let (safe_x, safe_y, safe_z) = {
             let coord = ChunkCoord::from_world(x, y);
@@ -77,7 +77,7 @@ impl GameRoom {
         };
 
         let mut player = Player::new(
-            player_id, name, safe_x, safe_y, gender, skin, hair_style, hair_color,
+            player_id, &name, safe_x, safe_y, &gender, &skin, hair_style, hair_color,
         );
         player.z = safe_z;
         player.bank_max_slots = bank_max_slots;
@@ -110,7 +110,7 @@ impl GameRoom {
         player.ip_address = ip_address;
 
         // Restore combat style preferences and set active style based on equipped weapon
-        if let Ok(prefs) = serde_json::from_str::<HashMap<String, String>>(combat_style_prefs_json)
+        if let Ok(prefs) = serde_json::from_str::<HashMap<String, String>>(&combat_style_prefs_json)
         {
             for (weapon_key, style_str) in &prefs {
                 if let Some(style) = CombatStyle::from_str(style_str) {
@@ -130,15 +130,15 @@ impl GameRoom {
             WeaponType::Melee => "melee",
             WeaponType::Ranged => "ranged",
         };
-        if let Some(&pref_style) = player.combat_style_prefs.get(weapon_key) {
-            if pref_style.is_valid_for(weapon_type) {
-                player.combat_style = pref_style;
-            }
+        if let Some(&pref_style) = player.combat_style_prefs.get(weapon_key)
+            && pref_style.is_valid_for(weapon_type)
+        {
+            player.combat_style = pref_style;
         }
 
         // Restore inventory from JSON - support both old (u8) and new (String) formats
         // Skip invalid slots (empty item_id or quantity <= 0) to prevent ghost items
-        if let Ok(slots) = serde_json::from_str::<Vec<(usize, String, i32)>>(inventory_json) {
+        if let Ok(slots) = serde_json::from_str::<Vec<(usize, String, i32)>>(&inventory_json) {
             // New format: (slot_idx, item_id, quantity)
             for (slot_idx, item_id, quantity) in slots {
                 if slot_idx < player.inventory.slots.len() && !item_id.is_empty() && quantity > 0 {
@@ -146,7 +146,7 @@ impl GameRoom {
                         Some(item::InventorySlot::new(item_id, quantity));
                 }
             }
-        } else if let Ok(slots) = serde_json::from_str::<Vec<(usize, u8, i32)>>(inventory_json) {
+        } else if let Ok(slots) = serde_json::from_str::<Vec<(usize, u8, i32)>>(&inventory_json) {
             // Legacy format: (slot_idx, item_type_u8, quantity) - migrate to string IDs
             for (slot_idx, item_type_u8, quantity) in slots {
                 if slot_idx < player.inventory.slots.len() && quantity > 0 {
@@ -167,7 +167,7 @@ impl GameRoom {
 
         // Restore bank from JSON
         player.bank.gold = bank_gold;
-        if let Ok(slots) = serde_json::from_str::<Vec<(usize, String, i32)>>(bank_json) {
+        if let Ok(slots) = serde_json::from_str::<Vec<(usize, String, i32)>>(&bank_json) {
             for (slot_idx, item_id, quantity) in slots {
                 if slot_idx < player.bank.slots.len() && !item_id.is_empty() && quantity > 0 {
                     player.bank.slots[slot_idx] = Some(item::InventorySlot::new(item_id, quantity));
@@ -188,14 +188,14 @@ impl GameRoom {
 
         tracing::info!(
             "Restored player {} at ({}, {}) with {} HP, combat level {}, {} gold, appearance: {} {}",
-            name,
+            &name,
             x,
             y,
             hp,
             player.combat_level(),
             gold,
-            gender,
-            skin
+            &gender,
+            &skin
         );
 
         let mut players = self.players.write().await;
@@ -241,14 +241,14 @@ impl GameRoom {
                     {
                         let mut players = self.players.write().await;
                         for placement in &placements {
-                            if placement.gold_reward > 0 {
-                                if let Some(p) = players.get_mut(&placement.player_id) {
-                                    p.inventory.gold = item::checked_gold_credit(
-                                        p.inventory.gold,
-                                        placement.gold_reward,
-                                    )
-                                    .unwrap_or(item::MAX_GOLD);
-                                }
+                            if placement.gold_reward > 0
+                                && let Some(p) = players.get_mut(&placement.player_id)
+                            {
+                                p.inventory.gold = item::checked_gold_credit(
+                                    p.inventory.gold,
+                                    placement.gold_reward,
+                                )
+                                .unwrap_or(item::MAX_GOLD);
                             }
                         }
                     }
@@ -293,10 +293,10 @@ impl GameRoom {
         };
         if let Some((tx, ty)) = sitting_pos {
             let mut chairs = self.chairs.write().await;
-            if let Some(chair) = chairs.get_mut(&(tx, ty)) {
-                if chair.occupied_by.as_deref() == Some(player_id) {
-                    chair.occupied_by = None;
-                }
+            if let Some(chair) = chairs.get_mut(&(tx, ty))
+                && chair.occupied_by.as_deref() == Some(player_id)
+            {
+                chair.occupied_by = None;
             }
         }
 
@@ -483,7 +483,7 @@ impl GameRoom {
 
         // Resolve map_ids for players in instances (batch)
         let mut map_ids: HashMap<String, String> = HashMap::new();
-        for (pid, _inst_id) in &instance_map {
+        for pid in instance_map.keys() {
             if let Some(inst) = self.instance_manager.find_player_instance(pid).await {
                 map_ids.insert(pid.clone(), inst.map_id.clone());
             }
@@ -661,15 +661,15 @@ impl GameRoom {
             .cloned()
             .unwrap_or_default();
         // Migration: fix old "living_rock" task IDs -> "rock"
-        if let Some(ref mut task) = state.current_task {
-            if task.monster_id == "living_rock" {
-                task.monster_id = "rock".to_string();
-                // Persist the fix
-                self.player_slayer_states
-                    .write()
-                    .await
-                    .insert(player_id.to_string(), state.clone());
-            }
+        if let Some(ref mut task) = state.current_task
+            && task.monster_id == "living_rock"
+        {
+            task.monster_id = "rock".to_string();
+            // Persist the fix
+            self.player_slayer_states
+                .write()
+                .await
+                .insert(player_id.to_string(), state.clone());
         }
         state
     }
@@ -723,21 +723,13 @@ impl GameRoom {
 
         // Persist to DB using character_id (parsed from player_id "char_123")
         let obtained_at = chrono::Utc::now().to_rfc3339();
-        if let Some(ref db) = self.db {
-            if let Some(character_id) = Self::parse_character_id(player_id) {
-                if let Err(e) = db
-                    .save_collection_entry(
-                        character_id,
-                        item_id,
-                        source,
-                        source_detail,
-                        &obtained_at,
-                    )
-                    .await
-                {
-                    tracing::warn!("Failed to save collection entry for {}: {}", player_id, e);
-                }
-            }
+        if let Some(ref db) = self.db
+            && let Some(character_id) = Self::parse_character_id(player_id)
+            && let Err(e) = db
+                .save_collection_entry(character_id, item_id, source, source_detail, &obtained_at)
+                .await
+        {
+            tracing::warn!("Failed to save collection entry for {}: {}", player_id, e);
         }
 
         // Send real-time notification to client
@@ -1105,10 +1097,10 @@ impl GameRoom {
     }
 
     pub(super) async fn sync_ground_item_visibility(&self) {
+        let senders = self.transport.player_senders().await;
         let players = self.players.read().await;
         let instances = self.player_instances.read().await;
         let items = self.ground_items.read().await;
-        let senders = self.player_senders.read().await;
         let mut visibility = self.visible_ground_items.write().await;
 
         for (player_id, sender) in senders.iter() {

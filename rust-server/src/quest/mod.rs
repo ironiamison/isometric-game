@@ -10,9 +10,10 @@ pub mod registry;
 pub mod runner;
 pub mod state;
 
-pub use api::QuestContext;
-pub use definition::{Objective, ObjectiveType, Quest, QuestChain, QuestDialogue, Reward};
+pub use definition::{ObjectiveType, Quest};
 pub use events::QuestEvent;
-pub use registry::{HotReloadEvent, QuestRegistry};
-pub use runner::{BonusReward, DialogueChoice, DialogueResult, QuestRunner, ScriptResult};
-pub use state::{PlayerQuestState, QuestProgress, QuestStatus};
+pub use registry::QuestRegistry;
+#[cfg(debug_assertions)]
+pub use registry::HotReloadEvent;
+pub use runner::QuestRunner;
+pub use state::{PlayerQuestState, QuestStatus};

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useEditorStore } from '@/state/store';
 import { notesStorage } from '@/core/NotesStorage';
 import { screenToWorldTile, worldToChunk } from '@/core/coords';
@@ -44,7 +44,7 @@ export function NotesPanel() {
   const [editStatus, setEditStatus] = useState<NoteStatus>('open');
 
   const filteredNotes = useMemo(() => {
-    let result = notes;
+    let result = [...notes];
     if (filterCategory) result = result.filter(n => n.category === filterCategory);
     if (filterStatus) result = result.filter(n => n.status === filterStatus);
     return result.sort((a, b) => {
@@ -56,23 +56,24 @@ export function NotesPanel() {
     });
   }, [notes, filterCategory, filterStatus]);
 
-  // Auto-open editing when a new note is selected with empty text (e.g. from right-click)
-  useEffect(() => {
-    if (selectedNoteId && !editingId) {
-      const note = notes.find(n => n.id === selectedNoteId);
-      if (note && note.text === '') {
-        startEditing(note);
-      }
-    }
-  }, [selectedNoteId]);
-
-  const startEditing = (note: DevNote) => {
+  const startEditing = useCallback((note: DevNote) => {
     setEditingId(note.id);
     setEditText(note.text);
     setEditCategory(note.category);
     setEditPriority(note.priority);
     setEditStatus(note.status);
-  };
+  }, []);
+
+  // Auto-open editing when a new note is selected with empty text (e.g. from right-click)
+  useEffect(() => {
+    if (selectedNoteId && !editingId) {
+      const note = notes.find(n => n.id === selectedNoteId);
+      if (note && note.text === '') {
+        const timeoutId = window.setTimeout(() => startEditing(note), 0);
+        return () => window.clearTimeout(timeoutId);
+      }
+    }
+  }, [editingId, notes, selectedNoteId, startEditing]);
 
   const handleCreate = async () => {
     // Use hovered tile, or center of current canvas

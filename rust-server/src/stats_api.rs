@@ -507,8 +507,12 @@ pub(super) struct PerfQuery {
 
 pub(super) async fn api_logs(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     Query(params): Query<LogsQuery>,
-) -> impl IntoResponse {
+) -> axum::response::Response {
+    if !is_admin_request(&state, &headers) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
     let important_only = params.important.unwrap_or(false);
     let max_count = if important_only { 5000 } else { 1000 };
     let default_count = if important_only { 500 } else { 200 };
@@ -529,18 +533,42 @@ pub(super) async fn api_logs(
         entries
     };
 
-    Json(entries)
+    Json(entries).into_response()
 }
 
 pub(super) async fn api_perf(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     Query(params): Query<PerfQuery>,
-) -> impl IntoResponse {
+) -> axum::response::Response {
+    if !is_admin_request(&state, &headers) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
     let top_rooms = params.rooms.unwrap_or(10).clamp(1, 50);
     let recent_spikes = params.spikes.unwrap_or(50).min(200);
-    Json(state.perf_metrics.snapshot(top_rooms, recent_spikes))
+    Json(state.perf_metrics.snapshot(top_rooms, recent_spikes)).into_response()
 }
 
-pub(super) async fn logs_page() -> impl IntoResponse {
-    axum::response::Html(include_str!("logs.html"))
+fn is_admin_request(state: &AppState, headers: &axum::http::HeaderMap) -> bool {
+    let Some(expected) = state.config.admin_api_token.as_deref() else {
+        return false;
+    };
+    let Some(provided) = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+    else {
+        return false;
+    };
+    constant_time_eq(expected.as_bytes(), provided.as_bytes())
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter()
+        .zip(right)
+        .fold(0u8, |difference, (a, b)| difference | (a ^ b))
+        == 0
 }

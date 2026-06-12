@@ -191,6 +191,7 @@ export class ChunkManager {
   private parseSimplifiedFormat(data: SimplifiedChunk, coord: ChunkCoord): Chunk {
     const size = data.size;
     const tileSize = size * size;
+    const heights = data.heightmap ?? data.heights;
 
     // Decode collision from base64
     const collisionBitset = BitSet.fromBase64(data.collision, tileSize);
@@ -247,8 +248,8 @@ export class ChunkManager {
         y: g.y,
         zoneId: g.zoneId,
       })),
-      heights: (data.heights || (data as any).heightmap) && ((data.heights || (data as any).heightmap).length > 0)
-        ? new Uint8Array(data.heights || (data as any).heightmap)
+      heights: heights && heights.length > 0
+        ? new Uint8Array(heights)
         : undefined,
       blockTypesDown: data.blockTypesDown && data.blockTypesDown.length > 0
         ? new Uint16Array(data.blockTypesDown)

@@ -409,9 +409,7 @@ impl Renderer {
                     total_h += line_height;
                 }
                 // Level requirement lines (only if > 1)
-                if equip.ranged_level_required > 0 {
-                    total_h += line_height;
-                } else if equip.attack_level_required > 1 {
+                if equip.ranged_level_required > 0 || equip.attack_level_required > 1 {
                     total_h += line_height;
                 }
                 if equip.defence_level_required > 1 {

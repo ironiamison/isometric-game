@@ -103,10 +103,10 @@ impl Database {
             let skills_json: String = row.try_get("skills_json").unwrap_or_default();
             let skills = Skills::from_json(&skills_json);
             let total = skills.total_level();
-            if first.as_ref().map_or(true, |(_, b)| total > *b) {
+            if first.as_ref().is_none_or(|(_, b)| total > *b) {
                 second = first.take();
                 first = Some((name, total));
-            } else if second.as_ref().map_or(true, |(_, b)| total > *b) {
+            } else if second.as_ref().is_none_or(|(_, b)| total > *b) {
                 second = Some((name, total));
             }
         }

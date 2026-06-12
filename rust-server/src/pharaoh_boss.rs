@@ -110,7 +110,7 @@ fn minion_prototype(phase: &BossPhase, index: u32) -> &'static str {
         BossPhase::Hunt => "pharaoh_mummy",
         BossPhase::Storm => "pharaoh_skeleton",
         BossPhase::Frenzy => {
-            if index % 2 == 0 {
+            if index.is_multiple_of(2) {
                 "pharaoh_mummy"
             } else {
                 "pharaoh_skeleton"
@@ -257,29 +257,29 @@ impl PharaohBossState {
         }
 
         // --- Arena shrink (Phase 3 / Frenzy only) ---
-        if self.phase == BossPhase::Frenzy && config.arena_shrink_interval > 0 {
-            if current_time.saturating_sub(self.last_arena_shrink_time)
+        if self.phase == BossPhase::Frenzy
+            && config.arena_shrink_interval > 0
+            && current_time.saturating_sub(self.last_arena_shrink_time)
                 >= config.arena_shrink_interval
-            {
-                self.last_arena_shrink_time = current_time;
-                let tiles = arena_shrink_tiles(self.arena_shrink_layer);
-                if !tiles.is_empty() {
-                    // Warning first
-                    events.push(BossEvent::AoeWarning {
-                        instance_id: self.instance_id.clone(),
-                        tiles: tiles.clone(),
-                        delay_ms: 2_000,
-                        effect: "arena_shrink".to_string(),
-                    });
-                    // Then damage
-                    events.push(BossEvent::AoeDamage {
-                        instance_id: self.instance_id.clone(),
-                        tiles,
-                        damage: 5,
-                        effect: "arena_shrink".to_string(),
-                    });
-                    self.arena_shrink_layer += 1;
-                }
+        {
+            self.last_arena_shrink_time = current_time;
+            let tiles = arena_shrink_tiles(self.arena_shrink_layer);
+            if !tiles.is_empty() {
+                // Warning first
+                events.push(BossEvent::AoeWarning {
+                    instance_id: self.instance_id.clone(),
+                    tiles: tiles.clone(),
+                    delay_ms: 2_000,
+                    effect: "arena_shrink".to_string(),
+                });
+                // Then damage
+                events.push(BossEvent::AoeDamage {
+                    instance_id: self.instance_id.clone(),
+                    tiles,
+                    damage: 5,
+                    effect: "arena_shrink".to_string(),
+                });
+                self.arena_shrink_layer += 1;
             }
         }
 

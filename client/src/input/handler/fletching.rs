@@ -155,23 +155,22 @@ impl InputHandler {
                 let max_scroll = (total_content - content_h).max(0.0);
 
                 // W/S or Up/Down to navigate recipes
-                if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W) {
-                    if state.ui_state.fletching_selected_recipe > 0 {
-                        state.ui_state.fletching_selected_recipe -= 1;
-                        let item_top = state.ui_state.fletching_selected_recipe as f32 * row_h;
-                        if item_top < state.ui_state.fletching_scroll_offset {
-                            state.ui_state.fletching_scroll_offset = item_top;
-                        }
+                if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W))
+                    && state.ui_state.fletching_selected_recipe > 0
+                {
+                    state.ui_state.fletching_selected_recipe -= 1;
+                    let item_top = state.ui_state.fletching_selected_recipe as f32 * row_h;
+                    if item_top < state.ui_state.fletching_scroll_offset {
+                        state.ui_state.fletching_scroll_offset = item_top;
                     }
                 }
-                if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S) {
-                    if state.ui_state.fletching_selected_recipe < recipe_count.saturating_sub(1) {
-                        state.ui_state.fletching_selected_recipe += 1;
-                        let item_bottom =
-                            (state.ui_state.fletching_selected_recipe + 1) as f32 * row_h;
-                        if item_bottom > state.ui_state.fletching_scroll_offset + content_h {
-                            state.ui_state.fletching_scroll_offset = item_bottom - content_h;
-                        }
+                if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
+                    && state.ui_state.fletching_selected_recipe < recipe_count.saturating_sub(1)
+                {
+                    state.ui_state.fletching_selected_recipe += 1;
+                    let item_bottom = (state.ui_state.fletching_selected_recipe + 1) as f32 * row_h;
+                    if item_bottom > state.ui_state.fletching_scroll_offset + content_h {
+                        state.ui_state.fletching_scroll_offset = item_bottom - content_h;
                     }
                 }
 
