@@ -2,20 +2,58 @@ name: Client Release
 
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - 'client/**'
-      - 'launcher/**'
-      - 'crates/aeven-protocol/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'rust-toolchain.toml'
-      - 'tools/**'
-      - '.github/workflows/client-release.yml'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
 
 jobs:
+  changes:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master')
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.filter.outputs.should_run }}
+      revision: ${{ steps.revision.outputs.revision }}
+    steps:
+      - name: Resolve revision
+        id: revision
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "revision=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "revision=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.revision.outputs.revision }}
+          fetch-depth: 2
+
+      - name: Detect client release changes
+        id: filter
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet HEAD^ HEAD -- \
+            client launcher crates/aeven-protocol tools \
+            Cargo.toml Cargo.lock rust-toolchain.toml \
+            .github/workflows/client-release.yml; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: changes
+    if: needs.changes.outputs.should_run == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -37,6 +75,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changes.outputs.revision }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -79,11 +119,13 @@ jobs:
 
   manifest:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [changes, build]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changes.outputs.revision }}
 
       - name: Setup Python
         uses: actions/setup-python@v5

@@ -259,6 +259,15 @@ impl InteriorMapDef {
                 return Err(format!("invalid entity spawn '{}'", entity.entity_id));
             }
         }
+        let mut unique_entity_ids = std::collections::HashSet::new();
+        for entity in &self.entities {
+            if let Some(unique_id) = entity.unique_id.as_deref()
+                && !unique_id.is_empty()
+                && !unique_entity_ids.insert(unique_id)
+            {
+                return Err(format!("duplicate entity uniqueId '{unique_id}'"));
+            }
+        }
         for wall in &self.walls {
             if !matches!(wall.edge.as_str(), "down" | "right")
                 || wall.x < 0

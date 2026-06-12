@@ -104,6 +104,26 @@ impl ContentRegistries {
                     ));
                 }
             }
+            for portal in &interior.portals {
+                if portal.target_map == "overworld" {
+                    continue;
+                }
+                let target = interior_registry.get(&portal.target_map).ok_or_else(|| {
+                    format!(
+                        "interior '{interior_id}' portal '{}' references unknown map '{}'",
+                        portal.id, portal.target_map
+                    )
+                })?;
+                if let Some(spawn) = portal.target_spawn.as_deref()
+                    && !spawn.is_empty()
+                    && target.get_spawn_point(spawn).is_none()
+                {
+                    return Err(format!(
+                        "interior '{interior_id}' portal '{}' references unknown spawn '{}' in '{}'",
+                        portal.id, spawn, portal.target_map
+                    ));
+                }
+            }
         }
 
         let quest_names = quest_registry

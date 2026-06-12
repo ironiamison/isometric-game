@@ -21,13 +21,23 @@ require_node_toolchain() {
     fi
 }
 
-# Get current commit before pull
+# Deploy the exact revision that passed CI. Falling back to origin/master keeps
+# intentional manual invocations working.
 BEFORE=$(git rev-parse HEAD)
+TARGET_REVISION="${DEPLOY_SHA:-origin/master}"
 
-# Pull latest changes
-git pull --ff-only origin master
+git fetch origin master
+TARGET_SHA=$(git rev-parse "$TARGET_REVISION^{commit}")
+if ! git merge-base --is-ancestor "$TARGET_SHA" origin/master; then
+    echo "ERROR: target revision $TARGET_SHA is not reachable from origin/master."
+    exit 1
+fi
+if ! git merge-base --is-ancestor "$BEFORE" "$TARGET_SHA"; then
+    echo "ERROR: target revision $TARGET_SHA is not a fast-forward from deployed revision $BEFORE."
+    exit 1
+fi
+git merge --ff-only "$TARGET_SHA"
 
-# Get new commit after pull
 AFTER=$(git rev-parse HEAD)
 
 if [ "$BEFORE" = "$AFTER" ]; then

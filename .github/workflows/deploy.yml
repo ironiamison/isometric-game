@@ -1,19 +1,22 @@
 name: Deploy
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'client/**'
-      - 'crates/aeven-protocol/**'
-      - 'rust-server/**'
-      - 'site/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'rust-toolchain.toml'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to server
@@ -22,4 +25,6 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
-          script: /root/isometric-game/deploy.sh
+          script: >-
+            DEPLOY_SHA='${{ github.event.workflow_run.head_sha }}'
+            /root/isometric-game/deploy.sh

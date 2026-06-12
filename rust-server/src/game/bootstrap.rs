@@ -48,6 +48,27 @@ impl GameRoom {
                     coord.x, coord.y
                 )
             });
+            for portal in &chunk.portals {
+                if portal.target_map == "overworld" {
+                    continue;
+                }
+                let target = interior_registry
+                    .get(&portal.target_map)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "chunk ({}, {}) portal '{}' references unknown map '{}'",
+                            coord.x, coord.y, portal.id, portal.target_map
+                        )
+                    });
+                if !portal.target_spawn.is_empty()
+                    && target.get_spawn_point(&portal.target_spawn).is_none()
+                {
+                    panic!(
+                        "chunk ({}, {}) portal '{}' references unknown spawn '{}' in '{}'",
+                        coord.x, coord.y, portal.id, portal.target_spawn, portal.target_map
+                    );
+                }
+            }
             for spawn in &chunk.entity_spawns {
                 let npc_id = spawn
                     .unique_id
@@ -98,6 +119,16 @@ impl GameRoom {
         // Load gathering system
         let mut gathering = crate::gathering::GatheringSystem::load(std::path::Path::new("data"))
             .unwrap_or_else(|error| panic!("gathering content validation failed: {error}"));
+        for (interior_id, interior) in interior_registry.iter() {
+            for marker in &interior.gathering_zones {
+                if !gathering.zones.contains_key(&marker.zone_id) {
+                    panic!(
+                        "interior '{interior_id}' references unknown gathering zone '{}'",
+                        marker.zone_id
+                    );
+                }
+            }
+        }
         tracing::info!(
             "Loaded gathering system with {} zones",
             gathering.zones.len()

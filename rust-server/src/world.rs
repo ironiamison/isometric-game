@@ -10,10 +10,102 @@ use crate::chunk::{
     MapObject, Portal, Wall, WallEdge, world_to_local,
 };
 
+const CHUNK_TILE_COUNT: usize = (CHUNK_SIZE * CHUNK_SIZE) as usize;
+
 #[derive(Deserialize)]
 struct CollisionIgnoreConfig {
     objects_first_gid: u32,
     ignore_object_ids: Vec<u32>,
+}
+
+fn required_array<'a>(
+    value: Option<&'a serde_json::Value>,
+    name: &str,
+) -> Result<&'a Vec<serde_json::Value>, String> {
+    let values = value
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| format!("{name} must be an array"))?;
+    if values.len() != CHUNK_TILE_COUNT {
+        return Err(format!(
+            "{name} has {} entries; expected {CHUNK_TILE_COUNT}",
+            values.len()
+        ));
+    }
+    Ok(values)
+}
+
+fn parse_u32_array(value: Option<&serde_json::Value>, name: &str) -> Result<Vec<u32>, String> {
+    required_array(value, name)?
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            value
+                .as_u64()
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| format!("{name}[{index}] must be a u32"))
+        })
+        .collect()
+}
+
+fn parse_u8_array(value: Option<&serde_json::Value>, name: &str) -> Result<Vec<u8>, String> {
+    required_array(value, name)?
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            value
+                .as_u64()
+                .and_then(|value| u8::try_from(value).ok())
+                .ok_or_else(|| format!("{name}[{index}] must be a u8"))
+        })
+        .collect()
+}
+
+fn parse_optional_u16_array(
+    value: Option<&serde_json::Value>,
+    name: &str,
+) -> Result<Vec<u16>, String> {
+    let Some(value) = value else {
+        return Ok(vec![0; CHUNK_TILE_COUNT]);
+    };
+    required_array(Some(value), name)?
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            value
+                .as_u64()
+                .and_then(|value| u16::try_from(value).ok())
+                .ok_or_else(|| format!("{name}[{index}] must be a u16"))
+        })
+        .collect()
+}
+
+fn parse_local_coordinate(value: Option<&serde_json::Value>, name: &str) -> Result<u32, String> {
+    let coordinate = value
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or_else(|| format!("{name} must be a non-negative integer"))?;
+    if coordinate >= CHUNK_SIZE {
+        return Err(format!(
+            "{name} must be between 0 and {}; got {coordinate}",
+            CHUNK_SIZE - 1
+        ));
+    }
+    Ok(coordinate)
+}
+
+fn parse_i32(value: Option<&serde_json::Value>, name: &str) -> Result<i32, String> {
+    value
+        .and_then(serde_json::Value::as_i64)
+        .and_then(|value| i32::try_from(value).ok())
+        .ok_or_else(|| format!("{name} must be an i32"))
+}
+
+fn parse_positive_u32(value: Option<&serde_json::Value>, name: &str) -> Result<u32, String> {
+    value
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .filter(|value| *value > 0)
+        .ok_or_else(|| format!("{name} must be a positive u32"))
 }
 
 /// World manager that handles loading and caching chunks
@@ -43,34 +135,22 @@ impl World {
     /// Load collision ignore list from data/collision_ignore.toml
     fn load_collision_ignores() -> HashSet<u32> {
         let path = "data/collision_ignore.toml";
-        let content = match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("No collision_ignore.toml found ({}), no GIDs ignored", e);
-                return HashSet::new();
-            }
-        };
-
-        match toml::from_str::<CollisionIgnoreConfig>(&content) {
-            Ok(config) => {
-                let gids: HashSet<u32> = config
-                    .ignore_object_ids
-                    .iter()
-                    .map(|id| config.objects_first_gid + id)
-                    .collect();
-                info!(
-                    "Loaded {} collision-ignore GIDs (firstGid={}, {} editor IDs)",
-                    gids.len(),
-                    config.objects_first_gid,
-                    config.ignore_object_ids.len()
-                );
-                gids
-            }
-            Err(e) => {
-                warn!("Failed to parse collision_ignore.toml: {}", e);
-                HashSet::new()
-            }
-        }
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|error| panic!("failed to read {path}: {error}"));
+        let config = toml::from_str::<CollisionIgnoreConfig>(&content)
+            .unwrap_or_else(|error| panic!("failed to parse {path}: {error}"));
+        let gids: HashSet<u32> = config
+            .ignore_object_ids
+            .iter()
+            .map(|id| config.objects_first_gid + id)
+            .collect();
+        info!(
+            "Loaded {} collision-ignore GIDs (firstGid={}, {} editor IDs)",
+            gids.len(),
+            config.objects_first_gid,
+            config.ignore_object_ids.len()
+        );
+        gids
     }
 
     /// Get or load a chunk at the given coordinates
@@ -83,6 +163,9 @@ impl World {
             }
         }
 
+        let filename = format!("chunk_{}_{}.json", coord.x, coord.y);
+        let file_exists = Path::new(&self.chunk_dir).join(filename).exists();
+
         // Try to load from file
         let chunk = self.load_chunk_from_file(coord).await;
 
@@ -91,6 +174,12 @@ impl World {
             let mut chunks = self.chunks.write().await;
             chunks.insert(coord, chunk.clone());
             return Some(chunk);
+        }
+
+        // An existing but invalid chunk is authoritative content corruption.
+        // Never hide it behind a generated development chunk.
+        if file_exists {
+            return None;
         }
 
         // Generate test chunk if enabled
@@ -164,8 +253,37 @@ impl World {
     ) -> Result<Chunk, String> {
         use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
-        let size = value["size"].as_u64().unwrap_or(CHUNK_SIZE as u64) as u32;
-        if size != CHUNK_SIZE {
+        let version = value
+            .get("version")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or("missing integer version")?;
+        if version != 2 {
+            return Err(format!("Unsupported chunk version {version}; expected 2"));
+        }
+        let stored_coord = value
+            .get("coord")
+            .and_then(serde_json::Value::as_object)
+            .ok_or("missing coord object")?;
+        let stored_x = stored_coord
+            .get("cx")
+            .and_then(serde_json::Value::as_i64)
+            .ok_or("coord.cx must be an integer")?;
+        let stored_y = stored_coord
+            .get("cy")
+            .and_then(serde_json::Value::as_i64)
+            .ok_or("coord.cy must be an integer")?;
+        if stored_x != i64::from(coord.x) || stored_y != i64::from(coord.y) {
+            return Err(format!(
+                "Chunk coordinate mismatch: file is ({}, {}), payload is ({stored_x}, {stored_y})",
+                coord.x, coord.y
+            ));
+        }
+
+        let size = value
+            .get("size")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or("missing integer size")?;
+        if size != u64::from(CHUNK_SIZE) {
             return Err(format!(
                 "Chunk size mismatch: expected {}, got {}",
                 CHUNK_SIZE, size
@@ -174,84 +292,59 @@ impl World {
 
         let mut chunk = Chunk::new(coord);
 
-        // Parse layers
-        if let Some(layers) = value.get("layers") {
-            // Ground layer
-            if let Some(ground) = layers["ground"].as_array() {
-                let tiles: Vec<u32> = ground
-                    .iter()
-                    .map(|v| v.as_u64().unwrap_or(0) as u32)
-                    .collect();
-                if tiles.len() == (CHUNK_SIZE * CHUNK_SIZE) as usize {
-                    chunk.layers[0].tiles = tiles;
-                }
-            }
-
-            // Objects layer
-            if let Some(objects) = layers["objects"].as_array() {
-                let tiles: Vec<u32> = objects
-                    .iter()
-                    .map(|v| v.as_u64().unwrap_or(0) as u32)
-                    .collect();
-                if tiles.len() == (CHUNK_SIZE * CHUNK_SIZE) as usize {
-                    chunk.layers[1].tiles = tiles;
-                }
-            }
-
-            // Overhead layer
-            if let Some(overhead) = layers["overhead"].as_array() {
-                let tiles: Vec<u32> = overhead
-                    .iter()
-                    .map(|v| v.as_u64().unwrap_or(0) as u32)
-                    .collect();
-                if tiles.len() == (CHUNK_SIZE * CHUNK_SIZE) as usize {
-                    chunk.layers[2].tiles = tiles;
-                }
-            }
-        }
+        let layers = value
+            .get("layers")
+            .and_then(serde_json::Value::as_object)
+            .ok_or("missing layers object")?;
+        chunk.layers[0].tiles = parse_u32_array(layers.get("ground"), "layers.ground")?;
+        chunk.layers[1].tiles = parse_u32_array(layers.get("objects"), "layers.objects")?;
+        chunk.layers[2].tiles = parse_u32_array(layers.get("overhead"), "layers.overhead")?;
 
         // Parse collision from base64
-        if let Some(collision_b64) = value["collision"].as_str()
-            && let Ok(collision_bytes) = BASE64.decode(collision_b64)
-        {
-            chunk.collision = Chunk::unpack_collision(&collision_bytes);
+        let collision_b64 = value
+            .get("collision")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("collision must be a base64 string")?;
+        let collision_bytes = BASE64
+            .decode(collision_b64)
+            .map_err(|error| format!("collision is not valid base64: {error}"))?;
+        let expected_collision_bytes = CHUNK_TILE_COUNT.div_ceil(8);
+        if collision_bytes.len() != expected_collision_bytes {
+            return Err(format!(
+                "collision has {} bytes; expected {expected_collision_bytes}",
+                collision_bytes.len()
+            ));
         }
+        chunk.collision = Chunk::unpack_collision(&collision_bytes);
 
         // Parse height data (optional - missing means flat at z=0)
-        if let Some(heightmap) = value["heightmap"].as_array() {
-            let heights: Vec<u8> = heightmap
-                .iter()
-                .map(|v| v.as_u64().unwrap_or(0) as u8)
-                .collect();
-            if heights.len() == (CHUNK_SIZE * CHUNK_SIZE) as usize {
-                let block_types_down = if let Some(bt) = value["blockTypesDown"].as_array() {
-                    bt.iter().map(|v| v.as_u64().unwrap_or(0) as u16).collect()
-                } else {
-                    vec![0u16; (CHUNK_SIZE * CHUNK_SIZE) as usize]
-                };
-                let block_types_right = if let Some(bt) = value["blockTypesRight"].as_array() {
-                    bt.iter().map(|v| v.as_u64().unwrap_or(0) as u16).collect()
-                } else {
-                    vec![0u16; (CHUNK_SIZE * CHUNK_SIZE) as usize]
-                };
-                chunk.height_data = Some(crate::chunk::HeightData {
-                    heights,
-                    block_types_down,
-                    block_types_right,
-                });
-            }
+        if value.get("heightmap").is_some() {
+            let heights = parse_u8_array(value.get("heightmap"), "heightmap")?;
+            let block_types_down =
+                parse_optional_u16_array(value.get("blockTypesDown"), "blockTypesDown")?;
+            let block_types_right =
+                parse_optional_u16_array(value.get("blockTypesRight"), "blockTypesRight")?;
+            chunk.height_data = Some(crate::chunk::HeightData {
+                heights,
+                block_types_down,
+                block_types_right,
+            });
         }
 
         // Parse entities
-        if let Some(entities) = value["entities"].as_array() {
+        if let Some(entities_value) = value.get("entities") {
+            let entities = entities_value
+                .as_array()
+                .ok_or("entities must be an array")?;
             for entity in entities {
-                let entity_id = entity["entityId"].as_str().unwrap_or("").to_string();
-                if entity_id.is_empty() {
-                    continue;
-                }
-
-                let local_x = entity["x"].as_u64().unwrap_or(0) as u32;
-                let local_y = entity["y"].as_u64().unwrap_or(0) as u32;
+                let entity_id = entity
+                    .get("entityId")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|id| !id.is_empty())
+                    .ok_or("entityId must be a non-empty string")?
+                    .to_string();
+                let local_x = parse_local_coordinate(entity.get("x"), "entity.x")?;
+                let local_y = parse_local_coordinate(entity.get("y"), "entity.y")?;
                 let world_x = coord.x * CHUNK_SIZE as i32 + local_x as i32;
                 let world_y = coord.y * CHUNK_SIZE as i32 + local_y as i32;
 
@@ -276,19 +369,23 @@ impl World {
         }
 
         // Parse map objects (new cartesian format)
-        if let Some(map_objects) = value["mapObjects"].as_array() {
+        if let Some(map_objects_value) = value.get("mapObjects") {
+            let map_objects = map_objects_value
+                .as_array()
+                .ok_or("mapObjects must be an array")?;
             for obj in map_objects {
-                let gid = obj["gid"].as_u64().unwrap_or(0) as u32;
-                if gid == 0 {
-                    continue;
-                }
-
-                let local_x = obj["x"].as_i64().unwrap_or(0) as i32;
-                let local_y = obj["y"].as_i64().unwrap_or(0) as i32;
+                let gid = obj
+                    .get("gid")
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|value| u32::try_from(value).ok())
+                    .filter(|gid| *gid > 0)
+                    .ok_or("mapObjects.gid must be a positive u32")?;
+                let local_x = parse_i32(obj.get("x"), "mapObjects.x")?;
+                let local_y = parse_i32(obj.get("y"), "mapObjects.y")?;
                 let world_x = coord.x * CHUNK_SIZE as i32 + local_x;
                 let world_y = coord.y * CHUNK_SIZE as i32 + local_y;
-                let width = obj["width"].as_u64().unwrap_or(64) as u32;
-                let height = obj["height"].as_u64().unwrap_or(64) as u32;
+                let width = parse_positive_u32(obj.get("width"), "mapObjects.width")?;
+                let height = parse_positive_u32(obj.get("height"), "mapObjects.height")?;
 
                 chunk.objects.push(MapObject {
                     gid,
@@ -301,48 +398,62 @@ impl World {
         }
 
         // Parse walls
-        if let Some(walls_array) = value["walls"].as_array() {
+        if let Some(walls_value) = value.get("walls") {
+            let walls_array = walls_value.as_array().ok_or("walls must be an array")?;
             for wall_value in walls_array {
-                if let (Some(gid), Some(x), Some(y), Some(edge_str)) = (
-                    wall_value["gid"].as_u64(),
-                    wall_value["x"].as_i64(),
-                    wall_value["y"].as_i64(),
-                    wall_value["edge"].as_str(),
-                ) {
-                    let edge = match edge_str {
-                        "down" => WallEdge::Down,
-                        "right" => WallEdge::Right,
-                        _ => continue,
-                    };
-                    chunk.walls.push(Wall {
-                        gid: gid as u32,
-                        tile_x: coord.x * CHUNK_SIZE as i32 + x as i32,
-                        tile_y: coord.y * CHUNK_SIZE as i32 + y as i32,
-                        edge,
-                    });
-                }
+                let gid = wall_value
+                    .get("gid")
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|value| u32::try_from(value).ok())
+                    .filter(|gid| *gid > 0)
+                    .ok_or("walls.gid must be a positive u32")?;
+                let x = parse_i32(wall_value.get("x"), "walls.x")?;
+                let y = parse_i32(wall_value.get("y"), "walls.y")?;
+                let edge = match wall_value.get("edge").and_then(serde_json::Value::as_str) {
+                    Some("down") => WallEdge::Down,
+                    Some("right") => WallEdge::Right,
+                    _ => return Err("walls.edge must be 'down' or 'right'".to_string()),
+                };
+                chunk.walls.push(Wall {
+                    gid,
+                    tile_x: coord.x * CHUNK_SIZE as i32 + x,
+                    tile_y: coord.y * CHUNK_SIZE as i32 + y,
+                    edge,
+                });
             }
         }
 
         // Parse portals
-        let portals: Vec<Portal> = value
-            .get("portals")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_default();
+        let portals: Vec<Portal> = match value.get("portals") {
+            Some(portals) => serde_json::from_value(portals.clone())
+                .map_err(|error| format!("invalid portals: {error}"))?,
+            None => Vec::new(),
+        };
+        for portal in &portals {
+            if portal.target_map.trim().is_empty() || portal.width <= 0 || portal.height <= 0 {
+                return Err(format!("invalid portal '{}'", portal.id));
+            }
+        }
         chunk.portals = portals;
 
         // Parse gathering zones
-        if let Some(gz_array) = value["gatheringZones"].as_array() {
+        if let Some(gathering_value) = value.get("gatheringZones") {
+            let gz_array = gathering_value
+                .as_array()
+                .ok_or("gatheringZones must be an array")?;
             for gz in gz_array {
-                if let (Some(x), Some(y), Some(zone_id)) =
-                    (gz["x"].as_i64(), gz["y"].as_i64(), gz["zoneId"].as_str())
-                {
-                    chunk.gathering_zones.push(GatheringZoneMarker {
-                        world_x: coord.x * CHUNK_SIZE as i32 + x as i32,
-                        world_y: coord.y * CHUNK_SIZE as i32 + y as i32,
-                        zone_id: zone_id.to_string(),
-                    });
-                }
+                let x = parse_local_coordinate(gz.get("x"), "gatheringZones.x")?;
+                let y = parse_local_coordinate(gz.get("y"), "gatheringZones.y")?;
+                let zone_id = gz
+                    .get("zoneId")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|id| !id.is_empty())
+                    .ok_or("gatheringZones.zoneId must be a non-empty string")?;
+                chunk.gathering_zones.push(GatheringZoneMarker {
+                    world_x: coord.x * CHUNK_SIZE as i32 + x as i32,
+                    world_y: coord.y * CHUNK_SIZE as i32 + y as i32,
+                    zone_id: zone_id.to_string(),
+                });
             }
         }
 
