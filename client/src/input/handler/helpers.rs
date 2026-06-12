@@ -1,4 +1,50 @@
 use super::*;
+use macroquad::miniquad::{self, EventHandler};
+use std::sync::OnceLock;
+
+/// True when a key event is a clipboard-paste combo (Ctrl+V on Windows/Linux, Cmd+V on macOS).
+///
+/// This is decided from the modifier flags carried on the *event itself*, which every miniquad
+/// backend derives from live OS state (`GetKeyState` on Windows, `modifierFlags` on macOS,
+/// `event.ctrlKey/metaKey` on web). That sidesteps a cross-platform bug: none of the backends
+/// reset keyboard state on focus loss, so a Ctrl/Cmd held while the window loses focus (alt-tab,
+/// Cmd-tab, browser tab switch) leaves the key stuck "down" in the polled `is_key_down` state
+/// forever — making every later `V` press look like paste. The event's own mods are never stuck.
+pub(super) fn is_paste_combo(keycode: miniquad::KeyCode, mods: miniquad::KeyMods) -> bool {
+    keycode == miniquad::KeyCode::V && (mods.ctrl || mods.logo)
+}
+
+/// Replays this frame's raw input events looking for a genuine paste combo.
+#[derive(Default)]
+struct PasteWatcher {
+    paste_requested: bool,
+}
+
+impl EventHandler for PasteWatcher {
+    fn update(&mut self) {}
+    fn draw(&mut self) {}
+    fn key_down_event(
+        &mut self,
+        keycode: miniquad::KeyCode,
+        mods: miniquad::KeyMods,
+        _repeat: bool,
+    ) {
+        if is_paste_combo(keycode, mods) {
+            self.paste_requested = true;
+        }
+    }
+}
+
+/// Returns whether a Ctrl/Cmd+V was pressed since the previous call. Lazily registers a single
+/// shared input subscriber. Call once per frame.
+pub(super) fn poll_paste_request() -> bool {
+    static SUBSCRIBER: OnceLock<usize> = OnceLock::new();
+    let subscriber =
+        *SUBSCRIBER.get_or_init(macroquad::input::utils::register_input_subscriber);
+    let mut watcher = PasteWatcher::default();
+    macroquad::input::utils::repeat_all_miniquad_input(&mut watcher, subscriber);
+    watcher.paste_requested
+}
 
 /// Convert a character index to a byte index in a UTF-8 string.
 pub(super) fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
@@ -141,12 +187,10 @@ pub(super) fn process_chat_keyboard_input(
         while get_char_pressed().is_some() {}
     }
 
-    // Paste from clipboard (Ctrl+V / Cmd+V)
-    let ctrl_held = is_key_down(KeyCode::LeftControl)
-        || is_key_down(KeyCode::RightControl)
-        || is_key_down(KeyCode::LeftSuper)
-        || is_key_down(KeyCode::RightSuper);
-    if ctrl_held && is_key_pressed(KeyCode::V) {
+    // Paste from clipboard (Ctrl+V / Cmd+V). Driven by the event's live modifier flags
+    // (see poll_paste_request) rather than is_key_down, which the OS leaves stuck "down" after
+    // focus loss with the key held — otherwise every plain `v` would paste.
+    if state.ui_state.paste_requested {
         if let Some(text) = macroquad::miniquad::window::clipboard_get() {
             for c in text.chars() {
                 if state.ui_state.chat_input.chars().count() >= 200 {
@@ -580,5 +624,38 @@ pub(super) fn auto_action_target_pos(
             None
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_paste_combo;
+    use macroquad::miniquad::{KeyCode, KeyMods};
+
+    fn mods(ctrl: bool, logo: bool) -> KeyMods {
+        KeyMods {
+            shift: false,
+            ctrl,
+            alt: false,
+            logo,
+        }
+    }
+
+    #[test]
+    fn ctrl_v_and_cmd_v_are_paste() {
+        assert!(is_paste_combo(KeyCode::V, mods(true, false))); // Ctrl+V (Win/Linux)
+        assert!(is_paste_combo(KeyCode::V, mods(false, true))); // Cmd+V (macOS)
+    }
+
+    #[test]
+    fn plain_v_is_not_paste() {
+        // The bug case: V pressed with no live modifier flags must not paste, even if the
+        // persistent key-down state thinks Ctrl/Cmd is held.
+        assert!(!is_paste_combo(KeyCode::V, mods(false, false)));
+    }
+
+    #[test]
+    fn modifier_without_v_is_not_paste() {
+        assert!(!is_paste_combo(KeyCode::C, mods(true, false)));
     }
 }

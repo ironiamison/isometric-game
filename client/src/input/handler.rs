@@ -703,6 +703,11 @@ impl InputHandler {
         let mut commands = Vec::new();
         let current_time = get_time();
 
+        // Detect Ctrl/Cmd+V from this frame's key events (live modifier flags) before any handler
+        // reads it. Avoids is_key_down, which the OS leaves stuck "down" after focus loss with the
+        // key held — a cross-platform quirk that otherwise makes every plain `v` paste.
+        state.ui_state.paste_requested = helpers::poll_paste_request();
+
         self.update_touch_controls(state, current_time);
 
         // Get current mouse/touch position in virtual coordinates (for UI hit detection)

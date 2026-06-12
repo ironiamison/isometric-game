@@ -495,6 +495,10 @@ pub struct UiState {
     pub chat_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub chat_key_repeat_time: f64, // Last time a repeated key action fired
     pub chat_key_initial_delay: bool, // Whether we're still in initial delay
+    /// Set once per frame when a genuine Ctrl/Cmd+V was pressed (from the key event's live
+    /// modifier flags). Avoids relying on is_key_down, which the OS leaves stuck "down" after
+    /// focus loss with the key held, making every plain `v` paste.
+    pub paste_requested: bool,
     pub chat_messages: ChatLog,
     pub chat_revision: u64, // Increments whenever chat content changes (for render cache invalidation)
     pub inventory_open: bool,
@@ -795,6 +799,7 @@ impl Default for UiState {
             chat_scroll_drag: Default::default(),
             chat_key_repeat_time: 0.0,
             chat_key_initial_delay: true,
+            paste_requested: false,
             chat_messages: ChatLog::new(),
             chat_revision: 0,
             inventory_open: false,
