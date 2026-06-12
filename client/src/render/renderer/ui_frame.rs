@@ -571,54 +571,56 @@ impl Renderer {
                 // ===== DESKTOP: portrait + name header, icon-prefixed bars, style row =====
                 let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
 
-                // Unified cluster frame (same gold/bronze panel treatment as the side
-                // panels). Encloses the header, the 3 stat bars, and the style row.
-                // `cpad` must match the inset baked into local_name_tag_position().
-                let cpad = 4.0 * s;
-                // header(26) + gap(4) + 3 bars(18*3) + 2 gaps(4*2) = 92
-                let cluster_h = 92.0 * s;
-                let frame_x = name_tag_x - FRAME_THICKNESS - cpad;
-                let frame_y = name_tag_y - FRAME_THICKNESS - cpad;
-                let frame_w = bar_width + 2.0 * (FRAME_THICKNESS + cpad);
-                let frame_h = cluster_h + 2.0 * (FRAME_THICKNESS + cpad);
-                self.draw_panel_frame(frame_x, frame_y, frame_w, frame_h);
-                self.draw_corner_accents(frame_x, frame_y, frame_w, frame_h);
+                // Frameless HUD cluster: the portrait, name/level and stat bars sit directly
+                // on the world. The bars keep their own recessed backgrounds; only the
+                // identity block (portrait + name + level) gets a small translucent backing.
 
-                // Live head portrait (base + hair, no frame). A 26-wide box centered on
-                // the bar icon column (icon_col/2 = 9) lands at name_tag_x - 4, i.e. flush
-                // to the frame's inner edge — so the head sits directly above the icons and
-                // fills the left margin. The crop centers the face, so the visible head
-                // lines up with the icon column.
-                let portrait_size = 26.0 * s;
+                // Portrait box: clips the head, which is drawn at a fixed integer scale, so a
+                // tighter box just trims the empty margin/hair around it (head stays the same
+                // size). Right edge lands ~at the icon-column edge so the text clears the hair.
+                let portrait_size = 22.0 * s;
                 let portrait_x = name_tag_x - 4.0 * s;
+
+                // Iconless stat bars: the bars (and the downstream HUD indicators that anchor
+                // off bar_x) start at the nameplate box's left edge and run full width — no
+                // icon gutter — so the whole cluster reads flush-left under the box.
+                let (_bx, stats_y) = self.minimap_stats_stack_position(state, bar_width);
+                let hpad = 4.0 * s;
+                bar_x = portrait_x - hpad; // box + bar left edge
+                let bar_rx = bar_x;
+                let bar_rw = bar_width - 20.0 * s; // trimmed in from the right
+
+                // Name + level sit to the right of the portrait inside the nameplate, with a
+                // bit of breathing room so they don't touch the head.
+                let txt_x = portrait_x + portrait_size + 8.0 * s;
+                let level_label = format!("Level {}", player.skills.total_level());
+
+                // Translucent nameplate backing (chat-box fill) wrapping the portrait + name +
+                // level. Its left edge doubles as the bars' left edge; expanded a little on the
+                // right + bottom so the text always fits with padding.
+                let name_w = self.measure_text_sharp(name, 16.0).width;
+                let level_w = self.measure_text_sharp(&level_label, 14.0).width;
+                let hb_x = bar_x;
+                let hb_y = name_tag_y - hpad;
+                let hb_right = txt_x + name_w.max(level_w) + hpad + 2.0 * s;
+                let hb_bottom = name_tag_y + 24.0 * s;
+                draw_rectangle(hb_x, hb_y, hb_right - hb_x, hb_bottom - hb_y, HUD_FILL_TRANSLUCENT);
+
                 self.draw_player_head_portrait(player, portrait_x, name_tag_y, portrait_size);
-                // Name + level: name top ~aligns with the portrait top, level base with its bottom.
-                let txt_x = portrait_x + portrait_size + 6.0 * s;
                 self.draw_text_sharp(
                     name,
                     txt_x,
-                    (name_tag_y + 13.0 * s).floor(),
+                    (name_tag_y + 11.0 * s).floor(),
                     16.0,
                     TEXT_NORMAL,
                 );
-                let level_label = format!("Level {}", player.skills.total_level());
                 self.draw_text_sharp(
                     &level_label,
                     txt_x,
-                    (name_tag_y + 25.0 * s).floor(),
+                    (name_tag_y + 21.0 * s).floor(),
                     14.0,
                     TEXT_DIM,
                 );
-
-                let (bx, stats_y) = self.minimap_stats_stack_position(state, bar_width);
-                bar_x = bx;
-
-                // Bars are inset to leave an icon gutter on the left (heart/flask/bolt).
-                let icon_col = 18.0 * s;
-                let bar_rx = bar_x + icon_col;
-                let bar_rw = bar_width - icon_col;
-                let icon_cx = bar_x + icon_col * 0.5;
-                let icon_r = 6.0 * s;
 
                 // ===== HP BAR =====
                 let hp_bar_y = stats_y;
@@ -640,11 +642,6 @@ impl Renderer {
                     hp_main,
                     hp_dark,
                 );
-                if let Some(tex) = &self.health_stat_icon {
-                    self.draw_hud_stat_icon(tex, icon_cx, hp_bar_y + bar_height * 0.5);
-                } else {
-                    self.draw_hud_heart(icon_cx, hp_bar_y + bar_height * 0.5, icon_r, STAT_HP_MAIN);
-                }
                 let hp_text = format!("{} / {}", player.hp, player.max_hp);
                 let hp_text_w = self.measure_text_sharp(&hp_text, font_size).width;
                 self.draw_text_outlined(
@@ -676,11 +673,6 @@ impl Renderer {
                     STAT_MP_MAIN,
                     STAT_MP_DARK,
                 );
-                if let Some(tex) = &self.magic_stat_icon {
-                    self.draw_hud_stat_icon(tex, icon_cx, mp_bar_y + bar_height * 0.5);
-                } else {
-                    self.draw_hud_flask(icon_cx, mp_bar_y + bar_height * 0.5, icon_r, STAT_MP_MAIN);
-                }
                 let mp_text = format!("{} / {}", mp, max_mp);
                 let mp_text_w = self.measure_text_sharp(&mp_text, font_size).width;
                 self.draw_text_outlined(
@@ -715,16 +707,6 @@ impl Renderer {
                     STAT_PRAYER_MAIN,
                     STAT_PRAYER_DARK,
                 );
-                if let Some(tex) = &self.prayer_stat_icon {
-                    self.draw_hud_stat_icon(tex, icon_cx, prayer_bar_y + bar_height * 0.5);
-                } else {
-                    self.draw_hud_bolt(
-                        icon_cx,
-                        prayer_bar_y + bar_height * 0.5,
-                        icon_r,
-                        STAT_PRAYER_MAIN,
-                    );
-                }
                 let prayer_text = format!("{} / {}", state.prayer_points, state.max_prayer_points);
                 let prayer_text_w = self.measure_text_sharp(&prayer_text, font_size).width;
                 self.draw_text_outlined(

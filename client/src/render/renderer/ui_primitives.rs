@@ -427,6 +427,22 @@ impl Renderer {
         );
     }
 
+    /// Simplified cluster frame for the HUD portrait/stats panel. Mirrors the menu
+    /// button treatment (1px outer border + inner shadow) over a chat-box style
+    /// translucent fill, rather than the heavier multi-layer bronze `draw_panel_frame`.
+    pub(crate) fn draw_hud_cluster_frame(&self, x: f32, y: f32, w: f32, h: f32) {
+        // Outer border with slight transparency (matches menu buttons).
+        let border = Color::new(SLOT_BORDER.r, SLOT_BORDER.g, SLOT_BORDER.b, 0.9);
+        draw_rectangle(x - 1.0, y - 1.0, w + 2.0, h + 2.0, border);
+
+        // Semi-transparent background (matches the chat box fill).
+        draw_rectangle(x, y, w, h, HUD_FILL_TRANSLUCENT);
+
+        // Inner shadow on top/left edges for a touch of depth (matches menu buttons).
+        draw_rectangle(x, y, w, 2.0, SLOT_INNER_SHADOW);
+        draw_rectangle(x, y, 2.0, h, SLOT_INNER_SHADOW);
+    }
+
     /// Draw text with a 1px black stroke for legibility over colored bars.
     pub(crate) fn draw_text_outlined(&self, text: &str, x: f32, y: f32, size: f32, color: Color) {
         let outline = Color::new(0.0, 0.0, 0.0, 0.9);
@@ -491,8 +507,17 @@ impl Renderer {
         // the sprite look slightly stretched. Center horizontally on the sprite and crop
         // lower (sprite y ~13) so the head fills the square.
         let scale = self.font_scale.get().round().max(1.0);
-        let ox = (ix + inner / 2.0 - 17.0 * scale).floor();
-        let oy = (iy + inner / 2.0 - 13.0 * scale).floor();
+        // Hair sprites sit slightly left of center on the head; when the player has hair
+        // (i.e. is not bald), nudge the whole portrait (base + hair) right by 2px so the
+        // styled head reads centered in the box. A bald head has no hair occupying the top
+        // rows, so raise it a few px to better fill the box.
+        let hair_nudge = if player.hair_style.is_some() { 2.0 * scale } else { 0.0 };
+        let bald_rise = if player.hair_style.is_none() { 3.0 * scale } else { 0.0 };
+        // Female sprites carry the head a touch lower than males, so raise them in the box
+        // (equivalently, crop a few rows lower) to show more of the face.
+        let female_rise = if player.gender == "female" { 3.0 * scale } else { 0.0 };
+        let ox = (ix + inner / 2.0 - 17.0 * scale + hair_nudge).floor();
+        let oy = (iy + inner / 2.0 - 13.0 * scale - bald_rise - female_rise).floor();
 
         // Clip to the recessed interior so only the head shows.
         let (vw, vh) = virtual_screen_size();
