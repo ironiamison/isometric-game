@@ -905,6 +905,21 @@ impl Renderer {
             return None;
         }
 
+        // Hover feedback: test the cursor against last frame's rect (stable frame-to-frame,
+        // so the one-frame lag is invisible) to show a subtle underline cue that it's clickable.
+        let hovered = state
+            .ui_state
+            .quest_tracker_rect
+            .get()
+            .map(|r| {
+                let (rx, ry) = mouse_position();
+                let (vw, vh) = crate::util::virtual_screen_size();
+                let mvx = rx * vw / screen_width();
+                let mvy = ry * vh / screen_height();
+                r.contains(macroquad::math::Vec2::new(mvx, mvy))
+            })
+            .unwrap_or(false);
+
         // Minimized: just show "Quests (<)" right-aligned
         if state.ui_state.quest_tracker_minimized {
             let font_size = 16.0;
@@ -919,16 +934,26 @@ impl Renderer {
                 font_size,
                 Color::from_rgba(255, 220, 100, 255),
             );
-            // On Android, use a larger hit area for easier tapping
-            let hit_pad = if cfg!(target_os = "android") {
-                12.0
-            } else {
-                0.0
-            };
+            if hovered {
+                let underline_y = tracker_y + 3.0;
+                draw_line(
+                    text_x,
+                    underline_y,
+                    text_x + text_width,
+                    underline_y,
+                    2.0,
+                    Color::from_rgba(255, 220, 100, 191),
+                );
+            }
+            // draw_text_sharp positions text by its baseline at `tracker_y`, so the visible
+            // glyphs sit ABOVE tracker_y by `offset_y`. Build the hit rect around the glyphs
+            // (not the empty space below them) and pad it for a comfortable click target.
             let text_dims = self.measure_text_sharp(text, font_size);
+            let hit_pad = if cfg!(target_os = "android") { 12.0 } else { 8.0 };
+            let visible_top = tracker_y - text_dims.offset_y;
             return Some(macroquad::math::Rect::new(
                 text_x - hit_pad,
-                tracker_y - hit_pad,
+                visible_top - hit_pad,
                 text_width + hit_pad * 2.0,
                 text_dims.height + hit_pad * 2.0,
             ));
@@ -945,6 +970,7 @@ impl Renderer {
             color: Color,
             height: f32,
             underline: bool,
+            underline_color: Color,
         }
 
         let mut lines: Vec<TrackerLine> = Vec::new();
@@ -955,7 +981,8 @@ impl Renderer {
             text: header.to_string(),
             color: Color::from_rgba(255, 220, 100, 255),
             height: line_height,
-            underline: false,
+            underline: hovered,
+            underline_color: Color::from_rgba(255, 220, 100, 191),
         });
 
         // Quest content (no wrapping — measure actual widths)
@@ -965,6 +992,7 @@ impl Renderer {
                 color: WHITE,
                 height: line_height,
                 underline: true,
+                underline_color: Color::new(1.0, 1.0, 1.0, 0.75),
             });
 
             for obj in &quest.objectives {
@@ -983,6 +1011,7 @@ impl Renderer {
                     color: status_color,
                     height: objective_line_height,
                     underline: false,
+                    underline_color: WHITE,
                 });
             }
 
@@ -992,6 +1021,7 @@ impl Renderer {
                 color: WHITE,
                 height: 8.0 * s,
                 underline: false,
+                underline_color: WHITE,
             });
         }
 
@@ -1010,6 +1040,7 @@ impl Renderer {
                 color: LIGHTGRAY,
                 height: line_height,
                 underline: false,
+                underline_color: WHITE,
             });
         }
 
@@ -1035,17 +1066,22 @@ impl Renderer {
                         right_edge,
                         underline_y,
                         2.0,
-                        Color::new(1.0, 1.0, 1.0, 0.75),
+                        line.underline_color,
                     );
                 }
             }
             y += line.height;
         }
+        // The first line's baseline is at `tracker_y`, so its glyphs render above it.
+        // Extend the hit rect up over the header and pad the left edge so the whole panel
+        // is an easy left-click target for toggling.
+        let top_offset = self.measure_text_sharp(header, font_size).offset_y;
+        let hit_pad_x = 8.0;
         Some(macroquad::math::Rect::new(
-            min_x,
-            tracker_y,
-            right_edge - min_x,
-            y - tracker_y,
+            min_x - hit_pad_x,
+            tracker_y - top_offset,
+            (right_edge - min_x) + hit_pad_x,
+            (y - tracker_y) + top_offset,
         ))
     }
 

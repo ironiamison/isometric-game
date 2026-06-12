@@ -10,6 +10,20 @@ impl InputHandler {
         let current_time = frame.current_time;
         let mouse_clicked = frame.mouse_clicked;
         let clicked_element = frame.clicked_element.clone();
+        // Quest tracker: a left-click (or tap) toggles minimize/expand. Handle this before
+        // the click-to-move logic below so clicking the tracker doesn't also move the player.
+        if mouse_clicked {
+            if let Some(tracker_rect) = state.ui_state.quest_tracker_rect.get() {
+                let (raw_x, raw_y) = mouse_position();
+                let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
+                if tracker_rect.contains(macroquad::math::Vec2::new(mouse_vx, mouse_vy)) {
+                    state.ui_state.quest_tracker_minimized =
+                        !state.ui_state.quest_tracker_minimized;
+                    save_current_ui_settings(state);
+                    return true;
+                }
+            }
+        }
         // Target selection (left click) - only if not clicking on UI
         if mouse_clicked && clicked_element.is_none() {
             let (raw_x, raw_y) = mouse_position();
@@ -928,7 +942,6 @@ impl InputHandler {
     ) -> bool {
         let mx = frame.mx;
         let my = frame.my;
-        let mouse_clicked = frame.mouse_clicked;
         let mouse_right_clicked = frame.mouse_right_clicked;
         let clicked_element = frame.clicked_element.clone();
         // Quest tracker interaction
@@ -936,14 +949,9 @@ impl InputHandler {
             let (raw_x, raw_y) = mouse_position();
             let (mouse_vx, mouse_vy) = screen_to_virtual_coords(raw_x, raw_y);
             if tracker_rect.contains(macroquad::math::Vec2::new(mouse_vx, mouse_vy)) {
-                // On Android: tap toggles minimize/expand directly
-                if cfg!(target_os = "android") && mouse_clicked {
-                    state.ui_state.quest_tracker_minimized =
-                        !state.ui_state.quest_tracker_minimized;
-                    save_current_ui_settings(state);
-                    return true;
-                }
-                // Right-click opens context menu (desktop, or long-press on mobile)
+                // Left-click/tap toggling is handled in handle_world_selection (it runs
+                // before click-to-move). Here we only open the right-click context menu
+                // (desktop, or long-press on mobile).
                 if mouse_right_clicked {
                     state.ui_state.context_menu = Some(ContextMenu {
                         target: ContextMenuTarget::QuestTracker,
