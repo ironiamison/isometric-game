@@ -1,505 +1,478 @@
 # Aeven Architecture
 
-This document describes the codebase as it exists on June 11, 2026. It is both a
-runtime reference and an engineering audit. Historical plans in `docs/` may
-describe earlier versions of the project and are not authoritative.
+This document describes the current production architecture. Historical files
+under `docs/` are useful context but are not authoritative.
 
-## Architectural Principles
+## Design Invariants
 
-The codebase should preserve these rules while it is modernized:
+1. The server owns game truth. Clients send intent, never outcomes.
+2. Every mutation is checked against identity, ownership, instance, position,
+   timing, resources, and progression as applicable.
+3. Private state is unicast. Shared state is scoped to the smallest relevant
+   room, instance, and visibility set.
+4. Required configuration, schema, maps, and content fail before traffic is
+   accepted.
+5. Wire and persistence formats are explicit compatibility boundaries.
+6. Platform shells may differ; replicated gameplay and frame behavior remain
+   shared.
+7. Tick work is bounded, measured, and kept separate from blocking I/O.
+8. Privileged tools are authenticated, scoped, CSRF-protected, and local-first.
 
-1. The server owns game truth. Clients send intent, never authoritative state.
-2. Persistence, inventory, rewards, combat, movement, and access checks are
-   validated server-side.
-3. Private player state is sent through per-connection channels; public world
-   events are scoped to the smallest useful audience.
-4. Data-driven content is validated before it becomes live game state.
-5. Wire contracts and stored data are versioned compatibility boundaries.
-6. Platform differences belong behind adapters, not in separate game loops.
-7. Gameplay systems should own their state and expose narrow commands, queries,
-   and events.
-8. Production must fail closed on authentication and fail fast on required
-   content or schema failures.
-
-## System Context
+## System Topology
 
 ```mermaid
 flowchart LR
-    P["Player"]
-    D["Developer / Content Author"]
-    C["Rust Game Client<br/>Desktop, WASM, Android"]
-    L["Rust Launcher"]
-    S["Rust Game Server<br/>Axum + Tokio"]
-    DB[("SQLite")]
-    DATA["TOML + Lua + Map JSON"]
-    M["React Mapper / Content Studio"]
-    MA["Express Mapper API"]
-    ST["React Stats Site"]
-    R2["Release Storage / R2"]
+    Player["Player"]
+    Author["Developer / Content Author"]
+    Client["Macroquad Client<br/>Desktop, WASM, Android"]
+    Launcher["Desktop Launcher"]
+    Server["Authoritative Rust Server<br/>Axum + Tokio"]
+    DB[("SQLite WAL")]
+    Content["TOML + Lua + JSON Maps"]
+    Mapper["React Mapper / Content Studio"]
+    MapperAPI["Authenticated Express API"]
+    Site["SvelteKit Site<br/>Stats + Control + Play"]
+    Storage["Release Storage / R2"]
 
-    P --> L
-    L --> R2
-    L --> C
-    C <-->|"JSON auth + matchmaking<br/>MessagePack WebSocket"| S
-    S <--> DB
-    S --> DATA
-    ST -->|"JSON stats API"| S
-    D --> M
-    M <--> MA
-    MA <--> DATA
+    Player --> Launcher
+    Launcher --> Storage
+    Launcher --> Client
+    Client <-->|"JSON auth/matchmaking<br/>MessagePack WebSocket"| Server
+    Server <--> DB
+    Server --> Content
+    Site -->|"Public stats / authenticated ops"| Server
+    Author --> Mapper
+    Mapper <-->|"Signed cookie + CSRF"| MapperAPI
+    MapperAPI <--> Content
 ```
 
-The game runtime is currently one server process with one canonical game room,
-in-memory session and instance state, and one SQLite database. This is a valid
-vertical-scaling architecture, but it is not horizontally scalable without
-additional coordination.
+The deployed game is one authoritative process, one canonical room aggregate,
+in-memory connection/session ownership, and one SQLite database. This is a
+deliberate vertical architecture. Horizontal replication requires shared
+session ownership, distributed room placement, inter-process publication, and
+a persistence strategy beyond a single SQLite writer.
 
 ## Components
 
-### Game Server
+### Server
 
-`rust-server/` is the authoritative game simulation and persistence boundary.
-
-Key modules:
-
-| Path | Responsibility |
-| --- | --- |
-| `src/main.rs` | Boot, routes, tick/autosave tasks, shared `AppState` |
-| `src/server_auth.rs` | Account authentication and bearer sessions |
-| `src/matchmaking.rs` | Character ownership, takeover, room admission |
-| `src/websocket.rs` | Session upgrade, bootstrap, send/receive lifecycle |
-| `src/protocol/` | MessagePack decoding and server message encoding |
-| `src/game.rs`, `src/game/` | `GameRoom` and gameplay command/tick systems |
-| `src/instance.rs` | Overworld, private interiors, and shared instances |
-| `src/game/tick.rs`, `src/protocol/state_sync.rs` | Visibility filtering, deltas, compression, backpressure |
-| `src/db/` | SQLite setup, reads, and player persistence |
-| `src/quest/` | Quest definitions, state, registry, and Lua runner |
-| `src/*_registry.rs` | Data-driven gameplay definitions |
-| `src/world.rs` | Chunk loading, collision, and world queries |
-
-At startup the server:
-
-1. Initializes tracing and the in-memory log buffer.
-2. Opens SQLite in WAL mode through SQLx.
-3. Creates or updates tables through startup schema statements.
-4. Loads maps, interiors, items, entities, recipes, shops, quests, spells,
-   prayers, and other gameplay registries.
-5. Builds the canonical `GameRoom` and shared `AppState`.
-6. Starts a 20 Hz game tick and a 30-second autosave task.
-7. Starts the Axum HTTP and WebSocket listener on port `2567`.
-
-### Game Client
-
-`client/` is a Macroquad application with native desktop, WASM, and Android
-targets.
-
-Key modules:
+`rust-server/` owns simulation, validation, persistence, and all authoritative
+content.
 
 | Path | Responsibility |
 | --- | --- |
-| `src/main.rs` | Desktop executable boot and application state |
-| `src/lib.rs` | Library entrypoint used by WASM and Android |
-| `src/main_runtime.rs` | Desktop frame runtime |
-| `src/app.rs` | Library/WASM/Android frame runtime |
-| `src/game/` | Client world model and interpolation |
-| `src/network/` | Matchmaking, WebSocket, wire encoding, message handlers |
-| `src/input/` | Input interpretation and outbound command creation |
-| `src/render/` | Isometric transforms, world rendering, effects, UI layers |
-| `src/ui/` | Login, character selection, panels, HUD, and dialogs |
-| `src/audio/` | Music and sound queues |
-| `src/assets/` | Atlas and asset loading |
-| `web/` | Browser shell and JavaScript auth/network bridges |
+| `src/main.rs` | Process boot, Axum routes, tick/autosave/telemetry tasks |
+| `src/config.rs` | Validated environment configuration and trusted proxies |
+| `src/app_state.rs` | Process services, room creation, sessions, shared content |
+| `src/content.rs` | Immutable registry loading and cross-reference validation |
+| `src/server_auth.rs` | Accounts, Argon2 passwords, bearer auth sessions |
+| `src/characters.rs` | Character ownership and lifecycle APIs |
+| `src/matchmaking.rs` | Admission, takeover serialization, signed room leases |
+| `src/websocket.rs` | Upgrade validation, bootstrap, receive/send lifecycle |
+| `src/game.rs`, `src/game/` | `GameRoom` aggregate and domain operations |
+| `src/game/transport.rs` | Bounded unicast/broadcast transport and sync state |
+| `src/instances.rs` | Overworld, public interiors, private instances |
+| `src/protocol/` | Server events, encoding, state sync |
+| `src/db/` | Typed SQLx persistence and snapshots |
+| `src/world.rs` | Strict chunk loading, collision, visibility/world queries |
+| `src/perf_metrics.rs` | Tick, save, handler, send, movement, and sync metrics |
+
+`GameRoom` remains the simulation aggregate root. Gameplay behavior is split
+into domain modules such as movement, combat, inventory, trade, shops, quests,
+farming, Slayer, arenas, bosses, and transport. New systems should own their
+mutable state behind operations instead of exposing locks or adding unrelated
+logic to the aggregate constructor.
+
+### Client
+
+`client/` is one Rust crate targeting desktop, WASM, and Android.
+
+| Path | Responsibility |
+| --- | --- |
+| `src/desktop.rs` | Native shell, spectator backdrop, lifecycle, frame pacing |
+| `src/lib.rs` | WASM/Android entrypoints and platform lifecycle |
+| `src/app.rs` | Shared state construction, settings, tutorial boot |
+| `src/gameplay.rs` | Shared authoritative-message/input/update/render frame |
+| `src/game/` | Replicated world and presentation state |
+| `src/network/` | HTTP/matchmaking/WebSocket adapters and message handling |
+| `src/input/` | Input interpretation and outbound commands |
+| `src/render/` | Isometric renderer, effects, world, and UI composition |
+| `src/ui/` | Login, character, HUD, panels, and dialogs |
+| `src/audio/` | Music/SFX loading and playback |
+| `web/` | Browser shell and JavaScript bridges |
 | `android/` | Android project integration |
 
-The client holds a large presentation-side `GameState`. It interpolates toward
-server positions, renders local effects, and predicts presentation only. It
-must not decide whether an action succeeds.
+All platforms construct gameplay state through `app::new_game_state` /
+`configure_game_state` and execute active gameplay through `run_game_frame`.
+Platform shells retain only real differences: browser matchmaking/storage,
+Android scaling/touch lifecycle, and desktop spectator/frame pacing.
 
-### Mapper And Content Studio
+### Shared Protocol
 
-`mapper/` contains:
+`crates/aeven-protocol/` is a wire-only crate used by client and server. It
+contains:
 
-- A React/TypeScript world editor and content studio
-- A Zustand editor store
-- Chunk and interior editing
-- Asset importing and atlas rebuilding
-- TOML item, entity, recipe, spell, shop, and balance tooling
-- Cross-content validation
-- An Express API in `mapper/server/` that reads and writes repository files
+- The `ClientMessage` command enum
+- Stable message names and field aliases
+- Strict MessagePack envelope encoding/decoding
+- A 64 KiB inbound command limit
+- `PROTOCOL_VERSION`
+- Round-trip and malformed-payload tests
 
-The Express process is a privileged development tool. It can mutate game data,
-maps, and assets and can run synchronization/deployment operations. It is not a
-public game service.
+It must not contain server domain objects or presentation state.
 
-### Public Stats
+### Mapper
 
-The unified `site/` SvelteKit app (under `/world/`) consumes the server's
-read-only `/api/stats/*` endpoints for overview data, online players,
-leaderboards, item and entity catalogs, and player profiles.
+`mapper/` contains the React editor and `mapper/server/` Express API. It edits
+working map data, structured content, notes, sprites, and atlases.
 
-### Launcher And Release Tools
+The API:
 
-`launcher/` checks the public server, reads a release manifest, downloads
-versioned client files, verifies SHA-256 hashes, and launches the installed
-client. Python utilities in `tools/` create client packages, launcher archives,
-and merged manifests for Cloudflare R2.
+- Binds to `127.0.0.1` unless configured otherwise
+- Loads users from `MAPPER_USERS` or ignored `mapper/users.json`
+- Requires scrypt password hashes in production
+- Uses HMAC-signed, expiring, `HttpOnly`, `SameSite=Strict` sessions
+- Uses double-submit CSRF protection for mutations
+- Rate-limits failed login attempts
+- Restricts users to configured worlds
+- Validates IDs, coordinates, payload sizes, image structure, and paths
+- Serializes asset mutations and uses atomic JSON/directory replacement
 
-## Runtime Flows
+It is a privileged development service, not part of the public game data plane.
 
-### Authentication And Character Admission
+### Site And Launcher
+
+`site/` is a static SvelteKit application:
+
+- `/` marketing/homepage
+- `/play/` packaged browser client
+- `/world/` public server statistics
+- `/control/` bearer-authenticated operational views
+
+`launcher/` downloads a release manifest, selects the platform artifact,
+verifies SHA-256 hashes, installs versioned files, and launches the client.
+
+## Server Startup
+
+```mermaid
+flowchart TD
+    Config["Validate environment configuration"]
+    DB["Open SQLite WAL pool"]
+    Migrate["Run SQLx migrations + legacy compatibility upgrades"]
+    Content["Parse and validate all TOML/JSON content"]
+    Graph["Validate IDs and cross-file references"]
+    Room["Build canonical GameRoom"]
+    Maps["Strict-load all production chunks and spawns"]
+    Tasks["Start tick, autosave, cache, telemetry tasks"]
+    Listen["Bind Axum listener"]
+
+    Config --> DB --> Migrate --> Content --> Graph --> Room --> Maps --> Tasks --> Listen
+```
+
+Startup aborts on invalid production secrets, database migration failure,
+missing required content, duplicate IDs, malformed maps, unknown entity/item/
+chest/quest/gathering references, or broken portal destinations. Existing but
+invalid chunks are never replaced by generated development chunks.
+
+Debug builds enable quest-file hot reload and may synthesize genuinely missing
+chunks for isolated development. Optimized builds never synthesize missing
+authoritative map data.
+
+## Configuration And Security
+
+Server environment:
+
+| Variable | Purpose |
+| --- | --- |
+| `AEVEN_ENV` | `development` or `production`; release defaults to production |
+| `AEVEN_BIND_ADDR` | Listener, default `0.0.0.0:2567` |
+| `AEVEN_DATABASE_URL` | SQLx SQLite URL, default `sqlite:game.db?mode=rwc` |
+| `AEVEN_ALLOWED_ORIGINS` | Comma-separated exact CORS origins; no wildcard |
+| `AEVEN_SESSION_SIGNING_SECRET` | HMAC secret, required in production, 32+ bytes |
+| `AEVEN_ADMIN_API_TOKEN` | Enables ops routes, 32+ characters |
+| `AEVEN_AUTH_SESSION_TTL_HOURS` | In-memory bearer lifetime, 1-720 hours |
+| `AEVEN_TRUSTED_PROXIES` | Exact proxy IPs allowed to supply forwarding headers |
+
+Untrusted peers cannot override their source IP through forwarding headers.
+Authentication is rate-limited per resolved client IP. Matchmaking verifies the
+bearer session, character ownership, ban state, online ownership, and a signed
+short-lived room admission before WebSocket activation.
+
+Auth sessions, room admissions, command leases, online-character ownership, and
+active sockets are process-local. Restarting the server invalidates them.
+
+## Connection Lifecycle
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant H as HTTP API
-    participant DB as SQLite
+    participant D as SQLite
     participant R as GameRoom
     participant W as WebSocket
 
     C->>H: POST /api/login
-    H->>DB: Verify account and Argon2 password hash
-    H-->>C: Bearer auth token
-    C->>H: GET/POST character APIs
-    H->>DB: Read or create character
-    C->>H: POST /matchmake/joinOrCreate/:room
-    H->>DB: Verify token, ownership, and ban state
-    H->>R: Load character and reserve command lease
+    H->>D: Verify account + Argon2 hash
+    H-->>C: Bearer token
+    C->>H: Character list/create/select
+    H->>D: Verify account ownership
+    C->>H: POST /matchmake/joinOrCreate/game_room
+    H->>R: Serialize character takeover and reserve command lease
     H-->>C: roomId + signed sessionId
-    C->>W: Upgrade with signed sessionId
-    W->>R: Activate player
-    W-->>C: Welcome and bootstrap messages
+    C->>W: Upgrade using signed sessionId
+    W->>R: Activate connection generation
+    W-->>C: Versioned welcome + definitions + state bootstrap
 ```
 
-Bearer authentication tokens, room reservations, command leases, online
-characters, and active WebSocket sessions are held in process memory. A server
-restart invalidates them.
+Each connection receives a bounded private channel and a scoped room broadcast
+subscription. Disconnect cleanup and saving only proceed when that connection
+still owns the character command lease, preventing an old socket from removing
+a newer takeover session.
 
-The signed matchmaking token prevents a client from inventing a room admission,
-but the signing secret is generated at process startup. Multiple server
-replicas would need a shared secret and coordinated session ownership.
+## Realtime Protocol
 
-### WebSocket Lifecycle
-
-After the signed session is validated, the server:
-
-1. Activates the player and establishes command ownership.
-2. Creates a bounded per-connection `mpsc` channel for private messages.
-3. Subscribes the connection to room broadcasts.
-4. Sends definitions and initial state: welcome, character state, maps,
-   entities, items, recipes, inventory, equipment, skills, quests, shops,
-   prayers, spells, contracts, and other registries.
-5. Decodes client MessagePack commands and dispatches them to authoritative
-   handlers.
-6. Sends pings and enforces connection timeouts.
-7. Saves and removes the player on disconnect when the connection still owns
-   the command lease.
-
-Private data such as inventory and progression should use unicast messages.
-Spatial events should use instance- and visibility-scoped publication. Global
-broadcasting is reserved for truly global events.
-
-### Protocol
-
-Realtime frames use the Colyseus-style shape:
+Frames use the envelope:
 
 ```text
 [13, "messageType", { ...payload }]
 ```
 
-The client manually converts `ClientMessage` variants into message names and
-`rmpv` maps in `client/src/network/messages.rs`. The server manually matches
-those names and extracts fields in `rust-server/src/protocol/decode.rs`.
-Server-to-client messages are similarly encoded and dispatched by hand.
+Client-to-server commands are shared and strictly decoded by
+`aeven-protocol`. Unknown variants, missing required fields, wrong types,
+oversized frames, trailing bytes, and invalid envelopes are rejected.
 
-This is currently a compile-time blind spot: the two crates can compile and
-test independently while disagreeing on names, fields, defaults, or numeric
-representations. There is no protocol version handshake and no end-to-end
-compatibility suite.
+Server-to-client events use server-owned typed variants and optimized `rmpv`
+encoders, then client handlers decode into presentation state. This direction
+is intentionally not a shared domain enum because many payloads are
+bandwidth-oriented projections. Its compatibility protection is:
 
-### Tick And State Synchronization
+- A version in the initial welcome message
+- Immediate client rejection on version mismatch
+- Stable event names and field semantics
+- Encoder and representative client-decoder tests
+- Required `PROTOCOL_VERSION` increment for incompatible changes
 
-The server uses a 20 Hz interval with a 50 ms deadline. Tick responsibilities
-include movement, auto-actions, combat, NPC AI, spawning, gathering, farming,
-bosses, arenas, timed objects, instance state, and outbound synchronization.
+This is an explicit boundary: adding a server event requires coordinated
+encoder, client handler, and compatibility tests in the same change.
 
-Movement advances on a five-tick cadence, or approximately 250 ms. The client
-renders at its frame rate and interpolates between authoritative grid
-positions.
+## Authority And Command Handling
 
-State synchronization:
+The client may request movement, attacks, interactions, purchases, trades,
+crafting, travel, or dialogue choices. The server derives success and all
+resulting state.
 
-- Filters entities by instance and a visibility radius
-- Keeps per-player sync state
-- Sends full snapshots when required and deltas otherwise
-- Compresses larger sync payloads
-- Uses bounded channels and backpressure-aware delivery
-- Records tick and synchronization performance metrics
+Handlers validate the relevant combination of:
 
-The June 11, 2026 release-mode capacity test simulated 128 players:
+- Authenticated account, selected character, and active command lease
+- Instance membership and target visibility
+- Position, collision, range, and line of sight
+- Cooldown, action state, sequence number, and stale input
+- Inventory quantity/capacity, currency, equipment, and ownership
+- Skill, quest, Slayer, spell, prayer, and content requirements
+- Trade counterpart/session state
+- Replay, duplicate, stale, and cross-instance requests
+
+Damage, XP, rewards, loot, prices, drops, completion, and final positions are
+never accepted from the client.
+
+## Tick And Synchronization
+
+The simulation runs at 20 Hz with a 50 ms budget and
+`MissedTickBehavior::Delay`, preventing catch-up bursts after a slow tick.
+Phases cover movement, actions, combat, NPC/world AI, resources, farming,
+instances, bosses, arenas, cleanup, and outbound synchronization.
+
+`RoomTransport` owns connection senders, room publication, spectator
+publication, and per-player synchronization state. State sync:
+
+- Filters by room instance and visibility radius
+- Sends periodic full snapshots and intermediate deltas
+- Falls back to self-only state when appropriate
+- Compresses larger payloads
+- Uses bounded channels and non-blocking backpressure accounting
+- Tracks full/delta counts, skipped sends, dropped sends, and byte ratios
+
+The release-mode 128-player synthetic gate runs 100 complete room ticks. The
+June 11, 2026 result was:
 
 ```text
-average  12.33 ms
-p95      14.66 ms
-p99      18.07 ms
-maximum  18.33 ms
+average  13.48 ms
+p95      16.08 ms
+p99      17.44 ms
+maximum  19.34 ms
 budget   50.00 ms
 ```
 
-This test measures one process under a synthetic workload. It does not validate
-database saturation, internet latency, multi-hour memory behavior, denial of
-service resistance, or multi-process coordination.
+This proves current single-process simulation headroom under the fixture. It
+does not replace soak, network, database saturation, hostile-client, or
+multi-process testing.
 
-### World And Instances
+## Persistence
+
+SQLite is configured with:
 
-The overworld is split into 32x32 JSON chunks under
-`rust-server/maps/world_0/`. Interiors are JSON maps under
-`rust-server/maps/interiors/`.
+- WAL journal mode
+- `NORMAL` synchronous mode
+- Foreign keys enabled
+- Five pooled connections
+- Five-second busy/acquire timeouts
 
-`InstanceManager` separates:
+`sqlx::migrate!` applies numbered migrations from `rust-server/migrations/`.
+Legacy installations receive narrowly scoped, introspected compatibility
+upgrades and one-time data consolidation after migrations.
 
-- The canonical overworld
-- Private interiors owned by a player or activity context
-- Shared interiors and activity instances
-- PvP, arena, boss, and other isolated encounter contexts
+The server snapshots player state under room locks, releases locks, then
+performs serialized writes. Autosave runs every 30 seconds. Disconnect and
+graceful shutdown also save current state. Related persistence methods use
+typed records/parameters and transactions where atomicity spans multiple rows.
 
-Every command involving another entity or object must validate that both sides
-share the correct instance and are within the system-specific range. A global
-ID lookup without an instance check is not sufficient.
+SQLite is appropriate for the current single-writer deployment. Multiple game
+server writers require a different persistence topology.
 
-### Gameplay And Content
+## Content Architecture
 
-Most definitions are loaded from `rust-server/data/`:
+`ContentRegistries` loads immutable registries once and shares them through
+`Arc` with HTTP handlers and rooms. It owns entities, items, prayers, quests,
+crafting, chests, interiors, and collection-log definitions.
 
-- Items, equipment, consumables, materials, seeds, and tools
-- Entities, attacks, loot tables, and ground spawns
-- Recipes, crafting stations, and production orders
-- Shops, chests, crates, chairs, waystones, and interactions
-- Gathering, fishing, mining, farming, and woodcutting definitions
-- Prayers, spells, PvP zones, Slayer masters, and Slayer rewards
-- Quest metadata and Lua scripts
+Validation occurs in layers:
 
-The server sends many registries to the client during bootstrap so the client
-can render names, icons, recipes, and UI details without owning the outcome of
-gameplay rules.
+1. Every TOML and JSON file parses.
+2. Typed registries reject missing directories, empty registries, duplicate IDs,
+   invalid ranges, and malformed definitions.
+3. Cross-reference checks validate item, entity, chest, quest, collection-log,
+   interior, spawn, gathering-zone, and portal references.
+4. Production room bootstrap loads every runtime subsystem and every world
+   chunk.
 
-Loader policy is currently inconsistent. Some required registries abort
-startup, while others log an error and continue with empty content. Production
-should validate a complete content graph and fail startup when required content
-is missing or internally inconsistent.
+Runtime systems such as shops, gathering, farming, mining, woodcutting, Slayer,
+scroll spells, ground spawns, waystones, dig sites, orders, and crate loot load
+with contextual fatal errors. The production bootstrap test exercises this
+entire path without opening a listener.
+
+### Maps
 
-### Persistence
+Overworld chunks are version `2`, exactly `32x32`, and named
+`chunk_<x>_<y>.json`. The server verifies:
 
-SQLite is configured in WAL mode with a small SQLx pool. Character state is
-saved:
+- Payload coordinates match the filename
+- All three tile layers contain exactly 1,024 `u32` values
+- Packed collision is valid Base64 and exactly 128 bytes
+- Optional height/block arrays have exact dimensions
+- Entity and gathering coordinates are local and bounded
+- Objects and walls have valid numeric fields
+- Portals deserialize and reference existing destinations/spawns
+- Spawned entities and gathering markers reference registered definitions
 
-- Every 30 seconds
-- During command-lease takeover
-- On WebSocket disconnect
-- During spectator-to-player transitions
-- During graceful shutdown
+Interiors declare dimensions, instance policy, spawn points, portals, layers,
+collision, entities, objects, walls, chests, and optional elevation. Their
+arrays and references are validated before room construction.
 
-State is spread across normalized tables and serialized JSON columns. Startup
-schema management currently consists of many inline `CREATE TABLE` and
-`ALTER TABLE` statements in `src/db/setup.rs`. Several migration operations
-discard errors to remain idempotent.
+## Instances
 
-The persistence layer needs a versioned migration history and a single
-transactional player snapshot API. Today, save orchestration is duplicated
-across connection and process lifecycle paths, and the central save method has
-an excessively wide parameter list.
-
-## Ownership And Extension Rules
-
-### Adding A Client Command
-
-Until a shared protocol crate exists:
-
-1. Add or update the client `ClientMessage` variant.
-2. Update client MessagePack encoding.
-3. Update server decoding and validation.
-4. Dispatch to a domain handler that checks authentication, command lease,
-   instance, range, ownership, quantities, cooldowns, and idempotency.
-5. Add encoder/decoder fixtures on both sides.
-6. Test malformed, stale, duplicate, cross-instance, and unauthorized inputs.
-
-Never use a client-supplied reward, damage amount, price, level, position, or
-ownership claim without deriving or verifying it on the server.
-
-### Adding A Server Event
-
-Choose its audience first:
-
-- Unicast for private state and command results
-- Instance- or zone-scoped for spatial activity
-- Room broadcast only for global announcements
-
-Then update server encoding, client dispatch, and the relevant client state
-slice. Events should carry stable IDs and enough context to reject stale
-updates.
-
-### Adding A Gameplay System
-
-Do not add another unrelated collection and lock directly to `GameRoom` by
-default. Prefer a system type that owns its state:
-
-```text
-Command -> DomainSystem -> DomainEvents
-                      \-> PersistenceChanges
-```
-
-A system should expose:
-
-- Explicit commands and validated inputs
-- Read-only queries needed by other systems
-- A bounded tick phase if it needs ticking
-- Domain events instead of direct UI/protocol knowledge
-- Snapshot data needed for persistence
-
-Cross-system access should flow through a narrow context or command/event API,
-not broad `use super::*` imports and arbitrary lock access.
-
-### Adding Content
-
-1. Edit through the content studio when an editor exists.
-2. Keep IDs stable after release.
-3. Validate all references, including drops, recipes, shops, spawns, quests,
-   assets, and maps.
-4. Confirm both startup loading and client bootstrap behavior.
-5. Add a focused loader or registry test.
-6. Review generated files and atlas changes before committing.
-
-### Changing The Database
-
-The current inline schema mechanism is legacy. A schema change must be
-idempotent, tested against a fresh database and an upgraded database, and must
-not silently discard unexpected errors. The target mechanism is checked-in,
-numbered SQL migrations executed by `sqlx::migrate!`.
-
-## Architecture Audit And Modernization Plan
-
-### P0: Release And Security Blockers
-
-#### Client endpoints are hard-coded to localhost
-
-Both desktop and library entrypoints currently compile
-`http://localhost:2567` and `ws://localhost:2567`. The release workflow builds
-the source without replacing them, so a release from the current branch would
-connect players to their own machine.
-
-Replace these constants with one typed configuration module populated by build
-profile or environment. CI must assert that release artifacts contain approved
-production endpoints and never localhost.
-
-#### Mapper mutation APIs bypass authentication
-
-The mapper server currently allows `/api/*` and `/mapper/api/*` through its
-authentication middleware. Those routes can write maps, content, and assets and
-can trigger synchronization operations.
-
-Keep the mapper bound to localhost until this is fixed. Production-safe tooling
-requires authenticated mutation routes, hashed credentials or an external
-identity provider, secure cookies, CSRF protection, explicit origin checks, and
-separate read/write privileges.
-
-### P1: Structural Risks
-
-#### Client runtime duplication
-
-Desktop runs through `main.rs` and `main_runtime.rs`; WASM and Android run
-through `lib.rs` and `app.rs`. Their frame loops have already diverged in
-tutorial, fullscreen, FPS, debug animation, and spectator behavior.
-
-Target: one `Application` and one frame pipeline with platform adapters for
-storage, auth, networking, windowing, and lifecycle.
-
-#### Protocol duplication
-
-More than 80 command/event names and their fields are manually mirrored across
-client and server. Dead and partially implemented variants already exist.
-
-Target: a Cargo workspace with a shared `protocol` crate containing serde wire
-DTOs, a negotiated protocol version, round-trip tests, and golden compatibility
-fixtures. Domain types should remain private to the server.
-
-#### `GameRoom` is a central ownership bottleneck
-
-The file split reduced individual module size, but `GameRoom` still owns most
-gameplay state through dozens of locks, and many modules implement it with
-`use super::*`. New systems continue to increase central coupling.
-
-Target: domain-owned systems such as world, combat, economy, progression,
-activities, and social services with explicit tick phases and events. This does
-not require an immediate ECS rewrite.
-
-#### Persistence and migrations are fragile
-
-Schema changes run as ad hoc startup SQL, some errors are ignored, save
-orchestration is duplicated, and the player save API is too wide.
-
-Target: versioned SQL migrations, fail-fast migration status, a
-`PlayerSnapshot` value object, repository methods, and one transaction per
-logical save.
-
-#### Content can fail open
-
-Some registry failures result in an empty system and a running server. That can
-turn a content deployment error into a partially functional live world.
-
-Target: define required and optional registries, run headless graph validation
-in CI, and make production startup atomic with respect to required content.
-
-#### Single-process scaling is implicit
-
-Rooms, sessions, leases, instances, and signing secrets are process-local, the
-room tick is serial, and SQLite is a single-writer database.
-
-Target when capacity requires it: choose explicit world shards, use sticky
-routing, externalize account/session coordination, move durable state to a
-multi-writer service, and define cross-shard social/event semantics. Do not add
-generic replicas before these ownership rules exist.
-
-#### Operational endpoints and proxy identity
-
-Performance and in-memory log endpoints are public, CORS permits all origins,
-and rate limiting relies on socket addresses. Behind a reverse proxy, the
-socket address may identify the proxy rather than the player.
-
-Target: authenticate operational endpoints, restrict CORS, introduce trusted
-proxy configuration, and use structured metrics/log export instead of exposing
-process internals publicly.
-
-### P2: Maintainability And Delivery Debt
-
-- `GameState` and the mapper Zustand store are broad mutable state containers.
-- Rust builds emit roughly 150-200 warnings depending on target.
-- Mapper lint currently reports 28 errors and 3 warnings.
-- Several source files remain above 1,000 lines.
-- Deployment runs on `master` without required test, lint, or build gates.
-- `Cargo.lock` is ignored even though the Rust packages are applications.
-- Rust and Node toolchains are not pinned consistently.
-- Built WASM binaries are tracked under three ambiguous filenames.
-- Mapper and stats package documentation is still generated-template content.
-- Some critical send, migration, and save results are intentionally discarded
-  without distinguishing best-effort work from correctness requirements.
-
-These issues make regressions harder to see. Establish a clean warning/lint
-baseline, pin toolchains and lockfiles, remove generated artifacts from source
-control where practical, and make the complete validation matrix a protected
-merge requirement.
-
-## Recommended Sequence
-
-1. Fix production endpoint configuration and mapper/server endpoint exposure.
-2. Add CI that runs the current validation matrix and blocks deployment.
-3. Create a shared versioned protocol crate with compatibility tests.
-4. Unify the client application runtime behind platform adapters.
-5. Introduce versioned migrations and a transactional player snapshot.
-6. Extract one high-change gameplay domain from `GameRoom` at a time.
-7. Split client and mapper state by domain and replace broad imports.
-8. Design sharding only after real production metrics exceed the current
-   single-process capacity envelope.
-
-The existing authoritative validation, instance isolation, scoped
-synchronization, content registries, performance instrumentation, and test
-coverage are good foundations. The next phase should improve boundaries and
-delivery discipline rather than rewrite the game wholesale.
+The overworld is the default shared instance. Interior definitions choose
+`public` or `private` policy. `InstanceManager` owns active instances while
+player-to-instance and entrance-position maps support scoped synchronization
+and return travel.
+
+Every interaction checks instance context. NPCs, ground items, chests, trades,
+combat targets, and events must not leak across instance boundaries.
+
+## Client State And Rendering
+
+The client keeps:
+
+- Replicated authoritative state
+- Interpolation and transient visual effects
+- Input state and outbound intent
+- UI/navigation state
+- Platform settings and local caches
+
+`run_game_frame` is the common active-game pipeline. Network messages update
+the smallest owning state area available; input produces protocol commands;
+rendering consumes a snapshot of local state. Client prediction is
+presentation-only and must converge on the next authoritative update.
+
+Platform entrypoints may manage different login/matchmaking adapters, storage,
+touch scaling, or frame pacing, but they must call the shared state constructor
+and gameplay frame.
+
+## Observability
+
+The server records rolling summaries for:
+
+- Tick loop and per-room phase duration
+- Autosave snapshot/write/total duration
+- Command handler and WebSocket send duration
+- Connected/overworld/instance/spectator load
+- Movement rejection reasons and stale/sequence anomalies
+- State-sync full/delta/fallback counts, drops, skips, and compression
+- Slow-operation counters and contextual warnings
+
+Every 60 seconds it emits a structured performance summary. Authenticated
+`/api/perf`, `/api/logs`, and `/api/admin/*` expose operational snapshots only
+when `AEVEN_ADMIN_API_TOKEN` enables those routes.
+
+## Extension Patterns
+
+### Add A Client Command
+
+1. Add the DTO and stable wire name to `aeven-protocol`.
+2. Add round-trip, malformed, and alias tests.
+3. Dispatch it in the server command layer.
+4. Validate authority in the owning gameplay module.
+5. Emit scoped server events.
+6. Increment `PROTOCOL_VERSION` if old peers cannot remain compatible.
+
+### Add A Server Event
+
+1. Add the server projection and encoder.
+2. Choose private, instance/spatial, room, or global scope deliberately.
+3. Add the client handler in the owning state module.
+4. Test the encoder and representative client decoding.
+5. Increment the protocol version for incompatible semantics.
+
+### Add A Gameplay System
+
+1. Define a state-owning service/manager.
+2. Expose commands and narrow queries, not locks.
+3. Define its tick phase and budget if it ticks.
+4. Define persistence snapshots if durable.
+5. Register immutable definitions in content loading.
+6. Add graph validation for every referenced ID.
+7. Add unit, integration, bootstrap, and capacity coverage proportional to risk.
+
+### Change Persistent Data
+
+1. Add a new numbered SQLx migration.
+2. Keep already-released migrations immutable.
+3. Test fresh creation and upgrade from the previous schema.
+4. Preserve serialized compatibility or migrate it explicitly.
+5. Keep multi-row invariants in transactions.
+
+## Delivery Architecture
+
+`CI` is the required upstream workflow. It validates Rust, WASM, content,
+capacity, mapper, mapper API, site, and dependency audits. Deployment and
+automatic client/launcher releases use `workflow_run` and proceed only after a
+successful CI run on `master`. Release workflows re-check whether relevant
+paths changed before building artifacts.
+
+`deploy.sh` fast-forwards only to the exact CI-tested SHA, verifies that it is
+reachable from `origin/master`, uses pinned Node/npm major versions and locked
+dependencies, compiles explicit release endpoints, and restarts the server
+through systemd.
+
+## Scaling Boundaries
+
+The current architecture is production-suitable for one authoritative process.
+These are boundaries to preserve explicitly rather than hide:
+
+- In-memory auth/session/lease state prevents transparent multi-process failover.
+- SQLite assumes one game-server writer.
+- `GameRoom` is still a broad aggregate; new domains must continue moving state
+  behind owned services.
+- Server-to-client projections are coordinated rather than generated from one
+  shared schema, so protocol tests and version discipline are mandatory.
+- Capacity coverage is synthetic; scheduled soak and adversarial tests are the
+  next operational maturity step.

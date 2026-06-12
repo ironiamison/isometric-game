@@ -1,245 +1,234 @@
 # Aeven
 
-An isometric pixel-art MMORPG with a server-authoritative Rust backend, native and
-web clients, persistent characters, data-driven content, and custom world-building
-tools.
+Aeven is a persistent isometric MMORPG with an authoritative Rust server,
+desktop/browser/Android clients, data-driven gameplay, instanced spaces, live
+operations tooling, and a purpose-built world/content editor.
 
 <img width="1026" height="753" alt="Aeven gameplay" src="https://github.com/user-attachments/assets/8e0a588f-64a4-43fc-86bf-a0dfd8fbded4" />
 
 **Play at [aeven.xyz](https://aeven.xyz).**
 
-## What Is In The Game
+## Game Systems
 
-- A persistent, chunk-streamed overworld with private and shared interiors
-- Server-authoritative movement, collision, combat, inventory, drops, trading,
-  shops, quests, skilling, and progression
-- Melee, ranged, and magic combat with equipment bonuses, prayers, spells,
-  status effects, bosses, PvP zones, arena matches, and King of the Hill
-- RuneScape-style experience and levels for Hitpoints, Attack, Strength,
-  Defence, Ranged, Fishing, Farming, Smithing, Prayer, Magic, Woodcutting,
-  Alchemy, Mining, Slayer, and Survivalist
-- TOML-defined items, entities, loot tables, shops, recipes, gathering nodes,
-  prayers, spells, Slayer content, contracts, and world objects
-- Lua-scripted quests with dialogue, objectives, rewards, and persistent state
-- Banking, equipment, chests, ground items, player trading, collection logs,
-  crafting orders, titles, waystones, chairs, and player stalls
-- Native desktop, browser/WASM, and Android client targets
-- A React map editor and content studio for chunks, interiors, assets, balance,
-  and cross-content validation
-- A public React stats site and a self-updating desktop launcher
+- Persistent accounts and characters backed by SQLite
+- Chunk-streamed overworld plus public and private interiors
+- Server-authoritative movement, collision, combat, inventory, trading, shops,
+  drops, rewards, progression, and access control
+- Melee, ranged, and magic combat with equipment, prayers, spells, status
+  effects, bosses, PvP, arenas, and King of the Hill
+- Gathering, farming, fishing, mining, woodcutting, cooking, smithing,
+  fletching, leatherworking, alchemy, Slayer, contracts, and crafting orders
+- Lua-scripted quests with dialogue, objectives, rewards, and persisted state
+- Banking, equipment, chests, ground items, collection logs, waystones,
+  player stalls, titles, chairs, and world-map discovery
+- Native desktop, browser/WASM, and Android targets
+- Public world statistics and authenticated operational control pages
+- React map/content studio with scoped users, validation, atomic writes, asset
+  import, atlas rebuilding, and explicit deploy operations
+- Self-updating desktop launcher with versioned release manifests and SHA-256
+  artifact verification
 
-## Technology
+## Stack
 
 | Area | Technology |
 | --- | --- |
-| Game server | Rust, Tokio, Axum, SQLite, SQLx |
+| Authoritative server | Rust 1.92, Tokio, Axum |
+| Persistence | SQLite WAL, SQLx migrations |
 | Game client | Rust, Macroquad |
-| Realtime protocol | MessagePack over WebSocket |
-| HTTP APIs | JSON over HTTP |
+| Realtime protocol | Versioned MessagePack over WebSocket |
+| Shared wire contract | `crates/aeven-protocol` |
 | Quest scripting | Lua 5.4 through `mlua` |
-| Content | TOML, JSON map chunks, Lua |
+| Gameplay content | TOML, Lua, versioned JSON maps |
 | Mapper/content studio | React 19, TypeScript, Zustand, Express |
-| Public stats | React 19, TypeScript, TanStack Query |
+| Public site and control UI | SvelteKit 2, Svelte 5 |
 | Launcher | Rust, eframe/egui |
-| Releases | GitHub Actions, Python packaging tools, Cloudflare R2 |
+| Automation | GitHub Actions, Python packaging, Cloudflare R2 |
 
-## Repository Layout
+## Repository
 
 ```text
-client/             Macroquad game client for desktop, WASM, and Android
-rust-server/        Authoritative game server and persistent game data
-mapper/             World mapper, content studio, and its local Express API
-site/               Unified SvelteKit site (homepage, /world/ stats, /play/ shell)
-launcher/           Desktop installer/updater
-tools/              Client and launcher packaging utilities
-docs/               Design notes, plans, and historical implementation records
-.github/workflows/  Deployment and release workflows
+client/                 Macroquad desktop, WASM, and Android client
+crates/aeven-protocol/  Shared client-command DTOs and MessagePack codec
+rust-server/            Authoritative simulation, APIs, persistence, content
+mapper/                 React mapper/content studio and privileged Express API
+site/                   Homepage, browser client shell, stats, control panel
+launcher/               Desktop installer and updater
+tools/                  Client/launcher packaging and manifest utilities
+docs/                   Historical design notes; not authoritative
+.github/workflows/      CI, deployment, and release automation
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for runtime flows, ownership boundaries,
-extension points, known risks, and the modernization plan. See
-[CONTRIBUTING.md](CONTRIBUTING.md) before changing code, data, maps, schemas, or
-the wire protocol.
+[ARCHITECTURE.md](ARCHITECTURE.md) is the authoritative system design and
+[CONTRIBUTING.md](CONTRIBUTING.md) defines compatibility and quality rules.
 
-## Local Development
+## Prerequisites
 
-### Prerequisites
+- Rust `1.92.0` via the checked-in `rust-toolchain.toml`
+- Node.js `22.x` and npm `10.x` via `.node-version` / `.nvmrc`
+- Python `3.11+` for packaging and asset utilities
+- Native libraries required by Macroquad and eframe on the host platform
+- Android SDK/NDK only when building Android
 
-- Rust 1.88 or newer with Cargo
-- Node.js 20.19 or newer and npm
-- Python 3.11 or newer for packaging tools
-- Platform libraries required by Macroquad and eframe
+Use committed lockfiles. Rust commands should include `--locked`; JavaScript
+packages should be installed with `npm ci`.
 
-The repository does not yet pin Rust or Node versions. Until it does, the
-versions above match the current CI and frontend toolchains.
+## Run Locally
 
-### 1. Start The Server
+### Server
 
-The server resolves `data/`, `maps/`, and the SQLite database relative to
-`rust-server/`, so run it from that directory:
+The server currently resolves `data/`, `maps/`, migrations, and the default
+database relative to `rust-server/`.
 
 ```bash
 cd rust-server
-cargo run --release
+AEVEN_ENV=development cargo run
 ```
 
-The default listener is `http://localhost:2567`. On first boot, the server
-creates its SQLite database and loads world maps and gameplay registries.
+It listens on `0.0.0.0:2567` by default. Startup runs SQLx migrations, validates
+the complete authoritative content graph, validates every interior, and
+preloads the production room before accepting traffic.
 
-Useful endpoints:
+Public endpoints include:
 
 - `GET /health`
 - `POST /api/register`
 - `POST /api/login`
+- `GET|POST /api/characters`
 - `POST /matchmake/joinOrCreate/:room`
-- `GET /api/stats/overview`
-- `GET /api/perf`
+- `GET /api/stats/*`
 
-### 2. Start The Desktop Client
+`/api/perf`, `/api/logs`, and `/api/admin/*` are not mounted unless
+`AEVEN_ADMIN_API_TOKEN` is configured, and then require its bearer token.
+
+### Desktop Client
 
 ```bash
 cd client
-cargo run --release --bin new-aeven
+cargo run --bin new-aeven
 ```
 
-The current development source defaults to `http://localhost:2567` and
-`ws://localhost:2567`. Production client builds must use the production HTTP
-and WebSocket endpoints; see the release blocker in
-[ARCHITECTURE.md](ARCHITECTURE.md#p0-release-and-security-blockers).
+Debug clients default to `http://localhost:2567` and `ws://localhost:2567`.
+Release clients default to `https://aeven.xyz` and `wss://aeven.xyz`.
+`AEVEN_SERVER_URL` and `AEVEN_WS_URL` override these at compile time. Release
+builds reject insecure or loopback endpoints unless
+`AEVEN_ALLOW_INSECURE_ENDPOINTS=1` is explicitly set for a private build.
 
-### 3. Start The Mapper And Content Studio
+### Mapper And Content Studio
+
+Create `mapper/users.json` from `mapper/users.example.json`. Generate a scrypt
+password hash with:
+
+```bash
+cd mapper/server
+npm ci
+npm run hash-password
+```
+
+Enter a password of at least 12 characters on stdin, then place the emitted hash
+in `mapper/users.json`.
 
 Run the API and frontend in separate terminals:
 
 ```bash
 cd mapper/server
-npm install
 npm run dev
 ```
 
 ```bash
 cd mapper
-npm install
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173/mapper/`. The mapper API reads and writes repository
-content, including maps, TOML files, and generated atlases. Treat it as a local
-development tool and do not expose it to an untrusted network.
+The API binds to `127.0.0.1:3000` by default. It requires authenticated,
+signed, eight-hour sessions; state-changing APIs also require a CSRF token.
+Users are restricted to configured worlds. Do not expose it publicly without a
+TLS reverse proxy and production secrets.
 
-### 4. Start The Public Site (homepage + world stats)
+### Site
 
 ```bash
 cd site
-npm install
+npm ci
 npm run dev
 ```
 
-World stats live at `http://localhost:5173/world/`. See `site/DEPLOYMENT.md` for VPS setup.
+The SvelteKit site contains the homepage, `/world/` statistics, `/control/`
+operations UI, and the packaged `/play/` browser client. See
+`site/DEPLOYMENT.md`.
 
-### 5. Start The Launcher
+### Launcher
 
 ```bash
 cd launcher
 cargo run
 ```
 
-Launcher settings live in `launcher/launcher-config.toml`. Release artifacts and
-the update manifest are generated by the scripts in `tools/`.
+Launcher behavior is configured by `launcher/launcher-config.toml`.
 
 ## Other Client Targets
 
-### WebAssembly
+Build the WASM library:
 
 ```bash
-rustup target add wasm32-unknown-unknown
 cd client
-cargo build --target wasm32-unknown-unknown --profile release-wasm
+cargo build --locked --target wasm32-unknown-unknown --profile release-wasm
 ```
 
-The web shell and JavaScript bridges are in `client/web/`. Building the Rust
-target alone does not package or deploy the complete browser client.
+The deploy scripts also copy `client/web/` and `client/assets/` into the
+SvelteKit `/play/` output. Android integration lives in `client/android/` and
+`client/src/android.rs`.
 
-### Android
+## Content
 
-Android project files and platform bindings live in `client/android/` and
-`client/src/android.rs`. Android builds require a configured Android SDK/NDK and
-the platform-specific native library packaging step.
-
-## Content Workflow
-
-Authoritative content lives with the server:
+Authoritative content is server-owned:
 
 ```text
-rust-server/data/             Items, entities, recipes, shops, skills, and systems
+rust-server/data/             Items, entities, recipes, shops, systems
 rust-server/data/quests/      Quest definitions
 rust-server/data/scripts/     Lua quest scripts
-rust-server/maps/world_0/     32x32 overworld chunk JSON files
-rust-server/maps/interiors/   Interior map JSON files
+rust-server/maps/world_0/     Version 2, 32x32 overworld chunks
+rust-server/maps/interiors/   Public/private interior definitions
 ```
 
-The mapper keeps editable working data in `mapper-data/` and provides explicit
-sync/deploy operations. Review generated diffs before committing them. Content
-that parses successfully can still be invalid as a game graph, so run the
-content studio validation as well as server tests.
+Startup rejects malformed files, duplicate IDs, invalid dimensions, broken
+item/entity/chest/quest/interior references, bad portal destinations, invalid
+loot ranges, and malformed packed collision data. The mapper keeps editable
+working copies under `mapper/mapper-data/`; deploying to server content is an
+explicit operation.
 
-## Validation
+## Quality Gates
 
-Run these checks before opening a pull request:
+Run the same core checks as CI from the repository root:
 
 ```bash
-(cd rust-server && cargo fmt --check && cargo test --all-targets)
-(cd client && cargo fmt --check && cargo test --all-targets)
-(cd launcher && cargo check --all-targets)
-(cd mapper/server && npm run build)
-(cd mapper && npm run build && npm run lint)
-(cd site && npm run build && npm run check)
+cargo fmt --all -- --check
+cargo check --locked --workspace --all-targets
+cargo check --locked -p new-aeven-client --target wasm32-unknown-unknown --lib
+cargo clippy --locked --workspace --all-targets
+cargo test --locked --workspace
+
+(cd mapper && npm ci && npm run lint && npm run build && npm audit --audit-level=moderate)
+(cd mapper/server && npm ci && npm test && npm audit --audit-level=moderate)
+(cd site && npm ci && npm run check && npm run build && npm audit --audit-level=moderate)
 ```
 
-The 128-player release-mode server budget test is ignored during normal test
-runs:
+Server/tick changes must also pass the release-mode capacity gate:
 
 ```bash
 cd rust-server
-cargo test --release \
-  game::load_test::full_tick_stays_within_budget_for_128_players \
+cargo test --locked --release -p isometric-server \
+  full_tick_stays_within_budget_for_128_players \
   -- --ignored --nocapture
 ```
 
-As of June 11, 2026, Rust tests, formatting, all builds, site check, and the
-capacity test pass. Mapper lint has an existing baseline of 28 errors and 3
-warnings that must be removed before lint can become a reliable merge gate.
+The current 128-player synthetic full-tick result is `p95 16.08 ms` and
+`p99 17.44 ms` against a `50 ms` tick budget.
 
-## Deployment
+## Delivery
 
-- `.github/workflows/deploy.yml` SSH-deploys the server and web client after
-  matching changes land on `master`.
-- `.github/workflows/client-release.yml` builds desktop clients and an updater
-  manifest.
-- `.github/workflows/launcher-release.yml` packages launchers for Windows,
-  macOS, and Linux.
-- `deploy.sh` and the force-deploy scripts contain the current host deployment
-  procedure.
-
-Deployment currently has no required test, lint, or server build gate. Do not
-consider a successful deployment workflow equivalent to a validated release.
-
-## Current Engineering Priorities
-
-1. Remove the production endpoint regression and introduce typed build-time
-   client configuration.
-2. Secure the mapper mutation API and operational server endpoints.
-3. Replace duplicated client/server protocol code with a shared, versioned
-   contract and compatibility tests.
-4. Consolidate desktop, WASM, and Android onto one application runtime.
-5. Break `GameRoom`, client `GameState`, and the mapper store into explicit
-   domain-owned services and state slices.
-6. Introduce versioned database migrations, fail-fast content validation, and
-   comprehensive CI quality gates.
-
-The full rationale and recommended sequence are in
-[ARCHITECTURE.md](ARCHITECTURE.md#architecture-audit-and-modernization-plan).
-
-## License
-
-All rights reserved.
+CI runs formatting, native/WASM checks, Clippy with warnings denied, all Rust
+tests, the 128-player capacity test, frontend checks/builds/tests, and npm
+audits. Production deployment and automatic client/launcher release workflows
+run only after successful CI on `master`. Manual release dispatch remains
+available.

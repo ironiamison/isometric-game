@@ -1,323 +1,322 @@
 # Contributing To Aeven
 
-This repository contains a live multiplayer game, content pipeline, web tools,
-and release system. A change that looks local can affect the wire protocol,
-persistent characters, map data, platform builds, or production operations.
+Aeven is a live multiplayer system. A local-looking change can affect authority,
+wire compatibility, persistent characters, map references, three client
+platforms, privileged tooling, or production delivery.
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) before making structural changes.
+Read [ARCHITECTURE.md](ARCHITECTURE.md) before structural work.
 
-## Development Setup
+## Toolchain
 
-Required tools:
+Required versions are repository policy:
 
-- Rust 1.88 or newer
-- Node.js 20.19 or newer and npm
-- Python 3.11 or newer for packaging work
-- Native libraries required by Macroquad or eframe on your platform
+- Rust `1.92.0`
+- Node.js `22.x`
+- npm `10.x`
+- Python `3.11+` for packaging/assets
 
-Install dependencies in each JavaScript package you intend to change:
-
-```bash
-(cd mapper && npm install)
-(cd mapper/server && npm install)
-(cd site && npm install)
-```
-
-Rust dependencies are resolved by Cargo in `client/`, `rust-server/`, and
-`launcher/`.
-
-Run the game server from `rust-server/` because its data, map, and database
-paths are currently relative to that working directory:
+Use the checked-in toolchain files and lockfiles:
 
 ```bash
-cd rust-server
-cargo run
+rustup show
+node --version
+npm --version
+
+(cd mapper && npm ci)
+(cd mapper/server && npm ci)
+(cd site && npm ci)
 ```
 
-Run the desktop client separately:
+Do not replace `npm ci` with an unreviewed lockfile refresh. Do not run Cargo
+without `--locked` in CI, release, or verification commands.
 
-```bash
-cd client
-cargo run --bin new-aeven
-```
+## Working Agreement
 
-## Before You Change Code
+Before editing, identify every affected boundary:
 
-Identify the boundaries affected by the change:
+- Client command or server event
+- Protocol compatibility/version
+- Persisted schema or serialized state
+- Server authority and instance scope
+- Tick phase, lock scope, channel capacity, or sync bandwidth
+- Content IDs referenced by maps, loot, quests, shops, or saves
+- Desktop, WASM, or Android lifecycle
+- Public HTTP, authenticated ops, or mapper mutation surface
+- Packaging, endpoint configuration, or release automation
 
-- Does it change a client command or server event?
-- Does it alter persisted state or database schema?
-- Does it add a gameplay system or another lock to `GameRoom`?
-- Does it affect desktop, WASM, or Android differently?
-- Does it change a content ID referenced by maps, loot, quests, or saves?
-- Does it expose data through HTTP, WebSocket, logs, metrics, or the mapper API?
-- Does it affect packaging, release manifests, or endpoint configuration?
+Keep gameplay changes separate from unrelated cleanup. Preserve released IDs
+and semantics unless the change includes an explicit migration/version plan.
 
-Prefer a focused change with explicit compatibility handling over a broad
-cleanup mixed with gameplay behavior.
+## Server Authority
 
-## Engineering Rules
+Clients send intent. The server derives results.
 
-### Server Authority
-
-Clients send intent. The server derives outcomes.
-
-Every mutating command must validate the relevant subset of:
+Every mutating command must validate the relevant combination of:
 
 - Authenticated account and active character
-- Current command lease and connection generation
-- Entity, item, object, or activity ownership
-- Shared instance or world context
+- Current command lease/connection generation
+- Character, entity, item, object, or activity ownership
+- Room and instance membership
 - Position, proximity, collision, and line of sight
-- Cooldown, action state, and activity state
-- Quantity, price, inventory capacity, and resource availability
-- Skill, quest, equipment, and progression requirements
-- Duplicate, replayed, stale, and out-of-order commands
+- Cooldown, action state, sequence, and stale input
+- Quantity, price, inventory capacity, and resources
+- Skill, quest, Slayer, equipment, spell, and prayer requirements
+- Duplicate, replayed, stale, and out-of-order requests
 
-Never accept client-calculated damage, rewards, XP, prices, drops, positions,
-completion state, or target access.
+Never accept client-calculated damage, XP, rewards, prices, loot, drops,
+completion, target access, or final position.
 
-### Domain Ownership
+Choose publication scope explicitly:
 
-`GameRoom` and client `GameState` are already too broad. Do not add unrelated
-state to them merely because they are globally reachable.
+- **Unicast:** inventory, bank, equipment, progression, private errors
+- **Spatial/instance:** movement, combat, nearby entities and items
+- **Room:** events every player in that room must receive
+- **Global:** rare process-wide announcements only
 
-New server systems should normally have:
+## Domain Ownership
 
-- A type that owns the system's mutable state
-- Command methods with validated inputs
-- Narrow read-only queries
-- Domain events for cross-system and protocol output
-- A defined tick phase, if ticking is required
-- A persistence snapshot or change set, if durable
+`GameRoom` is an aggregate root, not a default home for new state.
 
-Avoid new `use super::*` imports. Import the types a module actually depends on.
-Do not expose locks as a module API; expose operations.
+A new server system should normally provide:
 
-On the client, separate authoritative replicated data from local presentation,
-input, and UI state. A server message handler should update the smallest
-relevant state slice rather than know about every screen.
+- A type that owns mutable domain state
+- Validated command methods
+- Narrow read-only queries or snapshots
+- Domain events/protocol projections
+- A defined tick phase and measured cost, if applicable
+- A persistence snapshot/change set, if durable
+- Content/reference validation, if data-driven
 
-### Async And Locking
+Do not expose `RwLock`/`Mutex` guards as module APIs. Do not add a long positional
+constructor parameter list; group cohesive dependencies in a service or
+validated registry object.
 
-- Do not hold a lock across `.await` unless the protected invariant explicitly
-  requires it and the critical section is bounded.
-- Establish and document lock order when one operation needs multiple locks.
-- Copy or snapshot small values before asynchronous I/O.
-- Use bounded channels for per-connection work.
-- Treat dropped private state and failed bootstrap messages as correctness
-  failures, not silent best-effort work.
-- Keep expensive filesystem, database, compression, and parsing work off the
-  latency-sensitive tick path.
+On the client, keep replicated truth, presentation effects, input, and UI state
+separate. All platforms must construct gameplay through
+`app::new_game_state`/`configure_game_state` and run active gameplay through
+`run_game_frame`.
 
-### Errors And Logging
+## Async And Concurrency
 
-Classify failures:
+- Do not hold a lock across `.await` unless a documented invariant requires it.
+- Snapshot small values before database, filesystem, compression, or network I/O.
+- Define lock order when one operation needs multiple locks.
+- Keep tick phases free of blocking filesystem/database work.
+- Use bounded channels for connection work.
+- Treat dropped bootstrap/private state as correctness failures.
+- Record and handle backpressure instead of silently growing queues.
+- Serialize same-character admission/takeover and same-resource mutations.
 
-- **Fatal startup:** schema mismatch, missing required maps/content, invalid
-  production configuration
-- **Command error:** invalid or unauthorized player intent
-- **Connection error:** malformed protocol, timeout, backpressure, send failure
-- **Best effort:** optional telemetry or cleanup that does not affect truth
+Any change to tick, synchronization, connection channels, AI, visibility, or
+large shared collections must run the release capacity gate.
 
-Do not discard `Result` values with `.ok()` or `let _ =` unless the operation is
-genuinely best effort and the reason is documented. Logs must not contain
-passwords, bearer tokens, signed session IDs, private chat, or unnecessary
-personal data.
+## Error Policy
 
-### Configuration And Secrets
+Classify errors deliberately:
 
-- Do not commit credentials, tokens, local user databases, `.env` files, or
-  production host secrets.
-- Do not add another hard-coded service endpoint.
-- Keep local, staging, and production configuration explicit.
-- Production releases must reject localhost game endpoints.
-- The mapper API is privileged and must remain local-only until its mutation
-  routes are properly authenticated and protected.
+- **Fatal startup:** invalid production config, failed migration, malformed
+  required content/map, broken content graph
+- **Command rejection:** invalid or unauthorized player intent
+- **Connection failure:** malformed protocol, timeout, invalid lease,
+  backpressure/send failure
+- **Best effort:** optional telemetry or cleanup that cannot affect game truth
+
+Do not discard `Result` using `.ok()` or `let _ =` unless the operation is
+genuinely best effort and the reason is evident. Logs must not contain
+passwords, bearer tokens, signed room tokens, private chat, or unnecessary
+personal information.
 
 ## Protocol Changes
 
-The protocol is manually duplicated today, so changes require extra care.
+### Client To Server
 
-For a client-to-server command:
+Commands are defined once in `crates/aeven-protocol`.
 
-1. Update `client/src/network/messages.rs`.
-2. Update `rust-server/src/protocol/decode.rs`.
-3. Add server dispatch and domain validation.
-4. Add tests for valid, malformed, unauthorized, stale, and cross-instance
-   inputs.
+1. Add or change the `ClientMessage` variant with an explicit stable name.
+2. Add codec round-trip and malformed-input tests.
+3. Add aliases only when preserving a released field spelling.
+4. Add server dispatch and domain validation.
+5. Test unauthorized, stale, malformed, and cross-instance cases.
+6. Update every client call site.
 
-For a server-to-client event:
+Do not duplicate a command DTO in client/server modules.
 
-1. Update the server message type and encoder.
-2. Choose unicast, spatial/instance scope, or global broadcast deliberately.
-3. Update client dispatch and the owning client state module.
-4. Test missing fields, old fields, and unknown message types.
+### Server To Client
 
-Keep message names and field casing stable. If compatibility cannot be
-preserved, introduce an explicit protocol version and document the minimum
-client/server versions. Do not reuse an old message name for different
-semantics.
+Server events are optimized projections:
 
-The intended destination is a shared wire-only Cargo crate. Do not move server
-domain objects into that crate; shared DTOs are contracts, not game ownership.
+1. Add/update the server message variant and encoder.
+2. Select unicast/spatial/room/global scope.
+3. Update the client handler and smallest owning state module.
+4. Test encoded field names/types and representative client decoding.
+5. Keep old fields readable when compatibility is practical.
 
-## Database And Persistence Changes
+### Versioning
 
-Persistent data is a compatibility boundary. Test both:
+Increment `aeven_protocol::PROTOCOL_VERSION` when an old client or server cannot
+correctly interoperate. Examples:
 
-- A fresh database created from the current code
-- An existing database upgraded from the previous released schema
+- Removing/renaming a message or required field
+- Changing a field type, unit, meaning, or default
+- Changing ordering/atomicity semantics that affect gameplay correctness
 
-Until versioned migrations are introduced:
+Additive optional fields with safe defaults may remain on the same version.
+Never reuse an old message name for different semantics.
 
-- Keep schema updates idempotent.
-- Fail on unexpected migration errors.
-- Do not use broad error suppression to handle duplicate columns or tables.
-- Keep related player state changes in one transaction.
-- Preserve old serialized fields with Serde defaults or an explicit migration.
-- Consider rollback and partial-write behavior.
+## Database And Persistence
 
-Prefer a typed snapshot or repository API to adding more positional parameters
-to `save_character`.
+Migrations live in `rust-server/migrations/`.
 
-Never edit a production SQLite database manually as part of a normal deploy.
+- Never edit a migration already used by a released server.
+- Add the next zero-padded numbered migration.
+- Make the migration deterministic and transactional where SQLite permits.
+- Test a fresh database and an upgrade from the previous released schema.
+- Keep related row changes in one transaction.
+- Preserve old JSON fields with Serde defaults or migrate them explicitly.
+- Keep compatibility upgrades narrowly scoped and introspected.
+- Never manually patch the production database as the normal deployment path.
 
-## Content And Map Changes
+Autosave snapshots must be collected without holding room locks during SQL.
+Persistence failures affecting character truth must be surfaced and measured.
 
-Authoritative content is under `rust-server/data/` and `rust-server/maps/`.
-The mapper may use `mapper-data/` as editable working state.
+## Content Changes
 
-For content changes:
+Authoritative data lives in `rust-server/data/` and `rust-server/maps/`.
 
-1. Keep released IDs stable.
-2. Use the content studio where a structured editor exists.
-3. Validate references to items, entities, drops, recipes, shops, quests,
-   skills, objects, assets, chunks, and interiors.
-4. Start the server and confirm every required registry loads.
-5. Exercise the affected content in a client when practical.
-6. Review generated TOML, JSON, and atlas diffs for unrelated churn.
+Rules:
 
-For map changes:
+- Released item, entity, quest, recipe, chest, interior, and object IDs are stable.
+- Every referenced ID must exist.
+- Duplicate IDs and duplicate unique spawn IDs are errors.
+- Quantities, probabilities, weights, dimensions, and coordinates are bounded.
+- Empty required registries are errors.
+- Required files never fall back to empty/default production behavior.
+- Lua rewards and transitions remain server-derived.
 
-- Preserve the 32x32 overworld chunk contract.
-- Check collision, interaction markers, spawns, transitions, and instance
-  metadata.
-- Do not assume a visually reachable tile is server-walkable.
-- Verify transitions in both directions and with the correct instance policy.
-
-Lua quests execute inside the server. Treat scripts as gameplay code: validate
-all IDs, keep rewards server-derived, and test resumed quest state as well as a
-fresh start.
-
-## Client Platform Changes
-
-Desktop and library entrypoints currently have separate frame runtimes. Until
-they are unified, any change to boot, frame order, input, tutorial behavior,
-rendering, networking, or lifecycle must be checked in:
-
-- Desktop native
-- Browser/WASM when affected
-- Android when affected
-
-Do not fix only one runtime and assume the other follows it.
-
-Presentation prediction may improve responsiveness, but reconciliation must
-converge on server state. Platform adapters may differ; gameplay behavior
-should not.
-
-## Frontend And Tooling Changes
-
-The mapper API can write repository files. Validate paths using structured path
-operations and enforce that resolved paths remain under an approved root. Do
-not build filesystem paths by concatenating untrusted input.
-
-React changes must pass TypeScript compilation and hooks lint. Avoid moving
-editor behavior into the already large global Zustand store when a local store
-or domain slice has clear ownership.
-
-Large bundle warnings should be addressed with route or feature-level code
-splitting when they affect initial load; do not hide the warning without
-measuring.
-
-## Required Validation
-
-Run the checks relevant to your change. Before a merge to `master`, the target
-is the full matrix:
+Run:
 
 ```bash
-(cd rust-server && cargo fmt --check && cargo test --all-targets)
-(cd client && cargo fmt --check && cargo test --all-targets)
-(cd launcher && cargo check --all-targets)
-(cd mapper/server && npm run build)
-(cd mapper && npm run build && npm run lint)
-(cd site && npm run check && npm run build)
+cargo test --locked -p isometric-server production_content_registries_load
+cargo test --locked -p isometric-server production_room_bootstrap_loads_all_runtime_content
 ```
 
-For server tick, synchronization, or large-system changes, also run:
+The first validates immutable registries and cross-references. The second
+constructs the complete production room, loads every chunk/runtime subsystem,
+and catches integration-only content failures.
 
-```bash
-cd rust-server
-cargo test --release \
-  game::load_test::full_tick_stays_within_budget_for_128_players \
-  -- --ignored --nocapture
-```
+### Maps
 
-As of June 11, 2026, mapper lint has 28 pre-existing errors and 3 warnings.
-Do not add new violations. Changes touching those files should reduce the
-baseline, and lint must be cleaned before it becomes a hard CI gate.
+Overworld chunks must:
 
-Rust also has a substantial warning baseline. Do not introduce new warnings;
-prefer removing warnings in files already being changed without mixing in a
-repository-wide refactor.
+- Use format version `2`
+- Be exactly `32x32`
+- Match filename and payload coordinates
+- Contain exactly 1,024 entries in each tile layer
+- Contain exactly 128 decoded collision bytes
+- Use registered entities and gathering zones
+- Reference existing interior maps and named spawns
+
+Interiors must have valid dimensions, layers, collision, spawn points, portals,
+entities, chests, and optional elevation arrays.
+
+Use the mapper for structured edits. Review generated JSON/TOML and atlas diffs
+for unrelated churn before committing.
+
+## Mapper And Web Security
+
+The mapper API can alter repository and deployable files.
+
+- Keep the default bind address loopback-only.
+- Production requires `MAPPER_AUTH_SECRET` of at least 32 characters.
+- Production users require scrypt `passwordHash`; plaintext is development-only
+  and requires `MAPPER_ALLOW_PLAINTEXT_PASSWORDS=1`.
+- Validate world access on every world-scoped route.
+- Require CSRF for every state-changing API.
+- Resolve paths beneath approved roots; never concatenate untrusted paths.
+- Validate payload shape/size before the first filesystem mutation.
+- Use atomic replacement for JSON and directory-level bulk writes.
+- Serialize asset rebuilds and related multi-file mutations.
+- Never invoke shell parsing with user-controlled arguments.
+
+Frontend changes must pass TypeScript/Svelte checks and lint. Treat accessibility
+warnings as failures. Split large entry bundles when measurement shows startup
+cost, rather than suppressing warnings.
+
+## Configuration And Secrets
+
+Do not commit:
+
+- Passwords or password hashes for real users
+- Bearer/admin/session secrets
+- `.env` files
+- Production databases
+- SSH/R2 credentials
+- Generated local mapper users
+
+Production server requirements:
+
+- `AEVEN_ENV=production`
+- `AEVEN_SESSION_SIGNING_SECRET` at least 32 bytes
+- Exact HTTPS CORS origins
+- `AEVEN_ADMIN_API_TOKEN` only when ops routes are needed
+- `AEVEN_TRUSTED_PROXIES` only for proxies actually in the request path
+
+Release clients require HTTPS/WSS and reject localhost unless an intentional
+private build explicitly opts out.
 
 ## Tests
 
-Match test scope to risk:
+Match test scope to blast radius:
 
-- Pure formulas and parsing: unit tests
-- Registries and content loading: fixture-based loader tests
-- Commands: authorization and invariant tests
-- Protocol changes: encode/decode and golden frame tests
-- Persistence: fresh schema, upgrade, save/load round trips, transaction failure
-- Instances: cross-instance rejection and cleanup
-- Networking: reconnect, takeover, duplicate connection, timeout, backpressure
-- Client behavior: state reducer/handler tests separate from rendering
-- Performance-sensitive systems: release-mode capacity tests
+- **Unit:** parsing, validation, calculations, state transitions
+- **Protocol:** round trips, aliases, malformed/oversized frames, version mismatch
+- **Integration:** authority, ownership, instance isolation, persistence
+- **Production bootstrap:** all registries/maps/runtime content
+- **Capacity:** tick/sync/AI/shared-state changes
+- **Frontend/API:** auth, CSRF, path scope, validation, atomic writes
 
-A test that only exercises the happy path is insufficient for an economy,
-inventory, combat reward, trade, or persistence change.
+Bug fixes should include a regression test when the behavior is testable.
+
+## Required Verification
+
+Run the complete matrix before merging:
+
+```bash
+cargo fmt --all -- --check
+cargo check --locked --workspace --all-targets
+cargo check --locked -p new-aeven-client --target wasm32-unknown-unknown --lib
+cargo clippy --locked --workspace --all-targets
+cargo test --locked --workspace
+
+(cd mapper && npm ci && npm run lint && npm run build && npm audit --audit-level=moderate)
+(cd mapper/server && npm ci && npm test && npm audit --audit-level=moderate)
+(cd site && npm ci && npm run check && npm run build && npm audit --audit-level=moderate)
+```
+
+For server tick, sync, transport, instance, AI, or high-fanout changes:
+
+```bash
+cd rust-server
+cargo test --locked --release -p isometric-server \
+  full_tick_stays_within_budget_for_128_players \
+  -- --ignored --nocapture
+```
+
+Do not weaken lint levels, ignore a failing audit, raise the tick budget, or
+disable a validation test to merge a change.
 
 ## Pull Requests
 
-Keep pull requests reviewable and explain:
+A pull request should state:
 
-- The behavior and ownership boundary being changed
-- Compatibility impact on clients, protocol, database, and content
-- Security assumptions and validation performed
-- Tests and manual checks run
-- Known limitations or follow-up work
-- Screenshots or recordings for visible UI/map changes
-- Performance measurements for tick-path or synchronization changes
+- User-visible and architectural behavior changed
+- Authority/security implications
+- Protocol version/compatibility implications
+- Migration/content ID implications
+- Platforms exercised
+- Exact verification commands and results
+- Capacity result when required
+- Deployment or rollback considerations
 
-Do not combine generated asset churn, formatting of unrelated files, a schema
-change, and a gameplay feature unless they are inseparable.
-
-## Release Checklist
-
-Before releasing:
-
-1. Confirm desktop and library clients use approved production HTTP and
-   WebSocket endpoints.
-2. Run the full validation matrix.
-3. Run the 128-player capacity test for server simulation changes.
-4. Test database upgrade on a copy of production-shaped data.
-5. Validate required content and maps from a clean checkout.
-6. Confirm mapper and operational endpoints are not publicly exposed.
-7. Verify client package hashes and the launcher manifest.
-8. Smoke-test login, character selection, matchmaking, reconnect, movement,
-   combat, inventory, saving, and logout.
-9. Verify rollback artifacts and database backup availability.
-
-The current deployment workflow does not enforce these checks. Release owners
-must perform them until CI and deployment gates are added.
+Automatic deployment and release workflows run only after successful CI on
+`master`. A green deploy job is not a substitute for the local review above.
