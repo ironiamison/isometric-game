@@ -370,15 +370,6 @@ impl Renderer {
             gl.quad_gl.scissor(None);
         }
 
-        draw_rectangle_lines(
-            map_rect.x,
-            map_rect.y,
-            map_rect.w,
-            map_rect.h,
-            1.0,
-            Color::new(0.70, 0.57, 0.36, 0.80),
-        );
-
         hitboxes
     }
 
@@ -478,7 +469,7 @@ impl Renderer {
                 (sx2 - sx1).abs().max(1.0),
                 (sy2 - sy1).abs().max(1.0),
                 1.0,
-                Color::new(0.35, 0.50, 0.40, 0.30),
+                Color::new(0.40, 0.52, 0.46, 0.14),
             );
         }
     }
@@ -563,67 +554,65 @@ impl Renderer {
         layout.add(UiElementId::MinimapPanel, Rect::new(0.0, 0.0, sw, sh));
 
         let panel_rect = self.minimap_panel_rect();
-        self.draw_panel_frame(panel_rect.x, panel_rect.y, panel_rect.w, panel_rect.h);
+        let (px, py, pw, ph) = (panel_rect.x, panel_rect.y, panel_rect.w, panel_rect.h);
+        // Solid, premium dark shell. A focused full-screen map wants to feel
+        // grounded, not translucent: a soft drop shadow gives depth and separates
+        // it from the world, over an opaque cool dark fill — no edge borders.
+        draw_rectangle(px - 4.0, py - 4.0, pw + 8.0, ph + 8.0, Color::new(0.0, 0.0, 0.0, 0.22));
+        draw_rectangle(px - 2.0, py - 2.0, pw + 4.0, ph + 4.0, Color::new(0.0, 0.0, 0.0, 0.30));
+        draw_rectangle(px, py, pw, ph, Color::new(0.055, 0.063, 0.078, 0.985));
 
+        // Title floats over the translucent header zone (no filled strip / divider).
+        let title_band = 30.0;
+        let title = "World Map";
+        let title_w = self.measure_text_sharp(title, MINIMAP_WORLD_TEXT_SIZE).width;
         self.draw_text_sharp(
-            "World Map",
-            panel_rect.x + 14.0,
-            panel_rect.y + 22.0,
+            title,
+            (panel_rect.x + (panel_rect.w - title_w) * 0.5).floor(),
+            (panel_rect.y + 21.0).floor(),
             MINIMAP_WORLD_TEXT_SIZE,
             TEXT_TITLE,
         );
 
+        // Bare "X" close glyph — no bezel/box, just the line-drawn mark that
+        // brightens to red on hover.
+        let close_size = 22.0;
         let close_rect = Rect::new(
-            panel_rect.x + panel_rect.w - 34.0,
-            panel_rect.y + 10.0,
-            22.0,
-            16.0,
+            panel_rect.x + panel_rect.w - close_size - 8.0,
+            panel_rect.y + (title_band - close_size) * 0.5,
+            close_size,
+            close_size,
         );
         let close_hovered = matches!(hovered, Some(UiElementId::MinimapClose));
-        let close_bg = if close_hovered {
-            Color::new(0.36, 0.14, 0.14, 0.96)
+        let x_color = if close_hovered {
+            Color::new(1.0, 0.4, 0.4, 1.0)
         } else {
-            Color::new(0.28, 0.12, 0.12, 0.92)
+            TEXT_DIM
         };
-        let close_border = if close_hovered {
-            Color::new(0.90, 0.66, 0.60, 0.92)
-        } else {
-            Color::new(0.62, 0.40, 0.36, 0.82)
-        };
-        let close_text = if close_hovered {
-            TEXT_TITLE
-        } else {
-            TEXT_NORMAL
-        };
-        draw_rectangle(
-            close_rect.x,
-            close_rect.y,
-            close_rect.w,
-            close_rect.h,
-            close_bg,
+        let x_margin = close_size * 0.3;
+        draw_line(
+            close_rect.x + x_margin,
+            close_rect.y + x_margin,
+            close_rect.x + close_size - x_margin,
+            close_rect.y + close_size - x_margin,
+            2.0,
+            x_color,
         );
-        draw_rectangle_lines(
-            close_rect.x,
-            close_rect.y,
-            close_rect.w,
-            close_rect.h,
-            1.0,
-            close_border,
-        );
-        self.draw_text_sharp(
-            "X",
-            close_rect.x + 7.0,
-            close_rect.y + 13.0,
-            MINIMAP_WORLD_TEXT_SIZE,
-            close_text,
+        draw_line(
+            close_rect.x + close_size - x_margin,
+            close_rect.y + x_margin,
+            close_rect.x + x_margin,
+            close_rect.y + close_size - x_margin,
+            2.0,
+            x_color,
         );
         layout.add(UiElementId::MinimapClose, close_rect);
 
         let map_rect = Rect::new(
             panel_rect.x + 14.0,
-            panel_rect.y + 34.0,
+            panel_rect.y + title_band + 6.0,
             panel_rect.w - 28.0,
-            panel_rect.h - 86.0,
+            panel_rect.h - title_band - 6.0 - 52.0,
         );
 
         let hovered_marker_idx = match hovered {

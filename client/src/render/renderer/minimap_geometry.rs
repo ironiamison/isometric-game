@@ -93,56 +93,12 @@ impl Renderer {
     }
 
     pub(super) fn draw_minimap_preview_frame(&self, x: f32, y: f32, w: f32, h: f32) {
-        // Match the side panels' gold/bronze frame so the minimap reads as part of
-        // the same UI family. Multi-layer bevel + header strip + gold corner accents.
-        let s = self.font_scale.get();
-
-        // Outer drop shadow for depth from the world behind it.
-        draw_rectangle(x - 2.0, y - 2.0, w + 4.0, h + 4.0, Color::new(0.0, 0.0, 0.0, 0.30));
-
-        // Bronze frame layers (outer -> mid), matching draw_panel_frame.
-        draw_rectangle(x, y, w, h, FRAME_OUTER);
-        draw_rectangle(x + 2.0, y + 2.0, w - 4.0, h - 4.0, FRAME_MID);
-
-        // Recessed interior fill (canonical opaque panel navy, matching the stat cluster).
-        draw_rectangle(
-            x + FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            w - FRAME_THICKNESS * 2.0,
-            h - FRAME_THICKNESS * 2.0,
-            PANEL_BG_MID,
-        );
-
-        // Header strip behind the "Minimap [M]" title.
-        let header_h = 22.0 * s;
-        draw_rectangle(
-            x + FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            w - FRAME_THICKNESS * 2.0,
-            header_h,
-            HEADER_BG,
-        );
-        draw_line(
-            x + FRAME_THICKNESS,
-            y + FRAME_THICKNESS + header_h,
-            x + w - FRAME_THICKNESS,
-            y + FRAME_THICKNESS + header_h,
-            1.0,
-            HEADER_BORDER,
-        );
-
-        // Inner top/left highlight for the bevel.
-        draw_line(
-            x + FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            x + w - FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            1.0,
-            FRAME_INNER,
-        );
-
-        // Gold corner accents (same L-shapes as the panels).
-        self.draw_corner_accents(x, y, w, h);
+        // Lightweight treatment matching the redesigned HUD: a thin border + a
+        // translucent fill that lets the world bleed through, instead of the old
+        // bronze multi-layer bevel, solid header strip and gold corner accents.
+        // Keeps the minimap reading as part of the modern, low-intrusion HUD
+        // family (portrait cluster, chat, menu bars) rather than a heavy panel.
+        self.draw_hud_cluster_frame(x, y, w, h);
     }
 
     pub(super) fn minimap_bounds(&self, state: &GameState) -> Option<MinimapBounds> {
