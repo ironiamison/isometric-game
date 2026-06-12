@@ -134,7 +134,7 @@ Implementation:
 Recommended file targets:
 
 - persistence in `rust-server/src/db.rs`
-- player profile surfaces in `web-stats/src/pages/PlayerProfile.tsx`
+- player profile surfaces in `site/src/routes/world/player/[name]/+page.svelte`
 
 Success criteria:
 

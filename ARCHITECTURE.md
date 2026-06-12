@@ -133,9 +133,9 @@ public game service.
 
 ### Public Stats
 
-`web-stats/` is a React application that consumes the server's read-only
-`/api/stats/*` endpoints for overview data, online players, leaderboards, item
-and entity catalogs, and player profiles.
+The unified `site/` SvelteKit app (under `/world/`) consumes the server's
+read-only `/api/stats/*` endpoints for overview data, online players,
+leaderboards, item and entity catalogs, and player profiles.
 
 ### Launcher And Release Tools
 

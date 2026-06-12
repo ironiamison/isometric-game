@@ -20,7 +20,7 @@ Install dependencies in each JavaScript package you intend to change:
 ```bash
 (cd mapper && npm install)
 (cd mapper/server && npm install)
-(cd web-stats && npm install)
+(cd site && npm install)
 ```
 
 Rust dependencies are resolved by Cargo in `client/`, `rust-server/`, and
@@ -251,7 +251,7 @@ is the full matrix:
 (cd launcher && cargo check --all-targets)
 (cd mapper/server && npm run build)
 (cd mapper && npm run build && npm run lint)
-(cd web-stats && npm run build && npm run lint)
+(cd site && npm run check && npm run build)
 ```
 
 For server tick, synchronization, or large-system changes, also run:

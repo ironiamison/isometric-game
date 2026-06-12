@@ -108,21 +108,41 @@
             {@const eq = item.equipment}
             <div class="space-y-1 border-t border-[var(--panel-border)] pt-1">
               <div class="flex flex-wrap gap-x-3 gap-y-0.5">
-                {#if eq.attack_bonus !== 0}
+                {#if eq.attack_bonus}
                   <span class="text-xs {eq.attack_bonus > 0 ? 'text-[var(--moss-light)]' : 'text-[var(--ember)]'}">{eq.attack_bonus > 0 ? '+' : ''}{eq.attack_bonus} Attack</span>
                 {/if}
-                {#if eq.strength_bonus !== 0}
+                {#if eq.strength_bonus}
                   <span class="text-xs {eq.strength_bonus > 0 ? 'text-[var(--moss-light)]' : 'text-[var(--ember)]'}">{eq.strength_bonus > 0 ? '+' : ''}{eq.strength_bonus} Strength</span>
                 {/if}
-                {#if eq.defence_bonus !== 0}
+                {#if eq.defence_bonus}
                   <span class="text-xs {eq.defence_bonus > 0 ? 'text-[var(--moss-light)]' : 'text-[var(--ember)]'}">{eq.defence_bonus > 0 ? '+' : ''}{eq.defence_bonus} Defence</span>
                 {/if}
+                {#if eq.magic_bonus}
+                  <span class="text-xs {eq.magic_bonus > 0 ? 'text-[var(--moss-light)]' : 'text-[var(--ember)]'}">{eq.magic_bonus > 0 ? '+' : ''}{eq.magic_bonus} Magic</span>
+                {/if}
+                {#if eq.ranged_strength_bonus}
+                  <span class="text-xs {eq.ranged_strength_bonus > 0 ? 'text-[var(--moss-light)]' : 'text-[var(--ember)]'}">{eq.ranged_strength_bonus > 0 ? '+' : ''}{eq.ranged_strength_bonus} Ranged Str</span>
+                {/if}
               </div>
-              {#if eq.slot_type === 'weapon' && eq.attack_level_required > 1}
-                <p class="text-xs text-[var(--gold)]">Requires {eq.attack_level_required} Attack</p>
-              {:else if eq.slot_type !== 'weapon' && eq.defence_level_required > 1}
-                <p class="text-xs text-[var(--gold)]">Requires {eq.defence_level_required} Defence</p>
-              {/if}
+              <div class="flex flex-wrap gap-x-3 gap-y-0.5">
+                {#if eq.ranged_level_required > 0}
+                  <span class="text-xs text-[var(--gold)]">Requires {eq.ranged_level_required} Ranged</span>
+                {:else if eq.attack_level_required > 1}
+                  <span class="text-xs text-[var(--gold)]">Requires {eq.attack_level_required} Attack</span>
+                {/if}
+                {#if eq.defence_level_required > 1}
+                  <span class="text-xs text-[var(--gold)]">Requires {eq.defence_level_required} Defence</span>
+                {/if}
+                {#if eq.woodcutting_level_required > 1}
+                  <span class="text-xs text-[var(--gold)]">Requires {eq.woodcutting_level_required} Woodcutting</span>
+                {/if}
+                {#if eq.mining_level_required > 1}
+                  <span class="text-xs text-[var(--gold)]">Requires {eq.mining_level_required} Mining</span>
+                {/if}
+                {#if eq.magic_level_required > 0}
+                  <span class="text-xs text-[var(--gold)]">Requires {eq.magic_level_required} Magic</span>
+                {/if}
+              </div>
             </div>
           {/if}
         </div>

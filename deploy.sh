@@ -23,7 +23,7 @@ fi
 # Check what changed
 CLIENT_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- client/ | head -1)
 SERVER_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- rust-server/ | head -1)
-SITE_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- site/ homepage/ | head -1)
+SITE_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- site/ | head -1)
 SHARED_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- \
     crates/aeven-protocol/ Cargo.toml Cargo.lock rust-toolchain.toml | head -1)
 

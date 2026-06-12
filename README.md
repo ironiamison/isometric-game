@@ -51,8 +51,6 @@ rust-server/        Authoritative game server and persistent game data
 mapper/             World mapper, content studio, and its local Express API
 site/               Unified SvelteKit site (homepage, /world/ stats, /play/ shell)
 launcher/           Desktop installer/updater
-web-stats/          (deprecated — ported to site/)
-homepage/           (deprecated — ported to site/)
 tools/              Client and launcher packaging utilities
 docs/               Design notes, plans, and historical implementation records
 .github/workflows/  Deployment and release workflows
@@ -208,7 +206,7 @@ cargo test --release \
   -- --ignored --nocapture
 ```
 
-As of June 11, 2026, Rust tests, formatting, all builds, web-stats lint, and the
+As of June 11, 2026, Rust tests, formatting, all builds, site check, and the
 capacity test pass. Mapper lint has an existing baseline of 28 errors and 3
 warnings that must be removed before lint can become a reliable merge gate.
 

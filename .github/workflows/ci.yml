@@ -78,8 +78,6 @@ jobs:
             command: npm run build
           - directory: site
             command: npm run check && npm run build
-          - directory: web-stats
-            command: npm run lint && npm run build
     defaults:
       run:
         working-directory: ${{ matrix.directory }}

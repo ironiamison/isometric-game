@@ -93,9 +93,15 @@ export interface Equipment {
   slot_type: string;
   attack_level_required: number;
   defence_level_required: number;
+  ranged_level_required: number;
+  woodcutting_level_required: number;
+  mining_level_required: number;
+  magic_level_required: number;
   attack_bonus: number;
   strength_bonus: number;
   defence_bonus: number;
+  ranged_strength_bonus: number;
+  magic_bonus: number;
   weapon_type: string;
   range: number;
 }
