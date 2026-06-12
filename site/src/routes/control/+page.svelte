@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { control, tokenStore, UnauthorizedError } from '$lib/control';
-  import type { PerfSnapshot } from '$lib/control';
+  import type { PerfSnapshot, AdminRoomSummary, AdminPlayer } from '$lib/control';
   import { Lock, LogIn, RefreshCw, Activity } from 'lucide-svelte';
 
   let token = $state<string | null>(null);
@@ -68,6 +68,31 @@
     tick; // depend on the poll tick
     load(() => control.perf(token!), (v) => (perf = v));
   });
+
+  // Rooms + Players tab state + loaders.
+  let rooms = $state<AdminRoomSummary[]>([]);
+  let players = $state<AdminPlayer[]>([]);
+  let playerFilter = $state('');
+  let selectedRoom = $state('');
+
+  $effect(() => {
+    if (!token || tab !== 'rooms') return;
+    tick;
+    load(() => control.rooms(token!), (v) => (rooms = v));
+  });
+  $effect(() => {
+    if (!token || tab !== 'players') return;
+    tick;
+    load(() => control.players(token!), (v) => (players = v));
+  });
+
+  let filteredPlayers = $derived(
+    players.filter((p) =>
+      !playerFilter ||
+      p.name.toLowerCase().includes(playerFilter.toLowerCase()) ||
+      (p.ip_address ?? '').includes(playerFilter),
+    ),
+  );
 </script>
 
 <svelte:head><title>Control Panel</title></svelte:head>
@@ -141,6 +166,48 @@
         {:else}
           <p class="text-neutral-500">Loading…</p>
         {/if}
+      {:else if tab === 'rooms'}
+        <table class="w-full text-sm">
+          <thead class="text-left text-neutral-400">
+            <tr><th class="py-1">Room</th><th>Players</th><th>NPCs</th><th>Overworld</th><th>Instance</th></tr>
+          </thead>
+          <tbody>
+            {#each rooms as r}
+              <tr class="border-t border-neutral-800 hover:bg-neutral-900 cursor-pointer"
+                  onclick={() => { selectedRoom = r.room_id; tab = 'entities'; }}>
+                <td class="py-1 font-mono">{r.room_id}</td>
+                <td>{r.player_count}</td><td>{r.npc_count}</td>
+                <td>{r.overworld_players}</td><td>{r.instance_players}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else if tab === 'players'}
+        <input bind:value={playerFilter} placeholder="Filter by name or IP"
+               class="mb-3 w-64 rounded bg-neutral-800 px-3 py-1.5 text-sm outline-none" />
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-left text-neutral-400">
+              <tr><th class="py-1">Name</th><th>Room</th><th>Instance</th><th>Pos</th><th>HP</th><th>Cmb</th><th>Flags</th><th>IP</th></tr>
+            </thead>
+            <tbody>
+              {#each filteredPlayers as p}
+                <tr class="border-t border-neutral-800">
+                  <td class="py-1">{p.name}</td>
+                  <td class="font-mono text-xs">{p.room_id}</td>
+                  <td class="font-mono text-xs">{p.instance_id ?? '—'}</td>
+                  <td class="font-mono text-xs">{p.x},{p.y},{p.z}</td>
+                  <td>{p.hp}/{p.max_hp}</td>
+                  <td>{p.combat_level}</td>
+                  <td class="text-xs">
+                    {p.is_admin ? '👑' : ''}{p.is_god_mode ? '🛡' : ''}{p.is_dead ? '💀' : ''}
+                  </td>
+                  <td class="font-mono text-xs">{p.ip_address ?? '—'}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
     </main>
   </div>
