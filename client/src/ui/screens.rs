@@ -356,7 +356,10 @@ fn draw_character_preview(
             y,
             SPRITE_WIDTH,
             SPRITE_HEIGHT,
-            Color { a: tint.a, ..Color::from_rgba(100, 100, 100, 255) },
+            Color {
+                a: tint.a,
+                ..Color::from_rgba(100, 100, 100, 255)
+            },
         );
     }
 }

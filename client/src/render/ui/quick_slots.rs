@@ -64,10 +64,20 @@ impl Renderer {
             } else {
                 (SLOT_BG_EMPTY, SLOT_BORDER)
             };
-            draw_rectangle(x - 1.0, y - 1.0, w + 2.0, h + 2.0,
-                Color::new(border_color.r, border_color.g, border_color.b, 0.9));
-            draw_rectangle(x, y, w, h,
-                Color::new(bg_color.r, bg_color.g, bg_color.b, 0.85));
+            draw_rectangle(
+                x - 1.0,
+                y - 1.0,
+                w + 2.0,
+                h + 2.0,
+                Color::new(border_color.r, border_color.g, border_color.b, 0.9),
+            );
+            draw_rectangle(
+                x,
+                y,
+                w,
+                h,
+                Color::new(bg_color.r, bg_color.g, bg_color.b, 0.85),
+            );
             draw_rectangle(x, y, w, 2.0, SLOT_INNER_SHADOW);
             draw_rectangle(x, y, 2.0, h, SLOT_INNER_SHADOW);
         };
@@ -146,10 +156,20 @@ impl Renderer {
             } else {
                 (SLOT_BG_EMPTY, SLOT_BORDER)
             };
-            draw_rectangle(x - 1.0, y - 1.0, slot_size + 2.0, slot_size + 2.0,
-                Color::new(border_color.r, border_color.g, border_color.b, 0.9));
-            draw_rectangle(x, y, slot_size, slot_size,
-                Color::new(bg_color.r, bg_color.g, bg_color.b, 0.85));
+            draw_rectangle(
+                x - 1.0,
+                y - 1.0,
+                slot_size + 2.0,
+                slot_size + 2.0,
+                Color::new(border_color.r, border_color.g, border_color.b, 0.9),
+            );
+            draw_rectangle(
+                x,
+                y,
+                slot_size,
+                slot_size,
+                Color::new(bg_color.r, bg_color.g, bg_color.b, 0.85),
+            );
             draw_rectangle(x, y, slot_size, 2.0, SLOT_INNER_SHADOW);
             draw_rectangle(x, y, 2.0, slot_size, SLOT_INNER_SHADOW);
 
@@ -619,16 +639,27 @@ impl Renderer {
             let title_y = popup_y - 8.0;
             let title_h = 26.0;
             draw_rectangle(
-                title_x - 1.0, title_y - 1.0, title_width + 2.0, title_h + 2.0, FRAME_OUTER,
+                title_x - 1.0,
+                title_y - 1.0,
+                title_width + 2.0,
+                title_h + 2.0,
+                FRAME_OUTER,
             );
             draw_rectangle(title_x, title_y, title_width, title_h, HEADER_BG);
             draw_rectangle(
-                title_x + 1.0, title_y + 1.0, title_width - 2.0, title_h - 2.0,
+                title_x + 1.0,
+                title_y + 1.0,
+                title_width - 2.0,
+                title_h - 2.0,
                 Color::new(0.165, 0.149, 0.188, 1.0),
             );
             draw_line(
-                title_x + 2.0, title_y + 2.0, title_x + title_width - 2.0, title_y + 2.0,
-                1.0, FRAME_INNER,
+                title_x + 2.0,
+                title_y + 2.0,
+                title_x + title_width - 2.0,
+                title_y + 2.0,
+                1.0,
+                FRAME_INNER,
             );
             self.draw_text_sharp(title_text, title_x + 14.0, title_y + 18.0, 16.0, TEXT_TITLE);
             draw_rectangle(title_x, title_y, 3.0, 1.0, FRAME_ACCENT);
@@ -772,7 +803,10 @@ impl Renderer {
                     Some(UiElementId::HotkeySettingsSlotClear(idx)) if *idx == i
                 );
                 let (clear_bg, clear_border) = if clear_hovered {
-                    (Color::new(0.62, 0.18, 0.18, 0.95), Color::new(0.85, 0.45, 0.40, 1.0))
+                    (
+                        Color::new(0.62, 0.18, 0.18, 0.95),
+                        Color::new(0.85, 0.45, 0.40, 1.0),
+                    )
                 } else {
                     (Color::new(0.28, 0.10, 0.10, 0.8), SLOT_BORDER)
                 };

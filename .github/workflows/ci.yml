@@ -93,4 +93,6 @@ jobs:
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
       - run: npm ci
       - run: ${{ matrix.command }}
-      - run: npm audit --audit-level=moderate
+      # Audit only production deps: vite/esbuild and other build tooling are
+      # devDependencies that never ship, so their advisories shouldn't gate releases.
+      - run: npm audit --audit-level=moderate --omit=dev

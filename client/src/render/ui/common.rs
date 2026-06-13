@@ -43,7 +43,7 @@ pub const TEXT_TITLE: Color = Color::new(0.855, 0.737, 0.502, 1.0); // rgba(218,
 pub const TEXT_NORMAL: Color = Color::new(0.824, 0.824, 0.855, 1.0); // rgba(210, 210, 218, 255)
 pub const TEXT_DIM: Color = Color::new(0.502, 0.502, 0.541, 1.0); // rgba(128, 128, 138, 255)
 pub const TEXT_GOLD: Color = Color::new(1.0, 0.843, 0.314, 1.0); // rgba(255, 215, 80, 255)
-// Dark text drawn on top of a bright level chip
+                                                                 // Dark text drawn on top of a bright level chip
 pub const CHIP_TEXT_DARK: Color = Color::new(0.078, 0.063, 0.039, 1.0); // rgba(20, 16, 10, 255)
 
 // Danger button (restrained red-brown — used by destructive actions)
@@ -175,7 +175,13 @@ pub enum SlotState {
 /// "front door" look used by full-screen menus (login, character select).
 pub fn draw_panel_frame(x: f32, y: f32, w: f32, h: f32) {
     // Drop shadow for depth against the night sky
-    draw_rectangle(x - 3.0, y - 3.0, w + 6.0, h + 6.0, Color::new(0.0, 0.0, 0.0, 0.5));
+    draw_rectangle(
+        x - 3.0,
+        y - 3.0,
+        w + 6.0,
+        h + 6.0,
+        Color::new(0.0, 0.0, 0.0, 0.5),
+    );
     // Dark bronze outer frame
     draw_rectangle(x, y, w, h, FRAME_OUTER);
     // Mid bronze frame (inset 2px)
@@ -189,12 +195,40 @@ pub fn draw_panel_frame(x: f32, y: f32, w: f32, h: f32) {
         PANEL_BG_DARK,
     );
     // Inner highlight (top + left)
-    draw_line(x + FRAME_THICKNESS, y + FRAME_THICKNESS, x + w - FRAME_THICKNESS, y + FRAME_THICKNESS, 1.0, FRAME_INNER);
-    draw_line(x + FRAME_THICKNESS, y + FRAME_THICKNESS, x + FRAME_THICKNESS, y + h - FRAME_THICKNESS, 1.0, FRAME_INNER);
+    draw_line(
+        x + FRAME_THICKNESS,
+        y + FRAME_THICKNESS,
+        x + w - FRAME_THICKNESS,
+        y + FRAME_THICKNESS,
+        1.0,
+        FRAME_INNER,
+    );
+    draw_line(
+        x + FRAME_THICKNESS,
+        y + FRAME_THICKNESS,
+        x + FRAME_THICKNESS,
+        y + h - FRAME_THICKNESS,
+        1.0,
+        FRAME_INNER,
+    );
     // Inner shadow (bottom + right)
     let shadow = Color::new(0.0, 0.0, 0.0, 0.235);
-    draw_line(x + FRAME_THICKNESS + 1.0, y + h - FRAME_THICKNESS - 1.0, x + w - FRAME_THICKNESS, y + h - FRAME_THICKNESS - 1.0, 1.0, shadow);
-    draw_line(x + w - FRAME_THICKNESS - 1.0, y + FRAME_THICKNESS + 1.0, x + w - FRAME_THICKNESS - 1.0, y + h - FRAME_THICKNESS, 1.0, shadow);
+    draw_line(
+        x + FRAME_THICKNESS + 1.0,
+        y + h - FRAME_THICKNESS - 1.0,
+        x + w - FRAME_THICKNESS,
+        y + h - FRAME_THICKNESS - 1.0,
+        1.0,
+        shadow,
+    );
+    draw_line(
+        x + w - FRAME_THICKNESS - 1.0,
+        y + FRAME_THICKNESS + 1.0,
+        x + w - FRAME_THICKNESS - 1.0,
+        y + h - FRAME_THICKNESS,
+        1.0,
+        shadow,
+    );
 }
 
 /// Gold L-shaped corner accents for the panel frame.
@@ -245,7 +279,11 @@ pub fn draw_screen_button_alpha(
 ) {
     let (bg, border, text) = match variant {
         ButtonVariant::Primary => (
-            if hovered { Color::from_rgba(64, 50, 28, 255) } else { Color::from_rgba(44, 34, 18, 255) },
+            if hovered {
+                Color::from_rgba(64, 50, 28, 255)
+            } else {
+                Color::from_rgba(44, 34, 18, 255)
+            },
             if hovered { TEXT_GOLD } else { FRAME_ACCENT },
             TEXT_TITLE,
         ),
@@ -255,12 +293,19 @@ pub fn draw_screen_button_alpha(
             DANGER_TEXT,
         ),
         ButtonVariant::Neutral => (
-            if hovered { Color::from_rgba(36, 36, 52, 255) } else { Color::from_rgba(24, 24, 36, 255) },
+            if hovered {
+                Color::from_rgba(36, 36, 52, 255)
+            } else {
+                Color::from_rgba(24, 24, 36, 255)
+            },
             if hovered { FRAME_INNER } else { FRAME_OUTER },
             TEXT_NORMAL,
         ),
     };
-    let fade = |c: Color| Color { a: c.a * alpha, ..c };
+    let fade = |c: Color| Color {
+        a: c.a * alpha,
+        ..c
+    };
     draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(bg));
     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, fade(border));
     let tw = font.measure_text(label, 16.0).width;

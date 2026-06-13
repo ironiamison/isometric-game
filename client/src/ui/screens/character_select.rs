@@ -90,12 +90,8 @@ impl CharSelectLayout {
         };
         // Never exceed the available vertical space (forces scrolling on short
         // screens / when content is unexpectedly tall).
-        let max_panel_h = ((sh - 24.0).max(200.0)
-            - header_h
-            - Self::ACTION_GAP_Y
-            - action_h
-            - hint_h)
-            .max(160.0);
+        let max_panel_h =
+            ((sh - 24.0).max(200.0) - header_h - Self::ACTION_GAP_Y - action_h - hint_h).max(160.0);
         let panel_h = content_h.min(max_panel_h).max(160.0);
 
         // Center the whole group (header + panel + action bar + hint) vertically.
@@ -410,24 +406,82 @@ impl CharacterSelectScreen {
         draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(fill, alpha));
 
         if selected {
-            draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(Color { a: 0.06, ..FRAME_ACCENT }, alpha));
-            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, fade(FRAME_ACCENT, alpha));
+            draw_rectangle(
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                fade(
+                    Color {
+                        a: 0.06,
+                        ..FRAME_ACCENT
+                    },
+                    alpha,
+                ),
+            );
+            draw_rectangle_lines(
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                2.0,
+                fade(FRAME_ACCENT, alpha),
+            );
         } else if hovered {
             // 2px (not 1px) so all four edges land on whole pixels — a 1px
             // outline drops the top/left edges to sub-pixel rounding, leaving
             // only the bottom/right visible. A faint wash lifts the whole box.
-            draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(Color { a: 0.04, ..FRAME_INNER }, alpha));
-            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, fade(FRAME_INNER, alpha));
+            draw_rectangle(
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                fade(
+                    Color {
+                        a: 0.04,
+                        ..FRAME_INNER
+                    },
+                    alpha,
+                ),
+            );
+            draw_rectangle_lines(
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                2.0,
+                fade(FRAME_INNER, alpha),
+            );
         } else {
-            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, fade(FRAME_OUTER, alpha));
+            draw_rectangle_lines(
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                1.0,
+                fade(FRAME_OUTER, alpha),
+            );
         }
 
         // Portrait inset (recessed dark square with bronze edge)
         let inset = rect.h - 12.0;
         let inset_x = (rect.x + 8.0).floor();
         let inset_y = (rect.y + 6.0).floor();
-        draw_rectangle(inset_x, inset_y, inset, inset, fade(Color::from_rgba(12, 12, 18, 255), alpha));
-        draw_rectangle_lines(inset_x, inset_y, inset, inset, 1.0, fade(FRAME_OUTER, alpha));
+        draw_rectangle(
+            inset_x,
+            inset_y,
+            inset,
+            inset,
+            fade(Color::from_rgba(12, 12, 18, 255), alpha),
+        );
+        draw_rectangle_lines(
+            inset_x,
+            inset_y,
+            inset,
+            inset,
+            1.0,
+            fade(FRAME_OUTER, alpha),
+        );
 
         // Composite character sprite, centered in the inset
         let preview_x = (inset_x + (inset - SPRITE_WIDTH) / 2.0).floor();
@@ -452,7 +506,13 @@ impl CharacterSelectScreen {
         let center_y = rect.y + rect.h / 2.0;
         let text_x = inset_x + inset + 12.0;
         let name_color = if selected { TEXT_TITLE } else { TEXT_NORMAL };
-        self.draw_text_sharp(&character.name, text_x, center_y - 8.0, 16.0, fade(name_color, alpha));
+        self.draw_text_sharp(
+            &character.name,
+            text_x,
+            center_y - 8.0,
+            16.0,
+            fade(name_color, alpha),
+        );
 
         // Level chip
         let chip_label = format!("Lv {}", character.level);
@@ -466,17 +526,39 @@ impl CharacterSelectScreen {
         // Readable label: light text on dark (low-level) chips, dark text on
         // bright gold (high-level) chips.
         let chip_lum = 0.299 * chip_color.r + 0.587 * chip_color.g + 0.114 * chip_color.b;
-        let chip_text = if chip_lum < 0.5 { TEXT_NORMAL } else { CHIP_TEXT_DARK };
-        self.draw_text_sharp(&chip_label, chip_x + 7.0, chip_y + 14.0, 16.0, fade(chip_text, alpha));
+        let chip_text = if chip_lum < 0.5 {
+            TEXT_NORMAL
+        } else {
+            CHIP_TEXT_DARK
+        };
+        self.draw_text_sharp(
+            &chip_label,
+            chip_x + 7.0,
+            chip_y + 14.0,
+            16.0,
+            fade(chip_text, alpha),
+        );
 
         // Played time (right-aligned) + dim "played" label beneath
         let time_str = format_played_time(character.played_time);
         let tw = self.measure_text_sharp(&time_str, 16.0).width;
         let right = rect.x + rect.w - 12.0;
-        self.draw_text_sharp(&time_str, right - tw, center_y - 8.0, 16.0, fade(TEXT_NORMAL, alpha));
+        self.draw_text_sharp(
+            &time_str,
+            right - tw,
+            center_y - 8.0,
+            16.0,
+            fade(TEXT_NORMAL, alpha),
+        );
         let pl = "played";
         let plw = self.measure_text_sharp(pl, 16.0).width;
-        self.draw_text_sharp(pl, right - plw, center_y + 12.0, 16.0, fade(TEXT_DIM, alpha));
+        self.draw_text_sharp(
+            pl,
+            right - plw,
+            center_y + 12.0,
+            16.0,
+            fade(TEXT_DIM, alpha),
+        );
     }
 
     /// Action-bar button rects when characters exist: [Play, Delete, Logout].
@@ -495,7 +577,12 @@ impl CharacterSelectScreen {
     /// Right-aligned Logout button rect for the empty state.
     fn empty_logout_rect(l: &CharSelectLayout) -> Rect {
         let bw = 110.0_f32;
-        Rect::new(l.action_bar.x + l.action_bar.w - bw, l.action_bar.y, bw, l.action_bar.h)
+        Rect::new(
+            l.action_bar.x + l.action_bar.w - bw,
+            l.action_bar.y,
+            bw,
+            l.action_bar.h,
+        )
     }
 
     /// Centered "+ Create Character" button rect for the empty state.
@@ -506,7 +593,12 @@ impl CharacterSelectScreen {
         let ty = circle_cy + 56.0 + 28.0 + 20.0;
         let btn_w = 180.0_f32;
         let btn_h = 34.0_f32;
-        Rect::new((cx - btn_w / 2.0).floor(), (ty + 24.0).floor(), btn_w, btn_h)
+        Rect::new(
+            (cx - btn_w / 2.0).floor(),
+            (ty + 24.0).floor(),
+            btn_w,
+            btn_h,
+        )
     }
 
     /// Draw a dashed rectangle outline (used for the create-new-character row).
@@ -555,7 +647,12 @@ impl CharacterSelectScreen {
     /// panel space so its bottom inset matches the left/right padding — equal
     /// margins on all sides. While scrolling (small mobile screens) it keeps a
     /// single card height so the list stays uniform.
-    fn create_row_rect(&self, l: &CharSelectLayout, scroll_offset: f32, needs_scroll: bool) -> Rect {
+    fn create_row_rect(
+        &self,
+        l: &CharSelectLayout,
+        scroll_offset: f32,
+        needs_scroll: bool,
+    ) -> Rect {
         let item_height = CARD_HEIGHT + CARD_GAP;
         let top = l.list_top + self.characters.len() as f32 * item_height - scroll_offset;
         let h = if needs_scroll {
@@ -580,27 +677,65 @@ impl CharacterSelectScreen {
             let circle_cy = l.panel.y + l.panel.h * 0.34;
             draw_circle_lines(cx, circle_cy, 28.0, 2.0, fade(FRAME_OUTER, alpha));
             // A simple "+" inside the circle
-            draw_line(cx - 10.0, circle_cy, cx + 10.0, circle_cy, 2.0, fade(FRAME_ACCENT, alpha));
-            draw_line(cx, circle_cy - 10.0, cx, circle_cy + 10.0, 2.0, fade(FRAME_ACCENT, alpha));
+            draw_line(
+                cx - 10.0,
+                circle_cy,
+                cx + 10.0,
+                circle_cy,
+                2.0,
+                fade(FRAME_ACCENT, alpha),
+            );
+            draw_line(
+                cx,
+                circle_cy - 10.0,
+                cx,
+                circle_cy + 10.0,
+                2.0,
+                fade(FRAME_ACCENT, alpha),
+            );
 
             let headline = "Your story begins here";
             let hw = self.measure_text_sharp(headline, 16.0).width;
             let mut ty = circle_cy + 56.0;
-            self.draw_text_sharp(headline, (cx - hw / 2.0).floor(), ty, 16.0, fade(TEXT_TITLE, alpha));
+            self.draw_text_sharp(
+                headline,
+                (cx - hw / 2.0).floor(),
+                ty,
+                16.0,
+                fade(TEXT_TITLE, alpha),
+            );
 
             ty += 28.0;
             let line1 = "No heroes yet. Create your first character";
             let l1w = self.measure_text_sharp(line1, 16.0).width;
-            self.draw_text_sharp(line1, (cx - l1w / 2.0).floor(), ty, 16.0, fade(TEXT_DIM, alpha));
+            self.draw_text_sharp(
+                line1,
+                (cx - l1w / 2.0).floor(),
+                ty,
+                16.0,
+                fade(TEXT_DIM, alpha),
+            );
             ty += 20.0;
             let line2 = "to set foot in the realm of Aeven.";
             let l2w = self.measure_text_sharp(line2, 16.0).width;
-            self.draw_text_sharp(line2, (cx - l2w / 2.0).floor(), ty, 16.0, fade(TEXT_DIM, alpha));
+            self.draw_text_sharp(
+                line2,
+                (cx - l2w / 2.0).floor(),
+                ty,
+                16.0,
+                fade(TEXT_DIM, alpha),
+            );
 
             // Centered Create Character button
             let create_rect = Self::empty_create_rect(l);
-            let create_hovered =
-                point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h);
+            let create_hovered = point_in_rect(
+                mx,
+                my,
+                create_rect.x,
+                create_rect.y,
+                create_rect.w,
+                create_rect.h,
+            );
             draw_screen_button_alpha(
                 &self.font,
                 create_rect,
@@ -613,7 +748,11 @@ impl CharacterSelectScreen {
             // ---- Cards list with scissor clipping + scrollbar ----
             let item_height = CARD_HEIGHT + CARD_GAP;
             let row_count = self.characters.len()
-                + if self.characters.len() < MAX_CHARACTERS { 1 } else { 0 };
+                + if self.characters.len() < MAX_CHARACTERS {
+                    1
+                } else {
+                    0
+                };
             let total_list_height = row_count as f32 * item_height;
             let max_scroll = (total_list_height - l.list_visible_h).max(0.0);
             let scroll_offset = self.list_scroll_offset.clamp(0.0, max_scroll);
@@ -673,7 +812,8 @@ impl CharacterSelectScreen {
                     let lw = self.measure_text_sharp(label, 16.0).width;
                     let label_x = (row.x + (row.w - lw) / 2.0).floor();
                     let label_y = row.y + row.h / 2.0 + 6.0;
-                    let label_color = Color::new(FRAME_ACCENT.r, FRAME_ACCENT.g, FRAME_ACCENT.b, 0.9);
+                    let label_color =
+                        Color::new(FRAME_ACCENT.r, FRAME_ACCENT.g, FRAME_ACCENT.b, 0.9);
                     self.draw_text_sharp(label, label_x, label_y, 16.0, fade(label_color, alpha));
                 }
             }
@@ -725,8 +865,14 @@ impl CharacterSelectScreen {
         if self.characters.is_empty() {
             // Single right-aligned Logout button
             let logout_rect = Self::empty_logout_rect(l);
-            let logout_hovered =
-                point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h);
+            let logout_hovered = point_in_rect(
+                mx,
+                my,
+                logout_rect.x,
+                logout_rect.y,
+                logout_rect.w,
+                logout_rect.h,
+            );
             draw_screen_button_alpha(
                 &self.font,
                 logout_rect,
@@ -740,14 +886,33 @@ impl CharacterSelectScreen {
 
             let play_hovered =
                 point_in_rect(mx, my, play_rect.x, play_rect.y, play_rect.w, play_rect.h);
-            draw_screen_button_alpha(&self.font, play_rect, "Play", play_hovered, ButtonVariant::Primary, alpha);
+            draw_screen_button_alpha(
+                &self.font,
+                play_rect,
+                "Play",
+                play_hovered,
+                ButtonVariant::Primary,
+                alpha,
+            );
 
-            let del_hovered =
-                point_in_rect(mx, my, del_rect.x, del_rect.y, del_rect.w, del_rect.h);
-            draw_screen_button_alpha(&self.font, del_rect, "Delete", del_hovered, ButtonVariant::Danger, alpha);
+            let del_hovered = point_in_rect(mx, my, del_rect.x, del_rect.y, del_rect.w, del_rect.h);
+            draw_screen_button_alpha(
+                &self.font,
+                del_rect,
+                "Delete",
+                del_hovered,
+                ButtonVariant::Danger,
+                alpha,
+            );
 
-            let logout_hovered =
-                point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h);
+            let logout_hovered = point_in_rect(
+                mx,
+                my,
+                logout_rect.x,
+                logout_rect.y,
+                logout_rect.w,
+                logout_rect.h,
+            );
             draw_screen_button_alpha(
                 &self.font,
                 logout_rect,
@@ -785,14 +950,24 @@ impl CharacterSelectScreen {
             }
         };
         let hw = self.measure_text_sharp(hint, 16.0).width;
-        self.draw_text_sharp(hint, ((sw - hw) / 2.0).floor(), hint_y, 16.0, fade(TEXT_DIM, alpha));
+        self.draw_text_sharp(
+            hint,
+            ((sw - hw) / 2.0).floor(),
+            hint_y,
+            16.0,
+            fade(TEXT_DIM, alpha),
+        );
     }
 }
 
 impl Screen for CharacterSelectScreen {
     fn update(&mut self, audio: &AudioManager) -> ScreenState {
         // Advance the roster⇄create morph toward its target.
-        let target = if self.mode == SelectMode::Create { 1.0 } else { 0.0 };
+        let target = if self.mode == SelectMode::Create {
+            1.0
+        } else {
+            0.0
+        };
         if self.anim_t != target {
             let step = get_frame_time() / MORPH_SECS;
             self.anim_t = if self.anim_t < target {
@@ -1094,13 +1269,28 @@ impl Screen for CharacterSelectScreen {
             if self.characters.is_empty() {
                 // Empty state: Create button (in panel) + Logout (action bar)
                 let create_rect = Self::empty_create_rect(&l);
-                if point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h)
-                {
-                    { self.enter_create(); return ScreenState::Continue; }
+                if point_in_rect(
+                    mx,
+                    my,
+                    create_rect.x,
+                    create_rect.y,
+                    create_rect.w,
+                    create_rect.h,
+                ) {
+                    {
+                        self.enter_create();
+                        return ScreenState::Continue;
+                    }
                 }
                 let logout_rect = Self::empty_logout_rect(&l);
-                if point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h)
-                {
+                if point_in_rect(
+                    mx,
+                    my,
+                    logout_rect.x,
+                    logout_rect.y,
+                    logout_rect.w,
+                    logout_rect.h,
+                ) {
                     #[cfg(not(target_arch = "wasm32"))]
                     {
                         let _ = self.auth_client.logout(&self.session.token);
@@ -1124,8 +1314,14 @@ impl Screen for CharacterSelectScreen {
                 {
                     self.confirm_delete = true;
                 }
-                if point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h)
-                {
+                if point_in_rect(
+                    mx,
+                    my,
+                    logout_rect.x,
+                    logout_rect.y,
+                    logout_rect.w,
+                    logout_rect.h,
+                ) {
                     #[cfg(not(target_arch = "wasm32"))]
                     {
                         let _ = self.auth_client.logout(&self.session.token);
@@ -1153,7 +1349,10 @@ impl Screen for CharacterSelectScreen {
 
         // Keyboard: create
         if is_key_pressed(KeyCode::N) && self.characters.len() < MAX_CHARACTERS {
-            { self.enter_create(); return ScreenState::Continue; }
+            {
+                self.enter_create();
+                return ScreenState::Continue;
+            }
         }
 
         // Keyboard: delete (only a real character)
@@ -1179,7 +1378,10 @@ impl Screen for CharacterSelectScreen {
                 || (create_selectable && self.selected_index == self.characters.len())
             {
                 if self.characters.len() < MAX_CHARACTERS {
-                    { self.enter_create(); return ScreenState::Continue; }
+                    {
+                        self.enter_create();
+                        return ScreenState::Continue;
+                    }
                 }
             } else if self.selected_index < self.characters.len() {
                 let character = &self.characters[self.selected_index];
@@ -1208,7 +1410,8 @@ impl Screen for CharacterSelectScreen {
 
         // Natural layouts for each face, plus the interpolated box that morphs
         // between them. te==0 -> pure roster, te==1 -> pure create form.
-        let roster_layout = CharSelectLayout::compute(sw, sh, card_row_count(self.characters.len()));
+        let roster_layout =
+            CharSelectLayout::compute(sw, sh, card_row_count(self.characters.len()));
         let create_layout = CreateLayout::compute(sw, sh);
         let te = ease(self.anim_t);
         let roster_alpha = 1.0 - te;
@@ -1303,7 +1506,8 @@ impl Screen for CharacterSelectScreen {
                 no_hovered,
                 ButtonVariant::Neutral,
             );
-            #[allow(clippy::needless_return)] // explicit guard: nothing should draw after the dialog
+            #[allow(clippy::needless_return)]
+            // explicit guard: nothing should draw after the dialog
             return;
         }
     }

@@ -194,8 +194,16 @@ impl Renderer {
                 + self.hud_below_bars_offset()
                 + 4.0 * s
                 + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 }
-                + if has_stall_bar { 22.0 * s + 4.0 * s } else { 0.0 }
-                + if has_dash_bar { 22.0 * s + 4.0 * s } else { 0.0 };
+                + if has_stall_bar {
+                    22.0 * s + 4.0 * s
+                } else {
+                    0.0
+                }
+                + if has_dash_bar {
+                    22.0 * s + 4.0 * s
+                } else {
+                    0.0
+                };
             let chip_gap = 4.0 * s;
             // Chips draw flush with the cluster's left edge in render_ui (bar_x - 8*s).
             let mut cx = bar_x - 8.0 * s;
@@ -429,7 +437,13 @@ impl Renderer {
         dark: Color,
     ) {
         draw_rectangle(x, y, w, h, border);
-        draw_rectangle(x + 1.0, y + 1.0, w - 2.0, h - 2.0, Color::new(0.08, 0.08, 0.10, 1.0));
+        draw_rectangle(
+            x + 1.0,
+            y + 1.0,
+            w - 2.0,
+            h - 2.0,
+            Color::new(0.08, 0.08, 0.10, 1.0),
+        );
         let fill_w = (w - 4.0) * ratio;
         if fill_w > 0.0 {
             // Lighter main tone fills the whole inner height...
@@ -472,11 +486,23 @@ impl Renderer {
         // (i.e. is not bald), nudge the whole portrait (base + hair) right by 2px so the
         // styled head reads centered in the box. A bald head has no hair occupying the top
         // rows, so raise it a few px to better fill the box.
-        let hair_nudge = if player.hair_style.is_some() { 2.0 * scale } else { 0.0 };
-        let bald_rise = if player.hair_style.is_none() { 3.0 * scale } else { 0.0 };
+        let hair_nudge = if player.hair_style.is_some() {
+            2.0 * scale
+        } else {
+            0.0
+        };
+        let bald_rise = if player.hair_style.is_none() {
+            3.0 * scale
+        } else {
+            0.0
+        };
         // Female sprites carry the head a touch lower than males, so raise them in the box
         // (equivalently, crop a few rows lower) to show more of the face.
-        let female_rise = if player.gender == "female" { 3.0 * scale } else { 0.0 };
+        let female_rise = if player.gender == "female" {
+            3.0 * scale
+        } else {
+            0.0
+        };
         let ox = (ix + inner / 2.0 - 17.0 * scale + hair_nudge).floor();
         let oy = (iy + inner / 2.0 - 13.0 * scale - bald_rise - female_rise).floor();
 

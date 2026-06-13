@@ -11,8 +11,8 @@ use macroquad::prelude::*;
 /// Skills panel dimensions — shares the common tool-panel footprint
 /// (see TOOL_PANEL_* in common.rs) so it lines up with the Prayers/Spells panel.
 const SKILLS_PANEL_PADDING: f32 = 8.0;
-const SKILLS_GRID_HEIGHT: f32 = SKILL_GRID_ROWS as f32 * SKILL_SLOT_SIZE
-    + (SKILL_GRID_ROWS - 1) as f32 * SKILL_SLOT_SPACING; // 5 rows → 216
+const SKILLS_GRID_HEIGHT: f32 =
+    SKILL_GRID_ROWS as f32 * SKILL_SLOT_SIZE + (SKILL_GRID_ROWS - 1) as f32 * SKILL_SLOT_SPACING; // 5 rows → 216
 const SKILLS_HEADER_HEIGHT: f32 = 24.0;
 
 /// Skill slot dimensions

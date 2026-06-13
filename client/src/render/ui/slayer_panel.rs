@@ -426,7 +426,14 @@ impl Renderer {
 
         // Background (matches the name/portrait box fill) + a green-tinted border to distinguish from the slayer chip's brown.
         draw_rectangle(x, y, chip_w, chip_h, Color::new(0.094, 0.094, 0.122, 0.62));
-        draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, Color::from_rgba(90, 120, 65, 180));
+        draw_rectangle_lines(
+            x,
+            y,
+            chip_w,
+            chip_h,
+            1.0,
+            Color::from_rgba(90, 120, 65, 180),
+        );
 
         // Target item icon.
         if !contract.target_item_id.is_empty() {
@@ -535,7 +542,13 @@ impl Renderer {
         let tip_x = x + chip_w + 4.0 * s;
         let tip_y = y;
 
-        draw_rectangle(tip_x, tip_y, tip_w, tip_h, Color::from_rgba(12, 12, 18, 240));
+        draw_rectangle(
+            tip_x,
+            tip_y,
+            tip_w,
+            tip_h,
+            Color::from_rgba(12, 12, 18, 240),
+        );
         draw_rectangle_lines(
             tip_x,
             tip_y,

@@ -172,7 +172,14 @@ impl Renderer {
             1.0,
             shadow_color,
         );
-        draw_line(line_left, divider_y, line_right, divider_y, 1.0, divider_color);
+        draw_line(
+            line_left,
+            divider_y,
+            line_right,
+            divider_y,
+            1.0,
+            divider_color,
+        );
 
         // --- Diamond ornaments flanking the divider ---
         let diamond_r = 3.0;
@@ -187,17 +194,7 @@ impl Renderer {
     fn draw_diamond(&self, cx: f32, cy: f32, r: f32, color: Color, offset: f32) {
         let cx = cx + offset;
         let cy = cy + offset;
-        draw_triangle(
-            vec2(cx, cy - r),
-            vec2(cx + r, cy),
-            vec2(cx, cy + r),
-            color,
-        );
-        draw_triangle(
-            vec2(cx, cy - r),
-            vec2(cx - r, cy),
-            vec2(cx, cy + r),
-            color,
-        );
+        draw_triangle(vec2(cx, cy - r), vec2(cx + r, cy), vec2(cx, cy + r), color);
+        draw_triangle(vec2(cx, cy - r), vec2(cx - r, cy), vec2(cx, cy + r), color);
     }
 }

@@ -35,17 +35,53 @@ const STAT_NEGATIVE: Color = Color::new(0.85, 0.38, 0.38, 1.0);
 
 /// Combat styles: (id, button label, tooltip title, effect description, trained skill).
 const MELEE_COMBAT_STYLES: [(&str, &str, &str, &str, &str); 4] = [
-    ("accurate", "Acc", "Accurate", "Boosts attack accuracy", "Attack"),
-    ("aggressive", "Agg", "Aggressive", "Boosts damage dealt", "Strength"),
-    ("defensive", "Def", "Defensive", "Boosts your defence", "Defence"),
-    ("controlled", "Ctrl", "Controlled", "Trains all combat evenly", "Att/Str/Def"),
+    (
+        "accurate",
+        "Acc",
+        "Accurate",
+        "Boosts attack accuracy",
+        "Attack",
+    ),
+    (
+        "aggressive",
+        "Agg",
+        "Aggressive",
+        "Boosts damage dealt",
+        "Strength",
+    ),
+    (
+        "defensive",
+        "Def",
+        "Defensive",
+        "Boosts your defence",
+        "Defence",
+    ),
+    (
+        "controlled",
+        "Ctrl",
+        "Controlled",
+        "Trains all combat evenly",
+        "Att/Str/Def",
+    ),
 ];
 
 /// Ranged combat styles: same tuple shape as the melee set.
 const RANGED_COMBAT_STYLES: [(&str, &str, &str, &str, &str); 3] = [
-    ("accurate", "Acc", "Accurate", "Boosts ranged accuracy", "Ranged"),
+    (
+        "accurate",
+        "Acc",
+        "Accurate",
+        "Boosts ranged accuracy",
+        "Ranged",
+    ),
     ("rapid", "Rapid", "Rapid", "Faster attack speed", "Ranged"),
-    ("longrange", "Long", "Long range", "Adds range and defence", "Ranged/Defence"),
+    (
+        "longrange",
+        "Long",
+        "Long range",
+        "Adds range and defence",
+        "Ranged/Defence",
+    ),
 ];
 
 /// Format an equipment stat bonus with an explicit sign: "+5", "0", "-22".
@@ -74,7 +110,13 @@ fn stat_value_color(v: i32, identity: Color) -> Color {
 /// Get the combat styles for the currently equipped weapon type
 fn get_combat_styles_for_weapon(
     state: &GameState,
-) -> &'static [(&'static str, &'static str, &'static str, &'static str, &'static str)] {
+) -> &'static [(
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+)] {
     let is_ranged = state
         .get_local_player()
         .and_then(|p| p.equipped_weapon.as_ref())
@@ -266,8 +308,7 @@ impl Renderer {
             let col_hpad = 6.0 * scale; // horizontal inner padding
             let col_label_w = self.measure_text_sharp("MAG", 16.0).width;
             let col_value_w = self.measure_text_sharp("+99", 16.0).width;
-            let stat_content_w =
-                col_icon + col_icon_gap + col_label_w + col_lv_gap + col_value_w;
+            let stat_content_w = col_icon + col_icon_gap + col_label_w + col_lv_gap + col_value_w;
             let retaliate_content_w = self.measure_text_sharp("Retaliate", 16.0).width;
             let col_w = stat_content_w.max(retaliate_content_w) + col_hpad * 2.0;
             let col_x = panel_x + panel_width - frame_thickness - panel_padding - col_w;
@@ -592,10 +633,22 @@ impl Renderer {
             tooltip_height + 2.0,
             TOOLTIP_FRAME,
         );
-        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+        draw_rectangle(
+            tooltip_x,
+            tooltip_y,
+            tooltip_width,
+            tooltip_height,
+            TOOLTIP_BG,
+        );
 
         let mut text_y = tooltip_y + padding + 14.0;
-        self.draw_text_sharp(&title_text, tooltip_x + padding, text_y, font_size, TEXT_GOLD);
+        self.draw_text_sharp(
+            &title_text,
+            tooltip_x + padding,
+            text_y,
+            font_size,
+            TEXT_GOLD,
+        );
         text_y += line_height;
         self.draw_text_sharp(desc, tooltip_x + padding, text_y, font_size, TEXT_NORMAL);
     }

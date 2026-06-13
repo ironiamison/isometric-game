@@ -132,9 +132,9 @@ const WALLS_FIRSTGID: u32 = 1;
 // Panel backgrounds (neutral dark gray, darker to lighter for depth)
 const PANEL_BG_DARK: Color = Color::new(0.071, 0.071, 0.094, 0.961); // rgba(18, 18, 24, 245)
 const PANEL_BG_MID: Color = Color::new(0.110, 0.110, 0.149, 1.0); // rgba(28, 28, 38, 255)
-// Over-world HUD containers. The bottom bars use a near-solid dark fill so the gaps
-// between buttons read as one cohesive unit; the chat box stays translucent. Bordered
-// with a dark muted bronze (see draw_hud_tray).
+                                                                  // Over-world HUD containers. The bottom bars use a near-solid dark fill so the gaps
+                                                                  // between buttons read as one cohesive unit; the chat box stays translucent. Bordered
+                                                                  // with a dark muted bronze (see draw_hud_tray).
 const HUD_FILL_SOLID: Color = Color::new(0.071, 0.071, 0.094, 0.94);
 const HUD_FILL_TRANSLUCENT: Color = Color::new(0.094, 0.094, 0.122, 0.62);
 const HUD_BORDER: Color = Color::new(0.36, 0.27, 0.17, 1.0); // dark muted bronze

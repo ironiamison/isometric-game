@@ -9,6 +9,8 @@ use macroquad::prelude::*;
 
 impl Renderer {
     /// Render the settings panel (bottom-right, above menu buttons)
+    // The cfg-gated conditional pushes when building `toggles` make vec![] impractical.
+    #[allow(clippy::vec_init_then_push)]
     pub(crate) fn render_escape_menu(&self, state: &GameState, layout: &mut UiLayout) {
         let (sw, sh) = virtual_screen_size();
         let s = state.ui_state.ui_scale;
@@ -320,8 +322,7 @@ impl Renderer {
         let disconnect_width = inner_width;
         let disconnect_height = 28.0 * s;
         let disconnect_x = content_x;
-        let disconnect_y =
-            menu_y + menu_height - frame_thickness - 8.0 * s - disconnect_height;
+        let disconnect_y = menu_y + menu_height - frame_thickness - 8.0 * s - disconnect_height;
         let disconnect_bounds = Rect::new(
             disconnect_x,
             disconnect_y,
@@ -413,13 +414,7 @@ impl Renderer {
     /// clearly against the dim control labels.
     fn draw_section_label(&self, text: &str, x: f32, y: f32, s: f32) {
         let white = Color::new(0.94, 0.94, 0.96, 1.0);
-        self.draw_text_sharp(
-            text,
-            x.floor(),
-            (y + 11.0 * s).floor(),
-            16.0,
-            white,
-        );
+        self.draw_text_sharp(text, x.floor(), (y + 11.0 * s).floor(), 16.0, white);
     }
 
     /// Draw a full-width independent on/off toggle: a labelled row that lights
@@ -477,7 +472,14 @@ impl Renderer {
             let green = Color::new(0.45, 0.82, 0.45, 1.0);
             let t = 2.0 * s;
             draw_line(cx - 5.0 * s, cy, cx - 1.0 * s, cy + 4.0 * s, t, green);
-            draw_line(cx - 1.0 * s, cy + 4.0 * s, cx + 6.0 * s, cy - 5.0 * s, t, green);
+            draw_line(
+                cx - 1.0 * s,
+                cy + 4.0 * s,
+                cx + 6.0 * s,
+                cy - 5.0 * s,
+                t,
+                green,
+            );
         } else {
             draw_line(cx - 5.0 * s, cy, cx + 5.0 * s, cy, 2.0 * s, TEXT_DIM);
         }

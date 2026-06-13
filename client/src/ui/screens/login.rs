@@ -198,7 +198,7 @@ impl LoginScreen {
         let compact = sh < 480.0;
 
         // Inner content column (fields, button, tabs all share this width).
-        let content_w = (sw - 48.0).min(320.0).max(220.0).floor();
+        let content_w = (sw - 48.0).clamp(220.0, 320.0).floor();
         let pad_x = 24.0;
         let pad_top = 22.0;
         let pad_bottom = 18.0;
@@ -373,9 +373,9 @@ impl LoginScreen {
             self.loading = true;
             match self.mode {
                 LoginMode::Login => self.auth_client.start_login(&self.username, &self.password),
-                LoginMode::Register => {
-                    self.auth_client.start_register(&self.username, &self.password)
-                }
+                LoginMode::Register => self
+                    .auth_client
+                    .start_register(&self.username, &self.password),
             }
         }
 
@@ -518,11 +518,25 @@ impl LoginScreen {
                 };
                 if is_book {
                     // Book/scroll: outline + spine + two "text" lines
-                    draw_rectangle_lines(rect.x + 2.0, rect.y + 2.0, rect.w - 4.0, rect.h - 4.0, 2.0, c);
+                    draw_rectangle_lines(
+                        rect.x + 2.0,
+                        rect.y + 2.0,
+                        rect.w - 4.0,
+                        rect.h - 4.0,
+                        2.0,
+                        c,
+                    );
                     let mid = rect.x + rect.w / 2.0;
                     draw_line(mid, rect.y + 3.0, mid, rect.y + rect.h - 3.0, 1.0, c);
                     draw_line(rect.x + 5.0, rect.y + 8.0, mid - 2.0, rect.y + 8.0, 1.0, c);
-                    draw_line(rect.x + 5.0, rect.y + 13.0, mid - 2.0, rect.y + 13.0, 1.0, c);
+                    draw_line(
+                        rect.x + 5.0,
+                        rect.y + 13.0,
+                        mid - 2.0,
+                        rect.y + 13.0,
+                        1.0,
+                        c,
+                    );
                 } else {
                     // Speech bubble: rounded body + tail + two eyes
                     draw_rectangle(rect.x + 1.0, rect.y + 3.0, rect.w - 2.0, rect.h - 9.0, c);
@@ -769,7 +783,13 @@ impl Screen for LoginScreen {
         } else {
             l.tab_register
         };
-        draw_rectangle(active_tab.x, l.tab_underline_y - 1.0, active_tab.w, 2.0, FRAME_ACCENT);
+        draw_rectangle(
+            active_tab.x,
+            l.tab_underline_y - 1.0,
+            active_tab.w,
+            2.0,
+            FRAME_ACCENT,
+        );
 
         // === FIELDS ===
         let username_active = self.active_field == LoginField::Username;
@@ -777,7 +797,11 @@ impl Screen for LoginScreen {
         let username_display = if self.username.is_empty() && !username_active {
             String::new()
         } else {
-            let cursor = if username_active && cursor_on { "|" } else { "" };
+            let cursor = if username_active && cursor_on {
+                "|"
+            } else {
+                ""
+            };
             format!("{}{}", self.username, cursor)
         };
         self.draw_field(
@@ -795,7 +819,11 @@ impl Screen for LoginScreen {
             String::new()
         } else {
             let masked: String = "•".repeat(self.password.len());
-            let cursor = if password_active && cursor_on { "|" } else { "" };
+            let cursor = if password_active && cursor_on {
+                "|"
+            } else {
+                ""
+            };
             format!("{}{}", masked, cursor)
         };
         self.draw_field(
@@ -817,11 +845,29 @@ impl Screen for LoginScreen {
             cb.w,
             cb.h,
             2.0,
-            if self.remember_me { FRAME_ACCENT } else { FRAME_OUTER },
+            if self.remember_me {
+                FRAME_ACCENT
+            } else {
+                FRAME_OUTER
+            },
         );
         if self.remember_me {
-            draw_line(cb.x + 4.0, cb.y + 9.0, cb.x + 7.0, cb.y + 13.0, 2.0, FRAME_ACCENT);
-            draw_line(cb.x + 7.0, cb.y + 13.0, cb.x + 14.0, cb.y + 5.0, 2.0, FRAME_ACCENT);
+            draw_line(
+                cb.x + 4.0,
+                cb.y + 9.0,
+                cb.x + 7.0,
+                cb.y + 13.0,
+                2.0,
+                FRAME_ACCENT,
+            );
+            draw_line(
+                cb.x + 7.0,
+                cb.y + 13.0,
+                cb.x + 14.0,
+                cb.y + 5.0,
+                2.0,
+                FRAME_ACCENT,
+            );
         }
         self.draw_text_sharp(
             "Remember me",
@@ -876,7 +922,11 @@ impl Screen for LoginScreen {
         } else {
             Color::from_rgba(200, 60, 60, 255)
         };
-        let status_text = if self.server_online { "Online" } else { "Offline" };
+        let status_text = if self.server_online {
+            "Online"
+        } else {
+            "Offline"
+        };
         draw_circle(l.content_x + 4.0, l.footer_center_y, 4.0, status_color);
         self.draw_text_sharp(
             status_text,
@@ -887,7 +937,13 @@ impl Screen for LoginScreen {
         );
 
         // Footer icons (right): Discord (clickable) + News (soon)
-        self.draw_footer_icon(l.discord_icon, &self.discord_icon, hit(l.discord_icon), true, false);
+        self.draw_footer_icon(
+            l.discord_icon,
+            &self.discord_icon,
+            hit(l.discord_icon),
+            true,
+            false,
+        );
         self.draw_footer_icon(l.news_icon, &self.news_icon, hit(l.news_icon), false, true);
         // "soon" tag above the news icon
         let soon = "soon";

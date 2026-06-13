@@ -156,7 +156,13 @@ impl Renderer {
                 // Tab-strip fill: only as wide as the three tabs (so empty space above the
                 // content area doesn't show a floating background).
                 let tab_strip_h = clip_y - cont_y; // top_inset + tab_h
-                draw_rectangle(cont_x, cont_y, tabs_right - cont_x, tab_strip_h, HUD_FILL_TRANSLUCENT);
+                draw_rectangle(
+                    cont_x,
+                    cont_y,
+                    tabs_right - cont_x,
+                    tab_strip_h,
+                    HUD_FILL_TRANSLUCENT,
+                );
                 // Content body fill: full width from the divider down.
                 draw_rectangle(cont_x, clip_y, cont_w, clip_h, HUD_FILL_TRANSLUCENT);
                 // Divider below the tab row (full width).
@@ -194,7 +200,13 @@ impl Renderer {
                     // First tab: pull the left edge flush to the container edge (no clearance).
                     let a_left = if i == 0 { cont_x } else { r.x };
                     let a_w = (r.x + r.w) - a_left;
-                    draw_rectangle(a_left, a_top, a_w, a_h, Color::new(0.180, 0.165, 0.110, 0.92));
+                    draw_rectangle(
+                        a_left,
+                        a_top,
+                        a_w,
+                        a_h,
+                        Color::new(0.180, 0.165, 0.110, 0.92),
+                    );
                     draw_rectangle(a_left, a_top, a_w, 1.0, FRAME_ACCENT);
                     draw_rectangle(a_left, a_top, 1.0, a_h, FRAME_ACCENT);
                     draw_rectangle(a_left + a_w - 1.0, a_top, 1.0, a_h, FRAME_ACCENT);
@@ -598,8 +610,8 @@ impl Renderer {
                 bar_x = portrait_x - hpad; // box + bar left edge
                 let bar_rx = bar_x;
                 let bar_rw = bar_width - 20.0 * s; // trimmed in from the right
-                // Transient indicators + chip row share the stat bars' exact left edge
-                // and trimmed width so the whole cluster reads as one aligned column.
+                                                   // Transient indicators + chip row share the stat bars' exact left edge
+                                                   // and trimmed width so the whole cluster reads as one aligned column.
                 indicator_x = bar_rx;
                 indicator_w = bar_rw;
 
@@ -617,7 +629,13 @@ impl Renderer {
                 let hb_y = name_tag_y - hpad;
                 let hb_right = txt_x + name_w.max(level_w) + hpad + 2.0 * s;
                 let hb_bottom = name_tag_y + 24.0 * s;
-                draw_rectangle(hb_x, hb_y, hb_right - hb_x, hb_bottom - hb_y, HUD_FILL_TRANSLUCENT);
+                draw_rectangle(
+                    hb_x,
+                    hb_y,
+                    hb_right - hb_x,
+                    hb_bottom - hb_y,
+                    HUD_FILL_TRANSLUCENT,
+                );
 
                 self.draw_player_head_portrait(player, portrait_x, name_tag_y, portrait_size);
                 self.draw_text_sharp(
@@ -641,9 +659,15 @@ impl Renderer {
                 let (hp_main, hp_dark) = if hp_ratio > 0.5 {
                     (STAT_HP_MAIN, STAT_HP_DARK)
                 } else if hp_ratio > 0.25 {
-                    (Color::new(0.85, 0.65, 0.20, 1.0), Color::new(0.58, 0.42, 0.10, 1.0))
+                    (
+                        Color::new(0.85, 0.65, 0.20, 1.0),
+                        Color::new(0.58, 0.42, 0.10, 1.0),
+                    )
                 } else {
-                    (Color::new(0.80, 0.32, 0.32, 1.0), Color::new(0.54, 0.17, 0.17, 1.0))
+                    (
+                        Color::new(0.80, 0.32, 0.32, 1.0),
+                        Color::new(0.54, 0.17, 0.17, 1.0),
+                    )
                 };
                 self.draw_hud_stat_bar_fill(
                     bar_rx,
@@ -766,7 +790,13 @@ impl Renderer {
                     if by + box_h > vsh {
                         by = vsh - box_h;
                     }
-                    draw_rectangle(bx + 2.0, by + 2.0, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.4));
+                    draw_rectangle(
+                        bx + 2.0,
+                        by + 2.0,
+                        box_w,
+                        box_h,
+                        Color::new(0.0, 0.0, 0.0, 0.4),
+                    );
                     draw_rectangle(
                         bx - 1.0,
                         by - 1.0,
@@ -812,7 +842,14 @@ impl Renderer {
                     )
                 };
                 draw_rectangle(indicator_x, gather_y, indicator_w, gather_h, bg_color);
-                draw_rectangle_lines(indicator_x, gather_y, indicator_w, gather_h, 1.0, border_color);
+                draw_rectangle_lines(
+                    indicator_x,
+                    gather_y,
+                    indicator_w,
+                    gather_h,
+                    1.0,
+                    border_color,
+                );
                 // Animated dots
                 let dot_count = ((macroquad::time::get_time() * 2.0) as usize % 4) as usize;
                 let dots = ".".repeat(dot_count);
@@ -830,15 +867,21 @@ impl Renderer {
             // ===== Store Open status indicator (below gathering status or prayer bar) =====
             let has_stall_bar = state.ui_state.stall_active;
             if has_stall_bar {
-                let stall_bar_y = stack_bottom
-                    + 4.0 * s
-                    + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 };
+                let stall_bar_y =
+                    stack_bottom + 4.0 * s + if is_skilling { 22.0 * s + 4.0 * s } else { 0.0 };
                 let stall_h = 22.0 * s;
                 let bg_color = Color::new(0.05, 0.18, 0.08, 0.7);
                 let border_color = Color::new(0.2, 0.55, 0.25, 0.5);
                 let text_color = Color::new(0.5, 0.9, 0.55, 0.9);
                 draw_rectangle(indicator_x, stall_bar_y, indicator_w, stall_h, bg_color);
-                draw_rectangle_lines(indicator_x, stall_bar_y, indicator_w, stall_h, 1.0, border_color);
+                draw_rectangle_lines(
+                    indicator_x,
+                    stall_bar_y,
+                    indicator_w,
+                    stall_h,
+                    1.0,
+                    border_color,
+                );
                 let label = "Store Open";
                 let label_w = self.measure_text_sharp(label, 16.0).width;
                 self.draw_text_sharp(
@@ -869,7 +912,14 @@ impl Renderer {
                 let bg_color = Color::new(0.15, 0.08, 0.15, 0.7);
                 let border_color = Color::new(0.5, 0.25, 0.5, 0.5);
                 draw_rectangle(indicator_x, dash_bar_y, indicator_w, dash_h, bg_color);
-                draw_rectangle_lines(indicator_x, dash_bar_y, indicator_w, dash_h, 1.0, border_color);
+                draw_rectangle_lines(
+                    indicator_x,
+                    dash_bar_y,
+                    indicator_w,
+                    dash_h,
+                    1.0,
+                    border_color,
+                );
 
                 // Fill bar
                 let fill_w = (indicator_w - 4.0) * progress;
@@ -1070,7 +1120,13 @@ impl Renderer {
             let input_text = &state.ui_state.chat_input;
             let cursor_pos = state.ui_state.chat_cursor;
             // Indicator text at same baseline as hint row text.
-            self.draw_text_sharp(indicator, indicator_start_x, text_y, font_size, indicator_color);
+            self.draw_text_sharp(
+                indicator,
+                indicator_start_x,
+                text_y,
+                font_size,
+                indicator_color,
+            );
 
             if input_text.is_empty() {
                 // Fast path for idle chat input (common case in classic mode).
@@ -1143,23 +1199,11 @@ impl Renderer {
                     .collect();
                 let visible_end = scroll_offset + visible_char_count;
 
-                self.draw_text_sharp(
-                    &visible_text,
-                    text_start_x,
-                    text_y,
-                    font_size,
-                    WHITE,
-                );
+                self.draw_text_sharp(&visible_text, text_start_x, text_y, font_size, WHITE);
 
                 // Draw scroll indicators if text is clipped
                 if scroll_offset > 0 {
-                    self.draw_text_sharp(
-                        "<",
-                        text_start_x - 8.0 * scale,
-                        text_y,
-                        font_size,
-                        GRAY,
-                    );
+                    self.draw_text_sharp("<", text_start_x - 8.0 * scale, text_y, font_size, GRAY);
                 }
                 if visible_end < char_count {
                     self.draw_text_sharp(
@@ -1207,12 +1251,23 @@ impl Renderer {
                 let sb_w = 6.0 * scale;
                 let sb_x = clip_x + clip_w - sb_w;
                 // Redraw track over the input row area only (row_y..bg_bottom).
-                draw_rectangle(sb_x, row_y, sb_w, bg_bottom - row_y, Color::new(0.1, 0.09, 0.12, 0.6));
+                draw_rectangle(
+                    sb_x,
+                    row_y,
+                    sb_w,
+                    bg_bottom - row_y,
+                    Color::new(0.1, 0.09, 0.12, 0.6),
+                );
                 let visible_ratio_sc = (chat_area_h_sc / total_content_sc).min(1.0);
                 let thumb_h_sc = (clip_h_sc * visible_ratio_sc).max(12.0 * scale);
-                let thumb_y_sc = clip_y_sc + (clip_h_sc - thumb_h_sc) * (1.0 - scroll_sc / max_scroll_sc);
+                let thumb_y_sc =
+                    clip_y_sc + (clip_h_sc - thumb_h_sc) * (1.0 - scroll_sc / max_scroll_sc);
                 let is_drag = state.ui_state.chat_scroll_drag.dragging;
-                let thumb_c = if is_drag { Color::new(1.0, 1.0, 1.0, 0.6) } else { Color::new(1.0, 1.0, 1.0, 0.35) };
+                let thumb_c = if is_drag {
+                    Color::new(1.0, 1.0, 1.0, 0.6)
+                } else {
+                    Color::new(1.0, 1.0, 1.0, 0.35)
+                };
                 if thumb_y_sc + thumb_h_sc > row_y {
                     let vt = thumb_y_sc.max(row_y);
                     let vh = (thumb_y_sc + thumb_h_sc - vt).max(0.0);

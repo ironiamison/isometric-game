@@ -558,14 +558,28 @@ impl Renderer {
         // Solid, premium dark shell. A focused full-screen map wants to feel
         // grounded, not translucent: a soft drop shadow gives depth and separates
         // it from the world, over an opaque cool dark fill — no edge borders.
-        draw_rectangle(px - 4.0, py - 4.0, pw + 8.0, ph + 8.0, Color::new(0.0, 0.0, 0.0, 0.22));
-        draw_rectangle(px - 2.0, py - 2.0, pw + 4.0, ph + 4.0, Color::new(0.0, 0.0, 0.0, 0.30));
+        draw_rectangle(
+            px - 4.0,
+            py - 4.0,
+            pw + 8.0,
+            ph + 8.0,
+            Color::new(0.0, 0.0, 0.0, 0.22),
+        );
+        draw_rectangle(
+            px - 2.0,
+            py - 2.0,
+            pw + 4.0,
+            ph + 4.0,
+            Color::new(0.0, 0.0, 0.0, 0.30),
+        );
         draw_rectangle(px, py, pw, ph, Color::new(0.055, 0.063, 0.078, 0.985));
 
         // Title floats over the translucent header zone (no filled strip / divider).
         let title_band = 30.0;
         let title = "World Map";
-        let title_w = self.measure_text_sharp(title, MINIMAP_WORLD_TEXT_SIZE).width;
+        let title_w = self
+            .measure_text_sharp(title, MINIMAP_WORLD_TEXT_SIZE)
+            .width;
         self.draw_text_sharp(
             title,
             (panel_rect.x + (panel_rect.w - title_w) * 0.5).floor(),

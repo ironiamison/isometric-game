@@ -289,7 +289,14 @@ impl CreateForm {
                         self.gender_index - 1
                     };
                 }
-                if point_in_rect(mx, my, gb.x + gb.w - ARROW_ZONE_FULL, gb.y, ARROW_ZONE_FULL, gb.h) {
+                if point_in_rect(
+                    mx,
+                    my,
+                    gb.x + gb.w - ARROW_ZONE_FULL,
+                    gb.y,
+                    ARROW_ZONE_FULL,
+                    gb.h,
+                ) {
                     self.gender_index = (self.gender_index + 1) % GENDERS.len();
                 }
             }
@@ -306,7 +313,14 @@ impl CreateForm {
                         self.skin_index - 1
                     };
                 }
-                if point_in_rect(mx, my, sb.x + sb.w - ARROW_ZONE_FULL, sb.y, ARROW_ZONE_FULL, sb.h) {
+                if point_in_rect(
+                    mx,
+                    my,
+                    sb.x + sb.w - ARROW_ZONE_FULL,
+                    sb.y,
+                    ARROW_ZONE_FULL,
+                    sb.h,
+                ) {
                     self.skin_index = (self.skin_index + 1) % SKINS.len();
                 }
             }
@@ -317,7 +331,14 @@ impl CreateForm {
             if point_in_rect(mx, my, style_box.x, style_box.y, style_box.w, style_box.h) {
                 self.active_field = CreateField::HairStyle;
                 show_keyboard(false);
-                if point_in_rect(mx, my, style_box.x, style_box.y, ARROW_ZONE_HALF, style_box.h) {
+                if point_in_rect(
+                    mx,
+                    my,
+                    style_box.x,
+                    style_box.y,
+                    ARROW_ZONE_HALF,
+                    style_box.h,
+                ) {
                     self.hair_style_index = match self.hair_style_index {
                         None => Some(HAIR_STYLES - 1),
                         Some(0) => None,
@@ -346,7 +367,14 @@ impl CreateForm {
             {
                 self.active_field = CreateField::HairColor;
                 show_keyboard(false);
-                if point_in_rect(mx, my, color_box.x, color_box.y, ARROW_ZONE_HALF, color_box.h) {
+                if point_in_rect(
+                    mx,
+                    my,
+                    color_box.x,
+                    color_box.y,
+                    ARROW_ZONE_HALF,
+                    color_box.h,
+                ) {
                     self.hair_color_index = if self.hair_color_index == 0 {
                         HAIR_COLORS - 1
                     } else {
@@ -367,14 +395,28 @@ impl CreateForm {
 
             // Action bar: Create + Cancel
             let (create_rect, cancel_rect) = l.button_rects();
-            if point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h) {
+            if point_in_rect(
+                mx,
+                my,
+                create_rect.x,
+                create_rect.y,
+                create_rect.w,
+                create_rect.h,
+            ) {
                 show_keyboard(false);
                 if let Some(action) = self.try_submit() {
                     return action;
                 }
                 return CreateAction::None;
             }
-            if point_in_rect(mx, my, cancel_rect.x, cancel_rect.y, cancel_rect.w, cancel_rect.h) {
+            if point_in_rect(
+                mx,
+                my,
+                cancel_rect.x,
+                cancel_rect.y,
+                cancel_rect.w,
+                cancel_rect.h,
+            ) {
                 show_keyboard(false);
                 return CreateAction::Cancel;
             }
@@ -500,7 +542,15 @@ impl CreateForm {
     }
 
     /// Draw a label above a field. Gold when active, dim otherwise.
-    fn draw_field_label(&self, font: &BitmapFont, text: &str, x: f32, baseline: f32, active: bool, alpha: f32) {
+    fn draw_field_label(
+        &self,
+        font: &BitmapFont,
+        text: &str,
+        x: f32,
+        baseline: f32,
+        active: bool,
+        alpha: f32,
+    ) {
         let color = if active { TEXT_TITLE } else { TEXT_DIM };
         font.draw_text(text, x, baseline, 16.0, fade(color, alpha));
     }
@@ -516,12 +566,22 @@ impl CreateForm {
         alpha: f32,
     ) {
         self.draw_field_box(rect, active && enabled, alpha);
-        let arrow = if active && enabled { FRAME_ACCENT } else { TEXT_DIM };
+        let arrow = if active && enabled {
+            FRAME_ACCENT
+        } else {
+            TEXT_DIM
+        };
         let val_color = if enabled { TEXT_NORMAL } else { TEXT_DIM };
         let by = rect.y + rect.h / 2.0 + 6.0;
         font.draw_text("<", rect.x + 12.0, by, 16.0, fade(arrow, alpha));
         let vw = font.measure_text(value, 16.0).width;
-        font.draw_text(value, (rect.x + (rect.w - vw) / 2.0).floor(), by, 16.0, fade(val_color, alpha));
+        font.draw_text(
+            value,
+            (rect.x + (rect.w - vw) / 2.0).floor(),
+            by,
+            16.0,
+            fade(val_color, alpha),
+        );
         font.draw_text(">", rect.x + rect.w - 20.0, by, 16.0, fade(arrow, alpha));
     }
 
@@ -541,7 +601,13 @@ impl CreateForm {
 
         // Portrait inset (recessed dark square + bronze edge + corner accents)
         let p = l.portrait;
-        draw_rectangle(p.x, p.y, p.w, p.h, fade(Color::from_rgba(12, 12, 18, 255), alpha));
+        draw_rectangle(
+            p.x,
+            p.y,
+            p.w,
+            p.h,
+            fade(Color::from_rgba(12, 12, 18, 255), alpha),
+        );
         draw_rectangle_lines(p.x, p.y, p.w, p.h, 1.0, fade(FRAME_OUTER, alpha));
         // Centered sprite
         let sprite_x = (p.x + (p.w - SPRITE_WIDTH) / 2.0).floor();
@@ -594,17 +660,38 @@ impl CreateForm {
         // --- Row 1: Gender ---
         let gender_active = self.active_field == CreateField::Gender;
         self.draw_field_label(font, "Gender", l.form_x, l.label_y(1), gender_active, alpha);
-        self.draw_stepper(font, l.row_box(1), GENDERS[self.gender_index], gender_active, true, alpha);
+        self.draw_stepper(
+            font,
+            l.row_box(1),
+            GENDERS[self.gender_index],
+            gender_active,
+            true,
+            alpha,
+        );
 
         // --- Row 2: Skin ---
         let skin_active = self.active_field == CreateField::Skin;
         self.draw_field_label(font, "Skin", l.form_x, l.label_y(2), skin_active, alpha);
-        self.draw_stepper(font, l.row_box(2), SKINS[self.skin_index], skin_active, true, alpha);
+        self.draw_stepper(
+            font,
+            l.row_box(2),
+            SKINS[self.skin_index],
+            skin_active,
+            true,
+            alpha,
+        );
 
         // --- Row 3: Hair (Style + Color) ---
         let (style_box, color_box) = l.hair_boxes();
         let style_active = self.active_field == CreateField::HairStyle;
-        self.draw_field_label(font, "Style", style_box.x, l.label_y(3), style_active, alpha);
+        self.draw_field_label(
+            font,
+            "Style",
+            style_box.x,
+            l.label_y(3),
+            style_active,
+            alpha,
+        );
         let style_value = match self.hair_style_index {
             None => "Bald".to_string(),
             Some(i) => format!("{}", i + 1),
@@ -613,29 +700,69 @@ impl CreateForm {
 
         let color_active = self.active_field == CreateField::HairColor;
         let color_enabled = self.hair_style_index.is_some();
-        self.draw_field_label(font, "Color", color_box.x, l.label_y(3), color_active && color_enabled, alpha);
+        self.draw_field_label(
+            font,
+            "Color",
+            color_box.x,
+            l.label_y(3),
+            color_active && color_enabled,
+            alpha,
+        );
         let color_value = if color_enabled {
             format!("{}", self.hair_color_index + 1)
         } else {
             "-".to_string()
         };
-        self.draw_stepper(font, color_box, &color_value, color_active, color_enabled, alpha);
+        self.draw_stepper(
+            font,
+            color_box,
+            &color_value,
+            color_active,
+            color_enabled,
+            alpha,
+        );
 
         // --- Action bar (Create + Cancel) ---
         let (create_rect, cancel_rect) = l.button_rects();
-        let create_hovered =
-            point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h);
-        let cancel_hovered =
-            point_in_rect(mx, my, cancel_rect.x, cancel_rect.y, cancel_rect.w, cancel_rect.h);
-        draw_screen_button_alpha(font, create_rect, "Create", create_hovered, ButtonVariant::Primary, alpha);
-        draw_screen_button_alpha(font, cancel_rect, "Cancel", cancel_hovered, ButtonVariant::Neutral, alpha);
+        let create_hovered = point_in_rect(
+            mx,
+            my,
+            create_rect.x,
+            create_rect.y,
+            create_rect.w,
+            create_rect.h,
+        );
+        let cancel_hovered = point_in_rect(
+            mx,
+            my,
+            cancel_rect.x,
+            cancel_rect.y,
+            cancel_rect.w,
+            cancel_rect.h,
+        );
+        draw_screen_button_alpha(
+            font,
+            create_rect,
+            "Create",
+            create_hovered,
+            ButtonVariant::Primary,
+            alpha,
+        );
+        draw_screen_button_alpha(
+            font,
+            cancel_rect,
+            "Cancel",
+            cancel_hovered,
+            ButtonVariant::Neutral,
+            alpha,
+        );
 
         // Error message (just above the action bar)
         if let Some(ref error) = self.error_message {
             let ew = font.measure_text(error, 16.0).width;
             font.draw_text(
                 error,
-                ((l.panel.x + (l.panel.w - ew) / 2.0)).floor(),
+                (l.panel.x + (l.panel.w - ew) / 2.0).floor(),
                 l.action_bar.y - 8.0,
                 16.0,
                 fade(DANGER_TEXT, alpha),
@@ -647,7 +774,13 @@ impl CreateForm {
             let hint = "[Tab] Next field \u{00b7} [A/D] Change \u{00b7} [Enter] Create \u{00b7} [Esc] Cancel";
             let hw = font.measure_text(hint, 16.0).width;
             let hint_y = l.action_bar.y + l.action_bar.h + 16.0;
-            font.draw_text(hint, ((l.panel.x + (l.panel.w - hw) / 2.0)).floor(), hint_y, 16.0, fade(TEXT_DIM, alpha));
+            font.draw_text(
+                hint,
+                (l.panel.x + (l.panel.w - hw) / 2.0).floor(),
+                hint_y,
+                16.0,
+                fade(TEXT_DIM, alpha),
+            );
         }
     }
 }
@@ -799,14 +932,25 @@ impl Screen for CharacterCreateScreen {
         // Title (centered, above panel)
         let title = "CREATE CHARACTER";
         let tw = self.font.measure_text(title, 16.0).width;
-        self.font.draw_text(title, ((sw - tw) / 2.0).floor(), l.header_y, 16.0, TEXT_TITLE);
+        self.font.draw_text(
+            title,
+            ((sw - tw) / 2.0).floor(),
+            l.header_y,
+            16.0,
+            TEXT_TITLE,
+        );
 
         // Bronze-framed panel (shared box)
         draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
         draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
 
         // Form contents
-        self.form
-            .render(&self.font, &self.player_sprites, &self.hair_sprites, &l, 1.0);
+        self.form.render(
+            &self.font,
+            &self.player_sprites,
+            &self.hair_sprites,
+            &l,
+            1.0,
+        );
     }
 }
