@@ -46,7 +46,7 @@ use input::InputHandler;
 use network::NetworkClient;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use render::Renderer;
-#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+#[cfg(target_arch = "wasm32")]
 use spectator::SpectatorState;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use ui::{CharacterCreateScreen, CharacterSelectScreen, LoginScreen, Screen, ScreenState};

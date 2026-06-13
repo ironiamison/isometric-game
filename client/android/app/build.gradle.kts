@@ -26,8 +26,8 @@ android {
         applicationId = "com.newaeven.game"
         minSdk = 24
         targetSdk = 34
-        versionCode = 51
-        versionName = "4.5.0"
+        versionCode = 52
+        versionName = "4.5.1"
 
         ndk {
             abiFilters += listOf("arm64-v8a")
