@@ -32,8 +32,8 @@ impl Renderer {
         let chip_w = (sprite_area + padding * 2.0).max(count_dims.width + padding * 2.0);
         let chip_h = padding + sprite_area + 2.0 * s + count_dims.height + padding;
 
-        // Semi-transparent dark background
-        draw_rectangle(x, y, chip_w, chip_h, Color::from_rgba(0, 0, 0, 180));
+        // Semi-transparent dark background (matches the name/portrait box fill)
+        draw_rectangle(x, y, chip_w, chip_h, Color::new(0.094, 0.094, 0.122, 0.62));
         draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, Color::from_rgba(80, 70, 55, 180));
 
         // Draw NPC sprite (idle frame 0, down-facing)
@@ -424,8 +424,8 @@ impl Renderer {
         let chip_w = (sprite_area + padding * 2.0).max(count_dims.width + padding * 2.0);
         let chip_h = padding + sprite_area + 2.0 * s + count_dims.height + padding;
 
-        // Background + a green-tinted border to distinguish from the slayer chip's brown.
-        draw_rectangle(x, y, chip_w, chip_h, Color::from_rgba(0, 0, 0, 180));
+        // Background (matches the name/portrait box fill) + a green-tinted border to distinguish from the slayer chip's brown.
+        draw_rectangle(x, y, chip_w, chip_h, Color::new(0.094, 0.094, 0.122, 0.62));
         draw_rectangle_lines(x, y, chip_w, chip_h, 1.0, Color::from_rgba(90, 120, 65, 180));
 
         // Target item icon.
