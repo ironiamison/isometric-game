@@ -16,8 +16,14 @@ pub struct ShopDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShopStockItem {
     pub item_id: String,
+    #[serde(default)]
     pub max_quantity: i32,
+    #[serde(default)]
     pub restock_rate: i32,
+    /// When true, the item is in infinite supply: it never depletes on purchase
+    /// and is skipped during restock. `max_quantity`/`restock_rate` are ignored.
+    #[serde(default)]
+    pub unlimited: bool,
     #[serde(skip)]
     pub current_quantity: i32,
 }
@@ -45,6 +51,9 @@ impl ShopDefinition {
     pub fn restock(&mut self) -> Vec<(String, i32)> {
         let mut changed = Vec::new();
         for item in &mut self.stock {
+            if item.unlimited {
+                continue;
+            }
             let old_quantity = item.current_quantity;
             let new_quantity = (item.current_quantity + item.restock_rate).min(item.max_quantity);
             if new_quantity != old_quantity {

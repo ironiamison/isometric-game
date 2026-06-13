@@ -295,9 +295,14 @@ impl Renderer {
                     TEXT_GOLD,
                 );
 
-                // Stock (right side)
-                let stock_text = format!("x{}", stock_item.quantity);
-                let stock_color = if stock_item.quantity > 0 {
+                // Stock (right side). A negative quantity is the unlimited-supply
+                // sentinel and renders as "∞".
+                let stock_text = if stock_item.quantity < 0 {
+                    "∞".to_string()
+                } else {
+                    format!("x{}", stock_item.quantity)
+                };
+                let stock_color = if stock_item.quantity != 0 {
                     TEXT_DIM
                 } else {
                     Color::new(0.8, 0.3, 0.3, 1.0)
@@ -566,7 +571,9 @@ impl Renderer {
             if let Some(stock_item) = shop_data.stock.get(state.ui_state.shop_selected_buy_index) {
                 let total = stock_item.price * state.ui_state.shop_buy_quantity;
                 let can_afford = state.inventory.gold >= total;
-                let in_stock = stock_item.quantity >= state.ui_state.shop_buy_quantity;
+                // Negative quantity = unlimited supply, always in stock.
+                let in_stock = stock_item.quantity < 0
+                    || stock_item.quantity >= state.ui_state.shop_buy_quantity;
                 (total, can_afford && in_stock)
             } else {
                 (0, false)

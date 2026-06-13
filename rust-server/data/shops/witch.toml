@@ -3,8 +3,7 @@ display_name = "The Witch's Cauldron"
 
 [[stock]]
 item_id = "vial_of_water"
-max_quantity = 50
-restock_rate = 10
+unlimited = true
 
 [[stock]]
 item_id = "weak_health_potion"

@@ -8,8 +8,7 @@ restock_rate = 3
 
 [[stock]]
 item_id = "vial_of_water"
-max_quantity = 30
-restock_rate = 8
+unlimited = true
 
 [[stock]]
 item_id = "tangleroots"

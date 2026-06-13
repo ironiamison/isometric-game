@@ -1,6 +1,6 @@
 use super::*;
 use crate::entity::prototype::MerchantConfig;
-use crate::protocol::{ShopData, ShopStockItemData};
+use crate::protocol::{ShopData, ShopStockItemData, UNLIMITED_STOCK};
 use crate::shop::ShopDefinition;
 
 const SHOP_INTERACTION_DISTANCE: f32 = 2.5;
@@ -35,7 +35,11 @@ fn build_shop_data(
 
             ShopStockItemData {
                 item_id: item.item_id.clone(),
-                quantity: item.current_quantity,
+                quantity: if item.unlimited {
+                    UNLIMITED_STOCK
+                } else {
+                    item.current_quantity
+                },
                 price: shop_price(base_price, merchant_config.sell_multiplier),
             }
         })
@@ -427,7 +431,7 @@ impl GameRoom {
             }
         };
 
-        if stock_item.current_quantity < quantity {
+        if !stock_item.unlimited && stock_item.current_quantity < quantity {
             drop(shop_registry);
             self.send_shop_result(
                 player_id,
@@ -558,8 +562,12 @@ impl GameRoom {
             return;
         }
 
-        stock_item.current_quantity -= quantity;
-        let new_stock = stock_item.current_quantity;
+        let new_stock = if stock_item.unlimited {
+            UNLIMITED_STOCK
+        } else {
+            stock_item.current_quantity -= quantity;
+            stock_item.current_quantity
+        };
         player.inventory.gold = new_gold;
         player
             .inventory
@@ -927,12 +935,14 @@ base_price = 3
                     item_id: "apple".to_string(),
                     max_quantity: 10,
                     restock_rate: 1,
+                    unlimited: false,
                     current_quantity: 7,
                 },
                 ShopStockItem {
                     item_id: "mystery_item".to_string(),
                     max_quantity: 2,
                     restock_rate: 1,
+                    unlimited: false,
                     current_quantity: 1,
                 },
             ],

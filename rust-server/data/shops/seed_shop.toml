@@ -3,45 +3,31 @@ display_name = "Farmer Barley's Seeds"
 
 [[stock]]
 item_id = "potato_seed"
-max_quantity = 20
-restock_rate = 5
-restock_interval_minutes = 5
+unlimited = true
 
 [[stock]]
 item_id = "onion_seed"
-max_quantity = 20
-restock_rate = 5
-restock_interval_minutes = 5
+unlimited = true
 
 [[stock]]
 item_id = "tomato_seed"
-max_quantity = 15
-restock_rate = 3
-restock_interval_minutes = 5
+unlimited = true
 
 [[stock]]
 item_id = "cabbage_seed"
-max_quantity = 15
-restock_rate = 3
-restock_interval_minutes = 5
+unlimited = true
 
 [[stock]]
 item_id = "strawberry_seed"
-max_quantity = 10
-restock_rate = 2
-restock_interval_minutes = 5
+unlimited = true
 
 [[stock]]
 item_id = "sweetcorn_seed"
-max_quantity = 10
-restock_rate = 2
-restock_interval_minutes = 5
+unlimited = true
 
 [[stock]]
 item_id = "watermelon_seed"
-max_quantity = 5
-restock_rate = 1
-restock_interval_minutes = 5
+unlimited = true
 
 # Herb Seeds
 [[stock]]

@@ -1219,6 +1219,11 @@ pub struct ShopData {
     pub stock: Vec<ShopStockItemData>,
 }
 
+/// Sentinel `quantity` value indicating an item is in infinite supply.
+/// Sent in place of a real count so the client can render "∞" and never
+/// gate purchases on stock.
+pub const UNLIMITED_STOCK: i32 = -1;
+
 /// Shop stock item data for client synchronization
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShopStockItemData {
