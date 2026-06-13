@@ -402,6 +402,36 @@ impl CharacterSelectScreen {
         self.draw_text_sharp(pl, right - plw, center_y + 12.0, 16.0, TEXT_DIM);
     }
 
+    /// Action-bar button rects when characters exist: [Play, Delete, Logout].
+    fn action_button_rects(l: &CharSelectLayout) -> [Rect; 3] {
+        let gap = 8.0;
+        let bw = (l.action_bar.w - gap * 2.0) / 3.0;
+        let bh = l.action_bar.h;
+        let by = l.action_bar.y;
+        [
+            Rect::new(l.action_bar.x, by, bw, bh),
+            Rect::new(l.action_bar.x + bw + gap, by, bw, bh),
+            Rect::new(l.action_bar.x + (bw + gap) * 2.0, by, bw, bh),
+        ]
+    }
+
+    /// Right-aligned Logout button rect for the empty state.
+    fn empty_logout_rect(l: &CharSelectLayout) -> Rect {
+        let bw = 110.0_f32;
+        Rect::new(l.action_bar.x + l.action_bar.w - bw, l.action_bar.y, bw, l.action_bar.h)
+    }
+
+    /// Centered "+ Create Character" button rect for the empty state.
+    /// MUST match the y-chain render uses (circle_cy + 56 + 28 + 20, then +24).
+    fn empty_create_rect(l: &CharSelectLayout) -> Rect {
+        let cx = l.panel.x + l.panel.w / 2.0;
+        let circle_cy = l.panel.y + l.panel.h * 0.34;
+        let ty = circle_cy + 56.0 + 28.0 + 20.0;
+        let btn_w = 180.0_f32;
+        let btn_h = 34.0_f32;
+        Rect::new((cx - btn_w / 2.0).floor(), (ty + 24.0).floor(), btn_w, btn_h)
+    }
+
     /// Draw a dashed rectangle outline (used for the create-new-character row).
     fn draw_dashed_rect(&self, x: f32, y: f32, w: f32, h: f32, color: Color) {
         let dash = 6.0;
@@ -465,64 +495,61 @@ impl Screen for CharacterSelectScreen {
         let mx = input_pos.x;
         let my = input_pos.y;
 
-        // Layout constants (must match render)
-        let list_w = 500.0_f32.min(sw - 20.0);
-        let list_x = (sw - list_w) / 2.0;
-        let list_y = 44.0;
-        let item_height = 70.0;
-        let button_area_height = 48.0;
-        let inst_y = sh - button_area_height;
-
-        // Scrollable list area: from list_y down to the button area (with padding)
-        let list_button_gap = 4.0;
-        let list_visible_height = (inst_y - 10.0 - list_button_gap - list_y).min(400.0);
-        let total_list_height = self.characters.len() as f32 * item_height;
-        let max_scroll = (total_list_height - list_visible_height).max(0.0);
+        let l = CharSelectLayout::compute(sw, sh, !self.characters.is_empty());
+        let item_height = CARD_HEIGHT + CARD_GAP;
+        let create_selectable =
+            !self.characters.is_empty() && self.characters.len() < MAX_CHARACTERS;
+        // Number of rows in the scrollable list, including the create row when shown.
+        let row_count = self.characters.len() + if create_selectable { 1 } else { 0 };
+        let total_list_height = row_count as f32 * item_height;
+        let max_scroll = (total_list_height - l.list_visible_h).max(0.0);
         self.list_scroll_offset = self.list_scroll_offset.clamp(0.0, max_scroll);
 
-        // Touch drag scrolling
-        let all_touches: Vec<Touch> = touches();
-        if let Some(tracking_id) = self.touch_scroll_id {
-            if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
-                match touch.phase {
-                    TouchPhase::Moved | TouchPhase::Stationary => {
-                        let (_, vy) = screen_to_virtual(touch.position.x, touch.position.y);
-                        let dy = self.touch_scroll_last_y - vy;
-                        self.list_scroll_offset =
-                            (self.list_scroll_offset + dy).clamp(0.0, max_scroll);
-                        self.touch_scroll_last_y = vy;
+        // Touch drag scrolling (only when there is a list to scroll)
+        if !self.characters.is_empty() {
+            let all_touches: Vec<Touch> = touches();
+            if let Some(tracking_id) = self.touch_scroll_id {
+                if let Some(touch) = all_touches.iter().find(|t| t.id == tracking_id) {
+                    match touch.phase {
+                        TouchPhase::Moved | TouchPhase::Stationary => {
+                            let (_, vy) = screen_to_virtual(touch.position.x, touch.position.y);
+                            let dy = self.touch_scroll_last_y - vy;
+                            self.list_scroll_offset =
+                                (self.list_scroll_offset + dy).clamp(0.0, max_scroll);
+                            self.touch_scroll_last_y = vy;
+                        }
+                        TouchPhase::Ended | TouchPhase::Cancelled => {
+                            self.touch_scroll_id = None;
+                        }
+                        _ => {}
                     }
-                    TouchPhase::Ended | TouchPhase::Cancelled => {
-                        self.touch_scroll_id = None;
-                    }
-                    _ => {}
+                } else {
+                    self.touch_scroll_id = None;
                 }
-            } else {
-                self.touch_scroll_id = None;
-            }
-        } else if !self.confirm_delete {
-            for touch in &all_touches {
-                if touch.phase == TouchPhase::Started {
-                    let (vx, vy) = screen_to_virtual(touch.position.x, touch.position.y);
-                    // Only start scroll if touch is in the list area
-                    if vx >= list_x
-                        && vx <= list_x + list_w
-                        && vy >= list_y
-                        && vy <= list_y + list_visible_height
-                    {
-                        self.touch_scroll_id = Some(touch.id);
-                        self.touch_scroll_last_y = vy;
-                        break;
+            } else if !self.confirm_delete {
+                for touch in &all_touches {
+                    if touch.phase == TouchPhase::Started {
+                        let (vx, vy) = screen_to_virtual(touch.position.x, touch.position.y);
+                        // Only start scroll if touch is in the list area
+                        if vx >= l.list_x
+                            && vx <= l.list_x + l.list_w
+                            && vy >= l.list_top
+                            && vy <= l.list_top + l.list_visible_h
+                        {
+                            self.touch_scroll_id = Some(touch.id);
+                            self.touch_scroll_last_y = vy;
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        // Mouse wheel scrolling
-        let (_wheel_x, wheel_y) = mouse_wheel();
-        if wheel_y != 0.0 && my >= list_y && my <= list_y + list_visible_height {
-            self.list_scroll_offset =
-                (self.list_scroll_offset - wheel_y * 30.0).clamp(0.0, max_scroll);
+            // Mouse wheel scrolling
+            let (_wheel_x, wheel_y) = mouse_wheel();
+            if wheel_y != 0.0 && my >= l.list_top && my <= l.list_top + l.list_visible_h {
+                self.list_scroll_offset =
+                    (self.list_scroll_offset - wheel_y * 30.0).clamp(0.0, max_scroll);
+            }
         }
 
         // Delete confirmation mode
@@ -601,94 +628,112 @@ impl Screen for CharacterSelectScreen {
             return ScreenState::Continue;
         }
 
-        // Mouse: Click on character rows (accounting for scroll and clipping)
+        // Mouse: click on character cards / create row (mirrors render's list geometry)
         if clicked && !self.characters.is_empty() {
-            for i in 0..self.characters.len() {
-                let y = list_y + i as f32 * item_height - self.list_scroll_offset;
-                // Only allow clicking visible rows
-                if y + item_height - 5.0 < list_y || y > list_y + list_visible_height {
+            let scroll_offset = self.list_scroll_offset;
+            for i in 0..row_count {
+                let card_y = l.list_top + i as f32 * item_height - scroll_offset;
+                // visible-band check identical to render
+                if card_y + CARD_HEIGHT < l.list_top || card_y > l.list_top + l.list_visible_h {
                     continue;
                 }
-                if point_in_rect(mx, my, list_x, y, list_w, item_height - 5.0) {
-                    // Ensure click is within the visible list area
-                    if my >= list_y && my <= list_y + list_visible_height {
-                        if self.selected_index == i {
-                            let character = &self.characters[self.selected_index];
-                            return ScreenState::StartGame {
-                                session: self.session.clone(),
-                                character_id: character.id,
-                                character_name: character.name.clone(),
-                            };
-                        } else {
-                            self.selected_index = i;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Mouse: Click on buttons at bottom
-        if clicked {
-            // Play button
-            if point_in_rect(mx, my, list_x, inst_y - 10.0, 100.0, 30.0)
-                && !self.characters.is_empty()
-            {
-                let character = &self.characters[self.selected_index];
-                return ScreenState::StartGame {
-                    session: self.session.clone(),
-                    character_id: character.id,
-                    character_name: character.name.clone(),
-                };
-            }
-
-            // New button
-            if self.characters.len() < MAX_CHARACTERS
-                && point_in_rect(mx, my, list_x + 120.0, inst_y - 10.0, 70.0, 30.0)
-            {
-                return ScreenState::ToCharacterCreate(self.session.clone());
-            }
-
-            // Delete button
-            if point_in_rect(mx, my, list_x + 210.0, inst_y - 10.0, 90.0, 30.0)
-                && !self.characters.is_empty()
-            {
-                self.confirm_delete = true;
-            }
-
-            // Logout button
-            if point_in_rect(mx, my, list_x + 330.0, inst_y - 10.0, 100.0, 30.0) {
-                #[cfg(not(target_arch = "wasm32"))]
+                if point_in_rect(mx, my, l.list_x, card_y, l.list_w, CARD_HEIGHT)
+                    && my >= l.list_top
+                    && my <= l.list_top + l.list_visible_h
                 {
-                    let _ = self.auth_client.logout(&self.session.token);
+                    if create_selectable && i == self.characters.len() {
+                        // create row
+                        return ScreenState::ToCharacterCreate(self.session.clone());
+                    }
+                    if i == self.selected_index {
+                        let character = &self.characters[i];
+                        return ScreenState::StartGame {
+                            session: self.session.clone(),
+                            character_id: character.id,
+                            character_name: character.name.clone(),
+                        };
+                    } else {
+                        self.selected_index = i;
+                    }
+                    break;
                 }
-                return ScreenState::ToLogin;
             }
         }
 
-        // Keyboard: Navigate characters
+        // Mouse: action-bar / empty-state button click handling
+        if clicked {
+            if self.characters.is_empty() {
+                // Empty state: Create button (in panel) + Logout (action bar)
+                let create_rect = Self::empty_create_rect(&l);
+                if point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h)
+                {
+                    return ScreenState::ToCharacterCreate(self.session.clone());
+                }
+                let logout_rect = Self::empty_logout_rect(&l);
+                if point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h)
+                {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let _ = self.auth_client.logout(&self.session.token);
+                    }
+                    return ScreenState::ToLogin;
+                }
+            } else {
+                let [play_rect, del_rect, logout_rect] = Self::action_button_rects(&l);
+                if point_in_rect(mx, my, play_rect.x, play_rect.y, play_rect.w, play_rect.h)
+                    && self.selected_index < self.characters.len()
+                {
+                    let character = &self.characters[self.selected_index];
+                    return ScreenState::StartGame {
+                        session: self.session.clone(),
+                        character_id: character.id,
+                        character_name: character.name.clone(),
+                    };
+                }
+                if point_in_rect(mx, my, del_rect.x, del_rect.y, del_rect.w, del_rect.h)
+                    && self.selected_index < self.characters.len()
+                {
+                    self.confirm_delete = true;
+                }
+                if point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h)
+                {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let _ = self.auth_client.logout(&self.session.token);
+                    }
+                    return ScreenState::ToLogin;
+                }
+            }
+        }
+
+        // Keyboard: navigate (includes the create row when shown)
+        let max_index = if self.characters.is_empty() {
+            0
+        } else {
+            self.characters.len() - 1 + if create_selectable { 1 } else { 0 }
+        };
         if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W)) && self.selected_index > 0 {
             self.selected_index -= 1;
         }
         if (is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::S))
-            && self.selected_index < self.characters.len().saturating_sub(1)
+            && self.selected_index < max_index
         {
             self.selected_index += 1;
         }
 
-        // Keyboard: Create new character
+        // Keyboard: create
         if is_key_pressed(KeyCode::N) && self.characters.len() < MAX_CHARACTERS {
             return ScreenState::ToCharacterCreate(self.session.clone());
         }
 
-        // Keyboard: Delete character
+        // Keyboard: delete (only a real character)
         if (is_key_pressed(KeyCode::Delete) || is_key_pressed(KeyCode::X))
-            && !self.characters.is_empty()
+            && self.selected_index < self.characters.len()
         {
             self.confirm_delete = true;
         }
 
-        // Keyboard: Logout
+        // Keyboard: logout
         if is_key_pressed(KeyCode::Escape) {
             #[cfg(not(target_arch = "wasm32"))]
             {
@@ -697,14 +742,23 @@ impl Screen for CharacterSelectScreen {
             return ScreenState::ToLogin;
         }
 
-        // Keyboard: Select character and start game
-        if is_key_pressed(KeyCode::Enter) && !self.characters.is_empty() {
-            let character = &self.characters[self.selected_index];
-            return ScreenState::StartGame {
-                session: self.session.clone(),
-                character_id: character.id,
-                character_name: character.name.clone(),
-            };
+        // Keyboard: Enter — play selected character, or trigger create if the create row
+        // is focused or the roster is empty.
+        if is_key_pressed(KeyCode::Enter) {
+            if self.characters.is_empty()
+                || (create_selectable && self.selected_index == self.characters.len())
+            {
+                if self.characters.len() < MAX_CHARACTERS {
+                    return ScreenState::ToCharacterCreate(self.session.clone());
+                }
+            } else if self.selected_index < self.characters.len() {
+                let character = &self.characters[self.selected_index];
+                return ScreenState::StartGame {
+                    session: self.session.clone(),
+                    character_id: character.id,
+                    character_name: character.name.clone(),
+                };
+            }
         }
 
         ScreenState::Continue
@@ -758,12 +812,9 @@ impl Screen for CharacterSelectScreen {
             self.draw_text_sharp(line2, (cx - l2w / 2.0).floor(), ty, 16.0, TEXT_DIM);
 
             // Centered Create Character button
-            let btn_w = 180.0_f32;
-            let btn_h = 34.0_f32;
-            let btn_x = (cx - btn_w / 2.0).floor();
-            let btn_y = (ty + 24.0).floor();
-            let create_rect = Rect::new(btn_x, btn_y, btn_w, btn_h);
-            let create_hovered = point_in_rect(mx, my, btn_x, btn_y, btn_w, btn_h);
+            let create_rect = Self::empty_create_rect(&l);
+            let create_hovered =
+                point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h);
             draw_screen_button(
                 &self.font,
                 create_rect,
@@ -870,10 +921,15 @@ impl Screen for CharacterSelectScreen {
         // ---- Action bar (outside the clipped region) ----
         if self.characters.is_empty() {
             // Single right-aligned Logout button
-            let bw = 110.0_f32;
-            let bx = l.action_bar.x + l.action_bar.w - bw;
-            let logout_rect = Rect::new(bx, l.action_bar.y, bw, l.action_bar.h);
-            let logout_hovered = point_in_rect(mx, my, bx, l.action_bar.y, bw, l.action_bar.h);
+            let logout_rect = Self::empty_logout_rect(&l);
+            let logout_hovered = point_in_rect(
+                mx,
+                my,
+                logout_rect.x,
+                logout_rect.y,
+                logout_rect.w,
+                logout_rect.h,
+            );
             draw_screen_button(
                 &self.font,
                 logout_rect,
@@ -882,24 +938,24 @@ impl Screen for CharacterSelectScreen {
                 ButtonVariant::Neutral,
             );
         } else {
-            let gap = 8.0;
-            let bw = (l.action_bar.w - gap * 2.0) / 3.0;
-            let bh = l.action_bar.h;
-            let by = l.action_bar.y;
+            let [play_rect, del_rect, logout_rect] = Self::action_button_rects(&l);
 
-            let play_x = l.action_bar.x;
-            let play_rect = Rect::new(play_x, by, bw, bh);
-            let play_hovered = point_in_rect(mx, my, play_x, by, bw, bh);
+            let play_hovered =
+                point_in_rect(mx, my, play_rect.x, play_rect.y, play_rect.w, play_rect.h);
             draw_screen_button(&self.font, play_rect, "Play", play_hovered, ButtonVariant::Primary);
 
-            let del_x = l.action_bar.x + bw + gap;
-            let del_rect = Rect::new(del_x, by, bw, bh);
-            let del_hovered = point_in_rect(mx, my, del_x, by, bw, bh);
+            let del_hovered =
+                point_in_rect(mx, my, del_rect.x, del_rect.y, del_rect.w, del_rect.h);
             draw_screen_button(&self.font, del_rect, "Delete", del_hovered, ButtonVariant::Danger);
 
-            let logout_x = l.action_bar.x + (bw + gap) * 2.0;
-            let logout_rect = Rect::new(logout_x, by, bw, bh);
-            let logout_hovered = point_in_rect(mx, my, logout_x, by, bw, bh);
+            let logout_hovered = point_in_rect(
+                mx,
+                my,
+                logout_rect.x,
+                logout_rect.y,
+                logout_rect.w,
+                logout_rect.h,
+            );
             draw_screen_button(
                 &self.font,
                 logout_rect,
