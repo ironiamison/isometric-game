@@ -130,11 +130,17 @@ impl CraftingOrderRegistry {
     pub fn generate_daily_orders(&self, player_skills: &HashMap<String, i32>) -> Vec<String> {
         let mut rng = rand::thread_rng();
 
-        // Filter orders where player has the required skill level
+        // Filter orders where player has the required skill level, excluding any order whose
+        // items aren't currently obtainable (e.g. the rune tier — see is_contract_excluded_item).
         let eligible: Vec<&OrderTemplate> = self
             .orders
             .iter()
             .filter(|o| player_skills.get(&o.skill).copied().unwrap_or(1) >= o.min_level)
+            .filter(|o| {
+                !o.items
+                    .iter()
+                    .any(|item| crate::game::resource_contracts::is_contract_excluded_item(&item.id))
+            })
             .collect();
 
         if eligible.is_empty() {

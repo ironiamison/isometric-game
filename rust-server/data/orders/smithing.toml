@@ -104,17 +104,6 @@ marks = 2
 mining = 700
 smithing = 1200
 
-[[orders]]
-id = "masterwork_rune_scimitar"
-tier = "masterwork"
-skill = "smithing"
-min_level = 60
-items = [{ id = "rune_scimitar", quantity = 1 }]
-
-[orders.rewards]
-gold = 3500
-marks = 2
-
-[orders.rewards.xp]
-mining = 800
-smithing = 1200
+# NOTE: No rune-tier orders — rune ore is not yet mineable in the world, so players can't source
+# rune bars/gear. Re-add a masterwork_rune_* order once rune rocks exist. The contract generator
+# also filters the rune tier in code (see CONTRACT_EXCLUDED_ITEM_PREFIXES in resource_contracts.rs).

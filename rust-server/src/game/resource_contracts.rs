@@ -12,6 +12,21 @@ use std::collections::{HashMap, HashSet};
 const ADVENTURE_BOARD_NAME: &str = "Adventure Board";
 const DAILY_CONTRACT_LIMIT: i32 = 5;
 
+/// Item id prefixes that are never eligible for contracts or crafting orders. Rune is in the
+/// recipe/ore data (so it can be smithed once obtainable) but there is no rune-mineable rock in
+/// the world yet, so players can't actually source rune ore/bars/gear. Exclude the whole tier
+/// from generated orders until that content exists. See also `orders/*.toml`, which has no rune
+/// board orders for the same reason.
+const CONTRACT_EXCLUDED_ITEM_PREFIXES: &[&str] = &["rune_"];
+
+/// Whether an item id is barred from contract/order generation (see
+/// [`CONTRACT_EXCLUDED_ITEM_PREFIXES`]).
+pub(in crate::game) fn is_contract_excluded_item(item_id: &str) -> bool {
+    CONTRACT_EXCLUDED_ITEM_PREFIXES
+        .iter()
+        .any(|prefix| item_id.starts_with(prefix))
+}
+
 /// The set of dialogue choice IDs a client is allowed to send back in response to an
 /// `AdventureBoardState` message. The board is a bespoke panel (not a `ShowDialogue`), so
 /// `send_to_player`'s grant machinery can't infer its choices from `DialogueChoice` ids the way
@@ -1501,6 +1516,9 @@ impl GameRoom {
                 }
             }
         }
+
+        preferred.retain(|t| !is_contract_excluded_item(&t.item_id));
+        fallback.retain(|t| !is_contract_excluded_item(&t.item_id));
 
         if preferred.is_empty() {
             fallback
