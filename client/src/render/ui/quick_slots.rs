@@ -30,16 +30,18 @@ impl Renderer {
 
         let (sw, sh) = virtual_screen_size();
 
-        // --- Compute positions for left controls ---
-        let cog_size = (22.0 * scale).max(20.0);
-        let arrow_w = (20.0 * scale).max(18.0);
-        let arrow_h = (14.0 * scale).max(12.0);
-        let preset_num_w = (18.0 * scale).max(16.0);
-        let preset_block_w = arrow_w.max(preset_num_w);
-        let _preset_block_h = arrow_h * 2.0 + preset_num_w; // up + number + down
-        let left_controls_w = cog_size + spacing + preset_block_w + spacing;
+        // --- Compute positions for the left control column ---
+        // A single vertical column: increment-page (▲) / editor (✱), stacked.
+        // The column is bottom-aligned with the slot row so each control is
+        // comfortably sized and readable.
+        let col_w = (28.0 * scale).max(26.0);
+        let box_gap = (2.0 * scale).max(2.0);
+        let caret_h = (18.0 * scale).max(18.0); // top increment button
+        let asterisk_h = (20.0 * scale).max(20.0); // middle editor button
+        let col_h = caret_h + asterisk_h + box_gap;
+        let left_controls_w = col_w + spacing;
 
-        // Center the whole assembly (left controls + slots)
+        // Center the whole assembly (left column + slots)
         let total_w = left_controls_w + total_slots_width;
         let base_x = (sw - total_w) / 2.0;
         let slots_start_x = base_x + left_controls_w;
@@ -48,109 +50,80 @@ impl Renderer {
         // No tray behind the hotbar — elements float, each slot carries its own
         // menu-button-style box (matching the action-bar buttons).
 
-        // --- Settings Cog ---
-        let cog_x = base_x;
-        let cog_y = slots_start_y + (slot_size - cog_size) / 2.0;
-        let cog_bounds = Rect::new(cog_x, cog_y, cog_size, cog_size);
-        layout.add(UiElementId::HotkeySettingsCog, cog_bounds);
-        let cog_hovered = matches!(hovered, Some(UiElementId::HotkeySettingsCog));
-        let cog_bg = if cog_hovered || state.ui_state.hotkey_settings_open {
-            SLOT_HOVER_BG
-        } else {
-            SLOT_BG_FILLED
-        };
-        let cog_border = if cog_hovered || state.ui_state.hotkey_settings_open {
-            SLOT_HOVER_BORDER
-        } else {
-            SLOT_BORDER
-        };
-        draw_rectangle(cog_x, cog_y, cog_size, cog_size, cog_bg);
-        draw_rectangle_lines(cog_x, cog_y, cog_size, cog_size, 1.0, cog_border);
-        // Draw a small gear icon with primitives
-        {
-            let cx = cog_x + cog_size / 2.0;
-            let cy = cog_y + cog_size / 2.0;
-            let color = if cog_hovered || state.ui_state.hotkey_settings_open {
-                TEXT_TITLE
+        // --- Left control column (▲ increment / ✱ editor) ---
+        // Both buttons use a filled box that lightens on hover.
+        let col_x = base_x;
+        // Bottom edge aligns with the slot row; the column extends upward.
+        let col_top = slots_start_y + slot_size - col_h;
+
+        // Same box style as the hotkey slots: 1px 0.9-alpha outer border rect +
+        // 0.85-alpha fill + top/left inner shadow, with identical hover colors.
+        let draw_btn_box = |x: f32, y: f32, w: f32, h: f32, active: bool| {
+            let (bg_color, border_color) = if active {
+                (SLOT_HOVER_BG, SLOT_HOVER_BORDER)
             } else {
-                TEXT_DIM
+                (SLOT_BG_EMPTY, SLOT_BORDER)
             };
-            let inner_r = cog_size * 0.1;
-            let outer_r = cog_size * 0.28;
-            // 6 teeth radiating from center
-            for i in 0..6 {
-                let angle = std::f32::consts::PI / 3.0 * i as f32;
-                let x1 = cx + inner_r * angle.cos();
-                let y1 = cy + inner_r * angle.sin();
-                let x2 = cx + outer_r * angle.cos();
-                let y2 = cy + outer_r * angle.sin();
-                draw_line(x1, y1, x2, y2, 1.5, color);
-            }
-            // Center dot
-            draw_circle(cx, cy, inner_r, color);
+            draw_rectangle(x - 1.0, y - 1.0, w + 2.0, h + 2.0,
+                Color::new(border_color.r, border_color.g, border_color.b, 0.9));
+            draw_rectangle(x, y, w, h,
+                Color::new(bg_color.r, bg_color.g, bg_color.b, 0.85));
+            draw_rectangle(x, y, w, 2.0, SLOT_INNER_SHADOW);
+            draw_rectangle(x, y, 2.0, h, SLOT_INNER_SHADOW);
+        };
+
+        // Top box: increment hotkey page (^ button — cycles and wraps).
+        let inc_y = col_top;
+        layout.add(
+            UiElementId::HotkeyPresetUp,
+            Rect::new(col_x, inc_y, col_w, caret_h),
+        );
+        let inc_hovered = matches!(hovered, Some(UiElementId::HotkeyPresetUp));
+        draw_btn_box(col_x, inc_y, col_w, caret_h, inc_hovered);
+        if let Some(arrow) = self.arrow_raise_icon.as_ref() {
+            // 16x16 raise-arrow texture, centered in the box (pixel-snapped, nearest-filtered).
+            let a = (16.0 * scale).floor().min(caret_h).min(col_w);
+            let ax = (col_x + (col_w - a) / 2.0).floor();
+            let ay = (inc_y + (caret_h - a) / 2.0).floor();
+            let tint = if inc_hovered { WHITE } else { TEXT_NORMAL };
+            draw_texture_ex(
+                arrow,
+                ax,
+                ay,
+                tint,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(a, a)),
+                    ..Default::default()
+                },
+            );
         }
 
-        // --- Preset Selector (up arrow, number, down arrow) ---
-        let preset_x = base_x + cog_size + spacing;
-        let preset_center_y = slots_start_y + slot_size / 2.0;
-
-        // Up arrow
-        let up_x = preset_x + (preset_block_w - arrow_w) / 2.0;
-        let up_y = preset_center_y - preset_num_w / 2.0 - arrow_h;
-        let up_bounds = Rect::new(up_x, up_y, arrow_w, arrow_h);
-        layout.add(UiElementId::HotkeyPresetUp, up_bounds);
-        let up_hovered = matches!(hovered, Some(UiElementId::HotkeyPresetUp));
-        let up_bg = if up_hovered {
-            SLOT_HOVER_BG
-        } else {
-            SLOT_BG_FILLED
-        };
-        draw_rectangle(up_x, up_y, arrow_w, arrow_h, up_bg);
-        draw_rectangle_lines(up_x, up_y, arrow_w, arrow_h, 1.0, SLOT_BORDER);
-        let arrow_char = "\u{25B2}";
-        let aw = self.measure_text_sharp(arrow_char, 12.0).width;
-        self.draw_text_sharp(
-            arrow_char,
-            (up_x + (arrow_w - aw) / 2.0).floor(),
-            (up_y + arrow_h - 2.0).floor(),
-            12.0,
-            if up_hovered { TEXT_TITLE } else { TEXT_DIM },
+        // Middle box: editor / settings (gear button).
+        let ed_y = inc_y + caret_h + box_gap;
+        layout.add(
+            UiElementId::HotkeySettingsCog,
+            Rect::new(col_x, ed_y, col_w, asterisk_h),
         );
-
-        // Preset number
-        let num_y = preset_center_y - preset_num_w / 2.0;
-        let preset_num = (state.ui_state.hotkey_bar.active_preset + 1).to_string();
-        let pn_w = self.measure_text_sharp(&preset_num, 16.0).width;
-        self.draw_text_sharp(
-            &preset_num,
-            (preset_x + (preset_block_w - pn_w) / 2.0).floor(),
-            (num_y + preset_num_w * 0.75).floor(),
-            16.0,
-            TEXT_TITLE,
-        );
-
-        // Down arrow
-        let down_x = preset_x + (preset_block_w - arrow_w) / 2.0;
-        let down_y = preset_center_y + preset_num_w / 2.0;
-        let down_bounds = Rect::new(down_x, down_y, arrow_w, arrow_h);
-        layout.add(UiElementId::HotkeyPresetDown, down_bounds);
-        let down_hovered = matches!(hovered, Some(UiElementId::HotkeyPresetDown));
-        let down_bg = if down_hovered {
-            SLOT_HOVER_BG
-        } else {
-            SLOT_BG_FILLED
-        };
-        draw_rectangle(down_x, down_y, arrow_w, arrow_h, down_bg);
-        draw_rectangle_lines(down_x, down_y, arrow_w, arrow_h, 1.0, SLOT_BORDER);
-        let darrow_char = "\u{25BC}";
-        let daw = self.measure_text_sharp(darrow_char, 12.0).width;
-        self.draw_text_sharp(
-            darrow_char,
-            (down_x + (arrow_w - daw) / 2.0).floor(),
-            (down_y + arrow_h - 2.0).floor(),
-            12.0,
-            if down_hovered { TEXT_TITLE } else { TEXT_DIM },
-        );
+        let ed_active = matches!(hovered, Some(UiElementId::HotkeySettingsCog))
+            || state.ui_state.hotkey_settings_open;
+        draw_btn_box(col_x, ed_y, col_w, asterisk_h, ed_active);
+        if let Some(gear) = self.gear_icon.as_ref() {
+            // 16x16 gear texture, centered in the box (pixel-snapped, nearest-filtered).
+            let g = (16.0 * scale).floor().min(asterisk_h).min(col_w);
+            let gx = (col_x + (col_w - g) / 2.0).floor();
+            let gy = (ed_y + (asterisk_h - g) / 2.0).floor();
+            let tint = if ed_active { WHITE } else { TEXT_NORMAL };
+            draw_texture_ex(
+                gear,
+                gx,
+                gy,
+                tint,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(g, g)),
+                    ..Default::default()
+                },
+            );
+        }
 
         // --- 5 Unified Slots ---
         let active_preset = state.ui_state.hotkey_bar.active();
@@ -619,28 +592,56 @@ impl Renderer {
     ) {
         let scale = state.ui_state.ui_scale;
         let total_slots_w = 5.0 * slot_size + 4.0 * spacing;
-        let popup_w = total_slots_w + 16.0;
-        let popup_h = (100.0 * scale).max(90.0);
-        let popup_x = slots_x - 8.0;
+
+        // Floating bronze window above the hotkey bar, matching the game's panels.
+        let pad = 8.0 * scale;
+        let top_pad = 16.0 * scale; // space beneath the floating title tab
+        let tab_h = (22.0 * scale).max(20.0);
+        let row_gap = 8.0 * scale;
+        let preview_slot_size = (36.0 * scale).max(32.0);
+
+        let popup_w = total_slots_w + 2.0 * pad;
+        let popup_h = top_pad + tab_h + row_gap + preview_slot_size + pad;
+        let popup_x = slots_x - pad;
         let popup_y = slots_y - popup_h - 6.0;
+        let inner_x = popup_x + pad;
+        let inner_w = popup_w - 2.0 * pad;
 
-        // Background
-        draw_rectangle(
-            popup_x - 1.0,
-            popup_y - 1.0,
-            popup_w + 2.0,
-            popup_h + 2.0,
-            SLOT_BORDER,
-        );
-        draw_rectangle(popup_x, popup_y, popup_w, popup_h, PANEL_BG_DARK);
+        // ===== Bronze panel frame + gold corner accents (the game's window style) =====
+        self.draw_panel_frame(popup_x, popup_y, popup_w, popup_h);
+        self.draw_corner_accents(popup_x, popup_y, popup_w, popup_h);
 
-        // Preset tabs row at the top
-        let tab_w = (popup_w - 16.0) / 5.0;
-        let tab_h = 22.0;
-        let tab_y = popup_y + 6.0;
+        // ===== Floating title tab =====
+        {
+            let title_text = "HOTKEY PRESETS";
+            let title_width = self.measure_text_sharp(title_text, 16.0).width + 28.0;
+            let title_x = popup_x + (popup_w - title_width) / 2.0;
+            let title_y = popup_y - 8.0;
+            let title_h = 26.0;
+            draw_rectangle(
+                title_x - 1.0, title_y - 1.0, title_width + 2.0, title_h + 2.0, FRAME_OUTER,
+            );
+            draw_rectangle(title_x, title_y, title_width, title_h, HEADER_BG);
+            draw_rectangle(
+                title_x + 1.0, title_y + 1.0, title_width - 2.0, title_h - 2.0,
+                Color::new(0.165, 0.149, 0.188, 1.0),
+            );
+            draw_line(
+                title_x + 2.0, title_y + 2.0, title_x + title_width - 2.0, title_y + 2.0,
+                1.0, FRAME_INNER,
+            );
+            self.draw_text_sharp(title_text, title_x + 14.0, title_y + 18.0, 16.0, TEXT_TITLE);
+            draw_rectangle(title_x, title_y, 3.0, 1.0, FRAME_ACCENT);
+            draw_rectangle(title_x + title_width - 3.0, title_y, 3.0, 1.0, FRAME_ACCENT);
+        }
+
+        // ===== Preset tabs row =====
+        let tab_w = inner_w / 5.0;
+        let tab_y = (popup_y + top_pad).floor();
         for i in 0..5 {
-            let tx = popup_x + 8.0 + i as f32 * tab_w;
-            let tab_bounds = Rect::new(tx, tab_y, tab_w - 2.0, tab_h);
+            let tx = (inner_x + i as f32 * tab_w).floor();
+            let bw = (tab_w - 2.0).floor();
+            let tab_bounds = Rect::new(tx, tab_y, bw, tab_h);
             layout.add(UiElementId::HotkeySettingsPresetTab(i), tab_bounds);
 
             let is_active = state.ui_state.hotkey_bar.active_preset == i;
@@ -654,35 +655,37 @@ impl Renderer {
             } else {
                 PANEL_BG_MID
             };
+            // Active preset gets the bright gold selected-border so it clearly pops.
             let border = if is_active {
+                SLOT_SELECTED_BORDER
+            } else if is_tab_hovered {
                 SLOT_HOVER_BORDER
             } else {
                 SLOT_BORDER
             };
-            draw_rectangle(tx, tab_y, tab_w - 2.0, tab_h, bg);
-            draw_rectangle_lines(tx, tab_y, tab_w - 2.0, tab_h, 1.0, border);
+            // Full crisp border on all four sides (outer border rect + inset fill).
+            draw_rectangle(tx, tab_y, bw, tab_h, border);
+            draw_rectangle(tx + 1.0, tab_y + 1.0, bw - 2.0, tab_h - 2.0, bg);
 
             let label = (i + 1).to_string();
             let lw = self.measure_text_sharp(&label, 16.0).width;
             let text_color = if is_active { TEXT_TITLE } else { TEXT_DIM };
             self.draw_text_sharp(
                 &label,
-                (tx + (tab_w - 2.0 - lw) / 2.0).floor(),
-                (tab_y + 16.0).floor(),
+                (tx + (bw - lw) / 2.0).floor(),
+                (tab_y + tab_h / 2.0 + 5.0).floor(),
                 16.0,
                 text_color,
             );
         }
 
-        // Slot preview row
-        let preview_slot_size = (36.0 * scale).max(32.0);
-        let preview_spacing = (popup_w - 16.0 - 5.0 * preview_slot_size) / 4.0;
-        let preview_y = tab_y + tab_h + 8.0;
+        // ===== Slot preview row =====
+        let preview_spacing = (inner_w - 5.0 * preview_slot_size) / 4.0;
+        let preview_y = tab_y + tab_h + row_gap;
         let active_preset = state.ui_state.hotkey_bar.active();
-        let _now = macroquad::time::get_time();
 
         for i in 0..5 {
-            let px = popup_x + 8.0 + i as f32 * (preview_slot_size + preview_spacing);
+            let px = inner_x + i as f32 * (preview_slot_size + preview_spacing);
             let py = preview_y;
 
             let slot_bounds = Rect::new(px, py, preview_slot_size, preview_slot_size);
@@ -758,9 +761,9 @@ impl Renderer {
 
             // X (clear) button — small button at top-right of each preview slot
             if !matches!(&active_preset.slots[i], HotkeySlotBinding::Empty) {
-                let clear_size = 14.0;
-                let cx = px + preview_slot_size - clear_size - 1.0;
-                let cy = py + 1.0;
+                let clear_size = 16.0;
+                let cx = (px + preview_slot_size - clear_size - 1.0).floor();
+                let cy = (py + 1.0).floor();
                 let clear_bounds = Rect::new(cx, cy, clear_size, clear_size);
                 layout.add(UiElementId::HotkeySettingsSlotClear(i), clear_bounds);
 
@@ -768,19 +771,21 @@ impl Renderer {
                     hovered,
                     Some(UiElementId::HotkeySettingsSlotClear(idx)) if *idx == i
                 );
-                let clear_bg = if clear_hovered {
-                    Color::new(0.6, 0.15, 0.15, 0.9)
+                let (clear_bg, clear_border) = if clear_hovered {
+                    (Color::new(0.62, 0.18, 0.18, 0.95), Color::new(0.85, 0.45, 0.40, 1.0))
                 } else {
-                    Color::new(0.3, 0.1, 0.1, 0.7)
+                    (Color::new(0.28, 0.10, 0.10, 0.8), SLOT_BORDER)
                 };
                 draw_rectangle(cx, cy, clear_size, clear_size, clear_bg);
-                let x_w = self.measure_text_sharp("x", 12.0).width;
+                draw_rectangle_lines(cx, cy, clear_size, clear_size, 1.0, clear_border);
+                // Native 16px glyph (multiple-of-8 bitmap size) so it stays crisp.
+                let xd = self.measure_text_sharp("X", 16.0);
                 self.draw_text_sharp(
-                    "x",
-                    (cx + (clear_size - x_w) / 2.0).floor(),
-                    (cy + 11.0).floor(),
-                    12.0,
-                    WHITE,
+                    "X",
+                    (cx + (clear_size - xd.width) / 2.0).floor(),
+                    (cy + (clear_size + xd.height) / 2.0 - 1.0).floor(),
+                    16.0,
+                    if clear_hovered { WHITE } else { TEXT_NORMAL },
                 );
             }
         }

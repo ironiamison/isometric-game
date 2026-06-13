@@ -414,6 +414,10 @@ pub struct Renderer {
     /// Audio mute / unmute icons for the settings panel
     pub(crate) sound_icon: Option<Texture2D>,
     pub(crate) mute_icon: Option<Texture2D>,
+    /// Gear icon (16x16) for the hotkey-bar editor button
+    pub(crate) gear_icon: Option<Texture2D>,
+    /// Raise-arrow icon (16x16) for the hotkey-bar page incrementer
+    pub(crate) arrow_raise_icon: Option<Texture2D>,
     /// HUD stat-bar icons (16x16): health / magic / prayer
     pub(crate) health_stat_icon: Option<Texture2D>,
     pub(crate) magic_stat_icon: Option<Texture2D>,

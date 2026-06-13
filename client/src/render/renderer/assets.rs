@@ -1098,6 +1098,26 @@ impl Renderer {
                 None
             }
         };
+        let gear_icon = match load_texture(&asset_path("assets/ui/gear.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load gear icon: {}", e);
+                None
+            }
+        };
+        let arrow_raise_icon = match load_texture(&asset_path("assets/ui/arrow_raise.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load arrow_raise icon: {}", e);
+                None
+            }
+        };
 
         // HUD stat-bar icons (16x16)
         let load_stat_icon = |tex: Result<Texture2D, macroquad::Error>, name: &str| match tex {
@@ -1484,6 +1504,8 @@ impl Renderer {
             coin_small_icon,
             sound_icon,
             mute_icon,
+            gear_icon,
+            arrow_raise_icon,
             health_stat_icon,
             magic_stat_icon,
             prayer_stat_icon,
