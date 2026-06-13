@@ -1,7 +1,7 @@
 use super::*;
 use crate::render::ui::common::{
-    CORNER_ACCENT_SIZE, FRAME_ACCENT, FRAME_INNER, FRAME_MID, FRAME_OUTER, FRAME_THICKNESS,
-    PANEL_BG_DARK, TEXT_DIM, TEXT_GOLD, TEXT_NORMAL, TEXT_TITLE,
+    draw_corner_accents, draw_panel_frame, FRAME_ACCENT, FRAME_OUTER, TEXT_DIM, TEXT_GOLD,
+    TEXT_NORMAL, TEXT_TITLE,
 };
 
 // Placeholder external links — swap in the real Discord invite / news URL when ready.
@@ -454,77 +454,6 @@ impl LoginScreen {
         }
     }
 
-    /// Draw the multi-layer bronze/gold panel frame (mirrors the renderer's
-    /// `draw_panel_frame`, with a more opaque dark backing for the login screen).
-    fn draw_panel_frame(x: f32, y: f32, w: f32, h: f32) {
-        // Drop shadow for depth against the night sky
-        draw_rectangle(x - 3.0, y - 3.0, w + 6.0, h + 6.0, Color::new(0.0, 0.0, 0.0, 0.5));
-        // Dark bronze outer frame
-        draw_rectangle(x, y, w, h, FRAME_OUTER);
-        // Mid bronze frame (inset 2px)
-        draw_rectangle(x + 2.0, y + 2.0, w - 4.0, h - 4.0, FRAME_MID);
-        // Main panel backing (inset by frame thickness) — solid dark "front door"
-        draw_rectangle(
-            x + FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            w - FRAME_THICKNESS * 2.0,
-            h - FRAME_THICKNESS * 2.0,
-            PANEL_BG_DARK,
-        );
-        // Inner highlight (top + left)
-        draw_line(
-            x + FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            x + w - FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            1.0,
-            FRAME_INNER,
-        );
-        draw_line(
-            x + FRAME_THICKNESS,
-            y + FRAME_THICKNESS,
-            x + FRAME_THICKNESS,
-            y + h - FRAME_THICKNESS,
-            1.0,
-            FRAME_INNER,
-        );
-        // Inner shadow (bottom + right)
-        let shadow = Color::new(0.0, 0.0, 0.0, 0.235);
-        draw_line(
-            x + FRAME_THICKNESS + 1.0,
-            y + h - FRAME_THICKNESS - 1.0,
-            x + w - FRAME_THICKNESS,
-            y + h - FRAME_THICKNESS - 1.0,
-            1.0,
-            shadow,
-        );
-        draw_line(
-            x + w - FRAME_THICKNESS - 1.0,
-            y + FRAME_THICKNESS + 1.0,
-            x + w - FRAME_THICKNESS - 1.0,
-            y + h - FRAME_THICKNESS,
-            1.0,
-            shadow,
-        );
-    }
-
-    /// Gold L-shaped corner accents (mirrors the renderer's `draw_corner_accents`).
-    fn draw_corner_accents(x: f32, y: f32, w: f32, h: f32) {
-        let s = CORNER_ACCENT_SIZE + 4.0; // slightly bolder for the front door
-        // Top-left
-        draw_rectangle(x, y, s, 2.0, FRAME_ACCENT);
-        draw_rectangle(x, y, 2.0, s, FRAME_ACCENT);
-        // Top-right
-        draw_rectangle(x + w - s, y, s, 2.0, FRAME_ACCENT);
-        draw_rectangle(x + w - 2.0, y, 2.0, s, FRAME_ACCENT);
-        // Bottom-left
-        draw_rectangle(x, y + h - 2.0, s, 2.0, FRAME_ACCENT);
-        draw_rectangle(x, y + h - s, 2.0, s, FRAME_ACCENT);
-        // Bottom-right
-        draw_rectangle(x + w - s, y + h - 2.0, s, 2.0, FRAME_ACCENT);
-        draw_rectangle(x + w - 2.0, y + h - s, 2.0, s, FRAME_ACCENT);
-    }
-
     /// Draw a labelled text field with gold-on-focus borders (no blue fill).
     fn draw_field(
         &self,
@@ -882,8 +811,8 @@ impl Screen for LoginScreen {
         let hit = |r: Rect| point_in_rect(mx, my, r.x, r.y, r.w, r.h);
 
         // Gold-bevel frame + corner accents (the "front door")
-        Self::draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
-        Self::draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
+        draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
+        draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
 
         // Title wordmark — drawn as text at a native font size (32, falling back
         // to 24 if it would overflow) to stay pixel-crisp. The logo.png is
