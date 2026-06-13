@@ -28,6 +28,12 @@ const HAIR_STYLES: usize = 6; // 0-5
 const HAIR_COLORS: usize = 10; // 0-9 (20 frames / 2 front-back pairs)
 
 const FIELD_BOX_H: f32 = 34.0;
+const LABEL_DY: f32 = 14.0; // label baseline above its row's box
+const BOX_DY: f32 = 20.0; // box top below the row's label line
+const HAIR_MID_GAP: f32 = 10.0; // gap between Style and Color half-boxes
+const ACTION_GAP: f32 = 8.0; // gap between Create and Cancel
+const ARROW_ZONE_FULL: f32 = 50.0; // click width of < / > on full-width steppers
+const ARROW_ZONE_HALF: f32 = 35.0; // click width of < / > on half-width hair steppers
 
 /// Precomputed geometry for the create-character screen, centered as a group
 /// (mirrors char-select's `CharSelectLayout`) so `update` hit-testing and
@@ -87,6 +93,43 @@ impl CreateLayout {
             row_h,
             action_bar,
         }
+    }
+
+    /// Label baseline for form row `row`.
+    fn label_y(&self, row: usize) -> f32 {
+        self.form_top + row as f32 * self.row_h + LABEL_DY
+    }
+
+    /// Full-width field box for form row `row` (Name/Gender/Skin).
+    fn row_box(&self, row: usize) -> Rect {
+        Rect::new(
+            self.form_x,
+            self.form_top + row as f32 * self.row_h + BOX_DY,
+            self.form_w,
+            FIELD_BOX_H,
+        )
+    }
+
+    /// Hair row (row 3) half-width boxes: (style_left, color_right).
+    fn hair_boxes(&self) -> (Rect, Rect) {
+        let y = self.form_top + 3.0 * self.row_h + BOX_DY;
+        let half_w = (self.form_w - HAIR_MID_GAP) / 2.0;
+        let style = Rect::new(self.form_x, y, half_w, FIELD_BOX_H);
+        let color = Rect::new(self.form_x + half_w + HAIR_MID_GAP, y, half_w, FIELD_BOX_H);
+        (style, color)
+    }
+
+    /// Create / Cancel button rects in the action bar.
+    fn button_rects(&self) -> (Rect, Rect) {
+        let bw = (self.action_bar.w - ACTION_GAP) / 2.0;
+        let create = Rect::new(self.action_bar.x, self.action_bar.y, bw, self.action_bar.h);
+        let cancel = Rect::new(
+            self.action_bar.x + bw + ACTION_GAP,
+            self.action_bar.y,
+            bw,
+            self.action_bar.h,
+        );
+        (create, cancel)
     }
 }
 
@@ -196,7 +239,7 @@ impl CharacterCreateScreen {
         }
     }
 
-    /// Recessed gold-on-focus field box (matches login). Returns nothing.
+    /// Recessed gold-on-focus field box (matches login).
     fn draw_field_box(&self, rect: Rect, active: bool) {
         let fill = if active {
             Color::from_rgba(22, 22, 32, 250)
@@ -218,13 +261,7 @@ impl CharacterCreateScreen {
     /// `enabled=false` renders a dim disabled state with `value` (e.g. "-").
     fn draw_stepper(&self, rect: Rect, value: &str, active: bool, enabled: bool) {
         self.draw_field_box(rect, active && enabled);
-        let arrow = if !enabled {
-            TEXT_DIM
-        } else if active {
-            FRAME_ACCENT
-        } else {
-            TEXT_DIM
-        };
+        let arrow = if active && enabled { FRAME_ACCENT } else { TEXT_DIM };
         let val_color = if enabled { TEXT_NORMAL } else { TEXT_DIM };
         let by = rect.y + rect.h / 2.0 + 6.0;
         self.draw_text_sharp("<", rect.x + 12.0, by, 16.0, arrow);
@@ -266,15 +303,6 @@ impl Screen for CharacterCreateScreen {
         }
 
         let l = CreateLayout::compute(sw, sh);
-        let form_x = l.form_x;
-        let form_w = l.form_w;
-        let half_width = (form_w - 10.0) / 2.0;
-
-        // Per-row box geometry (must match render).
-        let name_box_y = l.form_top + 20.0;
-        let gender_box_y = l.form_top + l.row_h + 20.0;
-        let skin_box_y = l.form_top + l.row_h * 2.0 + 20.0;
-        let hair_box_y = l.form_top + l.row_h * 3.0 + 20.0;
 
         // Handle name input when name field is active
         if self.active_field == CreateField::Name {
@@ -284,18 +312,20 @@ impl Screen for CharacterCreateScreen {
         // Mouse: Click on fields to focus
         if clicked {
             // Name field box
-            if point_in_rect(mx, my, form_x, name_box_y, form_w, FIELD_BOX_H) {
+            let name_box = l.row_box(0);
+            if point_in_rect(mx, my, name_box.x, name_box.y, name_box.w, name_box.h) {
                 self.active_field = CreateField::Name;
                 show_keyboard(true);
             }
 
             // Gender field box
-            if point_in_rect(mx, my, form_x, gender_box_y, form_w, FIELD_BOX_H) {
+            let gb = l.row_box(1);
+            if point_in_rect(mx, my, gb.x, gb.y, gb.w, gb.h) {
                 self.active_field = CreateField::Gender;
                 show_keyboard(false);
 
                 // Check if clicked on left arrow area
-                if point_in_rect(mx, my, form_x, gender_box_y, 50.0, FIELD_BOX_H) {
+                if point_in_rect(mx, my, gb.x, gb.y, ARROW_ZONE_FULL, gb.h) {
                     self.gender_index = if self.gender_index == 0 {
                         GENDERS.len() - 1
                     } else {
@@ -303,18 +333,19 @@ impl Screen for CharacterCreateScreen {
                     };
                 }
                 // Check if clicked on right arrow area
-                if point_in_rect(mx, my, form_x + form_w - 50.0, gender_box_y, 50.0, FIELD_BOX_H) {
+                if point_in_rect(mx, my, gb.x + gb.w - ARROW_ZONE_FULL, gb.y, ARROW_ZONE_FULL, gb.h) {
                     self.gender_index = (self.gender_index + 1) % GENDERS.len();
                 }
             }
 
             // Skin field box
-            if point_in_rect(mx, my, form_x, skin_box_y, form_w, FIELD_BOX_H) {
+            let sb = l.row_box(2);
+            if point_in_rect(mx, my, sb.x, sb.y, sb.w, sb.h) {
                 self.active_field = CreateField::Skin;
                 show_keyboard(false);
 
                 // Check if clicked on left arrow area
-                if point_in_rect(mx, my, form_x, skin_box_y, 50.0, FIELD_BOX_H) {
+                if point_in_rect(mx, my, sb.x, sb.y, ARROW_ZONE_FULL, sb.h) {
                     self.skin_index = if self.skin_index == 0 {
                         SKINS.len() - 1
                     } else {
@@ -322,18 +353,20 @@ impl Screen for CharacterCreateScreen {
                     };
                 }
                 // Check if clicked on right arrow area
-                if point_in_rect(mx, my, form_x + form_w - 50.0, skin_box_y, 50.0, FIELD_BOX_H) {
+                if point_in_rect(mx, my, sb.x + sb.w - ARROW_ZONE_FULL, sb.y, ARROW_ZONE_FULL, sb.h) {
                     self.skin_index = (self.skin_index + 1) % SKINS.len();
                 }
             }
 
+            let (style_box, color_box) = l.hair_boxes();
+
             // Hair style field box (left half of hair row)
-            if point_in_rect(mx, my, form_x, hair_box_y, half_width, FIELD_BOX_H) {
+            if point_in_rect(mx, my, style_box.x, style_box.y, style_box.w, style_box.h) {
                 self.active_field = CreateField::HairStyle;
                 show_keyboard(false);
 
                 // Check if clicked on left arrow area
-                if point_in_rect(mx, my, form_x, hair_box_y, 35.0, FIELD_BOX_H) {
+                if point_in_rect(mx, my, style_box.x, style_box.y, ARROW_ZONE_HALF, style_box.h) {
                     self.hair_style_index = match self.hair_style_index {
                         None => Some(HAIR_STYLES - 1),
                         Some(0) => None,
@@ -341,7 +374,14 @@ impl Screen for CharacterCreateScreen {
                     };
                 }
                 // Check if clicked on right arrow area
-                if point_in_rect(mx, my, form_x + half_width - 35.0, hair_box_y, 35.0, FIELD_BOX_H) {
+                if point_in_rect(
+                    mx,
+                    my,
+                    style_box.x + style_box.w - ARROW_ZONE_HALF,
+                    style_box.y,
+                    ARROW_ZONE_HALF,
+                    style_box.h,
+                ) {
                     self.hair_style_index = match self.hair_style_index {
                         None => Some(0),
                         Some(i) if i >= HAIR_STYLES - 1 => None,
@@ -351,15 +391,14 @@ impl Screen for CharacterCreateScreen {
             }
 
             // Hair color field box (right half of hair row, only if hair style selected)
-            let hair_color_x = form_x + half_width + 10.0;
             if self.hair_style_index.is_some()
-                && point_in_rect(mx, my, hair_color_x, hair_box_y, half_width, FIELD_BOX_H)
+                && point_in_rect(mx, my, color_box.x, color_box.y, color_box.w, color_box.h)
             {
                 self.active_field = CreateField::HairColor;
                 show_keyboard(false);
 
                 // Check if clicked on left arrow area
-                if point_in_rect(mx, my, hair_color_x, hair_box_y, 35.0, FIELD_BOX_H) {
+                if point_in_rect(mx, my, color_box.x, color_box.y, ARROW_ZONE_HALF, color_box.h) {
                     self.hair_color_index = if self.hair_color_index == 0 {
                         HAIR_COLORS - 1
                     } else {
@@ -370,22 +409,17 @@ impl Screen for CharacterCreateScreen {
                 if point_in_rect(
                     mx,
                     my,
-                    hair_color_x + half_width - 35.0,
-                    hair_box_y,
-                    35.0,
-                    FIELD_BOX_H,
+                    color_box.x + color_box.w - ARROW_ZONE_HALF,
+                    color_box.y,
+                    ARROW_ZONE_HALF,
+                    color_box.h,
                 ) {
                     self.hair_color_index = (self.hair_color_index + 1) % HAIR_COLORS;
                 }
             }
 
             // Action bar: Create + Cancel
-            let gap = 8.0;
-            let bw = (l.action_bar.w - gap) / 2.0;
-            let bh = l.action_bar.h;
-            let by = l.action_bar.y;
-            let create_rect = Rect::new(l.action_bar.x, by, bw, bh);
-            let cancel_rect = Rect::new(l.action_bar.x + bw + gap, by, bw, bh);
+            let (create_rect, cancel_rect) = l.button_rects();
 
             // Create button
             if point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h) {
@@ -598,7 +632,6 @@ impl Screen for CharacterCreateScreen {
         ScreenState::Continue
     }
 
-
     fn render(&self) {
         let (sw, sh) = virtual_screen_size();
         let (input_pos, _, _) = get_input_state();
@@ -641,14 +674,10 @@ impl Screen for CharacterCreateScreen {
             sprite_y,
         );
 
-        let form_x = l.form_x;
-        let form_w = l.form_w;
-
         // --- Row 0: Name ---
         let name_active = self.active_field == CreateField::Name;
-        let name_top = l.form_top;
-        self.draw_field_label("Name", form_x, name_top + 14.0, name_active);
-        let name_box = Rect::new(form_x, name_top + 20.0, form_w, FIELD_BOX_H);
+        let name_box = l.row_box(0);
+        self.draw_field_label("Name", l.form_x, l.label_y(0), name_active);
         self.draw_field_box(name_box, name_active);
         let cursor = if name_active && (get_time() * 2.0) as i32 % 2 == 0 {
             "|"
@@ -675,26 +704,21 @@ impl Screen for CharacterCreateScreen {
 
         // --- Row 1: Gender ---
         let gender_active = self.active_field == CreateField::Gender;
-        let gender_top = l.form_top + l.row_h;
-        self.draw_field_label("Gender", form_x, gender_top + 14.0, gender_active);
-        let gender_box = Rect::new(form_x, gender_top + 20.0, form_w, FIELD_BOX_H);
+        let gender_box = l.row_box(1);
+        self.draw_field_label("Gender", l.form_x, l.label_y(1), gender_active);
         self.draw_stepper(gender_box, GENDERS[self.gender_index], gender_active, true);
 
         // --- Row 2: Skin ---
         let skin_active = self.active_field == CreateField::Skin;
-        let skin_top = l.form_top + l.row_h * 2.0;
-        self.draw_field_label("Skin", form_x, skin_top + 14.0, skin_active);
-        let skin_box = Rect::new(form_x, skin_top + 20.0, form_w, FIELD_BOX_H);
+        let skin_box = l.row_box(2);
+        self.draw_field_label("Skin", l.form_x, l.label_y(2), skin_active);
         self.draw_stepper(skin_box, SKINS[self.skin_index], skin_active, true);
 
         // --- Row 3: Hair (Style + Color) ---
-        let hair_top = l.form_top + l.row_h * 3.0;
-        let half_w = (form_w - 10.0) / 2.0;
-        let color_x = form_x + half_w + 10.0;
+        let (style_box, color_box) = l.hair_boxes();
 
         let style_active = self.active_field == CreateField::HairStyle;
-        self.draw_field_label("Style", form_x, hair_top + 14.0, style_active);
-        let style_box = Rect::new(form_x, hair_top + 20.0, half_w, FIELD_BOX_H);
+        self.draw_field_label("Style", style_box.x, l.label_y(3), style_active);
         let style_value = match self.hair_style_index {
             None => "Bald".to_string(),
             Some(i) => format!("{}", i + 1),
@@ -703,8 +727,7 @@ impl Screen for CharacterCreateScreen {
 
         let color_active = self.active_field == CreateField::HairColor;
         let color_enabled = self.hair_style_index.is_some();
-        self.draw_field_label("Color", color_x, hair_top + 14.0, color_active && color_enabled);
-        let color_box = Rect::new(color_x, hair_top + 20.0, half_w, FIELD_BOX_H);
+        self.draw_field_label("Color", color_box.x, l.label_y(3), color_active && color_enabled);
         let color_value = if color_enabled {
             format!("{}", self.hair_color_index + 1)
         } else {
@@ -713,14 +736,11 @@ impl Screen for CharacterCreateScreen {
         self.draw_stepper(color_box, &color_value, color_active, color_enabled);
 
         // --- Action bar (Create + Cancel) ---
-        let gap = 8.0;
-        let bw = (l.action_bar.w - gap) / 2.0;
-        let bh = l.action_bar.h;
-        let by = l.action_bar.y;
-        let create_rect = Rect::new(l.action_bar.x, by, bw, bh);
-        let cancel_rect = Rect::new(l.action_bar.x + bw + gap, by, bw, bh);
-        let create_hovered = point_in_rect(mx, my, create_rect.x, create_rect.y, bw, bh);
-        let cancel_hovered = point_in_rect(mx, my, cancel_rect.x, cancel_rect.y, bw, bh);
+        let (create_rect, cancel_rect) = l.button_rects();
+        let create_hovered =
+            point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h);
+        let cancel_hovered =
+            point_in_rect(mx, my, cancel_rect.x, cancel_rect.y, cancel_rect.w, cancel_rect.h);
         draw_screen_button(&self.font, create_rect, "Create", create_hovered, ButtonVariant::Primary);
         draw_screen_button(&self.font, cancel_rect, "Cancel", cancel_hovered, ButtonVariant::Neutral);
 
