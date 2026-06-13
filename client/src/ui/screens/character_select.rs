@@ -555,7 +555,7 @@ impl Screen for CharacterSelectScreen {
         if self.confirm_delete {
             // Keyboard shortcuts
             if is_key_pressed(KeyCode::Y) {
-                if !self.characters.is_empty() {
+                if self.selected_index < self.characters.len() {
                     let char_id = self.characters[self.selected_index].id;
                     #[cfg(not(target_arch = "wasm32"))]
                     {
@@ -593,7 +593,7 @@ impl Screen for CharacterSelectScreen {
                 let yes_x = box_x + 70.0;
                 let yes_y = box_y + 85.0;
                 if point_in_rect(mx, my, yes_x, yes_y, 100.0, 30.0) {
-                    if !self.characters.is_empty() {
+                    if self.selected_index < self.characters.len() {
                         let char_id = self.characters[self.selected_index].id;
                         #[cfg(not(target_arch = "wasm32"))]
                         {
@@ -1006,7 +1006,7 @@ impl Screen for CharacterSelectScreen {
             draw_panel_frame(box_x, box_y, box_w, box_h);
             draw_corner_accents(box_x, box_y, box_w, box_h);
 
-            if !self.characters.is_empty() {
+            if self.selected_index < self.characters.len() {
                 let char_name = &self.characters[self.selected_index].name;
                 let delete_text = format!("Delete '{}'?", char_name);
                 let delete_width = self.measure_text_sharp(&delete_text, 16.0).width;
