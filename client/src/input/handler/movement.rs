@@ -401,7 +401,9 @@ impl InputHandler {
             let is_moving = self.last_dx != 0.0 || self.last_dy != 0.0;
             if is_moving && current_time >= state.dash_cooldown_end {
                 commands.push(InputCommand::Dash);
-                state.dash_cooldown_end = current_time + 3.0; // 3 second cooldown
+                // Match server's DASH_COOLDOWN_TICKS (100 @ 20Hz = 5.0s) so we never
+                // attempt a dash the server will silently reject (every-other-dash bug).
+                state.dash_cooldown_end = current_time + 5.0;
             }
         }
 
