@@ -12,11 +12,24 @@ const MAX_CHARACTERS: usize = 3;
 const CARD_HEIGHT: f32 = 92.0;
 const CARD_GAP: f32 = 6.0;
 const ACTION_BAR_H: f32 = 44.0;
+/// Fixed panel height for the empty-state invitation (no character cards).
+const EMPTY_PANEL_H: f32 = 300.0;
+
+/// Rows the roster list shows: character cards plus the create row (when under
+/// the cap). Returns 0 for the empty state, which uses a fixed invitation panel.
+fn card_row_count(characters_len: usize) -> usize {
+    match characters_len {
+        0 => 0,
+        n if n < MAX_CHARACTERS => n + 1,
+        n => n,
+    }
+}
 
 /// Precomputed geometry for the character-select screen, computed once from the
 /// screen size and shared by both `update` (hit-testing) and `render` (drawing)
 /// so the two can never drift apart. (Mirrors login's `LoginLayout` pattern.)
 struct CharSelectLayout {
+    header_y: f32,       // baseline for the title / username row (above the panel)
     panel: Rect,         // bronze-framed roster panel
     list_x: f32,         // inner content x (inside frame padding)
     list_w: f32,         // inner content width
@@ -26,18 +39,36 @@ struct CharSelectLayout {
 }
 
 impl CharSelectLayout {
-    fn compute(sw: f32, sh: f32) -> Self {
+    fn compute(sw: f32, sh: f32, card_rows: usize) -> Self {
         let panel_w = 540.0_f32.min(sw - 24.0);
         let panel_x = (sw - panel_w) / 2.0;
-        let panel_top = 56.0; // below the header row
         let action_h = ACTION_BAR_H;
         let action_gap = 12.0;
-        let bottom_margin = 36.0; // room for hint line
-        let panel_bottom = sh - bottom_margin - action_h - action_gap;
-        let panel_h = (panel_bottom - panel_top).max(160.0);
+        let header_h = 28.0; // title sits just above the panel
+        let hint_h = 28.0; // hint line sits just below the action bar
+        let pad = FRAME_THICKNESS + 10.0;
+        let item_height = CARD_HEIGHT + CARD_GAP;
+
+        // Size the panel to its content (max 3 cards + create row) rather than
+        // filling the screen. Empty state uses a fixed invitation height.
+        let content_h = if card_rows == 0 {
+            EMPTY_PANEL_H
+        } else {
+            card_rows as f32 * item_height + pad * 2.0
+        };
+        // Never exceed the available vertical space (forces scrolling on short
+        // screens / when content is unexpectedly tall).
+        let max_panel_h =
+            ((sh - 24.0).max(200.0) - header_h - action_gap - action_h - hint_h).max(160.0);
+        let panel_h = content_h.min(max_panel_h).max(160.0);
+
+        // Center the whole group (header + panel + action bar + hint) vertically.
+        let block_h = header_h + panel_h + action_gap + action_h + hint_h;
+        let block_top = ((sh - block_h) / 2.0).max(12.0);
+        let header_y = block_top + 20.0;
+        let panel_top = block_top + header_h;
         let panel = Rect::new(panel_x, panel_top, panel_w, panel_h);
 
-        let pad = FRAME_THICKNESS + 10.0;
         let list_x = panel_x + pad;
         let list_w = panel_w - pad * 2.0;
         let list_top = panel_top + pad;
@@ -46,6 +77,7 @@ impl CharSelectLayout {
         let action_bar = Rect::new(panel_x, panel.y + panel.h + action_gap, panel_w, action_h);
 
         Self {
+            header_y,
             panel,
             list_x,
             list_w,
@@ -53,15 +85,6 @@ impl CharSelectLayout {
             list_visible_h,
             action_bar,
         }
-    }
-}
-
-/// Capitalize the first character of a string (ASCII-friendly), leaving the rest.
-fn title_case(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-        None => String::new(),
     }
 }
 
@@ -378,18 +401,13 @@ impl CharacterSelectScreen {
         let chip_h = 18.0;
         let chip_x = text_x;
         let chip_y = center_y + 2.0;
-        draw_rectangle(chip_x, chip_y, chip_w, chip_h, level_chip_color(character.level));
-        self.draw_text_sharp(
-            &chip_label,
-            chip_x + 7.0,
-            chip_y + 14.0,
-            16.0,
-            CHIP_TEXT_DARK,
-        );
-
-        // Meta: gender + race/skin, after the chip
-        let meta = format!("{} {}", title_case(&character.gender), title_case(&character.skin));
-        self.draw_text_sharp(&meta, chip_x + chip_w + 8.0, chip_y + 14.0, 16.0, TEXT_DIM);
+        let chip_color = level_chip_color(character.level);
+        draw_rectangle(chip_x, chip_y, chip_w, chip_h, chip_color);
+        // Readable label: light text on dark (low-level) chips, dark text on
+        // bright gold (high-level) chips.
+        let chip_lum = 0.299 * chip_color.r + 0.587 * chip_color.g + 0.114 * chip_color.b;
+        let chip_text = if chip_lum < 0.5 { TEXT_NORMAL } else { CHIP_TEXT_DARK };
+        self.draw_text_sharp(&chip_label, chip_x + 7.0, chip_y + 14.0, 16.0, chip_text);
 
         // Played time (right-aligned) + dim "played" label beneath
         let time_str = format_played_time(character.played_time);
@@ -494,7 +512,7 @@ impl Screen for CharacterSelectScreen {
         let mx = input_pos.x;
         let my = input_pos.y;
 
-        let l = CharSelectLayout::compute(sw, sh);
+        let l = CharSelectLayout::compute(sw, sh, card_row_count(self.characters.len()));
         let item_height = CARD_HEIGHT + CARD_GAP;
         let create_selectable =
             !self.characters.is_empty() && self.characters.len() < MAX_CHARACTERS;
@@ -768,7 +786,7 @@ impl Screen for CharacterSelectScreen {
         let (sw, sh) = virtual_screen_size();
         let (input_pos, _, _) = get_input_state();
         let (mx, my) = (input_pos.x, input_pos.y);
-        let l = CharSelectLayout::compute(sw, sh);
+        let l = CharSelectLayout::compute(sw, sh, card_row_count(self.characters.len()));
 
         // Background
         if self.has_spectator_backdrop {
@@ -777,9 +795,8 @@ impl Screen for CharacterSelectScreen {
             self.starfield.draw(sw, sh, 1.0);
         }
 
-        // Header row: username (left) + centered title
-        let header_y = 32.0;
-        self.draw_text_sharp(&self.session.username, 24.0, header_y, 16.0, TEXT_DIM);
+        // Header row: username (left) + centered title (above the panel)
+        let header_y = l.header_y;
         let title = "SELECT CHARACTER";
         let title_w = self.measure_text_sharp(title, 16.0).width;
         self.draw_text_sharp(title, ((sw - title_w) / 2.0).floor(), header_y, 16.0, TEXT_TITLE);
@@ -1057,13 +1074,6 @@ mod tests {
         assert_eq!(format_played_time(9 * 3600 + 51 * 60), "9h 51m");
         assert_eq!(format_played_time(149 * 3600 + 44 * 60), "149h 44m");
         assert_eq!(format_played_time(3600), "1h 0m");
-    }
-
-    #[test]
-    fn title_case_caps_first() {
-        assert_eq!(title_case("male"), "Male");
-        assert_eq!(title_case("orc"), "Orc");
-        assert_eq!(title_case(""), "");
     }
 
     #[test]
