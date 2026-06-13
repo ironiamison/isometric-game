@@ -417,6 +417,12 @@ impl Renderer {
             // Downstream anchors for indicators/chips
             let bar_x: f32;
             let prayer_bar_y: f32;
+            // Geometry the transient indicators (fishing/stall/dash) and chip row use so
+            // they line up flush with the stat bars: the bars are trimmed in from the
+            // right (bar_rw), so the indicators must match that exact width rather than
+            // running the full bar_width and overhanging.
+            let indicator_x: f32;
+            let indicator_w: f32;
 
             if cfg!(target_os = "android") {
                 // ===== ANDROID: Compact horizontal bars at top-left =====
@@ -567,6 +573,9 @@ impl Renderer {
                 bar_width = 100.0;
                 bar_height = compact_h;
                 prayer_bar_y = hud_y;
+                // Android bars run the full width, so indicators match it directly.
+                indicator_x = bar_x;
+                indicator_w = bar_width;
             } else {
                 // ===== DESKTOP: portrait + name header, icon-prefixed bars, style row =====
                 let (name_tag_x, name_tag_y) = self.local_name_tag_position(state);
@@ -589,6 +598,10 @@ impl Renderer {
                 bar_x = portrait_x - hpad; // box + bar left edge
                 let bar_rx = bar_x;
                 let bar_rw = bar_width - 20.0 * s; // trimmed in from the right
+                // Transient indicators + chip row share the stat bars' exact left edge
+                // and trimmed width so the whole cluster reads as one aligned column.
+                indicator_x = bar_rx;
+                indicator_w = bar_rw;
 
                 // Name + level sit to the right of the portrait inside the nameplate, with a
                 // bit of breathing room so they don't touch the head.
@@ -798,8 +811,8 @@ impl Renderer {
                         "Fishing",
                     )
                 };
-                draw_rectangle(bar_x, gather_y, bar_width, gather_h, bg_color);
-                draw_rectangle_lines(bar_x, gather_y, bar_width, gather_h, 1.0, border_color);
+                draw_rectangle(indicator_x, gather_y, indicator_w, gather_h, bg_color);
+                draw_rectangle_lines(indicator_x, gather_y, indicator_w, gather_h, 1.0, border_color);
                 // Animated dots
                 let dot_count = ((macroquad::time::get_time() * 2.0) as usize % 4) as usize;
                 let dots = ".".repeat(dot_count);
@@ -807,7 +820,7 @@ impl Renderer {
                 let label_w = self.measure_text_sharp(&label, 16.0).width;
                 self.draw_text_sharp(
                     &label,
-                    (bar_x + (bar_width - label_w) / 2.0).floor(),
+                    (indicator_x + (indicator_w - label_w) / 2.0).floor(),
                     (gather_y + gather_h * 0.68).floor(),
                     16.0,
                     text_color,
@@ -824,13 +837,13 @@ impl Renderer {
                 let bg_color = Color::new(0.05, 0.18, 0.08, 0.7);
                 let border_color = Color::new(0.2, 0.55, 0.25, 0.5);
                 let text_color = Color::new(0.5, 0.9, 0.55, 0.9);
-                draw_rectangle(bar_x, stall_bar_y, bar_width, stall_h, bg_color);
-                draw_rectangle_lines(bar_x, stall_bar_y, bar_width, stall_h, 1.0, border_color);
+                draw_rectangle(indicator_x, stall_bar_y, indicator_w, stall_h, bg_color);
+                draw_rectangle_lines(indicator_x, stall_bar_y, indicator_w, stall_h, 1.0, border_color);
                 let label = "Store Open";
                 let label_w = self.measure_text_sharp(label, 16.0).width;
                 self.draw_text_sharp(
                     label,
-                    (bar_x + (bar_width - label_w) / 2.0).floor(),
+                    (indicator_x + (indicator_w - label_w) / 2.0).floor(),
                     (stall_bar_y + stall_h * 0.68).floor(),
                     16.0,
                     text_color,
@@ -855,15 +868,15 @@ impl Renderer {
                 // Background
                 let bg_color = Color::new(0.15, 0.08, 0.15, 0.7);
                 let border_color = Color::new(0.5, 0.25, 0.5, 0.5);
-                draw_rectangle(bar_x, dash_bar_y, bar_width, dash_h, bg_color);
-                draw_rectangle_lines(bar_x, dash_bar_y, bar_width, dash_h, 1.0, border_color);
+                draw_rectangle(indicator_x, dash_bar_y, indicator_w, dash_h, bg_color);
+                draw_rectangle_lines(indicator_x, dash_bar_y, indicator_w, dash_h, 1.0, border_color);
 
                 // Fill bar
-                let fill_w = (bar_width - 4.0) * progress;
+                let fill_w = (indicator_w - 4.0) * progress;
                 if fill_w > 0.0 {
                     let fill_color = Color::new(0.6, 0.3, 0.8, 0.8);
                     draw_rectangle(
-                        bar_x + 2.0,
+                        indicator_x + 2.0,
                         dash_bar_y + 2.0,
                         fill_w,
                         dash_h - 4.0,
@@ -877,7 +890,7 @@ impl Renderer {
                 let text_color = Color::new(0.8, 0.6, 0.95, 0.9);
                 self.draw_text_sharp(
                     &remaining_text,
-                    (bar_x + (bar_width - text_w) / 2.0).floor(),
+                    (indicator_x + (indicator_w - text_w) / 2.0).floor(),
                     (dash_bar_y + dash_h * 0.68).floor(),
                     16.0,
                     text_color,
@@ -912,7 +925,7 @@ impl Renderer {
                         0.0
                     };
                 let chip_gap = 4.0 * s;
-                let mut chip_cursor_x = bar_x;
+                let mut chip_cursor_x = indicator_x;
                 let mut crh: f32 = 0.0;
 
                 // Slayer task chip (first, if active)

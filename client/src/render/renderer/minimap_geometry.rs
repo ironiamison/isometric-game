@@ -78,18 +78,14 @@ impl Renderer {
         }
     }
 
-    /// Extra vertical space the desktop stat cluster reserves below the bars for the
-    /// embedded combat-style selector + the frame's bottom padding. Transient HUD
-    /// indicators (gathering/stall/dash/chips/trackers) anchor below this. Zero on
-    /// android (no embedded selector / cluster frame).
+    /// Extra vertical space reserved below the stat bars before the transient HUD
+    /// indicators (gathering/stall/dash/chips/trackers) begin. The cluster is now
+    /// frameless and the combat-style selector moved into the character panel, so
+    /// there's nothing left to reserve for — the indicators flow at the same 4*s
+    /// rhythm as the gaps between the bars themselves. Kept as a helper so the draw
+    /// pass and the hit-test registration stay in sync.
     pub(super) fn hud_below_bars_offset(&self) -> f32 {
-        if cfg!(target_os = "android") {
-            0.0
-        } else {
-            let s = self.font_scale.get();
-            // Just the cluster's bottom frame padding (cpad=4 + FRAME_THICKNESS).
-            4.0 * s + FRAME_THICKNESS
-        }
+        0.0
     }
 
     pub(super) fn draw_minimap_preview_frame(&self, x: f32, y: f32, w: f32, h: f32) {
