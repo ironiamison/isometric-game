@@ -331,21 +331,21 @@ impl Renderer {
             } else {
                 Color::new(0.85, 0.38, 0.38, 1.0)
             };
-            let l1w = self.measure_text_sharp(line1, 14.0).width;
-            let l2w = self.measure_text_sharp(line2, 14.0).width;
+            let l1w = self.measure_text_sharp(line1, 16.0).width;
+            let l2w = self.measure_text_sharp(line2, 16.0).width;
             let text_start = ar_y + 4.0 * scale + 24.0 * scale + 2.0 * scale;
             self.draw_text_sharp(
                 line1,
                 ar_x + (ar_w - l1w) / 2.0,
                 text_start + 10.0 * scale,
-                14.0,
+                16.0,
                 TEXT_NORMAL,
             );
             self.draw_text_sharp(
                 line2,
                 ar_x + (ar_w - l2w) / 2.0,
                 text_start + 22.0 * scale,
-                14.0,
+                16.0,
                 state_color,
             );
         }

@@ -599,7 +599,7 @@ impl Renderer {
                 // level. Its left edge doubles as the bars' left edge; expanded a little on the
                 // right + bottom so the text always fits with padding.
                 let name_w = self.measure_text_sharp(name, 16.0).width;
-                let level_w = self.measure_text_sharp(&level_label, 14.0).width;
+                let level_w = self.measure_text_sharp(&level_label, 16.0).width;
                 let hb_x = bar_x;
                 let hb_y = name_tag_y - hpad;
                 let hb_right = txt_x + name_w.max(level_w) + hpad + 2.0 * s;
@@ -618,7 +618,7 @@ impl Renderer {
                     &level_label,
                     txt_x,
                     (name_tag_y + 21.0 * s).floor(),
-                    14.0,
+                    16.0,
                     TEXT_DIM,
                 );
 

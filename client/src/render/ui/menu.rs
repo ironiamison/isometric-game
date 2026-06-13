@@ -417,7 +417,7 @@ impl Renderer {
             text,
             x.floor(),
             (y + 11.0 * s).floor(),
-            14.0,
+            16.0,
             white,
         );
     }
