@@ -1,6 +1,9 @@
 use super::*;
 
-use crate::render::ui::common::{FRAME_ACCENT, FRAME_OUTER, FRAME_THICKNESS};
+use crate::render::ui::common::{
+    draw_corner_accents, draw_panel_frame, draw_screen_button, ButtonVariant, FRAME_ACCENT,
+    FRAME_INNER, FRAME_OUTER, FRAME_THICKNESS, PANEL_BG_DARK, TEXT_DIM, TEXT_NORMAL, TEXT_TITLE,
+};
 
 /// Maximum characters per account
 const MAX_CHARACTERS: usize = 3;
@@ -54,6 +57,15 @@ impl CharSelectLayout {
     }
 }
 
+/// Capitalize the first character of a string (ASCII-friendly), leaving the rest.
+fn title_case(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        None => String::new(),
+    }
+}
+
 /// Format played-time seconds as a compact `1m` / `9h 51m` / `149h 44m` string.
 fn format_played_time(seconds: i64) -> String {
     let hours = seconds / 3600;
@@ -95,6 +107,7 @@ pub struct CharacterSelectScreen {
     touch_scroll_last_y: f32,
     /// When true, spectator world is rendered behind this screen — use dark overlay instead of solid bg
     pub has_spectator_backdrop: bool,
+    starfield: StarfieldBackground,
     #[cfg(target_arch = "wasm32")]
     loading: bool,
     #[cfg(target_arch = "wasm32")]
@@ -125,6 +138,7 @@ impl CharacterSelectScreen {
             touch_scroll_id: None,
             touch_scroll_last_y: 0.0,
             has_spectator_backdrop: false,
+            starfield: StarfieldBackground::new(),
             #[cfg(target_arch = "wasm32")]
             loading: false,
             #[cfg(target_arch = "wasm32")]
@@ -299,6 +313,113 @@ impl CharacterSelectScreen {
     fn measure_text_sharp(&self, text: &str, font_size: f32) -> TextDimensions {
         self.font.measure_text(text, font_size)
     }
+
+    /// Draw a single character roster card (portrait, name, level chip, meta, played time).
+    fn draw_character_card(
+        &self,
+        rect: Rect,
+        character: &CharacterInfo,
+        selected: bool,
+        hovered: bool,
+    ) {
+        // Card fill
+        let fill = if selected {
+            Color::from_rgba(46, 38, 22, 255) // warm gold-tinted recess
+        } else if hovered {
+            Color::from_rgba(30, 30, 42, 255)
+        } else {
+            PANEL_BG_DARK
+        };
+        draw_rectangle(rect.x, rect.y, rect.w, rect.h, fill);
+
+        if selected {
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color::new(0.855, 0.698, 0.424, 0.06));
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, FRAME_ACCENT);
+        } else if hovered {
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, FRAME_INNER);
+        } else {
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, FRAME_OUTER);
+        }
+
+        // Portrait inset (recessed dark square with bronze edge)
+        let inset = rect.h - 12.0;
+        let inset_x = (rect.x + 8.0).floor();
+        let inset_y = (rect.y + 6.0).floor();
+        draw_rectangle(inset_x, inset_y, inset, inset, Color::from_rgba(12, 12, 18, 255));
+        draw_rectangle_lines(inset_x, inset_y, inset, inset, 1.0, FRAME_OUTER);
+
+        // Composite character sprite, centered in the inset
+        let preview_x = (inset_x + (inset - SPRITE_WIDTH) / 2.0).floor();
+        let preview_y = (inset_y + (inset - SPRITE_HEIGHT) / 2.0).floor();
+        draw_character_preview(
+            &self.player_sprites,
+            &self.hair_sprites,
+            &self.equipment_sprites,
+            &character.gender,
+            &character.skin,
+            character.hair_style,
+            character.hair_color.unwrap_or(0),
+            character.sprite_body.as_deref(),
+            character.sprite_back.as_deref(),
+            character.sprite_feet.as_deref(),
+            preview_x,
+            preview_y,
+        );
+
+        // Text column
+        let text_x = inset_x + inset + 12.0;
+        let name_color = if selected { TEXT_TITLE } else { TEXT_NORMAL };
+        self.draw_text_sharp(&character.name, text_x, rect.y + 26.0, 16.0, name_color);
+
+        // Level chip
+        let chip_label = format!("Lv {}", character.level);
+        let chip_text_w = self.measure_text_sharp(&chip_label, 16.0).width;
+        let chip_w = chip_text_w + 14.0;
+        let chip_h = 18.0;
+        let chip_x = text_x;
+        let chip_y = rect.y + 36.0;
+        draw_rectangle(chip_x, chip_y, chip_w, chip_h, level_chip_color(character.level));
+        self.draw_text_sharp(
+            &chip_label,
+            chip_x + 7.0,
+            chip_y + 14.0,
+            16.0,
+            Color::from_rgba(20, 16, 10, 255),
+        );
+
+        // Meta: gender + race/skin, after the chip
+        let meta = format!("{} {}", title_case(&character.gender), title_case(&character.skin));
+        self.draw_text_sharp(&meta, chip_x + chip_w + 8.0, chip_y + 14.0, 16.0, TEXT_DIM);
+
+        // Played time (right-aligned) + dim "played" label beneath
+        let time_str = format_played_time(character.played_time);
+        let tw = self.measure_text_sharp(&time_str, 16.0).width;
+        let right = rect.x + rect.w - 12.0;
+        self.draw_text_sharp(&time_str, right - tw, rect.y + 26.0, 16.0, TEXT_NORMAL);
+        let pl = "played";
+        let plw = self.measure_text_sharp(pl, 16.0).width;
+        self.draw_text_sharp(pl, right - plw, rect.y + 46.0, 16.0, TEXT_DIM);
+    }
+
+    /// Draw a dashed rectangle outline (used for the create-new-character row).
+    fn draw_dashed_rect(&self, x: f32, y: f32, w: f32, h: f32, color: Color) {
+        let dash = 6.0;
+        let gap = 4.0;
+        let mut dx = x;
+        while dx < x + w {
+            let e = (dx + dash).min(x + w);
+            draw_line(dx, y, e, y, 1.0, color);
+            draw_line(dx, y + h, e, y + h, 1.0, color);
+            dx += dash + gap;
+        }
+        let mut dy = y;
+        while dy < y + h {
+            let e = (dy + dash).min(y + h);
+            draw_line(x, dy, x, e, 1.0, color);
+            draw_line(x + w, dy, x + w, e, 1.0, color);
+            dy += dash + gap;
+        }
+    }
 }
 
 impl Screen for CharacterSelectScreen {
@@ -338,6 +459,7 @@ impl Screen for CharacterSelectScreen {
         }
 
         let (sw, sh) = virtual_screen_size();
+        self.starfield.update(get_frame_time(), sw, sh);
         let (input_pos, clicked, _is_touch) = get_input_state();
         let mx = input_pos.x;
         let my = input_pos.y;
@@ -590,56 +712,74 @@ impl Screen for CharacterSelectScreen {
     fn render(&self) {
         let (sw, sh) = virtual_screen_size();
         let (input_pos, _, _) = get_input_state();
-        let mx = input_pos.x;
-        let my = input_pos.y;
+        let (mx, my) = (input_pos.x, input_pos.y);
+        let l = CharSelectLayout::compute(sw, sh, !self.characters.is_empty());
 
         // Background
         if self.has_spectator_backdrop {
-            // Dark overlay over the live spectator world
             draw_rectangle(0.0, 0.0, sw, sh, Color::from_rgba(15, 15, 25, 160));
         } else {
-            clear_background(Color::from_rgba(25, 25, 35, 255));
-
-            // Draw decorative elements (only without spectator backdrop)
-            for i in 0..15 {
-                let alpha = 0.03 + (i as f32 * 0.005);
-                let color = Color::new(0.2, 0.3, 0.4, alpha);
-                draw_line(0.0, i as f32 * 50.0, sw, i as f32 * 50.0, 1.0, color);
-            }
+            self.starfield.draw(sw, sh, 1.0);
         }
 
-        // Title (aligned vertically with account info, horizontally centered)
+        // Header row: username (left) + centered title
+        let header_y = 32.0;
+        self.draw_text_sharp(&self.session.username, 24.0, header_y, 16.0, TEXT_DIM);
         let title = "SELECT CHARACTER";
-        let title_width = self.measure_text_sharp(title, 16.0).width;
-        self.draw_text_sharp(title, (sw - title_width) / 2.0, 24.0, 16.0, WHITE);
+        let title_w = self.measure_text_sharp(title, 16.0).width;
+        self.draw_text_sharp(title, ((sw - title_w) / 2.0).floor(), header_y, 16.0, TEXT_TITLE);
 
-        // Account info
-        let account_text = format!("Logged in as: {}", self.session.username);
-        self.draw_text_sharp(&account_text, 20.0, 24.0, 16.0, LIGHTGRAY);
-
-        // Layout
-        let list_w = 500.0_f32.min(sw - 20.0);
-        let list_x = (sw - list_w) / 2.0;
-        let list_y = 44.0;
-        let item_height = 70.0;
-        let button_area_height = 48.0;
-        let inst_y = sh - button_area_height;
-        let list_visible_height = (inst_y - 10.0 - list_y).min(400.0);
-        let total_list_height = self.characters.len() as f32 * item_height;
-        let max_scroll = (total_list_height - list_visible_height).max(0.0);
-        let scroll_offset = self.list_scroll_offset.clamp(0.0, max_scroll);
-        let needs_scroll = max_scroll > 0.0;
+        // Bronze-framed roster panel
+        draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
+        draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
 
         if self.characters.is_empty() {
-            self.draw_text_sharp("No characters yet!", list_x, list_y + 30.0, 16.0, GRAY);
-            self.draw_text_sharp(
-                "Press [N] to create your first character",
-                list_x,
-                list_y + 55.0,
-                16.0,
-                LIGHTGRAY,
+            // ---- Empty state: centered invitation inside the panel ----
+            let cx = l.panel.x + l.panel.w / 2.0;
+            let circle_cy = l.panel.y + l.panel.h * 0.34;
+            draw_circle_lines(cx, circle_cy, 28.0, 2.0, FRAME_OUTER);
+            // A simple "+" inside the circle
+            draw_line(cx - 10.0, circle_cy, cx + 10.0, circle_cy, 2.0, FRAME_ACCENT);
+            draw_line(cx, circle_cy - 10.0, cx, circle_cy + 10.0, 2.0, FRAME_ACCENT);
+
+            let headline = "Your story begins here";
+            let hw = self.measure_text_sharp(headline, 16.0).width;
+            let mut ty = circle_cy + 56.0;
+            self.draw_text_sharp(headline, (cx - hw / 2.0).floor(), ty, 16.0, TEXT_TITLE);
+
+            ty += 28.0;
+            let line1 = "No heroes yet. Create your first character";
+            let l1w = self.measure_text_sharp(line1, 16.0).width;
+            self.draw_text_sharp(line1, (cx - l1w / 2.0).floor(), ty, 16.0, TEXT_DIM);
+            ty += 20.0;
+            let line2 = "to set foot in the realm of Aeven.";
+            let l2w = self.measure_text_sharp(line2, 16.0).width;
+            self.draw_text_sharp(line2, (cx - l2w / 2.0).floor(), ty, 16.0, TEXT_DIM);
+
+            // Centered Create Character button
+            let btn_w = 180.0_f32;
+            let btn_h = 34.0_f32;
+            let btn_x = (cx - btn_w / 2.0).floor();
+            let btn_y = (ty + 24.0).floor();
+            let create_rect = Rect::new(btn_x, btn_y, btn_w, btn_h);
+            let create_hovered = point_in_rect(mx, my, btn_x, btn_y, btn_w, btn_h);
+            draw_screen_button(
+                &self.font,
+                create_rect,
+                "+ Create Character",
+                create_hovered,
+                ButtonVariant::Primary,
             );
         } else {
+            // ---- Cards list with scissor clipping + scrollbar ----
+            let item_height = CARD_HEIGHT + CARD_GAP;
+            let row_count = self.characters.len()
+                + if self.characters.len() < MAX_CHARACTERS { 1 } else { 0 };
+            let total_list_height = row_count as f32 * item_height;
+            let max_scroll = (total_list_height - l.list_visible_h).max(0.0);
+            let scroll_offset = self.list_scroll_offset.clamp(0.0, max_scroll);
+            let needs_scroll = max_scroll > 0.0;
+
             // Set up scissor clipping for the list area
             if needs_scroll {
                 let physical_w = screen_width();
@@ -649,107 +789,71 @@ impl Screen for CharacterSelectScreen {
                 let mut gl = unsafe { macroquad::window::get_internal_gl() };
                 gl.flush();
                 gl.quad_gl.scissor(Some((
-                    (list_x * scale_x) as i32,
-                    (list_y * scale_y) as i32,
-                    (list_w * scale_x) as i32,
-                    (list_visible_height * scale_y) as i32,
+                    (l.list_x * scale_x) as i32,
+                    (l.list_top * scale_y) as i32,
+                    (l.list_w * scale_x) as i32,
+                    (l.list_visible_h * scale_y) as i32,
                 )));
             }
 
             for (i, character) in self.characters.iter().enumerate() {
-                let y = list_y + i as f32 * item_height - scroll_offset;
-
-                // Skip rows fully outside visible area
-                if needs_scroll && (y + item_height < list_y || y > list_y + list_visible_height) {
+                let card_y = l.list_top + i as f32 * item_height - scroll_offset;
+                // Skip rows fully outside the visible area
+                if card_y + CARD_HEIGHT < l.list_top || card_y > l.list_top + l.list_visible_h {
                     continue;
                 }
-
+                let card_rect = Rect::new(l.list_x, card_y, l.list_w, CARD_HEIGHT);
                 let is_selected = i == self.selected_index;
-                let is_hovered = point_in_rect(mx, my, list_x, y, list_w, item_height - 5.0)
-                    && my >= list_y
-                    && my <= list_y + list_visible_height;
-
-                // Background
-                let bg_color = if is_selected {
-                    Color::from_rgba(60, 80, 120, 255)
-                } else if is_hovered {
-                    Color::from_rgba(50, 55, 80, 255)
-                } else {
-                    Color::from_rgba(40, 40, 60, 255)
-                };
-                draw_rectangle(list_x, y, list_w, item_height - 5.0, bg_color);
-
-                if is_selected {
-                    draw_rectangle_lines(list_x, y, list_w, item_height - 5.0, 2.0, WHITE);
-                } else if is_hovered {
-                    draw_rectangle_lines(list_x, y, list_w, item_height - 5.0, 1.0, GRAY);
-                }
-
-                // Character preview sprite (floor to avoid subpixel stretching)
-                let preview_x = (list_x + 10.0).floor();
-                let preview_y = (y + (item_height - 5.0 - SPRITE_HEIGHT) / 2.0).floor();
-                draw_character_preview(
-                    &self.player_sprites,
-                    &self.hair_sprites,
-                    &self.equipment_sprites,
-                    &character.gender,
-                    &character.skin,
-                    character.hair_style,
-                    character.hair_color.unwrap_or(0),
-                    character.sprite_body.as_deref(),
-                    character.sprite_back.as_deref(),
-                    character.sprite_feet.as_deref(),
-                    preview_x,
-                    preview_y,
-                );
-
-                // Character info (shifted right to make room for preview)
-                let text_x = list_x + 50.0;
-                self.draw_text_sharp(&character.name, text_x, y + 26.0, 16.0, WHITE);
-                let class_info = format!(
-                    "Level {} {} {}",
-                    character.level, character.gender, character.skin
-                );
-                self.draw_text_sharp(&class_info, text_x, y + 48.0, 16.0, LIGHTGRAY);
-
-                // Played time
-                let hours = character.played_time / 3600;
-                let minutes = (character.played_time % 3600) / 60;
-                let time_str = if hours > 0 {
-                    format!("{}h {}m played", hours, minutes)
-                } else {
-                    format!("{}m played", minutes)
-                };
-                let time_x = (list_x + list_w - 160.0).max(text_x + 120.0);
-                self.draw_text_sharp(&time_str, time_x, y + 36.0, 16.0, LIGHTGRAY);
+                let is_hovered = point_in_rect(mx, my, l.list_x, card_y, l.list_w, CARD_HEIGHT)
+                    && my >= l.list_top
+                    && my <= l.list_top + l.list_visible_h;
+                self.draw_character_card(card_rect, character, is_selected, is_hovered);
             }
 
-            // Disable scissor clipping
+            // Create row (only when below the cap), inside the clipped list
+            if self.characters.len() < MAX_CHARACTERS {
+                let create_idx = self.characters.len();
+                let card_y = l.list_top + create_idx as f32 * item_height - scroll_offset;
+                if !(card_y + CARD_HEIGHT < l.list_top || card_y > l.list_top + l.list_visible_h) {
+                    let is_create_selected = self.selected_index == create_idx;
+                    let outline = if is_create_selected { FRAME_ACCENT } else { FRAME_OUTER };
+                    self.draw_dashed_rect(l.list_x, card_y, l.list_w, CARD_HEIGHT, outline);
+
+                    let label = "+ Create new character";
+                    let lw = self.measure_text_sharp(label, 16.0).width;
+                    let label_x = (l.list_x + (l.list_w - lw) / 2.0).floor();
+                    let label_y = card_y + CARD_HEIGHT / 2.0 + 6.0;
+                    let label_color =
+                        Color::new(FRAME_ACCENT.r, FRAME_ACCENT.g, FRAME_ACCENT.b, 0.7);
+                    self.draw_text_sharp(label, label_x, label_y, 16.0, label_color);
+                }
+            }
+
+            // Disable scissor clipping + draw scrollbar
             if needs_scroll {
                 let mut gl = unsafe { macroquad::window::get_internal_gl() };
                 gl.flush();
                 gl.quad_gl.scissor(None);
 
-                // Draw scrollbar
                 let scrollbar_w = 4.0;
-                let scrollbar_x = list_x + list_w - scrollbar_w - 2.0;
-                let track_h = list_visible_height;
-                let thumb_ratio = list_visible_height / total_list_height;
+                let scrollbar_x = l.list_x + l.list_w - 6.0;
+                let track_h = l.list_visible_h;
+                let thumb_ratio = l.list_visible_h / total_list_height;
                 let thumb_h = (track_h * thumb_ratio).max(20.0);
                 let scroll_ratio = if max_scroll > 0.0 {
                     scroll_offset / max_scroll
                 } else {
                     0.0
                 };
-                let thumb_y = list_y + (track_h - thumb_h) * scroll_ratio;
+                let thumb_y = l.list_top + (track_h - thumb_h) * scroll_ratio;
 
                 // Track
                 draw_rectangle(
                     scrollbar_x,
-                    list_y,
+                    l.list_top,
                     scrollbar_w,
                     track_h,
-                    Color::new(1.0, 1.0, 1.0, 0.08),
+                    Color::new(0.855, 0.698, 0.424, 0.10),
                 );
                 // Thumb
                 draw_rectangle(
@@ -762,26 +866,78 @@ impl Screen for CharacterSelectScreen {
             }
         }
 
-        // Background below the list to cleanly separate from buttons
-        // (skip when spectator backdrop is active — the full-screen overlay already covers it)
-        if !self.has_spectator_backdrop {
-            let button_zone_y = list_y + list_visible_height;
-            draw_rectangle(
-                0.0,
-                button_zone_y,
-                sw,
-                sh - button_zone_y,
-                Color::from_rgba(25, 25, 35, 255),
+        // ---- Action bar (outside the clipped region) ----
+        if self.characters.is_empty() {
+            // Single right-aligned Logout button
+            let bw = 110.0_f32;
+            let bx = l.action_bar.x + l.action_bar.w - bw;
+            let logout_rect = Rect::new(bx, l.action_bar.y, bw, l.action_bar.h);
+            let logout_hovered = point_in_rect(mx, my, bx, l.action_bar.y, bw, l.action_bar.h);
+            draw_screen_button(
+                &self.font,
+                logout_rect,
+                "Logout",
+                logout_hovered,
+                ButtonVariant::Neutral,
+            );
+        } else {
+            let gap = 8.0;
+            let bw = (l.action_bar.w - gap * 2.0) / 3.0;
+            let bh = l.action_bar.h;
+            let by = l.action_bar.y;
+
+            let play_x = l.action_bar.x;
+            let play_rect = Rect::new(play_x, by, bw, bh);
+            let play_hovered = point_in_rect(mx, my, play_x, by, bw, bh);
+            draw_screen_button(&self.font, play_rect, "Play", play_hovered, ButtonVariant::Primary);
+
+            let del_x = l.action_bar.x + bw + gap;
+            let del_rect = Rect::new(del_x, by, bw, bh);
+            let del_hovered = point_in_rect(mx, my, del_x, by, bw, bh);
+            draw_screen_button(&self.font, del_rect, "Delete", del_hovered, ButtonVariant::Danger);
+
+            let logout_x = l.action_bar.x + (bw + gap) * 2.0;
+            let logout_rect = Rect::new(logout_x, by, bw, bh);
+            let logout_hovered = point_in_rect(mx, my, logout_x, by, bw, bh);
+            draw_screen_button(
+                &self.font,
+                logout_rect,
+                "Logout",
+                logout_hovered,
+                ButtonVariant::Neutral,
             );
         }
 
-        // Error message
+        // Error message (just above the action bar)
         if let Some(ref error) = self.error_message {
-            let error_y = inst_y - 25.0;
-            self.draw_text_sharp(error, list_x, error_y, 16.0, RED);
+            let ew = self.measure_text_sharp(error, 16.0).width;
+            self.draw_text_sharp(
+                error,
+                ((sw - ew) / 2.0).floor(),
+                l.action_bar.y - 8.0,
+                16.0,
+                Color::from_rgba(216, 119, 119, 255),
+            );
         }
 
-        // Delete confirmation overlay
+        // Hint line below the action bar
+        let hint_y = l.action_bar.y + l.action_bar.h + 16.0;
+        let hint: &str = if self.characters.is_empty() {
+            "[N] create character"
+        } else {
+            #[cfg(not(target_os = "android"))]
+            {
+                "[W/S] navigate \u{00b7} [Enter] play \u{00b7} [N] new"
+            }
+            #[cfg(target_os = "android")]
+            {
+                "[Enter] play \u{00b7} [N] new"
+            }
+        };
+        let hw = self.measure_text_sharp(hint, 16.0).width;
+        self.draw_text_sharp(hint, ((sw - hw) / 2.0).floor(), hint_y, 16.0, TEXT_DIM);
+
+        // ---- Delete confirmation dialog (bronze reskin; KEEP geometry) ----
         if self.confirm_delete {
             draw_rectangle(0.0, 0.0, sw, sh, Color::new(0.0, 0.0, 0.0, 0.7));
 
@@ -790,14 +946,8 @@ impl Screen for CharacterSelectScreen {
             let box_x = (sw - box_w) / 2.0;
             let box_y = (sh - box_h) / 2.0;
 
-            draw_rectangle(
-                box_x,
-                box_y,
-                box_w,
-                box_h,
-                Color::from_rgba(60, 40, 40, 255),
-            );
-            draw_rectangle_lines(box_x, box_y, box_w, box_h, 2.0, RED);
+            draw_panel_frame(box_x, box_y, box_w, box_h);
+            draw_corner_accents(box_x, box_y, box_w, box_h);
 
             if !self.characters.is_empty() {
                 let char_name = &self.characters[self.selected_index].name;
@@ -805,160 +955,36 @@ impl Screen for CharacterSelectScreen {
                 let delete_width = self.measure_text_sharp(&delete_text, 16.0).width;
                 self.draw_text_sharp(
                     &delete_text,
-                    box_x + (box_w - delete_width) / 2.0,
+                    (box_x + (box_w - delete_width) / 2.0).floor(),
                     box_y + 50.0,
                     16.0,
-                    WHITE,
+                    TEXT_TITLE,
                 );
             }
 
-            // Touch-friendly Yes/No buttons
-            let button_w = 100.0;
-            let button_h = 30.0;
+            // Yes/No buttons — geometry must match update's hit-rects exactly.
             let yes_x = box_x + 70.0;
             let yes_y = box_y + 85.0;
             let no_x = box_x + 250.0;
-
-            // Yes button
-            let yes_hovered = point_in_rect(mx, my, yes_x, yes_y, button_w, button_h);
-            let yes_bg = if yes_hovered {
-                Color::from_rgba(140, 60, 60, 255)
-            } else {
-                Color::from_rgba(100, 40, 40, 255)
-            };
-            let yes_border = if yes_hovered {
-                Color::from_rgba(255, 100, 100, 255)
-            } else {
-                RED
-            };
-            draw_rectangle(yes_x, yes_y, button_w, button_h, yes_bg);
-            draw_rectangle_lines(yes_x, yes_y, button_w, button_h, 2.0, yes_border);
-            self.draw_text_sharp("Yes, delete", yes_x + 8.0, yes_y + 20.0, 16.0, WHITE);
-
-            // No button
-            let no_hovered = point_in_rect(mx, my, no_x, yes_y, button_w, button_h);
-            let no_bg = if no_hovered {
-                Color::from_rgba(80, 80, 110, 255)
-            } else {
-                Color::from_rgba(60, 60, 80, 255)
-            };
-            let no_border = if no_hovered { WHITE } else { LIGHTGRAY };
-            draw_rectangle(no_x, yes_y, button_w, button_h, no_bg);
-            draw_rectangle_lines(no_x, yes_y, button_w, button_h, 2.0, no_border);
-            self.draw_text_sharp("No, cancel", no_x + 8.0, yes_y + 20.0, 16.0, WHITE);
+            let yes_hovered = point_in_rect(mx, my, yes_x, yes_y, 100.0, 30.0);
+            let no_hovered = point_in_rect(mx, my, no_x, yes_y, 100.0, 30.0);
+            draw_screen_button(
+                &self.font,
+                Rect::new(yes_x, yes_y, 100.0, 30.0),
+                "Yes, delete",
+                yes_hovered,
+                ButtonVariant::Danger,
+            );
+            draw_screen_button(
+                &self.font,
+                Rect::new(no_x, yes_y, 100.0, 30.0),
+                "No, cancel",
+                no_hovered,
+                ButtonVariant::Neutral,
+            );
+            #[allow(clippy::needless_return)] // explicit guard: nothing should draw after the dialog
             return;
         }
-
-        // Buttons at bottom
-        let button_height = 30.0;
-
-        // Play button
-        let play_hovered = point_in_rect(mx, my, list_x, inst_y - 10.0, 100.0, button_height);
-        let play_bg = if play_hovered {
-            Color::from_rgba(60, 140, 90, 255)
-        } else {
-            Color::from_rgba(40, 100, 60, 255)
-        };
-        let play_border = if play_hovered {
-            Color::from_rgba(100, 255, 150, 255)
-        } else {
-            GREEN
-        };
-        draw_rectangle(list_x, inst_y - 10.0, 100.0, button_height, play_bg);
-        draw_rectangle_lines(
-            list_x,
-            inst_y - 10.0,
-            100.0,
-            button_height,
-            2.0,
-            play_border,
-        );
-        self.draw_text_sharp("Play", list_x + 10.0, inst_y + 10.0, 16.0, WHITE);
-
-        // New button
-        if self.characters.len() < MAX_CHARACTERS {
-            let new_hovered =
-                point_in_rect(mx, my, list_x + 120.0, inst_y - 10.0, 70.0, button_height);
-            let new_bg = if new_hovered {
-                Color::from_rgba(120, 120, 60, 255)
-            } else {
-                Color::from_rgba(80, 80, 40, 255)
-            };
-            let new_border = if new_hovered {
-                Color::from_rgba(255, 255, 100, 255)
-            } else {
-                YELLOW
-            };
-            draw_rectangle(list_x + 120.0, inst_y - 10.0, 70.0, button_height, new_bg);
-            draw_rectangle_lines(
-                list_x + 120.0,
-                inst_y - 10.0,
-                70.0,
-                button_height,
-                2.0,
-                new_border,
-            );
-            self.draw_text_sharp("New", list_x + 130.0, inst_y + 10.0, 16.0, WHITE);
-        }
-
-        // Delete button
-        let delete_hovered =
-            point_in_rect(mx, my, list_x + 210.0, inst_y - 10.0, 90.0, button_height);
-        let delete_bg = if delete_hovered {
-            Color::from_rgba(140, 60, 60, 255)
-        } else {
-            Color::from_rgba(100, 40, 40, 255)
-        };
-        let delete_border = if delete_hovered {
-            Color::from_rgba(255, 100, 100, 255)
-        } else {
-            RED
-        };
-        draw_rectangle(
-            list_x + 210.0,
-            inst_y - 10.0,
-            90.0,
-            button_height,
-            delete_bg,
-        );
-        draw_rectangle_lines(
-            list_x + 210.0,
-            inst_y - 10.0,
-            90.0,
-            button_height,
-            2.0,
-            delete_border,
-        );
-        self.draw_text_sharp("Delete", list_x + 220.0, inst_y + 10.0, 16.0, WHITE);
-
-        // Logout button
-        let logout_hovered =
-            point_in_rect(mx, my, list_x + 330.0, inst_y - 10.0, 100.0, button_height);
-        let logout_bg = if logout_hovered {
-            Color::from_rgba(80, 80, 110, 255)
-        } else {
-            Color::from_rgba(60, 60, 80, 255)
-        };
-        let logout_border = if logout_hovered { WHITE } else { LIGHTGRAY };
-        draw_rectangle(
-            list_x + 330.0,
-            inst_y - 10.0,
-            100.0,
-            button_height,
-            logout_bg,
-        );
-        draw_rectangle_lines(
-            list_x + 330.0,
-            inst_y - 10.0,
-            100.0,
-            button_height,
-            2.0,
-            logout_border,
-        );
-        self.draw_text_sharp("Logout", list_x + 340.0, inst_y + 10.0, 16.0, WHITE);
-
-        #[cfg(not(target_os = "android"))]
-        self.draw_text_sharp("[W/S] Navigate", list_x, inst_y + 28.0, 16.0, DARKGRAY);
     }
 }
 
@@ -974,6 +1000,13 @@ mod tests {
         assert_eq!(format_played_time(9 * 3600 + 51 * 60), "9h 51m");
         assert_eq!(format_played_time(149 * 3600 + 44 * 60), "149h 44m");
         assert_eq!(format_played_time(3600), "1h 0m");
+    }
+
+    #[test]
+    fn title_case_caps_first() {
+        assert_eq!(title_case("male"), "Male");
+        assert_eq!(title_case("orc"), "Orc");
+        assert_eq!(title_case(""), "");
     }
 
     #[test]
