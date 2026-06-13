@@ -224,6 +224,7 @@ impl GameRoom {
                                 },
                             )
                             .await;
+                            self.clear_auto_action(player_id, "no_axe").await;
                             return;
                         }
                         Some(equip.chop_success_bonus)
@@ -249,6 +250,7 @@ impl GameRoom {
                 },
             )
             .await;
+            self.clear_auto_action(player_id, "no_axe").await;
             return;
         }
 
@@ -466,6 +468,7 @@ impl GameRoom {
                                 },
                             )
                             .await;
+                            self.clear_auto_action(player_id, "no_pickaxe").await;
                             return;
                         }
                         Some(equip.mine_success_bonus)
@@ -491,6 +494,7 @@ impl GameRoom {
                 },
             )
             .await;
+            self.clear_auto_action(player_id, "no_pickaxe").await;
             return;
         }
 

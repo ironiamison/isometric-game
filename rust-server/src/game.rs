@@ -84,8 +84,8 @@ const MOVE_INTENT_STALE_TIMEOUT_MS: u64 = 700;
 const MOVE_INPUT_GAP_WARN_MS: u64 = 250;
 const MOVE_INPUT_WARN_THROTTLE_MS: u64 = 2_000;
 
-// Dash: 1 tile forward, 5 second cooldown (100 ticks at 20Hz)
-const DASH_COOLDOWN_TICKS: u64 = 100;
+// Dash: 1 tile forward, 4 second cooldown (80 ticks at 20Hz)
+const DASH_COOLDOWN_TICKS: u64 = 80;
 const DASH_DISTANCE: i32 = 1;
 
 const MAP_WIDTH: u32 = 32;
