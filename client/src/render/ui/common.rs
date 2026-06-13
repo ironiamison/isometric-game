@@ -43,6 +43,8 @@ pub const TEXT_TITLE: Color = Color::new(0.855, 0.737, 0.502, 1.0); // rgba(218,
 pub const TEXT_NORMAL: Color = Color::new(0.824, 0.824, 0.855, 1.0); // rgba(210, 210, 218, 255)
 pub const TEXT_DIM: Color = Color::new(0.502, 0.502, 0.541, 1.0); // rgba(128, 128, 138, 255)
 pub const TEXT_GOLD: Color = Color::new(1.0, 0.843, 0.314, 1.0); // rgba(255, 215, 80, 255)
+// Dark text drawn on top of a bright level chip
+pub const CHIP_TEXT_DARK: Color = Color::new(0.078, 0.063, 0.039, 1.0); // rgba(20, 16, 10, 255)
 
 // Danger button (restrained red-brown — used by destructive actions)
 pub const DANGER_BG: Color = Color::new(0.247, 0.106, 0.106, 1.0); // rgba(63, 27, 27)

@@ -73,8 +73,7 @@ impl StarfieldBackground {
     /// Draw the sky gradient + stars. `alpha` (0..1) fades the whole field;
     /// values <= 0.001 skip drawing entirely.
     pub fn draw(&self, sw: f32, sh: f32, alpha: f32) {
-        let sa = alpha;
-        if sa <= 0.001 {
+        if alpha <= 0.001 {
             return;
         }
         let t = self.frame_counter;
@@ -87,22 +86,28 @@ impl StarfieldBackground {
             let b = (40.0 - frac * 10.0) as u8;
             let y = frac * sh;
             let h = sh / sky_steps as f32 + 1.0;
-            draw_rectangle(0.0, y, sw, h, Color::from_rgba(r, g, b, (255.0 * sa) as u8));
+            draw_rectangle(0.0, y, sw, h, Color::from_rgba(r, g, b, (255.0 * alpha) as u8));
         }
 
         for &(sx, sy, phase) in &self.stars {
-            let a = (((t * 1.5 + phase).sin() * 0.5 + 0.5) * 0.9 + 0.1) * sa;
-            let size = if a > 0.7 * sa { 2.0 } else { 1.0 };
+            let a = (((t * 1.5 + phase).sin() * 0.5 + 0.5) * 0.9 + 0.1) * alpha;
+            let size = if a > 0.7 * alpha { 2.0 } else { 1.0 };
             draw_rectangle(sx * sw, sy * sh, size, size, Color::new(1.0, 1.0, 0.95, a));
         }
 
         for s in &self.shooting_stars {
-            let a = s.life.min(1.0) * sa;
+            let a = s.life.min(1.0) * alpha;
             let speed = (s.vx * s.vx + s.vy * s.vy).sqrt();
             let dx = -s.vx / speed * s.length;
             let dy = -s.vy / speed * s.length;
             draw_line(s.x, s.y, s.x + dx * 0.3, s.y + dy * 0.3, 2.0, Color::new(1.0, 1.0, 1.0, a));
             draw_line(s.x + dx * 0.3, s.y + dy * 0.3, s.x + dx, s.y + dy, 1.0, Color::new(0.8, 0.85, 1.0, a * 0.4));
         }
+    }
+}
+
+impl Default for StarfieldBackground {
+    fn default() -> Self {
+        Self::new()
     }
 }

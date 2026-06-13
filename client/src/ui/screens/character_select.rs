@@ -1,8 +1,9 @@
 use super::*;
 
 use crate::render::ui::common::{
-    draw_corner_accents, draw_panel_frame, draw_screen_button, ButtonVariant, FRAME_ACCENT,
-    FRAME_INNER, FRAME_OUTER, FRAME_THICKNESS, PANEL_BG_DARK, TEXT_DIM, TEXT_NORMAL, TEXT_TITLE,
+    draw_corner_accents, draw_panel_frame, draw_screen_button, ButtonVariant, CHIP_TEXT_DARK,
+    DANGER_TEXT, FRAME_ACCENT, FRAME_INNER, FRAME_OUTER, FRAME_THICKNESS, PANEL_BG_DARK, TEXT_DIM,
+    TEXT_NORMAL, TEXT_TITLE,
 };
 
 /// Maximum characters per account
@@ -22,11 +23,10 @@ struct CharSelectLayout {
     list_top: f32,       // first card y (inside frame)
     list_visible_h: f32, // clip height for the scrollable list
     action_bar: Rect,    // full action-bar row below the panel
-    has_characters: bool,
 }
 
 impl CharSelectLayout {
-    fn compute(sw: f32, sh: f32, has_characters: bool) -> Self {
+    fn compute(sw: f32, sh: f32) -> Self {
         let panel_w = 540.0_f32.min(sw - 24.0);
         let panel_x = (sw - panel_w) / 2.0;
         let panel_top = 56.0; // below the header row
@@ -52,7 +52,6 @@ impl CharSelectLayout {
             list_top,
             list_visible_h,
             action_bar,
-            has_characters,
         }
     }
 }
@@ -333,7 +332,7 @@ impl CharacterSelectScreen {
         draw_rectangle(rect.x, rect.y, rect.w, rect.h, fill);
 
         if selected {
-            draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color::new(0.855, 0.698, 0.424, 0.06));
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color { a: 0.06, ..FRAME_ACCENT });
             draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, FRAME_ACCENT);
         } else if hovered {
             draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, FRAME_INNER);
@@ -385,7 +384,7 @@ impl CharacterSelectScreen {
             chip_x + 7.0,
             chip_y + 14.0,
             16.0,
-            Color::from_rgba(20, 16, 10, 255),
+            CHIP_TEXT_DARK,
         );
 
         // Meta: gender + race/skin, after the chip
@@ -405,7 +404,7 @@ impl CharacterSelectScreen {
     /// Action-bar button rects when characters exist: [Play, Delete, Logout].
     fn action_button_rects(l: &CharSelectLayout) -> [Rect; 3] {
         let gap = 8.0;
-        let bw = (l.action_bar.w - gap * 2.0) / 3.0;
+        let bw = ((l.action_bar.w - gap * 2.0) / 3.0).max(0.0);
         let bh = l.action_bar.h;
         let by = l.action_bar.y;
         [
@@ -495,7 +494,7 @@ impl Screen for CharacterSelectScreen {
         let mx = input_pos.x;
         let my = input_pos.y;
 
-        let l = CharSelectLayout::compute(sw, sh, !self.characters.is_empty());
+        let l = CharSelectLayout::compute(sw, sh);
         let item_height = CARD_HEIGHT + CARD_GAP;
         let create_selectable =
             !self.characters.is_empty() && self.characters.len() < MAX_CHARACTERS;
@@ -712,6 +711,7 @@ impl Screen for CharacterSelectScreen {
         } else {
             self.characters.len() - 1 + if create_selectable { 1 } else { 0 }
         };
+        self.selected_index = self.selected_index.min(max_index);
         if (is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::W)) && self.selected_index > 0 {
             self.selected_index -= 1;
         }
@@ -768,7 +768,7 @@ impl Screen for CharacterSelectScreen {
         let (sw, sh) = virtual_screen_size();
         let (input_pos, _, _) = get_input_state();
         let (mx, my) = (input_pos.x, input_pos.y);
-        let l = CharSelectLayout::compute(sw, sh, !self.characters.is_empty());
+        let l = CharSelectLayout::compute(sw, sh);
 
         // Background
         if self.has_spectator_backdrop {
@@ -973,7 +973,7 @@ impl Screen for CharacterSelectScreen {
                 ((sw - ew) / 2.0).floor(),
                 l.action_bar.y - 8.0,
                 16.0,
-                Color::from_rgba(216, 119, 119, 255),
+                DANGER_TEXT,
             );
         }
 
