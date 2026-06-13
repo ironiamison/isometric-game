@@ -302,7 +302,13 @@ impl InputHandler {
         let minimap_panel_blocks_input = state.ui_state.minimap_panel_open;
         let classic = state.ui_state.classic_controls;
 
-        if !minimap_panel_blocks_input && !chat_consuming_keyboard {
+        // Hold off the Enter→open-chat shortcut until Enter is released after entering
+        // gameplay, so the keypress that confirmed character selection doesn't pop chat open.
+        if state.ui_state.suppress_enter_chat_open {
+            if !is_key_down(KeyCode::Enter) {
+                state.ui_state.suppress_enter_chat_open = false;
+            }
+        } else if !minimap_panel_blocks_input && !chat_consuming_keyboard {
             // Enter key opens chat (not in classic mode - chat is always open)
             // Don't open chat on System tab (read-only)
             if !classic

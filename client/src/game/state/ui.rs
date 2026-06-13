@@ -490,6 +490,10 @@ pub struct StallBrowseInfo {
 
 pub struct UiState {
     pub chat_open: bool,
+    /// When true, the Enter→open-chat shortcut is ignored until Enter is released.
+    /// Set when entering gameplay so the Enter press used to log in on the character
+    /// select screen doesn't immediately pop the chat input open.
+    pub suppress_enter_chat_open: bool,
     pub chat_input: String,
     pub chat_cursor: usize, // Cursor position in chat_input (character index)
     pub chat_scroll_offset: usize, // Scroll offset for long messages (character index)
@@ -798,6 +802,7 @@ impl Default for UiState {
     fn default() -> Self {
         Self {
             chat_open: false,
+            suppress_enter_chat_open: false,
             chat_input: String::new(),
             chat_cursor: 0,
             chat_scroll_offset: 0,

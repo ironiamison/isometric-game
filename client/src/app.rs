@@ -77,6 +77,11 @@ pub fn configure_game_state(
     game_state.ui_state.hide_system_in_public = settings.hide_system_in_public;
     if game_state.ui_state.classic_controls {
         game_state.ui_state.chat_open = true;
+    } else {
+        // The Enter key used to confirm character selection is still registered as
+        // pressed on the first gameplay frame. Suppress the Enter→open-chat shortcut
+        // until Enter is released so the game doesn't start with chat input open.
+        game_state.ui_state.suppress_enter_chat_open = true;
     }
 
     #[cfg(not(target_os = "android"))]
