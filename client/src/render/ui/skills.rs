@@ -100,7 +100,7 @@ impl Renderer {
             .get_local_player()
             .map(|p| p.combat_level())
             .unwrap_or(3);
-        let header_text = format!("Skills · Combat Lv {}", combat_level);
+        let header_text = format!("Skills - Combat Lv {}", combat_level);
         let text_dims = self.measure_text_sharp(&header_text, 16.0);
         let text_x = header_x + (header_w - text_dims.width) / 2.0;
         self.draw_text_sharp(
