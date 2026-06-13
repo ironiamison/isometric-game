@@ -458,6 +458,13 @@ pub(crate) fn run_game_frame(
                         player.play_attack();
                     }
                 }
+                // Optimistically show the woodcutting indicator. Woodcutting has
+                // no server "started" session, so we drive the indicator off swing
+                // messages (and time it out in GameState::update); setting it here
+                // makes the bar appear immediately instead of after the first swing
+                // round-trips.
+                game_state.is_woodcutting = true;
+                game_state.woodcutting_started_at = get_time();
                 ClientMessage::ChopTree {
                     tree_x: *tree_x,
                     tree_y: *tree_y,

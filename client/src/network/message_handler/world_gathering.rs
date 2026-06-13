@@ -537,6 +537,16 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                         .unwrap_or(false)
                 };
 
+                // A swing is the authoritative signal that the local player is
+                // woodcutting (there's no server-side "started" session message
+                // for woodcutting like there is for fishing). Refresh the flag and
+                // timestamp on every swing; GameState::update times it out shortly
+                // after swings stop arriving.
+                if is_local {
+                    state.is_woodcutting = true;
+                    state.woodcutting_started_at = macroquad::time::get_time();
+                }
+
                 // Server says player swung - play attack animation (always) and sound (if in range)
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.play_attack();

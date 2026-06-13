@@ -447,6 +447,14 @@ impl GameState {
         let now = macroquad::time::get_time();
         self.active_potion_buffs.retain(|b| b.expires_at > now);
 
+        // Clear the woodcutting indicator once swings stop arriving. Woodcutting
+        // is swing-driven with no server "stopped" message, so we time it out:
+        // swings fire roughly every attack cooldown (~0.7s), so 1.5s without one
+        // means we're no longer chopping (moved away, tree depleted, stopped).
+        if self.is_woodcutting && now - self.woodcutting_started_at > 1.5 {
+            self.is_woodcutting = false;
+        }
+
         // Trigger fade-in when world first becomes ready
         if !self.world_was_ready && self.is_world_ready() {
             self.world_was_ready = true;
