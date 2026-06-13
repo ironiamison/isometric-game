@@ -226,7 +226,13 @@ impl Renderer {
             let ui_slider_x = content_x + 42.0 * s;
             let scale_bounds = Rect::new(ui_slider_x, y, ui_slider_width, slider_height);
             layout.add(UiElementId::EscapeMenuUiScaleSlider, scale_bounds);
-            let scale_normalized = (state.ui_state.ui_scale - 0.75) / 1.25; // 0.75-2.0 range
+            // While dragging, reflect the pending (not-yet-applied) value so the
+            // thumb tracks the cursor even though the panel isn't rescaling yet.
+            let displayed_scale = state
+                .ui_state
+                .ui_scale_pending
+                .unwrap_or(state.ui_state.ui_scale);
+            let scale_normalized = (displayed_scale - 0.75) / 1.25; // 0.75-2.0 range
             self.draw_compact_slider(
                 "Scale",
                 content_x,
@@ -305,18 +311,17 @@ impl Renderer {
                 s,
             );
         }
-        let rows = (toggles.len() + 1) / 2;
-        y += rows as f32 * (toggle_height + toggle_gap);
-
-        // Generous gap so the disconnect button isn't cramped against the toggles
-        // (balanced against the matching bottom margin baked into content_height).
-        y += 16.0 * s;
+        // (Disconnect is now bottom-anchored, so the toggle grid no longer needs
+        // to advance `y` past its last row.)
 
         // ===== DISCONNECT BUTTON =====
+        // Anchored to the bottom of the panel with the same padding the content
+        // has at the top (8px below the header), rather than flowing with `y`.
         let disconnect_width = inner_width;
         let disconnect_height = 28.0 * s;
         let disconnect_x = content_x;
-        let disconnect_y = y;
+        let disconnect_y =
+            menu_y + menu_height - frame_thickness - 8.0 * s - disconnect_height;
         let disconnect_bounds = Rect::new(
             disconnect_x,
             disconnect_y,

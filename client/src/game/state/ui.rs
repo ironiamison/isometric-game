@@ -635,6 +635,9 @@ pub struct UiState {
     pub sfx_muted: bool,
     // UI scale (0.75 to 2.0, default 1.0; fixed at 1.0 on Android)
     pub ui_scale: f32,
+    // Pending scale while dragging the settings slider. The live `ui_scale` is
+    // only updated on mouse release, so the panel doesn't rescale mid-drag.
+    pub ui_scale_pending: Option<f32>,
     // Input settings
     pub shift_drop_enabled: bool,
     // Menu button panel states
@@ -914,6 +917,7 @@ impl Default for UiState {
             music_muted: false,
             sfx_muted: false,
             ui_scale: 1.0,
+            ui_scale_pending: None,
             shift_drop_enabled: true,
             social_open: false,
             skills_open: false,

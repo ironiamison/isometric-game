@@ -12,6 +12,7 @@ impl InputHandler {
         let mx = frame.mx;
         let my = frame.my;
         let mouse_clicked = frame.mouse_clicked;
+        let mouse_right_clicked = frame.mouse_right_clicked;
         let clicked_element = frame.clicked_element.clone();
         // Handle menu button clicks (always visible, handle before modal UIs)
         if mouse_clicked {
@@ -674,17 +675,33 @@ impl InputHandler {
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let normalized =
                                     (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
-                                state.ui_state.ui_scale = 0.75 + normalized * 1.25;
+                                // Defer the actual rescale until release; only the
+                                // thumb position (pending value) updates mid-drag.
+                                state.ui_state.ui_scale_pending = Some(0.75 + normalized * 1.25);
                             }
                         }
                         _ => {}
                     }
                     return true;
                 } else {
-                    // Mouse released - stop dragging and save settings
+                    // Mouse released - apply any deferred scale, then save settings
+                    if let Some(pending) = state.ui_state.ui_scale_pending.take() {
+                        state.ui_state.ui_scale = pending;
+                    }
                     save_current_ui_settings(state);
                     state.ui_state.settings_slider_dragging = None;
                 }
+            }
+
+            // Right-click the scale slider resets UI scale to the default (1.0).
+            if mouse_right_clicked
+                && clicked_element.as_ref() == Some(&UiElementId::EscapeMenuUiScaleSlider)
+            {
+                state.ui_state.ui_scale = 1.0;
+                state.ui_state.ui_scale_pending = None;
+                state.ui_state.settings_slider_dragging = None;
+                save_current_ui_settings(state);
+                return true;
             }
 
             // Handle mouse clicks on escape menu elements
@@ -744,7 +761,8 @@ impl InputHandler {
                             return true;
                         }
                         UiElementId::EscapeMenuUiScaleSlider => {
-                            // Start dragging and set initial value
+                            // Start dragging and set the initial pending value. The
+                            // live scale only changes on release (see drag handler).
                             state.ui_state.settings_slider_dragging =
                                 Some(UiElementId::EscapeMenuUiScaleSlider);
                             if let Some(slider_elem) = layout
@@ -756,7 +774,7 @@ impl InputHandler {
                                 let relative_x = mouse_x - slider_elem.bounds.x;
                                 let normalized =
                                     (relative_x / slider_elem.bounds.w).clamp(0.0, 1.0);
-                                state.ui_state.ui_scale = 0.75 + normalized * 1.25;
+                                state.ui_state.ui_scale_pending = Some(0.75 + normalized * 1.25);
                             }
                             return true;
                         }
