@@ -18,6 +18,10 @@ const FADE_IN_DURATION: f32 = 0.5;
 const HOLD_DURATION: f32 = 2.5;
 const FADE_OUT_DURATION: f32 = 0.5;
 
+/// Vertical travel of the slide animation, in virtual pixels. The banner rises
+/// into place on the way in, then continues rising up and out on the way out.
+const SLIDE_DISTANCE: f32 = 22.0;
+
 /// Overworld display name
 pub const OVERWORLD_NAME: &str = "Verdant Fields";
 
@@ -84,106 +88,116 @@ impl AreaBanner {
         }
     }
 
+    /// Vertical slide offset in virtual pixels (positive = lower on screen).
+    /// The banner starts below its resting spot and rises up into place while
+    /// fading in, holds at rest, then keeps rising up and out while fading out.
+    pub fn slide_offset(&self) -> f32 {
+        match self.phase {
+            BannerPhase::Hidden => 0.0,
+            BannerPhase::FadingIn => {
+                // progress 0 -> 1; ease-out so it decelerates into place.
+                let p = 1.0 - (self.timer / FADE_IN_DURATION).clamp(0.0, 1.0);
+                SLIDE_DISTANCE * (1.0 - ease_out_cubic(p))
+            }
+            BannerPhase::Holding => 0.0,
+            BannerPhase::FadingOut => {
+                // progress 0 -> 1; ease-in so it accelerates away upward.
+                let p = 1.0 - (self.timer / FADE_OUT_DURATION).clamp(0.0, 1.0);
+                -SLIDE_DISTANCE * ease_in_cubic(p)
+            }
+        }
+    }
+
     /// Check if banner should be rendered
     pub fn is_visible(&self) -> bool {
         self.phase != BannerPhase::Hidden
     }
 }
 
+/// Cubic ease-out: fast start, gentle settle (1 - (1-t)^3).
+fn ease_out_cubic(t: f32) -> f32 {
+    let u = 1.0 - t;
+    1.0 - u * u * u
+}
+
+/// Cubic ease-in: gentle start, accelerating finish (t^3).
+fn ease_in_cubic(t: f32) -> f32 {
+    t * t * t
+}
+
 impl Renderer {
-    /// Render the area banner (called from main render loop)
-    pub fn render_area_banner(&self, text: &str, opacity: f32) {
+    /// Render the area banner (called from main render loop).
+    ///
+    /// Style: an elegant title flourish with no background box — gold title text
+    /// over a soft shadow, with a thin bronze divider beneath flanked by small
+    /// diamond ornaments. Matches the game's bronze/gold medieval UI theme.
+    pub fn render_area_banner(&self, text: &str, opacity: f32, slide_offset: f32) {
         let (screen_w, screen_h) = virtual_screen_size();
 
-        // Colors
-        let text_color = Color::new(0.96, 0.94, 0.88, opacity); // Off-white/cream
-        let corner_color = Color::new(0.96, 0.94, 0.88, opacity * 0.8);
-        let shadow_color = Color::new(0.1, 0.08, 0.05, opacity * 0.6);
-        let bg_color = Color::new(0.0, 0.0, 0.0, opacity * 0.4);
+        // Colors (alpha scaled by the fade opacity).
+        // Gold title matching the panel TEXT_TITLE accent: rgba(218, 188, 128).
+        let title_color = Color::new(0.855, 0.737, 0.502, opacity);
+        // Soft dark shadow for legibility over busy world tiles.
+        let shadow_color = Color::new(0.05, 0.04, 0.03, opacity * 0.75);
+        // Bronze divider matching FRAME_ACCENT: rgba(218, 178, 108).
+        let divider_color = Color::new(0.855, 0.698, 0.424, opacity * 0.9);
 
-        // Measure text
+        // Measure title.
         let font_size = 32.0;
         let text_dims = self.measure_text_sharp(text, font_size);
 
-        // Banner dimensions - snug fit around text
-        let padding_x = 14.0;
-        let padding_y = 6.0;
-        let banner_width = text_dims.width + padding_x * 2.0;
-        let banner_height = text_dims.height + padding_y * 2.0;
-        let banner_x = ((screen_w - banner_width) / 2.0).floor();
-        let banner_y = (screen_h * 0.18).floor();
+        let center_x = (screen_w / 2.0).floor();
+        let title_top = (screen_h * 0.18 + slide_offset).floor();
 
-        // Frame bounds (for corners)
-        let frame_left = banner_x;
-        let frame_right = banner_x + banner_width;
-        let frame_top = banner_y;
-        let frame_bottom = banner_y + banner_height;
+        // --- Title text (centered, with a slightly offset shadow for depth) ---
+        let text_x = (center_x - text_dims.width / 2.0).floor();
+        let text_y = (title_top + text_dims.height).floor();
+        self.draw_text_sharp(text, text_x + 2.0, text_y + 2.0, font_size, shadow_color);
+        self.draw_text_sharp(text, text_x, text_y, font_size, title_color);
 
-        // Draw semi-transparent background
-        draw_rectangle(frame_left, frame_top, banner_width, banner_height, bg_color);
+        // --- Divider flourish beneath the title ---
+        let divider_y = (text_y + 10.0).floor();
+        // Width tracks the title but is capped so short names still look balanced.
+        let half_len = (text_dims.width * 0.5 + 24.0).min(220.0);
+        let diamond_gap = 12.0; // space between line end and ornament
+        let line_left = center_x - half_len;
+        let line_right = center_x + half_len;
 
-        // Corner size
-        let corner_len = 10.0;
-        let thickness = 2.0;
-
-        // Top-left corner
-        draw_rectangle(frame_left, frame_top, corner_len, thickness, corner_color);
-        draw_rectangle(frame_left, frame_top, thickness, corner_len, corner_color);
-
-        // Top-right corner
-        draw_rectangle(
-            frame_right - corner_len,
-            frame_top,
-            corner_len,
-            thickness,
-            corner_color,
+        // Soft shadow under the divider, then the bronze line itself.
+        draw_line(
+            line_left,
+            divider_y + 1.0,
+            line_right,
+            divider_y + 1.0,
+            1.0,
+            shadow_color,
         );
-        draw_rectangle(
-            frame_right - thickness,
-            frame_top,
-            thickness,
-            corner_len,
-            corner_color,
-        );
+        draw_line(line_left, divider_y, line_right, divider_y, 1.0, divider_color);
 
-        // Bottom-left corner
-        draw_rectangle(
-            frame_left,
-            frame_bottom - thickness,
-            corner_len,
-            thickness,
-            corner_color,
-        );
-        draw_rectangle(
-            frame_left,
-            frame_bottom - corner_len,
-            thickness,
-            corner_len,
-            corner_color,
-        );
+        // --- Diamond ornaments flanking the divider ---
+        let diamond_r = 3.0;
+        for cx in [line_left - diamond_gap, line_right + diamond_gap] {
+            self.draw_diamond(cx, divider_y, diamond_r, shadow_color, 1.0); // shadow
+            self.draw_diamond(cx, divider_y, diamond_r, divider_color, 0.0);
+        }
+    }
 
-        // Bottom-right corner
-        draw_rectangle(
-            frame_right - corner_len,
-            frame_bottom - thickness,
-            corner_len,
-            thickness,
-            corner_color,
+    /// Draw a small filled diamond (rotated square) centered at (cx, cy).
+    /// `offset` nudges the shape for a drop shadow pass.
+    fn draw_diamond(&self, cx: f32, cy: f32, r: f32, color: Color, offset: f32) {
+        let cx = cx + offset;
+        let cy = cy + offset;
+        draw_triangle(
+            vec2(cx, cy - r),
+            vec2(cx + r, cy),
+            vec2(cx, cy + r),
+            color,
         );
-        draw_rectangle(
-            frame_right - thickness,
-            frame_bottom - corner_len,
-            thickness,
-            corner_len,
-            corner_color,
+        draw_triangle(
+            vec2(cx, cy - r),
+            vec2(cx - r, cy),
+            vec2(cx, cy + r),
+            color,
         );
-
-        // Draw text (perfectly centered in banner)
-        let text_x = (banner_x + (banner_width - text_dims.width) / 2.0).floor();
-        let text_y = (banner_y + (banner_height + text_dims.height) / 2.0).floor();
-        self.draw_text_sharp(text, text_x + 1.0, text_y + 1.0, font_size, shadow_color);
-
-        // Draw text
-        self.draw_text_sharp(text, text_x, text_y, font_size, text_color);
     }
 }

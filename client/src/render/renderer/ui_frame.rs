@@ -989,7 +989,11 @@ impl Renderer {
 
         // Area banner (location name during transitions)
         if state.area_banner.is_visible() {
-            self.render_area_banner(&state.area_banner.text, state.area_banner.opacity());
+            self.render_area_banner(
+                &state.area_banner.text,
+                state.area_banner.opacity(),
+                state.area_banner.slide_offset(),
+            );
         }
 
         // Chat input box (when open) - scale with UI scale
