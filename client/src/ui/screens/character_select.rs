@@ -315,6 +315,10 @@ impl CharacterSelectScreen {
         {
             if let Ok(chars) = self.auth_client.get_characters(&self.session.token) {
                 self.characters = chars;
+                // Keep the session in sync so navigating away and back (which
+                // rebuilds this screen from the session) doesn't resurrect a
+                // deleted character.
+                self.session.characters = self.characters.clone();
                 if self.selected_index >= self.characters.len() && !self.characters.is_empty() {
                     self.selected_index = self.characters.len() - 1;
                 }
@@ -484,6 +488,10 @@ impl Screen for CharacterSelectScreen {
                 match result {
                     AuthResult::Characters(Ok(chars)) => {
                         self.characters = chars;
+                        // Keep the session in sync so navigating away and back
+                        // (which rebuilds this screen from the session) doesn't
+                        // resurrect a deleted character.
+                        self.session.characters = self.characters.clone();
                         if self.selected_index >= self.characters.len()
                             && !self.characters.is_empty()
                         {
