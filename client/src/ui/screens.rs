@@ -392,6 +392,8 @@ pub trait Screen {
 mod character_create;
 mod character_select;
 mod login;
+mod starfield;
+pub use starfield::StarfieldBackground;
 
 pub use character_create::CharacterCreateScreen;
 pub use character_select::CharacterSelectScreen;
