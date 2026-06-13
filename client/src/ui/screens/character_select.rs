@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::render::ui::common::{FRAME_ACCENT, FRAME_OUTER};
+
 /// Maximum characters per account
 const MAX_CHARACTERS: usize = 3;
 
@@ -12,6 +14,19 @@ fn format_played_time(seconds: i64) -> String {
     } else {
         format!("{}m", minutes)
     }
+}
+
+/// Fill color for a level chip: bronze at low levels warming to gold at high
+/// levels. Linear ramp from level 1 (FRAME_OUTER) to level 100+ (FRAME_ACCENT).
+fn level_chip_color(level: i32) -> Color {
+    let t = ((level - 1) as f32 / 99.0).clamp(0.0, 1.0);
+    let lerp = |a: f32, b: f32| a + (b - a) * t;
+    Color::new(
+        lerp(FRAME_OUTER.r, FRAME_ACCENT.r),
+        lerp(FRAME_OUTER.g, FRAME_ACCENT.g),
+        lerp(FRAME_OUTER.b, FRAME_ACCENT.b),
+        1.0,
+    )
 }
 
 pub struct CharacterSelectScreen {
@@ -910,6 +925,20 @@ mod tests {
         assert_eq!(format_played_time(9 * 3600 + 51 * 60), "9h 51m");
         assert_eq!(format_played_time(149 * 3600 + 44 * 60), "149h 44m");
         assert_eq!(format_played_time(3600), "1h 0m");
+    }
+
+    #[test]
+    fn level_chip_ramp_endpoints_and_clamp() {
+        let low = level_chip_color(1);
+        assert!((low.r - 0.322).abs() < 0.01 && (low.g - 0.243).abs() < 0.01);
+        let high = level_chip_color(100);
+        assert!((high.r - 0.855).abs() < 0.01 && (high.g - 0.698).abs() < 0.01);
+        let clamped_low = level_chip_color(0);
+        assert!((clamped_low.r - low.r).abs() < 0.001);
+        let clamped_high = level_chip_color(126);
+        assert!((clamped_high.r - high.r).abs() < 0.001);
+        let mid = level_chip_color(50);
+        assert!(mid.r > low.r && mid.r < high.r);
     }
 }
 
