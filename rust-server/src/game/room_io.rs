@@ -408,7 +408,14 @@ impl GameRoom {
                 choices,
                 ..
             } => {
-                let allowed = choices.iter().map(|choice| choice.id.clone()).collect();
+                // A no-choice dialogue's only valid client action is "Continue", which the
+                // client sends as the synthetic "__continue__" choice. Grant it explicitly,
+                // otherwise continue-style dialogues (e.g. quest completion) fail authorization.
+                let allowed = if choices.is_empty() {
+                    std::iter::once("__continue__".to_string()).collect()
+                } else {
+                    choices.iter().map(|choice| choice.id.clone()).collect()
+                };
                 self.register_dialogue_grant(player_id, quest_id, npc_id, allowed)
                     .await;
             }

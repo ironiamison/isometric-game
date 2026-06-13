@@ -19,8 +19,7 @@ function show_offer_dialogue(ctx)
         speaker = "Adventurer Guide",
         text = "No fluff, just progress. Tier I has three milestones: defeat 8 crows, reach Combat level 8, and build up 150 gold. Complete all three, then report back.",
         choices = {
-            { id = "accept", text = "Assign me Tier I." },
-            { id = "ask_tips", text = "Any route advice?" }
+            { id = "accept", text = "Assign me Tier I." }
         }
     })
 
@@ -30,12 +29,6 @@ function show_offer_dialogue(ctx)
             speaker = "Adventurer Guide",
             text = "Good. Crows are nearby, and your combat level rises with real fights. Keep the gold you earn; don't spend below your target."
         })
-    elseif choice == "ask_tips" then
-        ctx:show_dialogue({
-            speaker = "Adventurer Guide",
-            text = "Loop between easy monsters and loot pickup. You'll train combat and stack gold at the same time."
-        })
-        return show_offer_dialogue(ctx)
     else
         return show_offer_dialogue(ctx)
     end

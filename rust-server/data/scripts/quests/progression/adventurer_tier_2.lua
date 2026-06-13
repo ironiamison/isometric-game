@@ -19,8 +19,7 @@ function show_offer_dialogue(ctx)
         speaker = "Adventurer Guide",
         text = "Tier II raises the bar: defeat 10 blue slimes and 12 worms, reach Woodcutting 8, Mining 8, Smithing 8, and Combat 14, then build your gold reserve to 1,200.",
         choices = {
-            { id = "accept", text = "Start Tier II." },
-            { id = "ask_tips", text = "What's the efficient route?" }
+            { id = "accept", text = "Start Tier II." }
         }
     })
 
@@ -30,12 +29,6 @@ function show_offer_dialogue(ctx)
             speaker = "Adventurer Guide",
             text = "Rotate combat and resource runs. Mine ore and smelt bars between fights. Chop trees to push woodcutting while keeping your income steady."
         })
-    elseif choice == "ask_tips" then
-        ctx:show_dialogue({
-            speaker = "Adventurer Guide",
-            text = "Avoid idling. If you're waiting on one objective, progress the others in parallel."
-        })
-        return show_offer_dialogue(ctx)
     else
         return show_offer_dialogue(ctx)
     end

@@ -19,8 +19,7 @@ function show_offer_dialogue(ctx)
         speaker = "Adventurer Guide",
         text = "Tier III benchmark: defeat 30 pigs and 20 wild boars, reach Farming 12 and Combat 25, and hold 2,600 gold. This is your early-game competency check.",
         choices = {
-            { id = "accept", text = "I'll clear Tier III." },
-            { id = "ask_tips", text = "How should I pace this?" }
+            { id = "accept", text = "I'll clear Tier III." }
         }
     })
 
@@ -30,12 +29,6 @@ function show_offer_dialogue(ctx)
             speaker = "Adventurer Guide",
             text = "Plan in loops: farm and gather while your combat route stays active. Keep your gold target protected until completion."
         })
-    elseif choice == "ask_tips" then
-        ctx:show_dialogue({
-            speaker = "Adventurer Guide",
-            text = "Longer tiers are won by pacing. Keep all three objectives moving every session."
-        })
-        return show_offer_dialogue(ctx)
     else
         return show_offer_dialogue(ctx)
     end
