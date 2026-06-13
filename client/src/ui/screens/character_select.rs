@@ -1,10 +1,38 @@
 use super::*;
 
+use super::character_create::{CreateAction, CreateForm, CreateLayout};
 use crate::render::ui::common::{
-    draw_corner_accents, draw_panel_frame, draw_screen_button, ButtonVariant, CHIP_TEXT_DARK,
-    DANGER_TEXT, FRAME_ACCENT, FRAME_INNER, FRAME_OUTER, FRAME_THICKNESS, PANEL_BG_DARK, TEXT_DIM,
-    TEXT_NORMAL, TEXT_TITLE,
+    draw_corner_accents, draw_panel_frame, draw_screen_button, draw_screen_button_alpha,
+    ButtonVariant, CHIP_TEXT_DARK, DANGER_TEXT, FRAME_ACCENT, FRAME_INNER, FRAME_OUTER,
+    FRAME_THICKNESS, PANEL_BG_DARK, TEXT_DIM, TEXT_GOLD, TEXT_NORMAL, TEXT_TITLE,
 };
+
+/// Which face of the character box is showing. `Create` overlays the roster
+/// with the in-place creation form; `anim_t` drives the crossfade + resize.
+#[derive(PartialEq, Clone, Copy)]
+enum SelectMode {
+    Roster,
+    Create,
+}
+
+/// Duration (seconds) of the roster⇄create morph.
+const MORPH_SECS: f32 = 0.18;
+
+/// Smoothstep ease for the morph progress.
+fn ease(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Linear interpolate two rects.
+fn lerp_rect(a: Rect, b: Rect, t: f32) -> Rect {
+    Rect::new(
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.w + (b.w - a.w) * t,
+        a.h + (b.h - a.h) * t,
+    )
+}
 
 /// Maximum characters per account
 const MAX_CHARACTERS: usize = 3;
@@ -39,14 +67,18 @@ struct CharSelectLayout {
 }
 
 impl CharSelectLayout {
+    /// Inner padding, gap below panel, and action-bar height — kept identical to
+    /// `CreateLayout` so the roster box can morph (resize) into the create box.
+    const PAD: f32 = FRAME_THICKNESS + 10.0;
+    const ACTION_GAP_Y: f32 = 12.0;
+
     fn compute(sw: f32, sh: f32, card_rows: usize) -> Self {
         let panel_w = 540.0_f32.min(sw - 24.0);
         let panel_x = (sw - panel_w) / 2.0;
         let action_h = ACTION_BAR_H;
-        let action_gap = 12.0;
         let header_h = 28.0; // title sits just above the panel
         let hint_h = 28.0; // hint line sits just below the action bar
-        let pad = FRAME_THICKNESS + 10.0;
+        let pad = Self::PAD;
         let item_height = CARD_HEIGHT + CARD_GAP;
 
         // Size the panel to its content (max 3 cards + create row) rather than
@@ -58,32 +90,41 @@ impl CharSelectLayout {
         };
         // Never exceed the available vertical space (forces scrolling on short
         // screens / when content is unexpectedly tall).
-        let max_panel_h =
-            ((sh - 24.0).max(200.0) - header_h - action_gap - action_h - hint_h).max(160.0);
+        let max_panel_h = ((sh - 24.0).max(200.0)
+            - header_h
+            - Self::ACTION_GAP_Y
+            - action_h
+            - hint_h)
+            .max(160.0);
         let panel_h = content_h.min(max_panel_h).max(160.0);
 
         // Center the whole group (header + panel + action bar + hint) vertically.
-        let block_h = header_h + panel_h + action_gap + action_h + hint_h;
+        let block_h = header_h + panel_h + Self::ACTION_GAP_Y + action_h + hint_h;
         let block_top = ((sh - block_h) / 2.0).max(12.0);
-        let header_y = block_top + 20.0;
         let panel_top = block_top + header_h;
         let panel = Rect::new(panel_x, panel_top, panel_w, panel_h);
 
-        let list_x = panel_x + pad;
-        let list_w = panel_w - pad * 2.0;
-        let list_top = panel_top + pad;
-        let list_visible_h = panel_h - pad * 2.0;
+        Self::from_panel(panel)
+    }
 
-        let action_bar = Rect::new(panel_x, panel.y + panel.h + action_gap, panel_w, action_h);
-
+    /// Derive the inner roster geometry from a given panel rect. Header sits 8px
+    /// above the panel and the action bar 12px below — matching `compute` and
+    /// `CreateLayout` so transitions stay aligned.
+    fn from_panel(panel: Rect) -> Self {
+        let pad = Self::PAD;
         Self {
-            header_y,
+            header_y: panel.y - 8.0,
+            list_x: panel.x + pad,
+            list_w: panel.w - pad * 2.0,
+            list_top: panel.y + pad,
+            list_visible_h: panel.h - pad * 2.0,
+            action_bar: Rect::new(
+                panel.x,
+                panel.y + panel.h + Self::ACTION_GAP_Y,
+                panel.w,
+                ACTION_BAR_H,
+            ),
             panel,
-            list_x,
-            list_w,
-            list_top,
-            list_visible_h,
-            action_bar,
         }
     }
 }
@@ -130,6 +171,12 @@ pub struct CharacterSelectScreen {
     /// When true, spectator world is rendered behind this screen — use dark overlay instead of solid bg
     pub has_spectator_backdrop: bool,
     starfield: StarfieldBackground,
+    /// Roster vs. in-place create form.
+    mode: SelectMode,
+    /// Morph progress: 0 = full roster, 1 = full create form.
+    anim_t: f32,
+    /// Embedded creation form (used when `mode == Create`).
+    create_form: CreateForm,
     #[cfg(target_arch = "wasm32")]
     loading: bool,
     #[cfg(target_arch = "wasm32")]
@@ -161,6 +208,9 @@ impl CharacterSelectScreen {
             touch_scroll_last_y: 0.0,
             has_spectator_backdrop: false,
             starfield: StarfieldBackground::new(),
+            mode: SelectMode::Roster,
+            anim_t: 0.0,
+            create_form: CreateForm::new(),
             #[cfg(target_arch = "wasm32")]
             loading: false,
             #[cfg(target_arch = "wasm32")]
@@ -347,6 +397,7 @@ impl CharacterSelectScreen {
         character: &CharacterInfo,
         selected: bool,
         hovered: bool,
+        alpha: f32,
     ) {
         // Card fill
         let fill = if selected {
@@ -356,23 +407,27 @@ impl CharacterSelectScreen {
         } else {
             PANEL_BG_DARK
         };
-        draw_rectangle(rect.x, rect.y, rect.w, rect.h, fill);
+        draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(fill, alpha));
 
         if selected {
-            draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color { a: 0.06, ..FRAME_ACCENT });
-            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, FRAME_ACCENT);
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(Color { a: 0.06, ..FRAME_ACCENT }, alpha));
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, fade(FRAME_ACCENT, alpha));
         } else if hovered {
-            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, FRAME_INNER);
+            // 2px (not 1px) so all four edges land on whole pixels — a 1px
+            // outline drops the top/left edges to sub-pixel rounding, leaving
+            // only the bottom/right visible. A faint wash lifts the whole box.
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(Color { a: 0.04, ..FRAME_INNER }, alpha));
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, fade(FRAME_INNER, alpha));
         } else {
-            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, FRAME_OUTER);
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, fade(FRAME_OUTER, alpha));
         }
 
         // Portrait inset (recessed dark square with bronze edge)
         let inset = rect.h - 12.0;
         let inset_x = (rect.x + 8.0).floor();
         let inset_y = (rect.y + 6.0).floor();
-        draw_rectangle(inset_x, inset_y, inset, inset, Color::from_rgba(12, 12, 18, 255));
-        draw_rectangle_lines(inset_x, inset_y, inset, inset, 1.0, FRAME_OUTER);
+        draw_rectangle(inset_x, inset_y, inset, inset, fade(Color::from_rgba(12, 12, 18, 255), alpha));
+        draw_rectangle_lines(inset_x, inset_y, inset, inset, 1.0, fade(FRAME_OUTER, alpha));
 
         // Composite character sprite, centered in the inset
         let preview_x = (inset_x + (inset - SPRITE_WIDTH) / 2.0).floor();
@@ -390,13 +445,14 @@ impl CharacterSelectScreen {
             character.sprite_feet.as_deref(),
             preview_x,
             preview_y,
+            fade(WHITE, alpha),
         );
 
         // Text column (vertically centered on the card's midline)
         let center_y = rect.y + rect.h / 2.0;
         let text_x = inset_x + inset + 12.0;
         let name_color = if selected { TEXT_TITLE } else { TEXT_NORMAL };
-        self.draw_text_sharp(&character.name, text_x, center_y - 8.0, 16.0, name_color);
+        self.draw_text_sharp(&character.name, text_x, center_y - 8.0, 16.0, fade(name_color, alpha));
 
         // Level chip
         let chip_label = format!("Lv {}", character.level);
@@ -406,21 +462,21 @@ impl CharacterSelectScreen {
         let chip_x = text_x;
         let chip_y = center_y + 2.0;
         let chip_color = level_chip_color(character.level);
-        draw_rectangle(chip_x, chip_y, chip_w, chip_h, chip_color);
+        draw_rectangle(chip_x, chip_y, chip_w, chip_h, fade(chip_color, alpha));
         // Readable label: light text on dark (low-level) chips, dark text on
         // bright gold (high-level) chips.
         let chip_lum = 0.299 * chip_color.r + 0.587 * chip_color.g + 0.114 * chip_color.b;
         let chip_text = if chip_lum < 0.5 { TEXT_NORMAL } else { CHIP_TEXT_DARK };
-        self.draw_text_sharp(&chip_label, chip_x + 7.0, chip_y + 14.0, 16.0, chip_text);
+        self.draw_text_sharp(&chip_label, chip_x + 7.0, chip_y + 14.0, 16.0, fade(chip_text, alpha));
 
         // Played time (right-aligned) + dim "played" label beneath
         let time_str = format_played_time(character.played_time);
         let tw = self.measure_text_sharp(&time_str, 16.0).width;
         let right = rect.x + rect.w - 12.0;
-        self.draw_text_sharp(&time_str, right - tw, center_y - 8.0, 16.0, TEXT_NORMAL);
+        self.draw_text_sharp(&time_str, right - tw, center_y - 8.0, 16.0, fade(TEXT_NORMAL, alpha));
         let pl = "played";
         let plw = self.measure_text_sharp(pl, 16.0).width;
-        self.draw_text_sharp(pl, right - plw, center_y + 12.0, 16.0, TEXT_DIM);
+        self.draw_text_sharp(pl, right - plw, center_y + 12.0, 16.0, fade(TEXT_DIM, alpha));
     }
 
     /// Action-bar button rects when characters exist: [Play, Delete, Logout].
@@ -454,7 +510,8 @@ impl CharacterSelectScreen {
     }
 
     /// Draw a dashed rectangle outline (used for the create-new-character row).
-    fn draw_dashed_rect(&self, x: f32, y: f32, w: f32, h: f32, color: Color) {
+    fn draw_dashed_rect(&self, x: f32, y: f32, w: f32, h: f32, color: Color, alpha: f32) {
+        let color = fade(color, alpha);
         let dash = 6.0;
         let gap = 4.0;
         let mut dx = x;
@@ -472,10 +529,279 @@ impl CharacterSelectScreen {
             dy += dash + gap;
         }
     }
+
+    /// Begin the in-place create flow: fresh form, animate the box into it.
+    fn enter_create(&mut self) {
+        self.create_form.reset();
+        self.mode = SelectMode::Create;
+    }
+
+    /// Leave the create flow, animating the box back to the roster.
+    fn exit_create(&mut self) {
+        self.mode = SelectMode::Roster;
+    }
+
+    /// Append a freshly created character to both the live list and the session
+    /// (kept in sync, per the delete-resurrection fix) and select it.
+    fn add_character(&mut self, character: CharacterInfo) {
+        self.characters.push(character.clone());
+        self.session.characters.push(character);
+        self.selected_index = self.characters.len().saturating_sub(1);
+        self.error_message = None;
+    }
+
+    /// Geometry of the dashed "+ Create new character" row. When the list isn't
+    /// scrolling (the desktop common case) the row stretches to fill the leftover
+    /// panel space so its bottom inset matches the left/right padding — equal
+    /// margins on all sides. While scrolling (small mobile screens) it keeps a
+    /// single card height so the list stays uniform.
+    fn create_row_rect(&self, l: &CharSelectLayout, scroll_offset: f32, needs_scroll: bool) -> Rect {
+        let item_height = CARD_HEIGHT + CARD_GAP;
+        let top = l.list_top + self.characters.len() as f32 * item_height - scroll_offset;
+        let h = if needs_scroll {
+            CARD_HEIGHT
+        } else {
+            (l.list_top + l.list_visible_h - top).max(CARD_HEIGHT)
+        };
+        Rect::new(l.list_x, top, l.list_w, h)
+    }
+
+    /// Draw the roster contents (cards/empty-state, action bar, error, hint)
+    /// inside `l`, faded by `alpha`. The caller draws the shared panel frame and
+    /// the (crossfaded) title so the box can morph independently of its content.
+    fn render_roster(&self, l: &CharSelectLayout, alpha: f32) {
+        let (sw, sh) = virtual_screen_size();
+        let (input_pos, _, _) = get_input_state();
+        let (mx, my) = (input_pos.x, input_pos.y);
+
+        if self.characters.is_empty() {
+            // ---- Empty state: centered invitation inside the panel ----
+            let cx = l.panel.x + l.panel.w / 2.0;
+            let circle_cy = l.panel.y + l.panel.h * 0.34;
+            draw_circle_lines(cx, circle_cy, 28.0, 2.0, fade(FRAME_OUTER, alpha));
+            // A simple "+" inside the circle
+            draw_line(cx - 10.0, circle_cy, cx + 10.0, circle_cy, 2.0, fade(FRAME_ACCENT, alpha));
+            draw_line(cx, circle_cy - 10.0, cx, circle_cy + 10.0, 2.0, fade(FRAME_ACCENT, alpha));
+
+            let headline = "Your story begins here";
+            let hw = self.measure_text_sharp(headline, 16.0).width;
+            let mut ty = circle_cy + 56.0;
+            self.draw_text_sharp(headline, (cx - hw / 2.0).floor(), ty, 16.0, fade(TEXT_TITLE, alpha));
+
+            ty += 28.0;
+            let line1 = "No heroes yet. Create your first character";
+            let l1w = self.measure_text_sharp(line1, 16.0).width;
+            self.draw_text_sharp(line1, (cx - l1w / 2.0).floor(), ty, 16.0, fade(TEXT_DIM, alpha));
+            ty += 20.0;
+            let line2 = "to set foot in the realm of Aeven.";
+            let l2w = self.measure_text_sharp(line2, 16.0).width;
+            self.draw_text_sharp(line2, (cx - l2w / 2.0).floor(), ty, 16.0, fade(TEXT_DIM, alpha));
+
+            // Centered Create Character button
+            let create_rect = Self::empty_create_rect(l);
+            let create_hovered =
+                point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h);
+            draw_screen_button_alpha(
+                &self.font,
+                create_rect,
+                "+ Create Character",
+                create_hovered,
+                ButtonVariant::Primary,
+                alpha,
+            );
+        } else {
+            // ---- Cards list with scissor clipping + scrollbar ----
+            let item_height = CARD_HEIGHT + CARD_GAP;
+            let row_count = self.characters.len()
+                + if self.characters.len() < MAX_CHARACTERS { 1 } else { 0 };
+            let total_list_height = row_count as f32 * item_height;
+            let max_scroll = (total_list_height - l.list_visible_h).max(0.0);
+            let scroll_offset = self.list_scroll_offset.clamp(0.0, max_scroll);
+            let needs_scroll = max_scroll > 0.0;
+
+            // Set up scissor clipping for the list area
+            if needs_scroll {
+                let physical_w = screen_width();
+                let physical_h = screen_height();
+                let scale_x = physical_w / sw;
+                let scale_y = physical_h / sh;
+                let mut gl = unsafe { macroquad::window::get_internal_gl() };
+                gl.flush();
+                gl.quad_gl.scissor(Some((
+                    (l.list_x * scale_x) as i32,
+                    (l.list_top * scale_y) as i32,
+                    (l.list_w * scale_x) as i32,
+                    (l.list_visible_h * scale_y) as i32,
+                )));
+            }
+
+            for (i, character) in self.characters.iter().enumerate() {
+                let card_y = l.list_top + i as f32 * item_height - scroll_offset;
+                // Skip rows fully outside the visible area
+                if card_y + CARD_HEIGHT < l.list_top || card_y > l.list_top + l.list_visible_h {
+                    continue;
+                }
+                let card_rect = Rect::new(l.list_x, card_y, l.list_w, CARD_HEIGHT);
+                let is_selected = i == self.selected_index;
+                let is_hovered = point_in_rect(mx, my, l.list_x, card_y, l.list_w, CARD_HEIGHT)
+                    && my >= l.list_top
+                    && my <= l.list_top + l.list_visible_h;
+                self.draw_character_card(card_rect, character, is_selected, is_hovered, alpha);
+            }
+
+            // Create row (only when below the cap), inside the clipped list.
+            // The dashed border lights up bright gold on hover (or keyboard
+            // selection); otherwise it sits quiet in dim bronze.
+            if self.characters.len() < MAX_CHARACTERS {
+                let create_idx = self.characters.len();
+                let row = self.create_row_rect(l, scroll_offset, needs_scroll);
+                if !(row.y + row.h < l.list_top || row.y > l.list_top + l.list_visible_h) {
+                    let is_create_selected = self.selected_index == create_idx;
+                    let is_create_hovered = point_in_rect(mx, my, row.x, row.y, row.w, row.h)
+                        && my >= l.list_top
+                        && my <= l.list_top + l.list_visible_h;
+                    let outline = if is_create_selected {
+                        TEXT_GOLD
+                    } else if is_create_hovered {
+                        FRAME_ACCENT
+                    } else {
+                        FRAME_OUTER
+                    };
+                    self.draw_dashed_rect(row.x, row.y, row.w, row.h, outline, alpha);
+
+                    let label = "+ Create new character";
+                    let lw = self.measure_text_sharp(label, 16.0).width;
+                    let label_x = (row.x + (row.w - lw) / 2.0).floor();
+                    let label_y = row.y + row.h / 2.0 + 6.0;
+                    let label_color = Color::new(FRAME_ACCENT.r, FRAME_ACCENT.g, FRAME_ACCENT.b, 0.9);
+                    self.draw_text_sharp(label, label_x, label_y, 16.0, fade(label_color, alpha));
+                }
+            }
+
+            // Disable scissor clipping, then draw the scrollbar — but only when
+            // fully settled in the roster (alpha == 1). Mid-morph the panel
+            // shrinks below the content and would briefly spawn a scrollbar; on
+            // desktop that flicker is pure noise (the bar only matters on small
+            // mobile screens), so suppress it during the transition.
+            if needs_scroll {
+                let mut gl = unsafe { macroquad::window::get_internal_gl() };
+                gl.flush();
+                gl.quad_gl.scissor(None);
+
+                if alpha >= 0.999 {
+                    let scrollbar_w = 4.0;
+                    let scrollbar_x = l.list_x + l.list_w - 6.0;
+                    let track_h = l.list_visible_h;
+                    let thumb_ratio = l.list_visible_h / total_list_height;
+                    let thumb_h = (track_h * thumb_ratio).max(20.0);
+                    let scroll_ratio = if max_scroll > 0.0 {
+                        scroll_offset / max_scroll
+                    } else {
+                        0.0
+                    };
+                    let thumb_y = l.list_top + (track_h - thumb_h) * scroll_ratio;
+
+                    // Track
+                    draw_rectangle(
+                        scrollbar_x,
+                        l.list_top,
+                        scrollbar_w,
+                        track_h,
+                        Color::new(0.855, 0.698, 0.424, 0.10),
+                    );
+                    // Thumb
+                    draw_rectangle(
+                        scrollbar_x,
+                        thumb_y,
+                        scrollbar_w,
+                        thumb_h,
+                        Color::new(1.0, 1.0, 1.0, 0.3),
+                    );
+                }
+            }
+        }
+
+        // ---- Action bar (outside the clipped region) ----
+        if self.characters.is_empty() {
+            // Single right-aligned Logout button
+            let logout_rect = Self::empty_logout_rect(l);
+            let logout_hovered =
+                point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h);
+            draw_screen_button_alpha(
+                &self.font,
+                logout_rect,
+                "Logout",
+                logout_hovered,
+                ButtonVariant::Neutral,
+                alpha,
+            );
+        } else {
+            let [play_rect, del_rect, logout_rect] = Self::action_button_rects(l);
+
+            let play_hovered =
+                point_in_rect(mx, my, play_rect.x, play_rect.y, play_rect.w, play_rect.h);
+            draw_screen_button_alpha(&self.font, play_rect, "Play", play_hovered, ButtonVariant::Primary, alpha);
+
+            let del_hovered =
+                point_in_rect(mx, my, del_rect.x, del_rect.y, del_rect.w, del_rect.h);
+            draw_screen_button_alpha(&self.font, del_rect, "Delete", del_hovered, ButtonVariant::Danger, alpha);
+
+            let logout_hovered =
+                point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h);
+            draw_screen_button_alpha(
+                &self.font,
+                logout_rect,
+                "Logout",
+                logout_hovered,
+                ButtonVariant::Neutral,
+                alpha,
+            );
+        }
+
+        // Error message (just above the action bar)
+        if let Some(ref error) = self.error_message {
+            let ew = self.measure_text_sharp(error, 16.0).width;
+            self.draw_text_sharp(
+                error,
+                ((sw - ew) / 2.0).floor(),
+                l.action_bar.y - 8.0,
+                16.0,
+                fade(DANGER_TEXT, alpha),
+            );
+        }
+
+        // Hint line below the action bar
+        let hint_y = l.action_bar.y + l.action_bar.h + 16.0;
+        let hint: &str = if self.characters.is_empty() {
+            "[N] create character"
+        } else {
+            #[cfg(not(target_os = "android"))]
+            {
+                "[W/S] navigate \u{00b7} [Enter] play \u{00b7} [N] new"
+            }
+            #[cfg(target_os = "android")]
+            {
+                "[Enter] play \u{00b7} [N] new"
+            }
+        };
+        let hw = self.measure_text_sharp(hint, 16.0).width;
+        self.draw_text_sharp(hint, ((sw - hw) / 2.0).floor(), hint_y, 16.0, fade(TEXT_DIM, alpha));
+    }
 }
 
 impl Screen for CharacterSelectScreen {
-    fn update(&mut self, _audio: &AudioManager) -> ScreenState {
+    fn update(&mut self, audio: &AudioManager) -> ScreenState {
+        // Advance the roster⇄create morph toward its target.
+        let target = if self.mode == SelectMode::Create { 1.0 } else { 0.0 };
+        if self.anim_t != target {
+            let step = get_frame_time() / MORPH_SECS;
+            self.anim_t = if self.anim_t < target {
+                (self.anim_t + step).min(target)
+            } else {
+                (self.anim_t - step).max(target)
+            };
+        }
+
         // WASM: poll pending requests (characters now come with login response)
         #[cfg(target_arch = "wasm32")]
         {
@@ -509,6 +835,14 @@ impl Screen for CharacterSelectScreen {
                     AuthResult::CharacterDeleted(Err(e)) => {
                         self.error_message = Some(e.to_string());
                     }
+                    AuthResult::CharacterCreated(Ok(char_info)) => {
+                        self.add_character(char_info);
+                        self.needs_equipment_load = true;
+                        self.exit_create();
+                    }
+                    AuthResult::CharacterCreated(Err(e)) => {
+                        self.create_form.set_error(e.to_string());
+                    }
                     _ => {}
                 }
             }
@@ -516,6 +850,63 @@ impl Screen for CharacterSelectScreen {
 
         let (sw, sh) = virtual_screen_size();
         self.starfield.update(get_frame_time(), sw, sh);
+
+        // ---- In-place create mode ----
+        if self.mode == SelectMode::Create {
+            // Only accept form input once the morph has fully settled, so the
+            // click that opened the form (and the moving rects mid-tween) can't
+            // be mis-hit.
+            if self.anim_t >= 1.0 {
+                let lc = CreateLayout::compute(sw, sh);
+                match self.create_form.update(&lc, audio) {
+                    CreateAction::Cancel => self.exit_create(),
+                    CreateAction::Submit {
+                        name,
+                        gender,
+                        skin,
+                        hair_style,
+                        hair_color,
+                    } => {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        match self.auth_client.create_character(
+                            &self.session.token,
+                            &name,
+                            gender,
+                            skin,
+                            hair_style,
+                            hair_color,
+                        ) {
+                            Ok(char_info) => {
+                                self.add_character(char_info);
+                                self.exit_create();
+                            }
+                            Err(e) => self.create_form.set_error(e.to_string()),
+                        }
+                        #[cfg(target_arch = "wasm32")]
+                        if !self.auth_client.is_busy() {
+                            self.loading = true;
+                            self.auth_client.start_create_character(
+                                &self.session.token,
+                                &name,
+                                gender,
+                                skin,
+                                hair_style,
+                                hair_color,
+                            );
+                        }
+                    }
+                    CreateAction::None => {}
+                }
+            }
+            return ScreenState::Continue;
+        }
+
+        // While the box is still animating back to the roster, swallow roster
+        // input until it settles.
+        if self.anim_t > 0.0 {
+            return ScreenState::Continue;
+        }
+
         let (input_pos, clicked, _is_touch) = get_input_state();
         let mx = input_pos.x;
         let my = input_pos.y;
@@ -656,19 +1047,32 @@ impl Screen for CharacterSelectScreen {
         // Mouse: click on character cards / create row (mirrors render's list geometry)
         if clicked && !self.characters.is_empty() {
             let scroll_offset = self.list_scroll_offset;
+            let needs_scroll = max_scroll > 0.0;
             for i in 0..row_count {
-                let card_y = l.list_top + i as f32 * item_height - scroll_offset;
+                let is_create_row = create_selectable && i == self.characters.len();
+                // Create row may be stretched to fill the panel (see
+                // create_row_rect); character rows are a fixed card height.
+                let rect = if is_create_row {
+                    self.create_row_rect(&l, scroll_offset, needs_scroll)
+                } else {
+                    Rect::new(
+                        l.list_x,
+                        l.list_top + i as f32 * item_height - scroll_offset,
+                        l.list_w,
+                        CARD_HEIGHT,
+                    )
+                };
                 // visible-band check identical to render
-                if card_y + CARD_HEIGHT < l.list_top || card_y > l.list_top + l.list_visible_h {
+                if rect.y + rect.h < l.list_top || rect.y > l.list_top + l.list_visible_h {
                     continue;
                 }
-                if point_in_rect(mx, my, l.list_x, card_y, l.list_w, CARD_HEIGHT)
+                if point_in_rect(mx, my, rect.x, rect.y, rect.w, rect.h)
                     && my >= l.list_top
                     && my <= l.list_top + l.list_visible_h
                 {
-                    if create_selectable && i == self.characters.len() {
-                        // create row
-                        return ScreenState::ToCharacterCreate(self.session.clone());
+                    if is_create_row {
+                        self.enter_create();
+                        return ScreenState::Continue;
                     }
                     if i == self.selected_index {
                         let character = &self.characters[i];
@@ -692,7 +1096,7 @@ impl Screen for CharacterSelectScreen {
                 let create_rect = Self::empty_create_rect(&l);
                 if point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h)
                 {
-                    return ScreenState::ToCharacterCreate(self.session.clone());
+                    { self.enter_create(); return ScreenState::Continue; }
                 }
                 let logout_rect = Self::empty_logout_rect(&l);
                 if point_in_rect(mx, my, logout_rect.x, logout_rect.y, logout_rect.w, logout_rect.h)
@@ -749,7 +1153,7 @@ impl Screen for CharacterSelectScreen {
 
         // Keyboard: create
         if is_key_pressed(KeyCode::N) && self.characters.len() < MAX_CHARACTERS {
-            return ScreenState::ToCharacterCreate(self.session.clone());
+            { self.enter_create(); return ScreenState::Continue; }
         }
 
         // Keyboard: delete (only a real character)
@@ -775,7 +1179,7 @@ impl Screen for CharacterSelectScreen {
                 || (create_selectable && self.selected_index == self.characters.len())
             {
                 if self.characters.len() < MAX_CHARACTERS {
-                    return ScreenState::ToCharacterCreate(self.session.clone());
+                    { self.enter_create(); return ScreenState::Continue; }
                 }
             } else if self.selected_index < self.characters.len() {
                 let character = &self.characters[self.selected_index];
@@ -794,7 +1198,6 @@ impl Screen for CharacterSelectScreen {
         let (sw, sh) = virtual_screen_size();
         let (input_pos, _, _) = get_input_state();
         let (mx, my) = (input_pos.x, input_pos.y);
-        let l = CharSelectLayout::compute(sw, sh, card_row_count(self.characters.len()));
 
         // Background
         if self.has_spectator_backdrop {
@@ -803,221 +1206,57 @@ impl Screen for CharacterSelectScreen {
             self.starfield.draw(sw, sh, 1.0);
         }
 
-        // Header row: username (left) + centered title (above the panel)
-        let header_y = l.header_y;
-        let title = "SELECT CHARACTER";
-        let title_w = self.measure_text_sharp(title, 16.0).width;
-        self.draw_text_sharp(title, ((sw - title_w) / 2.0).floor(), header_y, 16.0, TEXT_TITLE);
+        // Natural layouts for each face, plus the interpolated box that morphs
+        // between them. te==0 -> pure roster, te==1 -> pure create form.
+        let roster_layout = CharSelectLayout::compute(sw, sh, card_row_count(self.characters.len()));
+        let create_layout = CreateLayout::compute(sw, sh);
+        let te = ease(self.anim_t);
+        let roster_alpha = 1.0 - te;
+        let create_alpha = te;
+        let panel = lerp_rect(roster_layout.panel, create_layout.panel, te);
 
-        // Bronze-framed roster panel
-        draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
-        draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
+        // Shared bronze frame (drawn once, fully opaque — it's the box itself).
+        draw_panel_frame(panel.x, panel.y, panel.w, panel.h);
+        draw_corner_accents(panel.x, panel.y, panel.w, panel.h);
 
-        if self.characters.is_empty() {
-            // ---- Empty state: centered invitation inside the panel ----
-            let cx = l.panel.x + l.panel.w / 2.0;
-            let circle_cy = l.panel.y + l.panel.h * 0.34;
-            draw_circle_lines(cx, circle_cy, 28.0, 2.0, FRAME_OUTER);
-            // A simple "+" inside the circle
-            draw_line(cx - 10.0, circle_cy, cx + 10.0, circle_cy, 2.0, FRAME_ACCENT);
-            draw_line(cx, circle_cy - 10.0, cx, circle_cy + 10.0, 2.0, FRAME_ACCENT);
-
-            let headline = "Your story begins here";
-            let hw = self.measure_text_sharp(headline, 16.0).width;
-            let mut ty = circle_cy + 56.0;
-            self.draw_text_sharp(headline, (cx - hw / 2.0).floor(), ty, 16.0, TEXT_TITLE);
-
-            ty += 28.0;
-            let line1 = "No heroes yet. Create your first character";
-            let l1w = self.measure_text_sharp(line1, 16.0).width;
-            self.draw_text_sharp(line1, (cx - l1w / 2.0).floor(), ty, 16.0, TEXT_DIM);
-            ty += 20.0;
-            let line2 = "to set foot in the realm of Aeven.";
-            let l2w = self.measure_text_sharp(line2, 16.0).width;
-            self.draw_text_sharp(line2, (cx - l2w / 2.0).floor(), ty, 16.0, TEXT_DIM);
-
-            // Centered Create Character button
-            let create_rect = Self::empty_create_rect(&l);
-            let create_hovered =
-                point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h);
-            draw_screen_button(
-                &self.font,
-                create_rect,
-                "+ Create Character",
-                create_hovered,
-                ButtonVariant::Primary,
-            );
-        } else {
-            // ---- Cards list with scissor clipping + scrollbar ----
-            let item_height = CARD_HEIGHT + CARD_GAP;
-            let row_count = self.characters.len()
-                + if self.characters.len() < MAX_CHARACTERS { 1 } else { 0 };
-            let total_list_height = row_count as f32 * item_height;
-            let max_scroll = (total_list_height - l.list_visible_h).max(0.0);
-            let scroll_offset = self.list_scroll_offset.clamp(0.0, max_scroll);
-            let needs_scroll = max_scroll > 0.0;
-
-            // Set up scissor clipping for the list area
-            if needs_scroll {
-                let physical_w = screen_width();
-                let physical_h = screen_height();
-                let scale_x = physical_w / sw;
-                let scale_y = physical_h / sh;
-                let mut gl = unsafe { macroquad::window::get_internal_gl() };
-                gl.flush();
-                gl.quad_gl.scissor(Some((
-                    (l.list_x * scale_x) as i32,
-                    (l.list_top * scale_y) as i32,
-                    (l.list_w * scale_x) as i32,
-                    (l.list_visible_h * scale_y) as i32,
-                )));
-            }
-
-            for (i, character) in self.characters.iter().enumerate() {
-                let card_y = l.list_top + i as f32 * item_height - scroll_offset;
-                // Skip rows fully outside the visible area
-                if card_y + CARD_HEIGHT < l.list_top || card_y > l.list_top + l.list_visible_h {
-                    continue;
-                }
-                let card_rect = Rect::new(l.list_x, card_y, l.list_w, CARD_HEIGHT);
-                let is_selected = i == self.selected_index;
-                let is_hovered = point_in_rect(mx, my, l.list_x, card_y, l.list_w, CARD_HEIGHT)
-                    && my >= l.list_top
-                    && my <= l.list_top + l.list_visible_h;
-                self.draw_character_card(card_rect, character, is_selected, is_hovered);
-            }
-
-            // Create row (only when below the cap), inside the clipped list
-            if self.characters.len() < MAX_CHARACTERS {
-                let create_idx = self.characters.len();
-                let card_y = l.list_top + create_idx as f32 * item_height - scroll_offset;
-                if !(card_y + CARD_HEIGHT < l.list_top || card_y > l.list_top + l.list_visible_h) {
-                    let is_create_selected = self.selected_index == create_idx;
-                    let outline = if is_create_selected { FRAME_ACCENT } else { FRAME_OUTER };
-                    self.draw_dashed_rect(l.list_x, card_y, l.list_w, CARD_HEIGHT, outline);
-
-                    let label = "+ Create new character";
-                    let lw = self.measure_text_sharp(label, 16.0).width;
-                    let label_x = (l.list_x + (l.list_w - lw) / 2.0).floor();
-                    let label_y = card_y + CARD_HEIGHT / 2.0 + 6.0;
-                    let label_color =
-                        Color::new(FRAME_ACCENT.r, FRAME_ACCENT.g, FRAME_ACCENT.b, 0.7);
-                    self.draw_text_sharp(label, label_x, label_y, 16.0, label_color);
-                }
-            }
-
-            // Disable scissor clipping + draw scrollbar
-            if needs_scroll {
-                let mut gl = unsafe { macroquad::window::get_internal_gl() };
-                gl.flush();
-                gl.quad_gl.scissor(None);
-
-                let scrollbar_w = 4.0;
-                let scrollbar_x = l.list_x + l.list_w - 6.0;
-                let track_h = l.list_visible_h;
-                let thumb_ratio = l.list_visible_h / total_list_height;
-                let thumb_h = (track_h * thumb_ratio).max(20.0);
-                let scroll_ratio = if max_scroll > 0.0 {
-                    scroll_offset / max_scroll
-                } else {
-                    0.0
-                };
-                let thumb_y = l.list_top + (track_h - thumb_h) * scroll_ratio;
-
-                // Track
-                draw_rectangle(
-                    scrollbar_x,
-                    l.list_top,
-                    scrollbar_w,
-                    track_h,
-                    Color::new(0.855, 0.698, 0.424, 0.10),
-                );
-                // Thumb
-                draw_rectangle(
-                    scrollbar_x,
-                    thumb_y,
-                    scrollbar_w,
-                    thumb_h,
-                    Color::new(1.0, 1.0, 1.0, 0.3),
-                );
-            }
-        }
-
-        // ---- Action bar (outside the clipped region) ----
-        if self.characters.is_empty() {
-            // Single right-aligned Logout button
-            let logout_rect = Self::empty_logout_rect(&l);
-            let logout_hovered = point_in_rect(
-                mx,
-                my,
-                logout_rect.x,
-                logout_rect.y,
-                logout_rect.w,
-                logout_rect.h,
-            );
-            draw_screen_button(
-                &self.font,
-                logout_rect,
-                "Logout",
-                logout_hovered,
-                ButtonVariant::Neutral,
-            );
-        } else {
-            let [play_rect, del_rect, logout_rect] = Self::action_button_rects(&l);
-
-            let play_hovered =
-                point_in_rect(mx, my, play_rect.x, play_rect.y, play_rect.w, play_rect.h);
-            draw_screen_button(&self.font, play_rect, "Play", play_hovered, ButtonVariant::Primary);
-
-            let del_hovered =
-                point_in_rect(mx, my, del_rect.x, del_rect.y, del_rect.w, del_rect.h);
-            draw_screen_button(&self.font, del_rect, "Delete", del_hovered, ButtonVariant::Danger);
-
-            let logout_hovered = point_in_rect(
-                mx,
-                my,
-                logout_rect.x,
-                logout_rect.y,
-                logout_rect.w,
-                logout_rect.h,
-            );
-            draw_screen_button(
-                &self.font,
-                logout_rect,
-                "Logout",
-                logout_hovered,
-                ButtonVariant::Neutral,
-            );
-        }
-
-        // Error message (just above the action bar)
-        if let Some(ref error) = self.error_message {
-            let ew = self.measure_text_sharp(error, 16.0).width;
+        // Crossfaded titles above the panel.
+        let header_y = panel.y - 8.0;
+        if roster_alpha > 0.001 {
+            let title = "SELECT CHARACTER";
+            let tw = self.measure_text_sharp(title, 16.0).width;
             self.draw_text_sharp(
-                error,
-                ((sw - ew) / 2.0).floor(),
-                l.action_bar.y - 8.0,
+                title,
+                ((sw - tw) / 2.0).floor(),
+                header_y,
                 16.0,
-                DANGER_TEXT,
+                fade(TEXT_TITLE, roster_alpha),
+            );
+        }
+        if create_alpha > 0.001 {
+            let title = "CREATE CHARACTER";
+            let tw = self.measure_text_sharp(title, 16.0).width;
+            self.draw_text_sharp(
+                title,
+                ((sw - tw) / 2.0).floor(),
+                header_y,
+                16.0,
+                fade(TEXT_TITLE, create_alpha),
             );
         }
 
-        // Hint line below the action bar
-        let hint_y = l.action_bar.y + l.action_bar.h + 16.0;
-        let hint: &str = if self.characters.is_empty() {
-            "[N] create character"
-        } else {
-            #[cfg(not(target_os = "android"))]
-            {
-                "[W/S] navigate \u{00b7} [Enter] play \u{00b7} [N] new"
-            }
-            #[cfg(target_os = "android")]
-            {
-                "[Enter] play \u{00b7} [N] new"
-            }
-        };
-        let hw = self.measure_text_sharp(hint, 16.0).width;
-        self.draw_text_sharp(hint, ((sw - hw) / 2.0).floor(), hint_y, 16.0, TEXT_DIM);
+        // Roster + create contents, each glued to the (resizing) shared panel.
+        if roster_alpha > 0.001 {
+            self.render_roster(&CharSelectLayout::from_panel(panel), roster_alpha);
+        }
+        if create_alpha > 0.001 {
+            self.create_form.render(
+                &self.font,
+                &self.player_sprites,
+                &self.hair_sprites,
+                &CreateLayout::from_panel(panel),
+                create_alpha,
+            );
+        }
 
         // ---- Delete confirmation dialog (bronze reskin; KEEP geometry) ----
         if self.confirm_delete {

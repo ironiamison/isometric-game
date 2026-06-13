@@ -230,6 +230,19 @@ pub fn draw_screen_button(
     hovered: bool,
     variant: ButtonVariant,
 ) {
+    draw_screen_button_alpha(font, rect, label, hovered, variant, 1.0);
+}
+
+/// Same as `draw_screen_button` but multiplies every layer (fill, border, text)
+/// by `alpha` — used to crossfade buttons during the character-box morph.
+pub fn draw_screen_button_alpha(
+    font: &crate::render::BitmapFont,
+    rect: Rect,
+    label: &str,
+    hovered: bool,
+    variant: ButtonVariant,
+    alpha: f32,
+) {
     let (bg, border, text) = match variant {
         ButtonVariant::Primary => (
             if hovered { Color::from_rgba(64, 50, 28, 255) } else { Color::from_rgba(44, 34, 18, 255) },
@@ -247,14 +260,15 @@ pub fn draw_screen_button(
             TEXT_NORMAL,
         ),
     };
-    draw_rectangle(rect.x, rect.y, rect.w, rect.h, bg);
-    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, border);
+    let fade = |c: Color| Color { a: c.a * alpha, ..c };
+    draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(bg));
+    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, fade(border));
     let tw = font.measure_text(label, 16.0).width;
     font.draw_text(
         label,
         (rect.x + (rect.w - tw) / 2.0).floor(),
         (rect.y + rect.h / 2.0 + 6.0).floor(),
         16.0,
-        text,
+        fade(text),
     );
 }

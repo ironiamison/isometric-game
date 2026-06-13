@@ -1,24 +1,17 @@
 use super::*;
 
 use crate::render::ui::common::{
-    draw_corner_accents, draw_panel_frame, draw_screen_button, ButtonVariant, DANGER_TEXT,
+    draw_corner_accents, draw_panel_frame, draw_screen_button_alpha, ButtonVariant, DANGER_TEXT,
     FRAME_ACCENT, FRAME_OUTER, TEXT_DIM, TEXT_NORMAL, TEXT_TITLE,
 };
 
 pub struct CharacterCreateScreen {
     session: AuthSession,
-    name: String,
-    gender_index: usize,
-    skin_index: usize,
-    hair_style_index: Option<usize>, // None = bald, Some(0-2) = style
-    hair_color_index: usize,         // 0-6
-    error_message: Option<String>,
+    form: CreateForm,
     auth_client: AuthClient,
     font: BitmapFont,
-    active_field: CreateField,
     player_sprites: SpritesheetStore,
     hair_sprites: SpritesheetStore,
-    touch_detected: bool,
     starfield: StarfieldBackground,
     #[cfg(target_arch = "wasm32")]
     loading: bool,
@@ -35,53 +28,72 @@ const ACTION_GAP: f32 = 8.0; // gap between Create and Cancel
 const ARROW_ZONE_FULL: f32 = 50.0; // click width of < / > on full-width steppers
 const ARROW_ZONE_HALF: f32 = 35.0; // click width of < / > on half-width hair steppers
 
-/// Precomputed geometry for the create-character screen, centered as a group
+/// Precomputed geometry for the create-character form, centered as a group
 /// (mirrors char-select's `CharSelectLayout`) so `update` hit-testing and
 /// `render` drawing can never drift apart.
-struct CreateLayout {
-    header_y: f32,    // title baseline, above panel
-    panel: Rect,      // bronze framed panel
-    portrait: Rect,   // recessed portrait inset (inside panel, left)
-    form_x: f32,      // form column left
-    form_w: f32,      // form column width
-    form_top: f32,    // y of first form row
-    row_h: f32,       // vertical spacing per field row
-    action_bar: Rect, // Create/Cancel row below panel
+///
+/// `compute` centers the form for a standalone screen; `from_panel` derives the
+/// same inner geometry from an arbitrary panel rect, which lets the character
+/// box morph (resize) the form in place during the select→create transition.
+pub(crate) struct CreateLayout {
+    pub header_y: f32,    // title baseline, above panel
+    pub panel: Rect,      // bronze framed panel
+    portrait: Rect,       // recessed portrait inset (inside panel, left)
+    form_x: f32,          // form column left
+    form_w: f32,          // form column width
+    form_top: f32,        // y of first form row
+    row_h: f32,           // vertical spacing per field row
+    pub action_bar: Rect, // Create/Cancel row below panel
 }
 
 impl CreateLayout {
-    fn compute(sw: f32, sh: f32) -> Self {
+    /// Inner padding (FRAME_THICKNESS + 10), gap below panel, and action-bar
+    /// height — kept identical to `CharSelectLayout` so the two layouts line up
+    /// when one morphs into the other.
+    const PAD: f32 = 14.0;
+    const ACTION_GAP_Y: f32 = 12.0;
+    const ACTION_H: f32 = 44.0;
+    const ROWS: f32 = 4.0; // Name, Gender, Skin, Hair(Style+Color)
+
+    pub(crate) fn compute(sw: f32, sh: f32) -> Self {
         let panel_w = 520.0_f32.min(sw - 24.0);
         let panel_x = (sw - panel_w) / 2.0;
-        let pad = 14.0; // FRAME_THICKNESS(4) + 10
         let header_h = 28.0;
-        let action_h = 44.0;
-        let action_gap = 12.0;
         let hint_h = 28.0;
 
-        let inner_w = panel_w - pad * 2.0;
+        let inner_h = Self::ROWS * 58.0; // natural row height 58 -> 232
+        let panel_h = inner_h + Self::PAD * 2.0;
+
+        // center the whole group vertically
+        let block_h = header_h + panel_h + Self::ACTION_GAP_Y + Self::ACTION_H + hint_h;
+        let block_top = ((sh - block_h) / 2.0).max(12.0);
+        let panel_top = block_top + header_h;
+        let panel = Rect::new(panel_x, panel_top, panel_w, panel_h);
+        Self::from_panel(panel)
+    }
+
+    /// Derive the inner form geometry from a given panel rect. Header sits 8px
+    /// above the panel and the action bar 12px below — matching `compute` and
+    /// `CharSelectLayout` so transitions stay aligned.
+    pub(crate) fn from_panel(panel: Rect) -> Self {
+        let pad = Self::PAD;
+        let inner_w = panel.w - pad * 2.0;
+        let inner_h = panel.h - pad * 2.0;
         let portrait_w = 150.0;
         let form_gap = 24.0;
         let form_w = inner_w - portrait_w - form_gap;
+        let row_h = inner_h / Self::ROWS;
 
-        // 4 form rows: Name, Gender, Skin, Hair(Style+Color)
-        let rows = 4.0;
-        let row_h = 58.0;
-        let inner_h = rows * row_h; // 232
-        let panel_h = inner_h + pad * 2.0;
-
-        // center the whole group vertically
-        let block_h = header_h + panel_h + action_gap + action_h + hint_h;
-        let block_top = ((sh - block_h) / 2.0).max(12.0);
-        let header_y = block_top + 20.0;
-        let panel_top = block_top + header_h;
-        let panel = Rect::new(panel_x, panel_top, panel_w, panel_h);
-
-        let portrait = Rect::new(panel_x + pad, panel_top + pad, portrait_w, inner_h);
+        let header_y = panel.y - 8.0;
+        let portrait = Rect::new(panel.x + pad, panel.y + pad, portrait_w, inner_h);
         let form_x = portrait.x + portrait_w + form_gap;
-        let form_top = panel_top + pad;
-
-        let action_bar = Rect::new(panel_x, panel.y + panel.h + action_gap, panel_w, action_h);
+        let form_top = panel.y + pad;
+        let action_bar = Rect::new(
+            panel.x,
+            panel.y + panel.h + Self::ACTION_GAP_Y,
+            panel.w,
+            Self::ACTION_H,
+        );
 
         Self {
             header_y,
@@ -134,7 +146,7 @@ impl CreateLayout {
 }
 
 #[derive(PartialEq, Clone, Copy)]
-enum CreateField {
+pub(crate) enum CreateField {
     Name,
     Gender,
     Skin,
@@ -142,87 +154,59 @@ enum CreateField {
     HairColor,
 }
 
-impl CharacterCreateScreen {
-    pub fn new(session: AuthSession, server_url: &str) -> Self {
+/// What a `CreateForm` interaction resolved to this frame. The host (standalone
+/// screen or the embedded select-mode) turns `Submit` into an auth request and
+/// `Cancel` into a return to the roster.
+pub(crate) enum CreateAction {
+    None,
+    Cancel,
+    Submit {
+        name: String,
+        gender: &'static str,
+        skin: &'static str,
+        hair_style: Option<i32>,
+        hair_color: Option<i32>,
+    },
+}
+
+/// The character-creation form (state + input + drawing), independent of where
+/// it is hosted. Owned by `CharacterCreateScreen` (standalone) and embedded in
+/// `CharacterSelectScreen` for the in-place create mode.
+pub(crate) struct CreateForm {
+    pub name: String,
+    gender_index: usize,
+    skin_index: usize,
+    hair_style_index: Option<usize>, // None = bald, Some(0-5) = style
+    hair_color_index: usize,         // 0-9
+    active_field: CreateField,
+    error_message: Option<String>,
+    touch_detected: bool,
+}
+
+impl CreateForm {
+    pub(crate) fn new() -> Self {
         Self {
-            session,
             name: String::new(),
             gender_index: 0,
             skin_index: 0,
             hair_style_index: None,
             hair_color_index: 0,
-            error_message: None,
-            auth_client: AuthClient::new(server_url),
-            font: BitmapFont::default(),
             active_field: CreateField::Name,
-            player_sprites: SpritesheetStore::Individual(HashMap::new()),
-            hair_sprites: SpritesheetStore::Individual(HashMap::new()),
+            error_message: None,
             touch_detected: false,
-            starfield: StarfieldBackground::new(),
-            #[cfg(target_arch = "wasm32")]
-            loading: false,
         }
     }
 
-    /// Use pre-loaded assets from the renderer (avoids duplicate loading)
-    pub fn use_renderer_assets(
-        &mut self,
-        font: BitmapFont,
-        player: SpritesheetStore,
-        hair: SpritesheetStore,
-    ) {
-        self.font = font;
-        self.player_sprites = player;
-        self.hair_sprites = hair;
+    /// Reset to a fresh form (called when (re)entering the create flow).
+    pub(crate) fn reset(&mut self) {
+        let touch = self.touch_detected;
+        *self = Self::new();
+        self.touch_detected = touch;
     }
 
-    pub async fn load_font(&mut self) {
-        // If assets were pre-loaded via use_renderer_assets(), skip loading
-        if !self.player_sprites.is_empty() {
-            return;
-        }
-
-        {
-            self.font =
-                BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf")
-                    .await;
-            self.player_sprites = load_player_sprites().await;
-
-            let mut hair_map = HashMap::new();
-            for style in 0..HAIR_STYLES as i32 {
-                // Male hair sprites
-                let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
-                match load_texture(&path).await {
-                    Ok(tex) => {
-                        tex.set_filter(FilterMode::Nearest);
-                        hair_map.insert(format!("male_{}", style), tex);
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to load hair sprite {}: {}", path, e);
-                    }
-                }
-                // Female hair sprites
-                let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
-                match load_texture(&path).await {
-                    Ok(tex) => {
-                        tex.set_filter(FilterMode::Nearest);
-                        hair_map.insert(format!("female_{}", style), tex);
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to load female hair sprite {}: {}", path, e);
-                    }
-                }
-            }
-            self.hair_sprites = SpritesheetStore::Individual(hair_map);
-        }
-    }
-
-    fn draw_text_sharp(&self, text: &str, x: f32, y: f32, font_size: f32, color: Color) {
-        self.font.draw_text(text, x, y, font_size, color);
-    }
-
-    fn measure_text_sharp(&self, text: &str, font_size: f32) -> TextDimensions {
-        self.font.measure_text(text, font_size)
+    /// Push a server-side error (e.g. name taken) for display.
+    pub(crate) fn set_error(&mut self, message: String) {
+        self.error_message = Some(message);
     }
 
     fn handle_name_input(&mut self) {
@@ -232,67 +216,44 @@ impl CharacterCreateScreen {
                 self.error_message = None;
             }
         }
-
         if is_key_pressed(KeyCode::Backspace) {
             self.name.pop();
             self.error_message = None;
         }
     }
 
-    /// Recessed gold-on-focus field box (matches login).
-    fn draw_field_box(&self, rect: Rect, active: bool) {
-        let fill = if active {
-            Color::from_rgba(22, 22, 32, 250)
-        } else {
-            Color::from_rgba(14, 14, 20, 235)
-        };
-        draw_rectangle(rect.x, rect.y, rect.w, rect.h, fill);
-        let border = if active { FRAME_ACCENT } else { FRAME_OUTER };
-        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, border);
-    }
-
-    /// Draw a label above a field. Gold when active, dim otherwise.
-    fn draw_field_label(&self, text: &str, x: f32, baseline: f32, active: bool) {
-        let color = if active { TEXT_TITLE } else { TEXT_DIM };
-        self.draw_text_sharp(text, x, baseline, 16.0, color);
-    }
-
-    /// Draw a `< value >` stepper inside an already-drawn field box.
-    /// `enabled=false` renders a dim disabled state with `value` (e.g. "-").
-    fn draw_stepper(&self, rect: Rect, value: &str, active: bool, enabled: bool) {
-        self.draw_field_box(rect, active && enabled);
-        let arrow = if active && enabled { FRAME_ACCENT } else { TEXT_DIM };
-        let val_color = if enabled { TEXT_NORMAL } else { TEXT_DIM };
-        let by = rect.y + rect.h / 2.0 + 6.0;
-        self.draw_text_sharp("<", rect.x + 12.0, by, 16.0, arrow);
-        let vw = self.measure_text_sharp(value, 16.0).width;
-        self.draw_text_sharp(value, (rect.x + (rect.w - vw) / 2.0).floor(), by, 16.0, val_color);
-        self.draw_text_sharp(">", rect.x + rect.w - 20.0, by, 16.0, arrow);
-    }
-}
-
-impl Screen for CharacterCreateScreen {
-    fn update(&mut self, audio: &AudioManager) -> ScreenState {
-        // WASM: poll pending requests
-        #[cfg(target_arch = "wasm32")]
-        {
-            if let Some(result) = self.auth_client.poll() {
-                self.loading = false;
-                match result {
-                    AuthResult::CharacterCreated(Ok(char_info)) => {
-                        self.session.characters.push(char_info);
-                        return ScreenState::ToCharacterSelect(self.session.clone());
-                    }
-                    AuthResult::CharacterCreated(Err(e)) => {
-                        self.error_message = Some(e.to_string());
-                    }
-                    _ => {}
-                }
-            }
+    /// Validate the current form and build a `Submit` action, or set an error
+    /// and return `None`.
+    fn try_submit(&mut self) -> Option<CreateAction> {
+        let name = self.name.trim();
+        if name.len() < 2 {
+            self.error_message = Some("Name must be at least 2 characters".to_string());
+            return None;
         }
+        if name.len() > 16 {
+            self.error_message = Some("Name must be at most 16 characters".to_string());
+            return None;
+        }
+        let gender = GENDERS[self.gender_index];
+        let skin = SKINS[self.skin_index];
+        let hair_style = self.hair_style_index.map(|i| i as i32);
+        let hair_color = if self.hair_style_index.is_some() {
+            Some(self.hair_color_index as i32)
+        } else {
+            None
+        };
+        Some(CreateAction::Submit {
+            name: name.to_string(),
+            gender,
+            skin,
+            hair_style,
+            hair_color,
+        })
+    }
 
-        let (sw, sh) = virtual_screen_size();
-        self.starfield.update(get_frame_time(), sw, sh);
+    /// Process a frame of input against the given layout. Returns the resolved
+    /// action (mostly `None`).
+    pub(crate) fn update(&mut self, l: &CreateLayout, audio: &AudioManager) -> CreateAction {
         let (input_pos, clicked, _is_touch) = get_input_state();
         let mx = input_pos.x;
         let my = input_pos.y;
@@ -302,14 +263,12 @@ impl Screen for CharacterCreateScreen {
             self.touch_detected = true;
         }
 
-        let l = CreateLayout::compute(sw, sh);
-
         // Handle name input when name field is active
         if self.active_field == CreateField::Name {
             self.handle_name_input();
         }
 
-        // Mouse: Click on fields to focus
+        // Mouse: Click on fields to focus / steppers to cycle
         if clicked {
             // Name field box
             let name_box = l.row_box(0);
@@ -323,8 +282,6 @@ impl Screen for CharacterCreateScreen {
             if point_in_rect(mx, my, gb.x, gb.y, gb.w, gb.h) {
                 self.active_field = CreateField::Gender;
                 show_keyboard(false);
-
-                // Check if clicked on left arrow area
                 if point_in_rect(mx, my, gb.x, gb.y, ARROW_ZONE_FULL, gb.h) {
                     self.gender_index = if self.gender_index == 0 {
                         GENDERS.len() - 1
@@ -332,7 +289,6 @@ impl Screen for CharacterCreateScreen {
                         self.gender_index - 1
                     };
                 }
-                // Check if clicked on right arrow area
                 if point_in_rect(mx, my, gb.x + gb.w - ARROW_ZONE_FULL, gb.y, ARROW_ZONE_FULL, gb.h) {
                     self.gender_index = (self.gender_index + 1) % GENDERS.len();
                 }
@@ -343,8 +299,6 @@ impl Screen for CharacterCreateScreen {
             if point_in_rect(mx, my, sb.x, sb.y, sb.w, sb.h) {
                 self.active_field = CreateField::Skin;
                 show_keyboard(false);
-
-                // Check if clicked on left arrow area
                 if point_in_rect(mx, my, sb.x, sb.y, ARROW_ZONE_FULL, sb.h) {
                     self.skin_index = if self.skin_index == 0 {
                         SKINS.len() - 1
@@ -352,7 +306,6 @@ impl Screen for CharacterCreateScreen {
                         self.skin_index - 1
                     };
                 }
-                // Check if clicked on right arrow area
                 if point_in_rect(mx, my, sb.x + sb.w - ARROW_ZONE_FULL, sb.y, ARROW_ZONE_FULL, sb.h) {
                     self.skin_index = (self.skin_index + 1) % SKINS.len();
                 }
@@ -364,8 +317,6 @@ impl Screen for CharacterCreateScreen {
             if point_in_rect(mx, my, style_box.x, style_box.y, style_box.w, style_box.h) {
                 self.active_field = CreateField::HairStyle;
                 show_keyboard(false);
-
-                // Check if clicked on left arrow area
                 if point_in_rect(mx, my, style_box.x, style_box.y, ARROW_ZONE_HALF, style_box.h) {
                     self.hair_style_index = match self.hair_style_index {
                         None => Some(HAIR_STYLES - 1),
@@ -373,7 +324,6 @@ impl Screen for CharacterCreateScreen {
                         Some(i) => Some(i - 1),
                     };
                 }
-                // Check if clicked on right arrow area
                 if point_in_rect(
                     mx,
                     my,
@@ -390,14 +340,12 @@ impl Screen for CharacterCreateScreen {
                 }
             }
 
-            // Hair color field box (right half of hair row, only if hair style selected)
+            // Hair color field box (right half of hair row, only if style selected)
             if self.hair_style_index.is_some()
                 && point_in_rect(mx, my, color_box.x, color_box.y, color_box.w, color_box.h)
             {
                 self.active_field = CreateField::HairColor;
                 show_keyboard(false);
-
-                // Check if clicked on left arrow area
                 if point_in_rect(mx, my, color_box.x, color_box.y, ARROW_ZONE_HALF, color_box.h) {
                     self.hair_color_index = if self.hair_color_index == 0 {
                         HAIR_COLORS - 1
@@ -405,7 +353,6 @@ impl Screen for CharacterCreateScreen {
                         self.hair_color_index - 1
                     };
                 }
-                // Check if clicked on right arrow area
                 if point_in_rect(
                     mx,
                     my,
@@ -420,64 +367,16 @@ impl Screen for CharacterCreateScreen {
 
             // Action bar: Create + Cancel
             let (create_rect, cancel_rect) = l.button_rects();
-
-            // Create button
             if point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h) {
                 show_keyboard(false);
-                let name = self.name.trim();
-                if name.len() < 2 {
-                    self.error_message = Some("Name must be at least 2 characters".to_string());
-                    return ScreenState::Continue;
+                if let Some(action) = self.try_submit() {
+                    return action;
                 }
-                if name.len() > 16 {
-                    self.error_message = Some("Name must be at most 16 characters".to_string());
-                    return ScreenState::Continue;
-                }
-
-                let gender = GENDERS[self.gender_index];
-                let skin = SKINS[self.skin_index];
-                let hair_style = self.hair_style_index.map(|i| i as i32);
-                let hair_color = if self.hair_style_index.is_some() {
-                    Some(self.hair_color_index as i32)
-                } else {
-                    None
-                };
-
-                #[cfg(not(target_arch = "wasm32"))]
-                match self.auth_client.create_character(
-                    &self.session.token,
-                    name,
-                    gender,
-                    skin,
-                    hair_style,
-                    hair_color,
-                ) {
-                    Ok(char_info) => {
-                        self.session.characters.push(char_info);
-                        return ScreenState::ToCharacterSelect(self.session.clone());
-                    }
-                    Err(e) => {
-                        self.error_message = Some(e.to_string());
-                    }
-                }
-                #[cfg(target_arch = "wasm32")]
-                if !self.auth_client.is_busy() {
-                    self.loading = true;
-                    self.auth_client.start_create_character(
-                        &self.session.token,
-                        name,
-                        gender,
-                        skin,
-                        hair_style,
-                        hair_color,
-                    );
-                }
+                return CreateAction::None;
             }
-
-            // Cancel button
             if point_in_rect(mx, my, cancel_rect.x, cancel_rect.y, cancel_rect.w, cancel_rect.h) {
                 show_keyboard(false);
-                return ScreenState::ToCharacterSelect(self.session.clone());
+                return CreateAction::Cancel;
             }
         }
 
@@ -574,94 +473,83 @@ impl Screen for CharacterCreateScreen {
         // Keyboard: Cancel
         if is_key_pressed(KeyCode::Escape) {
             show_keyboard(false);
-            return ScreenState::ToCharacterSelect(self.session.clone());
+            return CreateAction::Cancel;
         }
 
         // Keyboard: Create character
         if is_key_pressed(KeyCode::Enter) {
             audio.play_sfx("enter");
-            let name = self.name.trim();
-            if name.len() < 2 {
-                self.error_message = Some("Name must be at least 2 characters".to_string());
-                return ScreenState::Continue;
-            }
-            if name.len() > 16 {
-                self.error_message = Some("Name must be at most 16 characters".to_string());
-                return ScreenState::Continue;
-            }
-
-            let gender = GENDERS[self.gender_index];
-            let skin = SKINS[self.skin_index];
-            let hair_style = self.hair_style_index.map(|i| i as i32);
-            let hair_color = if self.hair_style_index.is_some() {
-                Some(self.hair_color_index as i32)
-            } else {
-                None
-            };
-
-            #[cfg(not(target_arch = "wasm32"))]
-            match self.auth_client.create_character(
-                &self.session.token,
-                name,
-                gender,
-                skin,
-                hair_style,
-                hair_color,
-            ) {
-                Ok(_) => {
-                    return ScreenState::ToCharacterSelect(self.session.clone());
-                }
-                Err(e) => {
-                    self.error_message = Some(e.to_string());
-                }
-            }
-            #[cfg(target_arch = "wasm32")]
-            if !self.auth_client.is_busy() {
-                self.loading = true;
-                self.auth_client.start_create_character(
-                    &self.session.token,
-                    name,
-                    gender,
-                    skin,
-                    hair_style,
-                    hair_color,
-                );
+            if let Some(action) = self.try_submit() {
+                return action;
             }
         }
 
-        ScreenState::Continue
+        CreateAction::None
     }
 
-    fn render(&self) {
-        let (sw, sh) = virtual_screen_size();
+    /// Recessed gold-on-focus field box (matches login), faded by `alpha`.
+    fn draw_field_box(&self, rect: Rect, active: bool, alpha: f32) {
+        let fill = if active {
+            Color::from_rgba(22, 22, 32, 250)
+        } else {
+            Color::from_rgba(14, 14, 20, 235)
+        };
+        draw_rectangle(rect.x, rect.y, rect.w, rect.h, fade(fill, alpha));
+        let border = if active { FRAME_ACCENT } else { FRAME_OUTER };
+        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, fade(border, alpha));
+    }
+
+    /// Draw a label above a field. Gold when active, dim otherwise.
+    fn draw_field_label(&self, font: &BitmapFont, text: &str, x: f32, baseline: f32, active: bool, alpha: f32) {
+        let color = if active { TEXT_TITLE } else { TEXT_DIM };
+        font.draw_text(text, x, baseline, 16.0, fade(color, alpha));
+    }
+
+    /// Draw a `< value >` stepper inside an already-drawn field box.
+    fn draw_stepper(
+        &self,
+        font: &BitmapFont,
+        rect: Rect,
+        value: &str,
+        active: bool,
+        enabled: bool,
+        alpha: f32,
+    ) {
+        self.draw_field_box(rect, active && enabled, alpha);
+        let arrow = if active && enabled { FRAME_ACCENT } else { TEXT_DIM };
+        let val_color = if enabled { TEXT_NORMAL } else { TEXT_DIM };
+        let by = rect.y + rect.h / 2.0 + 6.0;
+        font.draw_text("<", rect.x + 12.0, by, 16.0, fade(arrow, alpha));
+        let vw = font.measure_text(value, 16.0).width;
+        font.draw_text(value, (rect.x + (rect.w - vw) / 2.0).floor(), by, 16.0, fade(val_color, alpha));
+        font.draw_text(">", rect.x + rect.w - 20.0, by, 16.0, fade(arrow, alpha));
+    }
+
+    /// Draw the whole form (portrait + 4 rows + action buttons + error + hint)
+    /// inside `l`, faded by `alpha`. The host draws the shared panel frame and
+    /// title so they can crossfade independently during the morph.
+    pub(crate) fn render(
+        &self,
+        font: &BitmapFont,
+        player_sprites: &SpritesheetStore,
+        hair_sprites: &SpritesheetStore,
+        l: &CreateLayout,
+        alpha: f32,
+    ) {
         let (input_pos, _, _) = get_input_state();
         let (mx, my) = (input_pos.x, input_pos.y);
-        let l = CreateLayout::compute(sw, sh);
-
-        // Background
-        self.starfield.draw(sw, sh, 1.0);
-
-        // Title (centered, above panel)
-        let title = "CREATE CHARACTER";
-        let tw = self.measure_text_sharp(title, 16.0).width;
-        self.draw_text_sharp(title, ((sw - tw) / 2.0).floor(), l.header_y, 16.0, TEXT_TITLE);
-
-        // Bronze-framed panel
-        draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
-        draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
 
         // Portrait inset (recessed dark square + bronze edge + corner accents)
         let p = l.portrait;
-        draw_rectangle(p.x, p.y, p.w, p.h, Color::from_rgba(12, 12, 18, 255));
-        draw_rectangle_lines(p.x, p.y, p.w, p.h, 1.0, FRAME_OUTER);
-        draw_corner_accents(p.x, p.y, p.w, p.h);
+        draw_rectangle(p.x, p.y, p.w, p.h, fade(Color::from_rgba(12, 12, 18, 255), alpha));
+        draw_rectangle_lines(p.x, p.y, p.w, p.h, 1.0, fade(FRAME_OUTER, alpha));
         // Centered sprite
         let sprite_x = (p.x + (p.w - SPRITE_WIDTH) / 2.0).floor();
         let sprite_y = (p.y + (p.h - SPRITE_HEIGHT) / 2.0).floor();
         let empty_equip = SpritesheetStore::Individual(HashMap::new());
         draw_character_preview(
-            &self.player_sprites,
-            &self.hair_sprites,
+            player_sprites,
+            hair_sprites,
             &empty_equip,
             GENDERS[self.gender_index],
             SKINS[self.skin_index],
@@ -672,13 +560,14 @@ impl Screen for CharacterCreateScreen {
             None,
             sprite_x,
             sprite_y,
+            fade(WHITE, alpha),
         );
 
         // --- Row 0: Name ---
         let name_active = self.active_field == CreateField::Name;
         let name_box = l.row_box(0);
-        self.draw_field_label("Name", l.form_x, l.label_y(0), name_active);
-        self.draw_field_box(name_box, name_active);
+        self.draw_field_label(font, "Name", l.form_x, l.label_y(0), name_active, alpha);
+        self.draw_field_box(name_box, name_active, alpha);
         let cursor = if name_active && (get_time() * 2.0) as i32 % 2 == 0 {
             "|"
         } else {
@@ -694,46 +583,43 @@ impl Screen for CharacterCreateScreen {
         } else {
             TEXT_NORMAL
         };
-        self.draw_text_sharp(
+        font.draw_text(
             &name_display,
             name_box.x + 10.0,
             name_box.y + name_box.h / 2.0 + 6.0,
             16.0,
-            name_color,
+            fade(name_color, alpha),
         );
 
         // --- Row 1: Gender ---
         let gender_active = self.active_field == CreateField::Gender;
-        let gender_box = l.row_box(1);
-        self.draw_field_label("Gender", l.form_x, l.label_y(1), gender_active);
-        self.draw_stepper(gender_box, GENDERS[self.gender_index], gender_active, true);
+        self.draw_field_label(font, "Gender", l.form_x, l.label_y(1), gender_active, alpha);
+        self.draw_stepper(font, l.row_box(1), GENDERS[self.gender_index], gender_active, true, alpha);
 
         // --- Row 2: Skin ---
         let skin_active = self.active_field == CreateField::Skin;
-        let skin_box = l.row_box(2);
-        self.draw_field_label("Skin", l.form_x, l.label_y(2), skin_active);
-        self.draw_stepper(skin_box, SKINS[self.skin_index], skin_active, true);
+        self.draw_field_label(font, "Skin", l.form_x, l.label_y(2), skin_active, alpha);
+        self.draw_stepper(font, l.row_box(2), SKINS[self.skin_index], skin_active, true, alpha);
 
         // --- Row 3: Hair (Style + Color) ---
         let (style_box, color_box) = l.hair_boxes();
-
         let style_active = self.active_field == CreateField::HairStyle;
-        self.draw_field_label("Style", style_box.x, l.label_y(3), style_active);
+        self.draw_field_label(font, "Style", style_box.x, l.label_y(3), style_active, alpha);
         let style_value = match self.hair_style_index {
             None => "Bald".to_string(),
             Some(i) => format!("{}", i + 1),
         };
-        self.draw_stepper(style_box, &style_value, style_active, true);
+        self.draw_stepper(font, style_box, &style_value, style_active, true, alpha);
 
         let color_active = self.active_field == CreateField::HairColor;
         let color_enabled = self.hair_style_index.is_some();
-        self.draw_field_label("Color", color_box.x, l.label_y(3), color_active && color_enabled);
+        self.draw_field_label(font, "Color", color_box.x, l.label_y(3), color_active && color_enabled, alpha);
         let color_value = if color_enabled {
             format!("{}", self.hair_color_index + 1)
         } else {
             "-".to_string()
         };
-        self.draw_stepper(color_box, &color_value, color_active, color_enabled);
+        self.draw_stepper(font, color_box, &color_value, color_active, color_enabled, alpha);
 
         // --- Action bar (Create + Cancel) ---
         let (create_rect, cancel_rect) = l.button_rects();
@@ -741,27 +627,186 @@ impl Screen for CharacterCreateScreen {
             point_in_rect(mx, my, create_rect.x, create_rect.y, create_rect.w, create_rect.h);
         let cancel_hovered =
             point_in_rect(mx, my, cancel_rect.x, cancel_rect.y, cancel_rect.w, cancel_rect.h);
-        draw_screen_button(&self.font, create_rect, "Create", create_hovered, ButtonVariant::Primary);
-        draw_screen_button(&self.font, cancel_rect, "Cancel", cancel_hovered, ButtonVariant::Neutral);
+        draw_screen_button_alpha(font, create_rect, "Create", create_hovered, ButtonVariant::Primary, alpha);
+        draw_screen_button_alpha(font, cancel_rect, "Cancel", cancel_hovered, ButtonVariant::Neutral, alpha);
 
         // Error message (just above the action bar)
         if let Some(ref error) = self.error_message {
-            let ew = self.measure_text_sharp(error, 16.0).width;
-            self.draw_text_sharp(
+            let ew = font.measure_text(error, 16.0).width;
+            font.draw_text(
                 error,
-                ((sw - ew) / 2.0).floor(),
+                ((l.panel.x + (l.panel.w - ew) / 2.0)).floor(),
                 l.action_bar.y - 8.0,
                 16.0,
-                DANGER_TEXT,
+                fade(DANGER_TEXT, alpha),
             );
         }
 
         // Hint line below the action bar (hidden on touch devices)
         if !self.touch_detected {
             let hint = "[Tab] Next field \u{00b7} [A/D] Change \u{00b7} [Enter] Create \u{00b7} [Esc] Cancel";
-            let hw = self.measure_text_sharp(hint, 16.0).width;
+            let hw = font.measure_text(hint, 16.0).width;
             let hint_y = l.action_bar.y + l.action_bar.h + 16.0;
-            self.draw_text_sharp(hint, ((sw - hw) / 2.0).floor(), hint_y, 16.0, TEXT_DIM);
+            font.draw_text(hint, ((l.panel.x + (l.panel.w - hw) / 2.0)).floor(), hint_y, 16.0, fade(TEXT_DIM, alpha));
         }
+    }
+}
+
+impl CharacterCreateScreen {
+    pub fn new(session: AuthSession, server_url: &str) -> Self {
+        Self {
+            session,
+            form: CreateForm::new(),
+            auth_client: AuthClient::new(server_url),
+            font: BitmapFont::default(),
+            player_sprites: SpritesheetStore::Individual(HashMap::new()),
+            hair_sprites: SpritesheetStore::Individual(HashMap::new()),
+            starfield: StarfieldBackground::new(),
+            #[cfg(target_arch = "wasm32")]
+            loading: false,
+        }
+    }
+
+    /// Use pre-loaded assets from the renderer (avoids duplicate loading)
+    pub fn use_renderer_assets(
+        &mut self,
+        font: BitmapFont,
+        player: SpritesheetStore,
+        hair: SpritesheetStore,
+    ) {
+        self.font = font;
+        self.player_sprites = player;
+        self.hair_sprites = hair;
+    }
+
+    pub async fn load_font(&mut self) {
+        // If assets were pre-loaded via use_renderer_assets(), skip loading
+        if !self.player_sprites.is_empty() {
+            return;
+        }
+
+        self.font =
+            BitmapFont::load_or_default("assets/fonts/monogram/ttf/monogram-extended.ttf").await;
+        self.player_sprites = load_player_sprites().await;
+
+        let mut hair_map = HashMap::new();
+        for style in 0..HAIR_STYLES as i32 {
+            // Male hair sprites
+            let path = asset_path(&format!("assets/sprites/hair/hair_{}.png", style));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    hair_map.insert(format!("male_{}", style), tex);
+                }
+                Err(e) => {
+                    log::warn!("Failed to load hair sprite {}: {}", path, e);
+                }
+            }
+            // Female hair sprites
+            let path = asset_path(&format!("assets/sprites/hair/hair_female_{}.png", style));
+            match load_texture(&path).await {
+                Ok(tex) => {
+                    tex.set_filter(FilterMode::Nearest);
+                    hair_map.insert(format!("female_{}", style), tex);
+                }
+                Err(e) => {
+                    log::warn!("Failed to load female hair sprite {}: {}", path, e);
+                }
+            }
+        }
+        self.hair_sprites = SpritesheetStore::Individual(hair_map);
+    }
+}
+
+impl Screen for CharacterCreateScreen {
+    fn update(&mut self, audio: &AudioManager) -> ScreenState {
+        // WASM: poll pending requests
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(result) = self.auth_client.poll() {
+                self.loading = false;
+                match result {
+                    AuthResult::CharacterCreated(Ok(char_info)) => {
+                        self.session.characters.push(char_info);
+                        return ScreenState::ToCharacterSelect(self.session.clone());
+                    }
+                    AuthResult::CharacterCreated(Err(e)) => {
+                        self.form.set_error(e.to_string());
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let (sw, sh) = virtual_screen_size();
+        self.starfield.update(get_frame_time(), sw, sh);
+
+        let l = CreateLayout::compute(sw, sh);
+        match self.form.update(&l, audio) {
+            CreateAction::Cancel => {
+                return ScreenState::ToCharacterSelect(self.session.clone());
+            }
+            CreateAction::Submit {
+                name,
+                gender,
+                skin,
+                hair_style,
+                hair_color,
+            } => {
+                #[cfg(not(target_arch = "wasm32"))]
+                match self.auth_client.create_character(
+                    &self.session.token,
+                    &name,
+                    gender,
+                    skin,
+                    hair_style,
+                    hair_color,
+                ) {
+                    Ok(char_info) => {
+                        self.session.characters.push(char_info);
+                        return ScreenState::ToCharacterSelect(self.session.clone());
+                    }
+                    Err(e) => {
+                        self.form.set_error(e.to_string());
+                    }
+                }
+                #[cfg(target_arch = "wasm32")]
+                if !self.auth_client.is_busy() {
+                    self.loading = true;
+                    self.auth_client.start_create_character(
+                        &self.session.token,
+                        &name,
+                        gender,
+                        skin,
+                        hair_style,
+                        hair_color,
+                    );
+                }
+            }
+            CreateAction::None => {}
+        }
+
+        ScreenState::Continue
+    }
+
+    fn render(&self) {
+        let (sw, sh) = virtual_screen_size();
+        let l = CreateLayout::compute(sw, sh);
+
+        // Background
+        self.starfield.draw(sw, sh, 1.0);
+
+        // Title (centered, above panel)
+        let title = "CREATE CHARACTER";
+        let tw = self.font.measure_text(title, 16.0).width;
+        self.font.draw_text(title, ((sw - tw) / 2.0).floor(), l.header_y, 16.0, TEXT_TITLE);
+
+        // Bronze-framed panel (shared box)
+        draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
+        draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
+
+        // Form contents
+        self.form
+            .render(&self.font, &self.player_sprites, &self.hair_sprites, &l, 1.0);
     }
 }

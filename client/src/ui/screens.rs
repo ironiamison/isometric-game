@@ -152,6 +152,7 @@ fn draw_character_preview(
     sprite_feet: Option<&str>,
     x: f32,
     y: f32,
+    tint: Color,
 ) {
     let key = format!("{}_{}", gender, skin);
     if let Some((texture, player_offset)) = sprites.get(&key) {
@@ -171,7 +172,7 @@ fn draw_character_preview(
                         equip_sprite,
                         x,
                         y - 15.0,
-                        WHITE,
+                        tint,
                         DrawTextureParams {
                             source: Some(Rect::new(
                                 back_src_x,
@@ -192,7 +193,7 @@ fn draw_character_preview(
             texture,
             x,
             y,
-            WHITE,
+            tint,
             DrawTextureParams {
                 source: Some(Rect::new(
                     player_atlas_x,
@@ -217,7 +218,7 @@ fn draw_character_preview(
                         equip_sprite,
                         x,
                         y - 3.0,
-                        WHITE,
+                        tint,
                         DrawTextureParams {
                             source: Some(Rect::new(
                                 equip_atlas_x,
@@ -234,7 +235,7 @@ fn draw_character_preview(
                         equip_sprite,
                         x,
                         y,
-                        WHITE,
+                        tint,
                         DrawTextureParams {
                             source: Some(Rect::new(
                                 equip_atlas_x,
@@ -264,7 +265,7 @@ fn draw_character_preview(
                     hair_tex,
                     hair_x,
                     hair_y,
-                    WHITE,
+                    tint,
                     DrawTextureParams {
                         source: Some(Rect::new(
                             hair_src_x,
@@ -291,7 +292,7 @@ fn draw_character_preview(
                         equip_sprite,
                         x,
                         y + 46.0,
-                        WHITE,
+                        tint,
                         DrawTextureParams {
                             source: Some(Rect::new(
                                 equip_atlas_x,
@@ -307,7 +308,7 @@ fn draw_character_preview(
                         equip_sprite,
                         x,
                         y,
-                        WHITE,
+                        tint,
                         DrawTextureParams {
                             source: Some(Rect::new(
                                 equip_atlas_x,
@@ -335,7 +336,7 @@ fn draw_character_preview(
                         equip_sprite,
                         x - 2.0,
                         y + 20.0,
-                        WHITE,
+                        tint,
                         DrawTextureParams {
                             source: Some(Rect::new(
                                 equip_atlas_x,
@@ -355,9 +356,15 @@ fn draw_character_preview(
             y,
             SPRITE_WIDTH,
             SPRITE_HEIGHT,
-            Color::from_rgba(100, 100, 100, 255),
+            Color { a: tint.a, ..Color::from_rgba(100, 100, 100, 255) },
         );
     }
+}
+
+/// Multiply a color's alpha by `a` — the crossfade primitive shared by the
+/// character box's roster and create layers during the morph transition.
+fn fade(c: Color, a: f32) -> Color {
+    Color { a: c.a * a, ..c }
 }
 
 /// Result of screen update - tells main loop what to do next
