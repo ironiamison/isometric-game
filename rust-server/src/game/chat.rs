@@ -53,11 +53,7 @@ impl GameRoom {
             Some(p) => p,
             None => return,
         };
-        let sender_name = if let Some(ref title) = sender.active_title {
-            format!("{} ({})", sender.name, title)
-        } else {
-            sender.name.clone()
-        };
+        let sender_name = sender.name.clone();
         let sender_x = sender.x;
         let sender_y = sender.y;
         drop(players);
