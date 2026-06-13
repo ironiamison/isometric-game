@@ -3,6 +3,17 @@ use super::*;
 /// Maximum characters per account
 const MAX_CHARACTERS: usize = 3;
 
+/// Format played-time seconds as a compact `1m` / `9h 51m` / `149h 44m` string.
+fn format_played_time(seconds: i64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    if hours > 0 {
+        format!("{}h {}m", hours, minutes)
+    } else {
+        format!("{}m", minutes)
+    }
+}
+
 pub struct CharacterSelectScreen {
     session: AuthSession,
     characters: Vec<CharacterInfo>,
@@ -884,6 +895,21 @@ impl Screen for CharacterSelectScreen {
 
         #[cfg(not(target_os = "android"))]
         self.draw_text_sharp("[W/S] Navigate", list_x, inst_y + 28.0, 16.0, DARKGRAY);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn played_time_formats() {
+        assert_eq!(format_played_time(0), "0m");
+        assert_eq!(format_played_time(59), "0m");
+        assert_eq!(format_played_time(60), "1m");
+        assert_eq!(format_played_time(9 * 3600 + 51 * 60), "9h 51m");
+        assert_eq!(format_played_time(149 * 3600 + 44 * 60), "149h 44m");
+        assert_eq!(format_played_time(3600), "1h 0m");
     }
 }
 
