@@ -503,8 +503,13 @@ impl Renderer {
         let tip_pad = 6.0 * s;
 
         let complete = contract.amount_completed >= contract.amount_required;
+        let header = if contract.contract_kind.is_empty() {
+            "Contract".to_string()
+        } else {
+            format!("Contract: {}", contract.contract_kind)
+        };
         let mut lines: Vec<(String, Color)> = vec![
-            ("CONTRACT".to_string(), TEXT_TITLE),
+            (header, TEXT_TITLE),
             (
                 format!("{} ({})", contract.task_text, contract.difficulty),
                 TEXT_NORMAL,
