@@ -8,7 +8,7 @@ use crate::render::ui::common::{
 /// Maximum characters per account
 const MAX_CHARACTERS: usize = 3;
 
-const CARD_HEIGHT: f32 = 64.0;
+const CARD_HEIGHT: f32 = 92.0;
 const CARD_GAP: f32 = 6.0;
 const ACTION_BAR_H: f32 = 44.0;
 
@@ -366,10 +366,11 @@ impl CharacterSelectScreen {
             preview_y,
         );
 
-        // Text column
+        // Text column (vertically centered on the card's midline)
+        let center_y = rect.y + rect.h / 2.0;
         let text_x = inset_x + inset + 12.0;
         let name_color = if selected { TEXT_TITLE } else { TEXT_NORMAL };
-        self.draw_text_sharp(&character.name, text_x, rect.y + 26.0, 16.0, name_color);
+        self.draw_text_sharp(&character.name, text_x, center_y - 8.0, 16.0, name_color);
 
         // Level chip
         let chip_label = format!("Lv {}", character.level);
@@ -377,7 +378,7 @@ impl CharacterSelectScreen {
         let chip_w = chip_text_w + 14.0;
         let chip_h = 18.0;
         let chip_x = text_x;
-        let chip_y = rect.y + 36.0;
+        let chip_y = center_y + 2.0;
         draw_rectangle(chip_x, chip_y, chip_w, chip_h, level_chip_color(character.level));
         self.draw_text_sharp(
             &chip_label,
@@ -395,10 +396,10 @@ impl CharacterSelectScreen {
         let time_str = format_played_time(character.played_time);
         let tw = self.measure_text_sharp(&time_str, 16.0).width;
         let right = rect.x + rect.w - 12.0;
-        self.draw_text_sharp(&time_str, right - tw, rect.y + 26.0, 16.0, TEXT_NORMAL);
+        self.draw_text_sharp(&time_str, right - tw, center_y - 8.0, 16.0, TEXT_NORMAL);
         let pl = "played";
         let plw = self.measure_text_sharp(pl, 16.0).width;
-        self.draw_text_sharp(pl, right - plw, rect.y + 46.0, 16.0, TEXT_DIM);
+        self.draw_text_sharp(pl, right - plw, center_y + 12.0, 16.0, TEXT_DIM);
     }
 
     /// Draw a dashed rectangle outline (used for the create-new-character row).
