@@ -17,15 +17,16 @@ impl Renderer {
         let frame_thickness = FRAME_THICKNESS * s;
         let menu_width = 240.0 * s;
 
-        // Content height varies by platform:
-        //   header(24) + pad(8) + zoom(30) + disconnect(28) + gap(8) + pad(8)
-        //   + toggle rows: mute(26) + chat(26) + tapwalk(26) = 78
-        //   Desktop: sliders(22+22+26=70) + control(26) + gfx(26) = 122
-        //   Android: sliders(22) + joystick(26) = 48
+        // Content height is the interior (header + grouped sections + disconnect).
+        // Layout below must keep the accumulated `y` in sync with these totals.
+        //   Desktop: header/pad(32) + ZOOM(44) + AUDIO(93) + DISPLAY(44)
+        //            + TOGGLES(157) + disconnect(36) + pad(8) = 414
+        //   Android: header/pad(32) + ZOOM(44) + AUDIO(71) + TOGGLES(130)
+        //            + disconnect(36) + pad(8) = 321
         #[cfg(not(target_os = "android"))]
-        let content_height = 306.0 * s;
+        let content_height = 414.0 * s;
         #[cfg(target_os = "android")]
-        let content_height = 306.0 * s;
+        let content_height = 322.0 * s;
 
         // Position at bottom-right, above menu buttons (matching other panels)
         let _button_size = MENU_BUTTON_SIZE * s;
@@ -79,53 +80,14 @@ impl Renderer {
         let mut y = menu_y + frame_thickness + header_height + 8.0 * s;
 
         // Shared dimensions
-        let row_height = 26.0 * s;
-        let btn_height = 24.0 * s;
+        let btn_height = 24.0 * s; // segmented controls
+        let toggle_height = 24.0 * s; // independent on/off rows
+        let toggle_gap = 3.0 * s;
         let slider_height = 16.0 * s;
+        let slider_gap = 6.0 * s;
+        let label_height = 16.0 * s; // section header advance
+        let section_gap = 6.0 * s; // breathing room before a new section
         let inner_width = menu_width - frame_thickness * 2.0 - 16.0 * s;
-
-        // Helper to draw themed button
-        let draw_button = |btn_x: f32,
-                           btn_y: f32,
-                           btn_w: f32,
-                           btn_h: f32,
-                           text: &str,
-                           is_selected: bool,
-                           is_hovered: bool,
-                           renderer: &Self| {
-            let (bg_color, border_color) = if is_selected {
-                // Gold-tinted fill + gold border = the single "active" language
-                (Color::new(0.224, 0.190, 0.118, 1.0), FRAME_ACCENT) // gold-tinted (active)
-            } else if is_hovered {
-                (SLOT_HOVER_BG, SLOT_BORDER)
-            } else {
-                (SLOT_BG_EMPTY, SLOT_BORDER)
-            };
-
-            draw_rectangle(btn_x, btn_y, btn_w, btn_h, border_color);
-            draw_rectangle(btn_x + 1.0, btn_y + 1.0, btn_w - 2.0, btn_h - 2.0, bg_color);
-
-            if is_selected || is_hovered {
-                draw_line(
-                    btn_x + 2.0,
-                    btn_y + 2.0,
-                    btn_x + btn_w - 2.0,
-                    btn_y + 2.0,
-                    1.0,
-                    FRAME_INNER,
-                );
-            }
-
-            let text_width = renderer.measure_text_sharp(text, 16.0).width;
-            let text_color = if is_selected { TEXT_TITLE } else { TEXT_NORMAL };
-            renderer.draw_text_sharp(
-                text,
-                (btn_x + (btn_w - text_width) / 2.0).floor(),
-                (btn_y + btn_h * 0.71).floor(),
-                16.0,
-                text_color,
-            );
-        };
 
         // Helper to check hover
         let is_hovered = |bounds: Rect| -> bool {
@@ -135,7 +97,10 @@ impl Renderer {
                 && mouse_y <= bounds.y + bounds.h
         };
 
-        // ===== ZOOM ROW (segmented selector) =====
+        // ===== ZOOM =====
+        self.draw_section_label("Zoom", content_x, y, s);
+        y += label_height;
+
         let zoom_seg_w = inner_width / 3.0;
         let zoom_05x_bounds = Rect::new(content_x, y, zoom_seg_w, btn_height);
         let zoom_1x_bounds = Rect::new(content_x + zoom_seg_w, y, zoom_seg_w, btn_height);
@@ -158,11 +123,14 @@ impl Renderer {
                 ("2x", is_2x_selected, is_hovered(zoom_2x_bounds)),
             ],
         );
-        y += row_height + 4.0 * s;
+        y += btn_height + 4.0 * s;
 
-        // ===== AUDIO SLIDERS =====
-        // On Android: Music + SFX side by side on one row
-        // On desktop: separate rows
+        // ===== AUDIO =====
+        y += section_gap;
+        self.draw_section_label("Audio", content_x, y, s);
+        y += label_height;
+
+        // Sliders: Android packs Music + SFX side by side; desktop stacks them.
         #[cfg(target_os = "android")]
         {
             let half_width = (inner_width - 6.0 * s) / 2.0;
@@ -176,6 +144,7 @@ impl Renderer {
             layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
             self.draw_compact_slider(
                 "Mus",
+                content_x,
                 left_slider_x,
                 y,
                 left_slider_w,
@@ -189,6 +158,7 @@ impl Renderer {
             layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
             self.draw_compact_slider(
                 "SFX",
+                content_x + half_width + 6.0 * s,
                 right_slider_x,
                 y,
                 right_slider_w,
@@ -197,7 +167,7 @@ impl Renderer {
                 state.ui_state.audio_muted,
                 is_hovered(sfx_bounds),
             );
-            y += row_height - 4.0 * s;
+            y += slider_height + slider_gap;
         }
         #[cfg(not(target_os = "android"))]
         {
@@ -208,6 +178,7 @@ impl Renderer {
             layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
             self.draw_compact_slider(
                 "Music",
+                content_x,
                 slider_x,
                 y,
                 slider_width,
@@ -216,12 +187,13 @@ impl Renderer {
                 state.ui_state.audio_muted,
                 is_hovered(music_bounds),
             );
-            y += row_height - 4.0 * s;
+            y += slider_height + slider_gap;
 
             let sfx_bounds = Rect::new(slider_x, y, slider_width, slider_height);
             layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
             self.draw_compact_slider(
                 "SFX",
+                content_x,
                 slider_x,
                 y,
                 slider_width,
@@ -230,12 +202,51 @@ impl Renderer {
                 state.ui_state.audio_muted,
                 is_hovered(sfx_bounds),
             );
-            y += row_height - 4.0 * s;
+            y += slider_height + slider_gap;
         }
 
-        // UI Scale slider (not on Android — mobile is one-size-fits-all)
+        // Mute audio toggle (independent on/off)
+        let mute_bounds = Rect::new(content_x, y, inner_width, toggle_height);
+        layout.add(UiElementId::EscapeMenuMuteToggle, mute_bounds);
+        self.draw_toggle_row(
+            content_x,
+            y,
+            inner_width,
+            toggle_height,
+            "Mute audio",
+            state.ui_state.audio_muted,
+            is_hovered(mute_bounds),
+            s,
+        );
+        y += toggle_height + toggle_gap;
+
+        // ===== DISPLAY (desktop only) =====
         #[cfg(not(target_os = "android"))]
         {
+            y += section_gap;
+            self.draw_section_label("Display", content_x, y, s);
+            y += label_height;
+
+            // Graphics quality (GFX High / GFX Low) — hidden for now.
+            // let gfx_half = inner_width / 2.0;
+            // let gfx_high_bounds = Rect::new(content_x, y, gfx_half, btn_height);
+            // let gfx_low_bounds = Rect::new(content_x + gfx_half, y, gfx_half, btn_height);
+            // layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_high_bounds);
+            // layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_low_bounds);
+            // let gfx_low = state.ui_state.graphics_low;
+            // self.draw_segmented_control(
+            //     content_x,
+            //     y,
+            //     inner_width,
+            //     btn_height,
+            //     &[
+            //         ("GFX High", !gfx_low, is_hovered(gfx_high_bounds)),
+            //         ("GFX Low", gfx_low, is_hovered(gfx_low_bounds)),
+            //     ],
+            // );
+            // y += btn_height + 4.0 * s;
+
+            // UI scale slider
             let ui_slider_width = inner_width - 50.0 * s;
             let ui_slider_x = content_x + 42.0 * s;
             let scale_bounds = Rect::new(ui_slider_x, y, ui_slider_width, slider_height);
@@ -243,6 +254,7 @@ impl Renderer {
             let scale_normalized = (state.ui_state.ui_scale - 0.75) / 1.25; // 0.75-2.0 range
             self.draw_compact_slider(
                 "Scale",
+                content_x,
                 ui_slider_x,
                 y,
                 ui_slider_width,
@@ -251,166 +263,116 @@ impl Renderer {
                 false,
                 is_hovered(scale_bounds),
             );
-            y += row_height;
+            y += slider_height + slider_gap;
         }
 
-        // ===== TOGGLE BUTTONS (2 per row) =====
-        let toggle_w = (inner_width - 6.0 * s) / 2.0;
+        // ===== TOGGLES =====
+        y += section_gap;
+        self.draw_section_label("Toggles", content_x, y, s);
+        y += label_height;
 
-        // Row 1: Mute + Shift-Drop
-        let mute_bounds = Rect::new(content_x, y, toggle_w, btn_height);
-        let shift_drop_bounds = Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
-        layout.add(UiElementId::EscapeMenuMuteToggle, mute_bounds);
-        layout.add(UiElementId::EscapeMenuShiftDropToggle, shift_drop_bounds);
+        // Modern controls (desktop only) — on = modern, off = classic.
+        #[cfg(not(target_os = "android"))]
+        {
+            let modern_bounds = Rect::new(content_x, y, inner_width, toggle_height);
+            layout.add(UiElementId::EscapeMenuControlSchemeToggle, modern_bounds);
+            self.draw_toggle_row(
+                content_x,
+                y,
+                inner_width,
+                toggle_height,
+                "Modern controls",
+                !state.ui_state.classic_controls,
+                is_hovered(modern_bounds),
+                s,
+            );
+            y += toggle_height + toggle_gap;
+        }
 
-        let mute_text = if state.ui_state.audio_muted {
-            "Muted"
-        } else {
-            "Mute"
-        };
-        draw_button(
-            mute_bounds.x,
-            mute_bounds.y,
-            toggle_w,
-            btn_height,
-            mute_text,
-            state.ui_state.audio_muted,
-            is_hovered(mute_bounds),
-            self,
-        );
-        let shift_text = "ShftDrp";
-        draw_button(
-            shift_drop_bounds.x,
-            shift_drop_bounds.y,
-            toggle_w,
-            btn_height,
-            shift_text,
-            state.ui_state.shift_drop_enabled,
-            is_hovered(shift_drop_bounds),
-            self,
-        );
-        y += row_height;
-
-        // Row 2: Chat Log + ChatBG (ChatBG desktop only)
-        let chat_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+        // Chat log
+        let chat_bounds = Rect::new(content_x, y, inner_width, toggle_height);
         layout.add(UiElementId::EscapeMenuChatLogToggle, chat_bounds);
-
-        let chat_text = "Chat";
-        draw_button(
-            chat_bounds.x,
-            chat_bounds.y,
-            toggle_w,
-            btn_height,
-            chat_text,
+        self.draw_toggle_row(
+            content_x,
+            y,
+            inner_width,
+            toggle_height,
+            "Chat",
             state.ui_state.chat_log_visible,
             is_hovered(chat_bounds),
-            self,
+            s,
         );
+        y += toggle_height + toggle_gap;
 
+        // Chat background (desktop only)
         #[cfg(not(target_os = "android"))]
         {
-            let chat_bg_bounds = Rect::new(content_x + toggle_w + 6.0 * s, y, toggle_w, btn_height);
+            let chat_bg_bounds = Rect::new(content_x, y, inner_width, toggle_height);
             layout.add(UiElementId::EscapeMenuChatBgToggle, chat_bg_bounds);
-            draw_button(
-                chat_bg_bounds.x,
-                chat_bg_bounds.y,
-                toggle_w,
-                btn_height,
-                "ChatBG",
+            self.draw_toggle_row(
+                content_x,
+                y,
+                inner_width,
+                toggle_height,
+                "Chat background",
                 state.ui_state.chat_log_background,
                 is_hovered(chat_bg_bounds),
-                self,
+                s,
             );
+            y += toggle_height + toggle_gap;
         }
-        y += row_height;
 
-        // Row 3: Tap Walk
-        let tap_walk_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+        // Tap/click to walk (wording matches the platform's primary input)
+        #[cfg(target_os = "android")]
+        let walk_label = "Tap to walk";
+        #[cfg(not(target_os = "android"))]
+        let walk_label = "Click to walk";
+        let tap_walk_bounds = Rect::new(content_x, y, inner_width, toggle_height);
         layout.add(UiElementId::EscapeMenuTapPathfindToggle, tap_walk_bounds);
-
-        let tap_text = "TapWalk";
-        draw_button(
-            tap_walk_bounds.x,
-            tap_walk_bounds.y,
-            toggle_w,
-            btn_height,
-            tap_text,
+        self.draw_toggle_row(
+            content_x,
+            y,
+            inner_width,
+            toggle_height,
+            walk_label,
             state.ui_state.tap_to_pathfind,
             is_hovered(tap_walk_bounds),
-            self,
+            s,
         );
-        y += row_height;
+        y += toggle_height + toggle_gap;
 
-        // Row 3: Joystick toggle (Android only)
+        // Joystick (Android only)
         #[cfg(target_os = "android")]
         {
-            let joystick_bounds = Rect::new(content_x, y, toggle_w, btn_height);
+            let joystick_bounds = Rect::new(content_x, y, inner_width, toggle_height);
             layout.add(UiElementId::EscapeMenuJoystickToggle, joystick_bounds);
-            let joystick_text = "Joystick";
-            draw_button(
-                joystick_bounds.x,
-                joystick_bounds.y,
-                toggle_w,
-                btn_height,
-                joystick_text,
+            self.draw_toggle_row(
+                content_x,
+                y,
+                inner_width,
+                toggle_height,
+                "Joystick",
                 state.ui_state.use_joystick,
                 is_hovered(joystick_bounds),
-                self,
+                s,
             );
-            y += row_height;
+            y += toggle_height + toggle_gap;
         }
 
-        // Row: Control Scheme (Modern / Classic) - desktop only
-        #[cfg(not(target_os = "android"))]
-        {
-            let ctrl_half = inner_width / 2.0;
-            let ctrl_modern_bounds = Rect::new(content_x, y, ctrl_half, btn_height);
-            let ctrl_classic_bounds = Rect::new(content_x + ctrl_half, y, ctrl_half, btn_height);
-            layout.add(
-                UiElementId::EscapeMenuControlSchemeToggle,
-                ctrl_modern_bounds,
-            );
-            layout.add(
-                UiElementId::EscapeMenuControlSchemeToggle,
-                ctrl_classic_bounds,
-            );
-
-            let classic = state.ui_state.classic_controls;
-            self.draw_segmented_control(
-                content_x,
-                y,
-                inner_width,
-                btn_height,
-                &[
-                    ("Modern", !classic, is_hovered(ctrl_modern_bounds)),
-                    ("Classic", classic, is_hovered(ctrl_classic_bounds)),
-                ],
-            );
-            y += row_height;
-        }
-
-        // Row: Graphics Quality (High / Low) - desktop only
-        #[cfg(not(target_os = "android"))]
-        {
-            let gfx_half = inner_width / 2.0;
-            let gfx_high_bounds = Rect::new(content_x, y, gfx_half, btn_height);
-            let gfx_low_bounds = Rect::new(content_x + gfx_half, y, gfx_half, btn_height);
-            layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_high_bounds);
-            layout.add(UiElementId::EscapeMenuGraphicsToggle, gfx_low_bounds);
-
-            let gfx_low = state.ui_state.graphics_low;
-            self.draw_segmented_control(
-                content_x,
-                y,
-                inner_width,
-                btn_height,
-                &[
-                    ("GFX High", !gfx_low, is_hovered(gfx_high_bounds)),
-                    ("GFX Low", gfx_low, is_hovered(gfx_low_bounds)),
-                ],
-            );
-            y += row_height;
-        }
+        // Shift to drop
+        let shift_drop_bounds = Rect::new(content_x, y, inner_width, toggle_height);
+        layout.add(UiElementId::EscapeMenuShiftDropToggle, shift_drop_bounds);
+        self.draw_toggle_row(
+            content_x,
+            y,
+            inner_width,
+            toggle_height,
+            "Shift to drop",
+            state.ui_state.shift_drop_enabled,
+            is_hovered(shift_drop_bounds),
+            s,
+        );
+        y += toggle_height + toggle_gap;
 
         y += 8.0 * s;
 
@@ -475,6 +437,81 @@ impl Renderer {
             16.0,
             disconnect_text_color,
         );
+    }
+
+    /// Draw a section header that groups the controls beneath it — the
+    /// labelled groups in the redesigned panel. White so the groups read
+    /// clearly against the dim control labels.
+    fn draw_section_label(&self, text: &str, x: f32, y: f32, s: f32) {
+        let white = Color::new(0.94, 0.94, 0.96, 1.0);
+        self.draw_text_sharp(
+            text,
+            x.floor(),
+            (y + 11.0 * s).floor(),
+            14.0,
+            white,
+        );
+    }
+
+    /// Draw a full-width independent on/off toggle: a labelled row that lights
+    /// up (gold-tinted, bright label, green check) when on and reads dim with a
+    /// dash when off. Distinct from the segmented "pick one" controls.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_toggle_row(
+        &self,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        label: &str,
+        is_on: bool,
+        is_hovered: bool,
+        s: f32,
+    ) {
+        let border = if is_on {
+            FRAME_MID
+        } else if is_hovered {
+            SLOT_HOVER_BORDER
+        } else {
+            SLOT_BORDER
+        };
+        let bg = if is_hovered {
+            SLOT_HOVER_BG
+        } else if is_on {
+            SLOT_BG_FILLED
+        } else {
+            SLOT_BG_EMPTY
+        };
+
+        draw_rectangle(x, y, w, h, border);
+        draw_rectangle(x + 1.0, y + 1.0, w - 2.0, h - 2.0, bg);
+
+        // Subtle top highlight reinforces the "lit" state.
+        if is_on {
+            draw_line(x + 2.0, y + 1.5, x + w - 2.0, y + 1.5, 1.0, FRAME_INNER);
+        }
+
+        // Label, left aligned.
+        let label_color = if is_on { TEXT_NORMAL } else { TEXT_DIM };
+        self.draw_text_sharp(
+            label,
+            (x + 10.0 * s).floor(),
+            (y + h * 0.68).floor(),
+            16.0,
+            label_color,
+        );
+
+        // State indicator on the right: green check when on, dim dash when off.
+        let cx = x + w - 16.0 * s;
+        let cy = y + h * 0.5;
+        if is_on {
+            let green = Color::new(0.45, 0.82, 0.45, 1.0);
+            let t = 2.0 * s;
+            draw_line(cx - 5.0 * s, cy, cx - 1.0 * s, cy + 4.0 * s, t, green);
+            draw_line(cx - 1.0 * s, cy + 4.0 * s, cx + 6.0 * s, cy - 5.0 * s, t, green);
+        } else {
+            draw_line(cx - 5.0 * s, cy, cx + 5.0 * s, cy, 2.0 * s, TEXT_DIM);
+        }
     }
 
     /// Draw a segmented selector: N mutually-exclusive options sharing one track
@@ -550,10 +587,12 @@ impl Renderer {
         }
     }
 
-    /// Draw a compact slider with label on left
+    /// Draw a compact slider with a left-aligned label in the gutter at `label_x`.
+    #[allow(clippy::too_many_arguments)]
     fn draw_compact_slider(
         &self,
         label: &str,
+        label_x: f32,
         x: f32,
         y: f32,
         width: f32,
@@ -562,12 +601,10 @@ impl Renderer {
         muted: bool,
         hovered: bool,
     ) {
-        let s = self.font_scale.get();
-        // Label to the left
-        let label_width = self.measure_text_sharp(label, 16.0).width;
+        // Label left-aligned in its gutter (cleaner than right-hugging the track).
         self.draw_text_sharp(
             label,
-            (x - label_width - 6.0 * s).floor(),
+            label_x.floor(),
             (y + height * 0.75).floor(),
             16.0,
             TEXT_DIM,
