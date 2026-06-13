@@ -3,7 +3,7 @@ pub mod font;
 pub mod isometric;
 mod renderer;
 pub mod shaders;
-mod ui;
+pub(crate) mod ui;
 
 pub use animation::{AnimationState, PlayerAnimation};
 pub use font::BitmapFont;

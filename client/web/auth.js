@@ -107,5 +107,14 @@ miniquad_add_plugin({
                 console.error("storage_remove error:", e);
             }
         };
+
+        importObject.env.open_url = function (url_js) {
+            const url = consume_js_object(url_js);
+            try {
+                window.open(url, "_blank", "noopener,noreferrer");
+            } catch (e) {
+                console.error("open_url error:", e);
+            }
+        };
     },
 });
