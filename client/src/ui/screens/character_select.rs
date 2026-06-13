@@ -1,9 +1,58 @@
 use super::*;
 
-use crate::render::ui::common::{FRAME_ACCENT, FRAME_OUTER};
+use crate::render::ui::common::{FRAME_ACCENT, FRAME_OUTER, FRAME_THICKNESS};
 
 /// Maximum characters per account
 const MAX_CHARACTERS: usize = 3;
+
+const CARD_HEIGHT: f32 = 64.0;
+const CARD_GAP: f32 = 6.0;
+const ACTION_BAR_H: f32 = 44.0;
+
+/// Precomputed geometry for the character-select screen, computed once from the
+/// screen size and shared by both `update` (hit-testing) and `render` (drawing)
+/// so the two can never drift apart. (Mirrors login's `LoginLayout` pattern.)
+struct CharSelectLayout {
+    panel: Rect,         // bronze-framed roster panel
+    list_x: f32,         // inner content x (inside frame padding)
+    list_w: f32,         // inner content width
+    list_top: f32,       // first card y (inside frame)
+    list_visible_h: f32, // clip height for the scrollable list
+    action_bar: Rect,    // full action-bar row below the panel
+    has_characters: bool,
+}
+
+impl CharSelectLayout {
+    fn compute(sw: f32, sh: f32, has_characters: bool) -> Self {
+        let panel_w = 540.0_f32.min(sw - 24.0);
+        let panel_x = (sw - panel_w) / 2.0;
+        let panel_top = 56.0; // below the header row
+        let action_h = ACTION_BAR_H;
+        let action_gap = 12.0;
+        let bottom_margin = 36.0; // room for hint line
+        let panel_bottom = sh - bottom_margin - action_h - action_gap;
+        let panel_h = (panel_bottom - panel_top).max(160.0);
+        let panel = Rect::new(panel_x, panel_top, panel_w, panel_h);
+
+        let pad = FRAME_THICKNESS + 10.0;
+        let list_x = panel_x + pad;
+        let list_w = panel_w - pad * 2.0;
+        let list_top = panel_top + pad;
+        let list_visible_h = panel_h - pad * 2.0;
+
+        let action_bar = Rect::new(panel_x, panel.y + panel.h + action_gap, panel_w, action_h);
+
+        Self {
+            panel,
+            list_x,
+            list_w,
+            list_top,
+            list_visible_h,
+            action_bar,
+            has_characters,
+        }
+    }
+}
 
 /// Format played-time seconds as a compact `1m` / `9h 51m` / `149h 44m` string.
 fn format_played_time(seconds: i64) -> String {
