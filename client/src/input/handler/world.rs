@@ -219,6 +219,14 @@ impl InputHandler {
                                 }
 
                                 if dist_to_player < INTERACT_RANGE {
+                                    // Crafting stations open their UI locally, but the server
+                                    // requires an active NPC-interaction grant to authorize
+                                    // crafting. Send Interact so the grant gets registered.
+                                    if npc.station_type.is_some() {
+                                        commands.push(InputCommand::Interact {
+                                            npc_id: npc_id.clone(),
+                                        });
+                                    }
                                     // Check if NPC is an altar or station
                                     if npc.is_altar {
                                         state.ui_state.altar_panel =

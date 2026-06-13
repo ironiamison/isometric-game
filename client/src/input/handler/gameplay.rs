@@ -814,6 +814,14 @@ impl InputHandler {
                     if let Some(ref npc_id) = path_state.interact_target {
                         // Check if target is an altar or station
                         if let Some(npc) = state.npcs.get(npc_id) {
+                            // Crafting stations open their UI locally, but the server requires
+                            // an active NPC-interaction grant to authorize crafting. Send
+                            // Interact so the grant gets registered.
+                            if npc.station_type.is_some() {
+                                commands.push(InputCommand::Interact {
+                                    npc_id: npc_id.clone(),
+                                });
+                            }
                             if npc.is_altar {
                                 state.ui_state.altar_panel = Some(crate::game::AltarPanelState {
                                     altar_npc_id: npc_id.clone(),
