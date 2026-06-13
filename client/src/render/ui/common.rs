@@ -44,6 +44,12 @@ pub const TEXT_NORMAL: Color = Color::new(0.824, 0.824, 0.855, 1.0); // rgba(210
 pub const TEXT_DIM: Color = Color::new(0.502, 0.502, 0.541, 1.0); // rgba(128, 128, 138, 255)
 pub const TEXT_GOLD: Color = Color::new(1.0, 0.843, 0.314, 1.0); // rgba(255, 215, 80, 255)
 
+// Danger button (restrained red-brown — used by destructive actions)
+pub const DANGER_BG: Color = Color::new(0.247, 0.106, 0.106, 1.0); // rgba(63, 27, 27)
+pub const DANGER_BG_HOVER: Color = Color::new(0.353, 0.149, 0.149, 1.0); // rgba(90, 38, 38)
+pub const DANGER_BORDER: Color = Color::new(0.667, 0.290, 0.290, 1.0); // rgba(170, 74, 74)
+pub const DANGER_TEXT: Color = Color::new(0.847, 0.467, 0.467, 1.0); // rgba(216, 119, 119)
+
 // Tooltip colors
 pub const TOOLTIP_BG: Color = Color::new(0.063, 0.063, 0.086, 0.980); // rgba(16, 16, 22, 250)
 pub const TOOLTIP_FRAME: Color = Color::new(0.322, 0.282, 0.227, 1.0); // rgba(82, 72, 58, 255)
@@ -204,4 +210,49 @@ pub fn draw_corner_accents(x: f32, y: f32, w: f32, h: f32) {
     // Bottom-right
     draw_rectangle(x + w - s, y + h - 2.0, s, 2.0, FRAME_ACCENT);
     draw_rectangle(x + w - 2.0, y + h - s, 2.0, s, FRAME_ACCENT);
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum ButtonVariant {
+    Primary, // gold on dark brown (default action)
+    Danger,  // restrained red-brown (destructive)
+    Neutral, // navy + bronze border (low emphasis)
+}
+
+/// Draw a labelled menu button with bronze-theme styling. Text is centered and
+/// drawn at native 16px for crisp pixels.
+pub fn draw_screen_button(
+    font: &crate::render::BitmapFont,
+    rect: Rect,
+    label: &str,
+    hovered: bool,
+    variant: ButtonVariant,
+) {
+    let (bg, border, text) = match variant {
+        ButtonVariant::Primary => (
+            if hovered { Color::from_rgba(64, 50, 28, 255) } else { Color::from_rgba(44, 34, 18, 255) },
+            if hovered { TEXT_GOLD } else { FRAME_ACCENT },
+            TEXT_TITLE,
+        ),
+        ButtonVariant::Danger => (
+            if hovered { DANGER_BG_HOVER } else { DANGER_BG },
+            DANGER_BORDER,
+            DANGER_TEXT,
+        ),
+        ButtonVariant::Neutral => (
+            if hovered { Color::from_rgba(36, 36, 52, 255) } else { Color::from_rgba(24, 24, 36, 255) },
+            if hovered { FRAME_INNER } else { FRAME_OUTER },
+            TEXT_NORMAL,
+        ),
+    };
+    draw_rectangle(rect.x, rect.y, rect.w, rect.h, bg);
+    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, border);
+    let tw = font.measure_text(label, 16.0).width;
+    font.draw_text(
+        label,
+        (rect.x + (rect.w - tw) / 2.0).floor(),
+        (rect.y + rect.h / 2.0 + 6.0).floor(),
+        16.0,
+        text,
+    );
 }
