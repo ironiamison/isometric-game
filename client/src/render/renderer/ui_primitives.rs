@@ -304,6 +304,7 @@ impl Renderer {
             self.render_item_tooltip(state);
             self.render_skill_tooltip(state, hovered);
             self.render_prayer_tooltip(state, hovered);
+            self.render_combat_style_tooltip(state, hovered);
 
             // XP globe tooltip (calculate position to match render_ui exactly)
             if state.get_local_player().is_some() {

@@ -10,7 +10,6 @@ use macroquad::prelude::*;
 /// Character panel dimensions
 const CHARACTER_PANEL_PADDING: f32 = 12.0;
 const CHARACTER_HEADER_HEIGHT: f32 = 24.0;
-const CHARACTER_GRID_WIDTH: f32 = 3.0 * EQUIP_SLOT_SIZE + 2.0 * EQUIP_SLOT_SPACING; // 122
 const CHARACTER_GRID_HEIGHT: f32 = 4.0 * EQUIP_SLOT_SIZE + 3.0 * EQUIP_SLOT_SPACING; // 164
 const CHARACTER_PANEL_WIDTH: f32 = 240.0; // Unified width to match inventory and other UI panels
 const SHOP_BUTTON_HEIGHT: f32 = 26.0;
@@ -26,25 +25,56 @@ const CHARACTER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
     + CHARACTER_PANEL_PADDING
     + SHOP_BUTTON_HEIGHT
     + CHARACTER_PANEL_PADDING;
-const STATS_SECTION_GAP: f32 = 8.0; // Gap between equipment grid and stats
 
-/// Melee combat style labels and short forms
-const MELEE_COMBAT_STYLES: [(&str, &str); 4] = [
-    ("accurate", "Acc"),
-    ("aggressive", "Agg"),
-    ("defensive", "Def"),
-    ("controlled", "Ctrl"),
+/// Tile size of the shared UI icon atlas (`ui_icons`), matching the skills panel.
+const UI_ICON_SIZE: f32 = 24.0;
+
+/// Value color for a negative stat bonus — penalties read red so a player
+/// instantly sees a loadout is hurting a stat. Matches the "OFF" red elsewhere.
+const STAT_NEGATIVE: Color = Color::new(0.85, 0.38, 0.38, 1.0);
+
+/// Combat styles: (id, button label, tooltip title, effect description, trained skill).
+const MELEE_COMBAT_STYLES: [(&str, &str, &str, &str, &str); 4] = [
+    ("accurate", "Acc", "Accurate", "Boosts attack accuracy", "Attack"),
+    ("aggressive", "Agg", "Aggressive", "Boosts damage dealt", "Strength"),
+    ("defensive", "Def", "Defensive", "Boosts your defence", "Defence"),
+    ("controlled", "Ctrl", "Controlled", "Trains all combat evenly", "Att/Str/Def"),
 ];
 
-/// Ranged combat style labels and short forms
-const RANGED_COMBAT_STYLES: [(&str, &str); 3] = [
-    ("accurate", "Acc"),
-    ("rapid", "Rapid"),
-    ("longrange", "Long"),
+/// Ranged combat styles: same tuple shape as the melee set.
+const RANGED_COMBAT_STYLES: [(&str, &str, &str, &str, &str); 3] = [
+    ("accurate", "Acc", "Accurate", "Boosts ranged accuracy", "Ranged"),
+    ("rapid", "Rapid", "Rapid", "Faster attack speed", "Ranged"),
+    ("longrange", "Long", "Long range", "Adds range and defence", "Ranged/Defence"),
 ];
+
+/// Format an equipment stat bonus with an explicit sign: "+5", "0", "-22".
+/// Blindly prefixing "+" produced "+-22" for negative bonuses; this fixes it.
+fn format_stat_bonus(v: i32) -> String {
+    if v > 0 {
+        format!("+{}", v)
+    } else {
+        // Negative values already carry their own "-"; zero shows as "0".
+        format!("{}", v)
+    }
+}
+
+/// Color a stat *value* by sign so penalties stand out: positive keeps the
+/// stat's identity color, negative is red, zero is dim.
+fn stat_value_color(v: i32, identity: Color) -> Color {
+    if v < 0 {
+        STAT_NEGATIVE
+    } else if v == 0 {
+        TEXT_DIM
+    } else {
+        identity
+    }
+}
 
 /// Get the combat styles for the currently equipped weapon type
-fn get_combat_styles_for_weapon(state: &GameState) -> &'static [(&'static str, &'static str)] {
+fn get_combat_styles_for_weapon(
+    state: &GameState,
+) -> &'static [(&'static str, &'static str, &'static str, &'static str, &'static str)] {
     let is_ranged = state
         .get_local_player()
         .and_then(|p| p.equipped_weapon.as_ref())
@@ -85,8 +115,6 @@ impl Renderer {
         let slot_spacing = EQUIP_SLOT_SPACING * scale;
         let _button_size = MENU_BUTTON_SIZE * scale;
         let _exp_bar_gap = EXP_BAR_GAP * scale;
-        let stats_gap = STATS_SECTION_GAP * scale;
-        let grid_width = CHARACTER_GRID_WIDTH * scale;
 
         // Position panel on right side, above menu buttons
         let panel_x = screen_w - panel_width - 8.0;
@@ -226,20 +254,25 @@ impl Renderer {
 
         // Stats section - to the right of equipment grid (desktop only)
         if !cfg!(target_os = "android") {
-            let stats_x = grid_x + grid_width + stats_gap;
             let stats_y = grid_y;
-            let available_width = panel_x + panel_width - frame_thickness - stats_x;
+
+            // Right-hand column (stats box + retaliate button), sized to its content
+            // and right-anchored against the panel's inner edge so it stops crowding
+            // the equipment grid. Width = the wider of the stat rows (icon + label +
+            // value) and the "Retaliate" caption.
+            let col_icon = 14.0 * scale;
+            let col_icon_gap = 4.0 * scale;
+            let col_lv_gap = 6.0 * scale; // label -> value gap (previously a loose ~14px)
+            let col_hpad = 6.0 * scale; // horizontal inner padding
+            let col_label_w = self.measure_text_sharp("MAG", 16.0).width;
+            let col_value_w = self.measure_text_sharp("+99", 16.0).width;
+            let stat_content_w =
+                col_icon + col_icon_gap + col_label_w + col_lv_gap + col_value_w;
+            let retaliate_content_w = self.measure_text_sharp("Retaliate", 16.0).width;
+            let col_w = stat_content_w.max(retaliate_content_w) + col_hpad * 2.0;
+            let col_x = panel_x + panel_width - frame_thickness - panel_padding - col_w;
 
             if let Some(player) = state.get_local_player() {
-                let line_height = 18.0 * scale;
-                let label_w = self.measure_text_sharp("MAG", 16.0).width;
-                let gap = 4.0;
-                let value_w = self.measure_text_sharp("+99", 16.0).width;
-                let total_stats_w = label_w + gap + value_w;
-                let label_x = stats_x + (available_width - total_stats_w) / 2.0 + 6.0;
-                let value_x = label_x + label_w + gap;
-                let mut text_y = stats_y + 14.0 * scale;
-
                 let atk_bonus = player.attack_bonus(&state.item_registry);
                 let str_bonus = player.strength_bonus(&state.item_registry);
                 let def_bonus = player.defence_bonus(&state.item_registry);
@@ -249,38 +282,84 @@ impl Renderer {
                 let mag_color = Color::new(0.650, 0.400, 0.850, 1.0);
                 let rng_color = Color::new(0.900, 0.600, 0.250, 1.0);
 
-                self.draw_text_sharp("ATK", label_x, text_y, 16.0, CATEGORY_EQUIPMENT);
-                let atk_val = format!("+{}", atk_bonus);
-                self.draw_text_sharp(&atk_val, value_x, text_y, 16.0, CATEGORY_EQUIPMENT);
-                text_y += line_height;
+                // Each row: (label, value, identity color, atlas tile coords matching
+                // the skills panel so ATK/STR/DEF/MAG/RNG are scannable by glyph).
+                let rows: [(&str, i32, Color, (i32, i32)); 5] = [
+                    ("ATK", atk_bonus, CATEGORY_EQUIPMENT, (5, 5)),
+                    ("STR", str_bonus, CATEGORY_CONSUMABLE, (2, 6)),
+                    ("DEF", def_bonus, CATEGORY_MATERIAL, (4, 5)),
+                    ("MAG", mag_bonus, mag_color, (6, 6)),
+                    ("RNG", rng_bonus, rng_color, (3, 5)),
+                ];
 
-                self.draw_text_sharp("STR", label_x, text_y, 16.0, CATEGORY_CONSUMABLE);
-                let str_val = format!("+{}", str_bonus);
-                self.draw_text_sharp(&str_val, value_x, text_y, 16.0, CATEGORY_CONSUMABLE);
-                text_y += line_height;
+                // Framed "your totals" sub-panel: gold-language 1px border + recessed
+                // dark fill wrapping the five rows so they read as one coherent block.
+                let row_h = 17.0 * scale;
+                let vpad = 4.0 * scale; // vertical inner padding (kept tight)
+                let box_h = vpad * 2.0 + rows.len() as f32 * row_h;
+                // Border matches the equipment slots so the stats box reads as part
+                // of the same set rather than a separate gold-framed element.
+                draw_rectangle(col_x, stats_y, col_w, box_h, SLOT_BORDER);
+                draw_rectangle(
+                    col_x + 1.0,
+                    stats_y + 1.0,
+                    col_w - 2.0,
+                    box_h - 2.0,
+                    SLOT_BG_EMPTY,
+                );
 
-                self.draw_text_sharp("DEF", label_x, text_y, 16.0, CATEGORY_MATERIAL);
-                let def_val = format!("+{}", def_bonus);
-                self.draw_text_sharp(&def_val, value_x, text_y, 16.0, CATEGORY_MATERIAL);
-                text_y += line_height;
+                let icon_x = col_x + col_hpad;
+                let label_x = icon_x + col_icon + col_icon_gap;
+                // Right-align values to the content's natural right edge so the
+                // label -> value gap stays tight regardless of the box width.
+                let value_right = label_x + col_label_w + col_lv_gap + col_value_w;
 
-                self.draw_text_sharp("MAG", label_x, text_y, 16.0, mag_color);
-                let mag_val = format!("+{}", mag_bonus);
-                self.draw_text_sharp(&mag_val, value_x, text_y, 16.0, mag_color);
-                text_y += line_height;
+                for (i, (label, val, identity, (ic, ir))) in rows.iter().enumerate() {
+                    let row_top = stats_y + vpad + i as f32 * row_h;
+                    let baseline = (row_top + 13.0 * scale).floor();
 
-                self.draw_text_sharp("RNG", label_x, text_y, 16.0, rng_color);
-                let rng_val = format!("+{}", rng_bonus);
-                self.draw_text_sharp(&rng_val, value_x, text_y, 16.0, rng_color);
+                    // Glyph from the shared UI icon atlas
+                    if let Some(tex) = &self.ui_icons {
+                        let src = Rect::new(
+                            *ic as f32 * UI_ICON_SIZE,
+                            *ir as f32 * UI_ICON_SIZE,
+                            UI_ICON_SIZE,
+                            UI_ICON_SIZE,
+                        );
+                        draw_texture_ex(
+                            tex,
+                            icon_x,
+                            (row_top + (row_h - col_icon) / 2.0).floor(),
+                            WHITE,
+                            DrawTextureParams {
+                                source: Some(src),
+                                dest_size: Some(Vec2::new(col_icon, col_icon)),
+                                ..Default::default()
+                            },
+                        );
+                    }
+
+                    // Label keeps its identity color (scannable); value is sign-colored.
+                    self.draw_text_sharp(label, label_x, baseline, 16.0, *identity);
+                    let val_text = format_stat_bonus(*val);
+                    let val_w = self.measure_text_sharp(&val_text, 16.0).width;
+                    self.draw_text_sharp(
+                        &val_text,
+                        value_right - val_w,
+                        baseline,
+                        16.0,
+                        stat_value_color(*val, *identity),
+                    );
+                }
             }
 
             // Auto-retaliate toggle button (in stats column, bottom-aligned with belt row)
             let ar_h = AUTO_RETALIATE_BTN_HEIGHT * scale;
             let grid_bottom_local = grid_y + 3.0 * slot_step + slot_size; // bottom of belt row
             let ar_y = grid_bottom_local - ar_h;
-            // Width and x aligned with the right portion of the style row (Def+Ctrl area)
-            let ar_w = available_width - stats_gap;
-            let ar_x = panel_x + panel_width - frame_thickness - panel_padding - ar_w;
+            // Same content-sized, right-anchored column as the stats box above.
+            let ar_w = col_w;
+            let ar_x = col_x;
 
             let ar_bounds = Rect::new(ar_x, ar_y, ar_w, ar_h);
             layout.add(UiElementId::AutoRetaliateToggle, ar_bounds);
@@ -375,7 +454,7 @@ impl Renderer {
             .map(|p| p.combat_style.clone())
             .unwrap_or_else(|| "accurate".to_string());
 
-        for (i, (style_id, style_label)) in combat_styles.iter().enumerate() {
+        for (i, (style_id, style_label, _, _, _)) in combat_styles.iter().enumerate() {
             let bx = buttons_x + i as f32 * (btn_w + gap);
             let by = style_y;
             let bounds = Rect::new(bx, by, btn_w, style_row_height);
@@ -467,5 +546,57 @@ impl Renderer {
             16.0,
             btn_text_color,
         );
+    }
+
+    /// Hover tooltip for the combat style buttons: what the style does and which
+    /// skill it trains (shown in parentheses), since Acc/Agg/Def/Ctrl are opaque.
+    pub(crate) fn render_combat_style_tooltip(
+        &self,
+        state: &GameState,
+        hovered: &Option<UiElementId>,
+    ) {
+        if !state.ui_state.character_panel_open {
+            return;
+        }
+        let idx = match hovered {
+            Some(UiElementId::CombatStyleButton(i)) => *i,
+            _ => return,
+        };
+        let styles = get_combat_styles_for_weapon(state);
+        let (_, _, title, desc, trains) = match styles.get(idx) {
+            Some(s) => *s,
+            None => return,
+        };
+        let title_text = format!("{} ({})", title, trains);
+
+        let (mouse_x, mouse_y) = mouse_position();
+        let padding = 8.0;
+        let line_height = 20.0;
+        let font_size = 16.0;
+
+        let max_width = self
+            .measure_text_sharp(&title_text, font_size)
+            .width
+            .max(self.measure_text_sharp(desc, font_size).width);
+        let tooltip_width = max_width + padding * 2.0;
+        let tooltip_height = padding * 2.0 + line_height * 2.0;
+
+        let (sw, sh) = virtual_screen_size();
+        let tooltip_x = (mouse_x + 16.0).min(sw - tooltip_width - 8.0);
+        let tooltip_y = (mouse_y + 16.0).min(sh - tooltip_height - 8.0);
+
+        draw_rectangle(
+            tooltip_x - 1.0,
+            tooltip_y - 1.0,
+            tooltip_width + 2.0,
+            tooltip_height + 2.0,
+            TOOLTIP_FRAME,
+        );
+        draw_rectangle(tooltip_x, tooltip_y, tooltip_width, tooltip_height, TOOLTIP_BG);
+
+        let mut text_y = tooltip_y + padding + 14.0;
+        self.draw_text_sharp(&title_text, tooltip_x + padding, text_y, font_size, TEXT_GOLD);
+        text_y += line_height;
+        self.draw_text_sharp(desc, tooltip_x + padding, text_y, font_size, TEXT_NORMAL);
     }
 }
