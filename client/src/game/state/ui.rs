@@ -631,7 +631,8 @@ pub struct UiState {
     // Audio settings (synced with AudioManager)
     pub audio_volume: f32,
     pub audio_sfx_volume: f32,
-    pub audio_muted: bool,
+    pub music_muted: bool,
+    pub sfx_muted: bool,
     // UI scale (0.75 to 2.0, default 1.0; fixed at 1.0 on Android)
     pub ui_scale: f32,
     // Input settings
@@ -910,7 +911,8 @@ impl Default for UiState {
             mobile_menu_expanded: cfg!(target_os = "android"),
             audio_volume: 0.7,
             audio_sfx_volume: 0.7,
-            audio_muted: false,
+            music_muted: false,
+            sfx_muted: false,
             ui_scale: 1.0,
             shift_drop_enabled: true,
             social_open: false,

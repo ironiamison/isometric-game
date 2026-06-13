@@ -760,10 +760,16 @@ impl InputHandler {
                             }
                             return true;
                         }
-                        UiElementId::EscapeMenuMuteToggle => {
+                        UiElementId::EscapeMenuMusicMuteToggle => {
                             audio.play_sfx("enter");
-                            state.ui_state.audio_muted = !state.ui_state.audio_muted;
-                            audio.toggle_mute();
+                            audio.toggle_music_mute();
+                            state.ui_state.music_muted = audio.is_music_muted();
+                            return true;
+                        }
+                        UiElementId::EscapeMenuSfxMuteToggle => {
+                            audio.play_sfx("enter");
+                            audio.toggle_sfx_mute();
+                            state.ui_state.sfx_muted = audio.is_sfx_muted();
                             return true;
                         }
                         UiElementId::EscapeMenuShiftDropToggle => {

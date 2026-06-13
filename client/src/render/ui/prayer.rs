@@ -12,28 +12,18 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
-/// Prayer panel dimensions
+/// Prayer panel dimensions. The overall footprint (width/height) comes from the
+/// shared TOOL_PANEL_* constants in common.rs so this lines up with the Skills
+/// panel; the constants below drive the internal layout (4×4 grid of 40px slots,
+/// header + tab + points rows) which is what sets that shared height.
 const PRAYER_PANEL_PADDING: f32 = 8.0;
 const PRAYER_GRID_COLS: usize = 4;
 const PRAYER_GRID_ROWS: usize = 4; // 14 prayers + 2 empty slots
-const PRAYER_SLOT_SIZE: f32 = 36.0;
+const PRAYER_SLOT_SIZE: f32 = TOOL_PANEL_SLOT_SIZE;
 const PRAYER_SLOT_SPACING: f32 = 4.0;
-const PRAYER_GRID_WIDTH: f32 = PRAYER_GRID_COLS as f32 * PRAYER_SLOT_SIZE
-    + (PRAYER_GRID_COLS - 1) as f32 * PRAYER_SLOT_SPACING;
 const PRAYER_HEADER_HEIGHT: f32 = 24.0;
 const PRAYER_TAB_HEIGHT: f32 = 22.0;
 const PRAYER_POINTS_HEIGHT: f32 = 20.0;
-const PRAYER_PANEL_WIDTH: f32 =
-    PRAYER_GRID_WIDTH + PRAYER_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0;
-const PRAYER_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
-    + PRAYER_HEADER_HEIGHT
-    + PRAYER_TAB_HEIGHT
-    + PRAYER_PANEL_PADDING
-    + (PRAYER_GRID_ROWS as f32 * PRAYER_SLOT_SIZE
-        + (PRAYER_GRID_ROWS - 1) as f32 * PRAYER_SLOT_SPACING)
-    + PRAYER_PANEL_PADDING
-    + PRAYER_POINTS_HEIGHT
-    + PRAYER_PANEL_PADDING;
 
 /// Spell theme color (purple/arcane)
 const SPELL_COLOR: Color = Color::new(0.6, 0.4, 0.9, 1.0);
@@ -66,11 +56,12 @@ impl Renderer {
         let scale = state.ui_state.ui_scale;
 
         // Scaled dimensions
-        let panel_width = PRAYER_PANEL_WIDTH * scale;
+        // Shared footprint with the Skills panel (see TOOL_PANEL_* in common.rs).
+        let panel_width = TOOL_PANEL_WIDTH * scale;
         let panel_height = if cfg!(target_os = "android") {
-            (PRAYER_PANEL_HEIGHT - PRAYER_HEADER_HEIGHT) * scale
+            (TOOL_PANEL_HEIGHT - PRAYER_HEADER_HEIGHT) * scale
         } else {
-            PRAYER_PANEL_HEIGHT * scale
+            TOOL_PANEL_HEIGHT * scale
         };
         let frame_thickness = FRAME_THICKNESS * scale;
         let header_height = PRAYER_HEADER_HEIGHT * scale;

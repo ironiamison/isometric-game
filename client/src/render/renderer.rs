@@ -411,6 +411,9 @@ pub struct Renderer {
     pub(crate) fishing_skill_icon: Option<Texture2D>,
     /// Small coin icon for merchant name tags
     pub(crate) coin_small_icon: Option<Texture2D>,
+    /// Audio mute / unmute icons for the settings panel
+    pub(crate) sound_icon: Option<Texture2D>,
+    pub(crate) mute_icon: Option<Texture2D>,
     /// HUD stat-bar icons (16x16): health / magic / prayer
     pub(crate) health_stat_icon: Option<Texture2D>,
     pub(crate) magic_stat_icon: Option<Texture2D>,

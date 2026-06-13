@@ -58,13 +58,15 @@ pub fn configure_game_state(
     game_state.selected_character_name = selected_character_name;
     game_state.ui_state.audio_volume = audio.music_volume();
     game_state.ui_state.audio_sfx_volume = audio.sfx_volume();
-    game_state.ui_state.audio_muted = audio.is_muted();
+    game_state.ui_state.music_muted = audio.is_music_muted();
+    game_state.ui_state.sfx_muted = audio.is_sfx_muted();
     game_state.ui_state.classic_controls = crate::settings::load_classic_controls();
 
     let settings = crate::settings::load_ui_settings();
     game_state.camera.zoom = settings.zoom;
     game_state.ui_state.ui_scale = settings.ui_scale;
-    game_state.ui_state.shift_drop_enabled = settings.shift_drop_enabled;
+    // Shift-to-drop is always on now (no UI toggle); ignore any stale saved value.
+    game_state.ui_state.shift_drop_enabled = true;
     game_state.ui_state.chat_log_visible = settings.chat_log_visible;
     game_state.ui_state.tap_to_pathfind = settings.tap_to_pathfind;
     game_state.ui_state.use_joystick = settings.use_joystick;

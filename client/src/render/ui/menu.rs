@@ -19,14 +19,18 @@ impl Renderer {
 
         // Content height is the interior (header + grouped sections + disconnect).
         // Layout below must keep the accumulated `y` in sync with these totals.
-        //   Desktop: header/pad(32) + ZOOM(44) + AUDIO(93) + DISPLAY(44)
-        //            + TOGGLES(157) + disconnect(36) + pad(8) = 414
-        //   Android: header/pad(32) + ZOOM(44) + AUDIO(71) + TOGGLES(130)
-        //            + disconnect(36) + pad(8) = 321
+        // Audio mute lives on per-channel icons now, so the old "Mute" toggle row
+        // is gone. Desktop matches the Social panel's 314px footprint again; the
+        // freed space becomes balanced breathing room (~16 above / ~15 below) for
+        // the Disconnect button.
+        //   Desktop: header/pad(32) + ZOOM(44) + AUDIO(58) + DISPLAY(39)
+        //            + TOGGLES(74) + gap(16) + disconnect(28) + pad(15) = 306
+        //   Android: header/pad(32) + ZOOM(44) + AUDIO(58) + TOGGLES(74)
+        //            + gap(16) + disconnect(28) + pad(15) = 267
         #[cfg(not(target_os = "android"))]
-        let content_height = 414.0 * s;
+        let content_height = 306.0 * s;
         #[cfg(target_os = "android")]
-        let content_height = 322.0 * s;
+        let content_height = 267.0 * s;
 
         // Position at bottom-right, above menu buttons (matching other panels)
         let _button_size = MENU_BUTTON_SIZE * s;
@@ -84,9 +88,9 @@ impl Renderer {
         let toggle_height = 24.0 * s; // independent on/off rows
         let toggle_gap = 3.0 * s;
         let slider_height = 16.0 * s;
-        let slider_gap = 6.0 * s;
+        let slider_gap = 3.0 * s;
         let label_height = 16.0 * s; // section header advance
-        let section_gap = 6.0 * s; // breathing room before a new section
+        let section_gap = 4.0 * s; // breathing room before a new section
         let inner_width = menu_width - frame_thickness * 2.0 - 16.0 * s;
 
         // Helper to check hover
@@ -130,95 +134,66 @@ impl Renderer {
         self.draw_section_label("Audio", content_x, y, s);
         y += label_height;
 
-        // Sliders: Android packs Music + SFX side by side; desktop stacks them.
-        #[cfg(target_os = "android")]
-        {
-            let half_width = (inner_width - 6.0 * s) / 2.0;
-            let label_offset = 30.0 * s;
-            let left_slider_x = content_x + label_offset;
-            let left_slider_w = half_width - label_offset;
-            let right_slider_x = content_x + half_width + 6.0 * s + label_offset;
-            let right_slider_w = half_width - label_offset;
+        // Music + SFX sliders stacked, each with a bg-less speaker/mute icon
+        // button at the right edge that toggles that channel independently.
+        // 16px native icons drawn at the slider height keep them pixel-crisp.
+        let icon_size = slider_height;
+        let icon_gap = 6.0 * s;
+        let slider_label_w = 42.0 * s;
+        let audio_slider_x = content_x + slider_label_w;
+        let audio_slider_w = inner_width - slider_label_w - icon_size - icon_gap;
+        let mute_icon_x = content_x + inner_width - icon_size;
+        let mute_icon_dy = ((slider_height - icon_size) / 2.0).round();
 
-            let music_bounds = Rect::new(left_slider_x, y, left_slider_w, slider_height);
-            layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
-            self.draw_compact_slider(
-                "Mus",
-                content_x,
-                left_slider_x,
-                y,
-                left_slider_w,
-                slider_height,
-                state.ui_state.audio_volume,
-                state.ui_state.audio_muted,
-                is_hovered(music_bounds),
-            );
-
-            let sfx_bounds = Rect::new(right_slider_x, y, right_slider_w, slider_height);
-            layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
-            self.draw_compact_slider(
-                "SFX",
-                content_x + half_width + 6.0 * s,
-                right_slider_x,
-                y,
-                right_slider_w,
-                slider_height,
-                state.ui_state.audio_sfx_volume,
-                state.ui_state.audio_muted,
-                is_hovered(sfx_bounds),
-            );
-            y += slider_height + slider_gap;
-        }
-        #[cfg(not(target_os = "android"))]
-        {
-            let slider_width = inner_width - 50.0 * s;
-            let slider_x = content_x + 42.0 * s;
-
-            let music_bounds = Rect::new(slider_x, y, slider_width, slider_height);
-            layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
-            self.draw_compact_slider(
-                "Music",
-                content_x,
-                slider_x,
-                y,
-                slider_width,
-                slider_height,
-                state.ui_state.audio_volume,
-                state.ui_state.audio_muted,
-                is_hovered(music_bounds),
-            );
-            y += slider_height + slider_gap;
-
-            let sfx_bounds = Rect::new(slider_x, y, slider_width, slider_height);
-            layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
-            self.draw_compact_slider(
-                "SFX",
-                content_x,
-                slider_x,
-                y,
-                slider_width,
-                slider_height,
-                state.ui_state.audio_sfx_volume,
-                state.ui_state.audio_muted,
-                is_hovered(sfx_bounds),
-            );
-            y += slider_height + slider_gap;
-        }
-
-        // Mute audio toggle (independent on/off)
-        let mute_bounds = Rect::new(content_x, y, inner_width, toggle_height);
-        layout.add(UiElementId::EscapeMenuMuteToggle, mute_bounds);
-        self.draw_toggle_row(
+        // Music row
+        let music_bounds = Rect::new(audio_slider_x, y, audio_slider_w, slider_height);
+        layout.add(UiElementId::EscapeMenuMusicSlider, music_bounds);
+        self.draw_compact_slider(
+            "Music",
             content_x,
+            audio_slider_x,
             y,
-            inner_width,
-            toggle_height,
-            "Mute audio",
-            state.ui_state.audio_muted,
-            is_hovered(mute_bounds),
-            s,
+            audio_slider_w,
+            slider_height,
+            state.ui_state.audio_volume,
+            state.ui_state.music_muted,
+            is_hovered(music_bounds),
         );
-        y += toggle_height + toggle_gap;
+        let music_mute_bounds = Rect::new(mute_icon_x, y + mute_icon_dy, icon_size, icon_size);
+        layout.add(UiElementId::EscapeMenuMusicMuteToggle, music_mute_bounds);
+        self.draw_mute_icon(
+            mute_icon_x,
+            y + mute_icon_dy,
+            icon_size,
+            state.ui_state.music_muted,
+            is_hovered(music_mute_bounds),
+        );
+        y += slider_height + slider_gap;
+
+        // SFX row
+        let sfx_bounds = Rect::new(audio_slider_x, y, audio_slider_w, slider_height);
+        layout.add(UiElementId::EscapeMenuSfxSlider, sfx_bounds);
+        self.draw_compact_slider(
+            "SFX",
+            content_x,
+            audio_slider_x,
+            y,
+            audio_slider_w,
+            slider_height,
+            state.ui_state.audio_sfx_volume,
+            state.ui_state.sfx_muted,
+            is_hovered(sfx_bounds),
+        );
+        let sfx_mute_bounds = Rect::new(mute_icon_x, y + mute_icon_dy, icon_size, icon_size);
+        layout.add(UiElementId::EscapeMenuSfxMuteToggle, sfx_mute_bounds);
+        self.draw_mute_icon(
+            mute_icon_x,
+            y + mute_icon_dy,
+            icon_size,
+            state.ui_state.sfx_muted,
+            is_hovered(sfx_mute_bounds),
+        );
+        y += slider_height + slider_gap;
 
         // ===== DISPLAY (desktop only) =====
         #[cfg(not(target_os = "android"))]
@@ -266,115 +241,76 @@ impl Renderer {
             y += slider_height + slider_gap;
         }
 
-        // ===== TOGGLES =====
+        // ===== TOGGLES (2-column grid of independent on/off switches) =====
         y += section_gap;
         self.draw_section_label("Toggles", content_x, y, s);
         y += label_height;
 
-        // Modern controls (desktop only) — on = modern, off = classic.
+        // Tap/click to walk wording matches the platform's primary input.
+        #[cfg(target_os = "android")]
+        let walk_label = "Tap walk";
         #[cfg(not(target_os = "android"))]
-        {
-            let modern_bounds = Rect::new(content_x, y, inner_width, toggle_height);
-            layout.add(UiElementId::EscapeMenuControlSchemeToggle, modern_bounds);
-            self.draw_toggle_row(
-                content_x,
-                y,
-                inner_width,
-                toggle_height,
-                "Modern controls",
-                !state.ui_state.classic_controls,
-                is_hovered(modern_bounds),
-                s,
-            );
-            y += toggle_height + toggle_gap;
-        }
+        let walk_label = "Click walk";
 
-        // Chat log
-        let chat_bounds = Rect::new(content_x, y, inner_width, toggle_height);
-        layout.add(UiElementId::EscapeMenuChatLogToggle, chat_bounds);
-        self.draw_toggle_row(
-            content_x,
-            y,
-            inner_width,
-            toggle_height,
+        // Build the toggle list (platform-specific entries via cfg), then lay it
+        // out two-per-row. Short labels keep each cell readable at half width.
+        // (Shift-to-drop is intentionally omitted — it stays silently enabled.)
+        let mut toggles: Vec<(UiElementId, &str, bool)> = Vec::new();
+        #[cfg(not(target_os = "android"))]
+        toggles.push((
+            UiElementId::EscapeMenuControlSchemeToggle,
+            "Modern",
+            !state.ui_state.classic_controls,
+        ));
+        toggles.push((
+            UiElementId::EscapeMenuChatLogToggle,
             "Chat",
             state.ui_state.chat_log_visible,
-            is_hovered(chat_bounds),
-            s,
-        );
-        y += toggle_height + toggle_gap;
-
-        // Chat background (desktop only)
+        ));
         #[cfg(not(target_os = "android"))]
-        {
-            let chat_bg_bounds = Rect::new(content_x, y, inner_width, toggle_height);
-            layout.add(UiElementId::EscapeMenuChatBgToggle, chat_bg_bounds);
-            self.draw_toggle_row(
-                content_x,
-                y,
-                inner_width,
-                toggle_height,
-                "Chat background",
-                state.ui_state.chat_log_background,
-                is_hovered(chat_bg_bounds),
-                s,
-            );
-            y += toggle_height + toggle_gap;
-        }
-
-        // Tap/click to walk (wording matches the platform's primary input)
-        #[cfg(target_os = "android")]
-        let walk_label = "Tap to walk";
-        #[cfg(not(target_os = "android"))]
-        let walk_label = "Click to walk";
-        let tap_walk_bounds = Rect::new(content_x, y, inner_width, toggle_height);
-        layout.add(UiElementId::EscapeMenuTapPathfindToggle, tap_walk_bounds);
-        self.draw_toggle_row(
-            content_x,
-            y,
-            inner_width,
-            toggle_height,
+        toggles.push((
+            UiElementId::EscapeMenuChatBgToggle,
+            "Chat BG",
+            state.ui_state.chat_log_background,
+        ));
+        toggles.push((
+            UiElementId::EscapeMenuTapPathfindToggle,
             walk_label,
             state.ui_state.tap_to_pathfind,
-            is_hovered(tap_walk_bounds),
-            s,
-        );
-        y += toggle_height + toggle_gap;
-
-        // Joystick (Android only)
+        ));
         #[cfg(target_os = "android")]
-        {
-            let joystick_bounds = Rect::new(content_x, y, inner_width, toggle_height);
-            layout.add(UiElementId::EscapeMenuJoystickToggle, joystick_bounds);
+        toggles.push((
+            UiElementId::EscapeMenuJoystickToggle,
+            "Joystick",
+            state.ui_state.use_joystick,
+        ));
+
+        let col_gap = 6.0 * s;
+        let toggle_w = (inner_width - col_gap) / 2.0;
+        for (i, (id, label, is_on)) in toggles.iter().enumerate() {
+            let col = (i % 2) as f32;
+            let row = (i / 2) as f32;
+            let tx = content_x + col * (toggle_w + col_gap);
+            let ty = y + row * (toggle_height + toggle_gap);
+            let bounds = Rect::new(tx, ty, toggle_w, toggle_height);
+            layout.add(id.clone(), bounds);
             self.draw_toggle_row(
-                content_x,
-                y,
-                inner_width,
+                tx,
+                ty,
+                toggle_w,
                 toggle_height,
-                "Joystick",
-                state.ui_state.use_joystick,
-                is_hovered(joystick_bounds),
+                label,
+                *is_on,
+                is_hovered(bounds),
                 s,
             );
-            y += toggle_height + toggle_gap;
         }
+        let rows = (toggles.len() + 1) / 2;
+        y += rows as f32 * (toggle_height + toggle_gap);
 
-        // Shift to drop
-        let shift_drop_bounds = Rect::new(content_x, y, inner_width, toggle_height);
-        layout.add(UiElementId::EscapeMenuShiftDropToggle, shift_drop_bounds);
-        self.draw_toggle_row(
-            content_x,
-            y,
-            inner_width,
-            toggle_height,
-            "Shift to drop",
-            state.ui_state.shift_drop_enabled,
-            is_hovered(shift_drop_bounds),
-            s,
-        );
-        y += toggle_height + toggle_gap;
-
-        y += 8.0 * s;
+        // Generous gap so the disconnect button isn't cramped against the toggles
+        // (balanced against the matching bottom margin baked into content_height).
+        y += 16.0 * s;
 
         // ===== DISCONNECT BUTTON =====
         let disconnect_width = inner_width;
@@ -436,6 +372,34 @@ impl Renderer {
             (disconnect_y + disconnect_height * 0.68).floor(),
             16.0,
             disconnect_text_color,
+        );
+    }
+
+    /// Draw a background-less speaker/mute icon button (just the sprite).
+    /// Uses the dedicated sound.png / mute.png textures; brightens on hover.
+    fn draw_mute_icon(&self, x: f32, y: f32, size: f32, muted: bool, hovered: bool) {
+        let texture = if muted {
+            &self.mute_icon
+        } else {
+            &self.sound_icon
+        };
+        let Some(texture) = texture.as_ref() else {
+            return;
+        };
+        let tint = if hovered {
+            WHITE
+        } else {
+            Color::new(0.85, 0.85, 0.88, 1.0)
+        };
+        draw_texture_ex(
+            texture,
+            x,
+            y,
+            tint,
+            DrawTextureParams {
+                dest_size: Some(Vec2::new(size, size)),
+                ..Default::default()
+            },
         );
     }
 

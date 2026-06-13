@@ -121,6 +121,14 @@ pub const TRANSACTION_BAR_HEIGHT: f32 = 100.0;
 pub const EXP_BAR_HEIGHT: f32 = 16.0;
 pub const EXP_BAR_GAP: f32 = 8.0; // Gap between exp bar and UI elements above
 
+// Right-side tool panels (Skills, Prayers/Spells) share one footprint so they
+// line up exactly when toggled between. Both use a 4×4 grid of 40px slots; the
+// prayer/spell panel's tab + points rows set the common height, and the skills
+// panel centers its grid to fill it.
+pub const TOOL_PANEL_WIDTH: f32 = 196.0;
+pub const TOOL_PANEL_HEIGHT: f32 = 270.0;
+pub const TOOL_PANEL_SLOT_SIZE: f32 = 40.0;
+
 // Menu Button Constants (5 × 45 + 4 × 4 = 241px ≈ 240px for alignment)
 pub const MENU_BUTTON_SIZE: f32 = 45.0;
 pub const MENU_BUTTON_SPACING: f32 = 4.0;

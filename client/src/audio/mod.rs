@@ -10,7 +10,12 @@ use std::collections::HashMap;
 pub struct AudioSettings {
     pub music_volume: f32,
     pub sfx_volume: f32,
-    pub muted: bool,
+    // Per-channel mute. `#[serde(default)]` so saves from before the split
+    // (which only had a single `muted`) still load cleanly.
+    #[serde(default)]
+    pub music_muted: bool,
+    #[serde(default)]
+    pub sfx_muted: bool,
 }
 
 impl Default for AudioSettings {
@@ -18,7 +23,8 @@ impl Default for AudioSettings {
         Self {
             music_volume: 0.7,
             sfx_volume: 0.7,
-            muted: false,
+            music_muted: false,
+            sfx_muted: false,
         }
     }
 }
@@ -260,7 +266,7 @@ impl AudioManager {
                 log::info!(
                     "Playing music with volume: {} (muted: {})",
                     volume,
-                    self.settings.muted
+                    self.settings.music_muted
                 );
                 play_sound(
                     &sound,
@@ -297,14 +303,19 @@ impl AudioManager {
         save_settings(&self.settings);
     }
 
-    pub fn toggle_mute(&mut self) {
-        self.settings.muted = !self.settings.muted;
+    pub fn toggle_music_mute(&mut self) {
+        self.settings.music_muted = !self.settings.music_muted;
         self.apply_music_volume();
         save_settings(&self.settings);
     }
 
+    pub fn toggle_sfx_mute(&mut self) {
+        self.settings.sfx_muted = !self.settings.sfx_muted;
+        save_settings(&self.settings);
+    }
+
     pub fn effective_music_volume(&self) -> f32 {
-        if self.settings.muted {
+        if self.settings.music_muted {
             0.0
         } else {
             self.settings.music_volume
@@ -312,7 +323,7 @@ impl AudioManager {
     }
 
     pub fn effective_sfx_volume(&self) -> f32 {
-        if self.settings.muted {
+        if self.settings.sfx_muted {
             0.0
         } else {
             self.settings.sfx_volume
@@ -327,8 +338,12 @@ impl AudioManager {
         self.settings.sfx_volume
     }
 
-    pub fn is_muted(&self) -> bool {
-        self.settings.muted
+    pub fn is_music_muted(&self) -> bool {
+        self.settings.music_muted
+    }
+
+    pub fn is_sfx_muted(&self) -> bool {
+        self.settings.sfx_muted
     }
 
     fn apply_music_volume(&self) {

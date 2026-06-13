@@ -1077,6 +1077,28 @@ impl Renderer {
             }
         };
 
+        // Audio mute / unmute icons for the settings panel
+        let sound_icon = match load_texture(&asset_path("assets/ui/sound.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load sound icon: {}", e);
+                None
+            }
+        };
+        let mute_icon = match load_texture(&asset_path("assets/ui/mute.png")).await {
+            Ok(tex) => {
+                tex.set_filter(FilterMode::Nearest);
+                Some(tex)
+            }
+            Err(e) => {
+                log::warn!("Failed to load mute icon: {}", e);
+                None
+            }
+        };
+
         // HUD stat-bar icons (16x16)
         let load_stat_icon = |tex: Result<Texture2D, macroquad::Error>, name: &str| match tex {
             Ok(t) => {
@@ -1460,6 +1482,8 @@ impl Renderer {
             fishing_skill_icon,
             chat_small_icon,
             coin_small_icon,
+            sound_icon,
+            mute_icon,
             health_stat_icon,
             magic_stat_icon,
             prayer_stat_icon,

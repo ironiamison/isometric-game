@@ -1,5 +1,5 @@
-//! Skills panel rendering - compact 4x4 grid showing skill levels
-//! 14 active skills, 2 locked placeholder slots
+//! Skills panel rendering - 4x5 grid showing skill levels
+//! 15 active skills, 5 locked placeholder slots (fills the shared panel height)
 
 use super::super::Renderer;
 use super::common::*;
@@ -8,25 +8,19 @@ use crate::ui::{UiElementId, UiLayout};
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
-/// Skills panel dimensions (compact: just fits the 4x4 grid with padding)
+/// Skills panel dimensions — shares the common tool-panel footprint
+/// (see TOOL_PANEL_* in common.rs) so it lines up with the Prayers/Spells panel.
 const SKILLS_PANEL_PADDING: f32 = 8.0;
-const SKILLS_GRID_WIDTH: f32 = 4.0 * SKILL_SLOT_SIZE + 3.0 * SKILL_SLOT_SPACING; // 172
-const SKILLS_GRID_HEIGHT: f32 = 4.0 * SKILL_SLOT_SIZE + 3.0 * SKILL_SLOT_SPACING; // 172
-const SKILLS_PANEL_WIDTH: f32 =
-    SKILLS_GRID_WIDTH + SKILLS_PANEL_PADDING * 2.0 + FRAME_THICKNESS * 2.0; // 196
+const SKILLS_GRID_HEIGHT: f32 = SKILL_GRID_ROWS as f32 * SKILL_SLOT_SIZE
+    + (SKILL_GRID_ROWS - 1) as f32 * SKILL_SLOT_SPACING; // 5 rows → 216
 const SKILLS_HEADER_HEIGHT: f32 = 24.0;
-const SKILLS_PANEL_HEIGHT: f32 = FRAME_THICKNESS * 2.0
-    + SKILLS_HEADER_HEIGHT
-    + SKILLS_PANEL_PADDING
-    + SKILLS_GRID_HEIGHT
-    + SKILLS_PANEL_PADDING;
 
 /// Skill slot dimensions
-const SKILL_SLOT_SIZE: f32 = 40.0;
+const SKILL_SLOT_SIZE: f32 = TOOL_PANEL_SLOT_SIZE;
 const SKILL_SLOT_SPACING: f32 = 4.0;
 const SKILL_GRID_COLS: usize = 4;
-const SKILL_GRID_ROWS: usize = 4;
-const TOTAL_SKILL_SLOTS: usize = 16;
+const SKILL_GRID_ROWS: usize = 5; // 4x5 fills the shared tool-panel height
+const TOTAL_SKILL_SLOTS: usize = SKILL_GRID_COLS * SKILL_GRID_ROWS; // 20
 
 /// UI icons sprite sheet: 24x24 icons in 10 columns
 const UI_ICON_SIZE: f32 = 24.0;
@@ -66,9 +60,9 @@ impl Renderer {
         let (screen_w, screen_h) = virtual_screen_size();
         let scale = state.ui_state.ui_scale;
 
-        // Scaled dimensions
-        let panel_width = SKILLS_PANEL_WIDTH * scale;
-        let panel_height = SKILLS_PANEL_HEIGHT * scale;
+        // Scaled dimensions (shared footprint with the Prayers/Spells panel)
+        let panel_width = TOOL_PANEL_WIDTH * scale;
+        let panel_height = TOOL_PANEL_HEIGHT * scale;
         let frame_thickness = FRAME_THICKNESS * scale;
         let header_height = SKILLS_HEADER_HEIGHT * scale;
         let panel_padding = SKILLS_PANEL_PADDING * scale;
@@ -117,9 +111,13 @@ impl Renderer {
             TEXT_TITLE,
         );
 
-        // Grid area
+        // Grid area — centered vertically in the space below the header so the
+        // panel fills the shared (taller) footprint without dead space at the top.
         let grid_x = panel_x + frame_thickness + panel_padding;
-        let grid_y = header_y + header_height + panel_padding;
+        let grid_h = SKILLS_GRID_HEIGHT * scale;
+        let content_top = header_y + header_height;
+        let content_bottom = panel_y + panel_height - frame_thickness;
+        let grid_y = content_top + ((content_bottom - content_top) - grid_h) / 2.0;
 
         // Draw skill slots (8 total in 3x3 grid, last slot empty)
         for slot_index in 0..TOTAL_SKILL_SLOTS {
