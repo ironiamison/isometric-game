@@ -142,6 +142,12 @@ struct AppState {
     play_time_anchors: Arc<DashMap<i64, std::time::Instant>>,
     /// Character IDs currently online (prevents duplicate sessions)
     online_characters: Arc<DashSet<i64>>,
+    /// Character ID -> monotonically increasing connection epoch. Each new
+    /// WebSocket connection for a character bumps this; older connections detect
+    /// the bump and self-terminate. Enforces one live socket per character even
+    /// when a client reuses a persisted session token across tabs (so the
+    /// matchmaking takeover path never runs).
+    connection_epochs: Arc<DashMap<i64, u64>>,
     /// Serializes matchmaking and takeover for the same character.
     character_session_locks: Arc<DashMap<i64, Arc<Mutex<()>>>>,
     /// In-memory log buffer for /api/logs endpoint

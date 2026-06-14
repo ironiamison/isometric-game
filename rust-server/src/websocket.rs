@@ -115,6 +115,18 @@ pub(super) async fn handle_socket(
     // Mark character as online now that WebSocket is actually connected
     state.online_characters.insert(character_id);
 
+    // Claim this character's live-connection slot. Bumping the epoch instantly
+    // invalidates any older socket for the same character — including a second
+    // tab that reused a persisted session token and connected directly (so the
+    // matchmaking takeover never ran). The older socket sees the mismatch on its
+    // next message or idle tick and tears itself down, leaving exactly one live
+    // connection per character.
+    let connection_epoch = {
+        let mut entry = state.connection_epochs.entry(character_id).or_insert(0);
+        *entry += 1;
+        *entry
+    };
+
     // Activate the player
     let player_name = room.activate_player(&player_id).await;
     info!(
@@ -514,6 +526,20 @@ pub(super) async fn handle_socket(
                 Ok(Some(Ok(msg))) => match msg {
                     Message::Binary(data) => {
                         last_app_msg = std::time::Instant::now();
+                        // A newer connection for this character has taken over —
+                        // stop processing this (now-stale) socket's commands.
+                        if state_clone
+                            .connection_epochs
+                            .get(&character_id)
+                            .map(|e| *e)
+                            != Some(connection_epoch)
+                        {
+                            warn!(
+                                "Closing superseded connection for player {} (newer tab/session took over)",
+                                player_id_clone
+                            );
+                            break;
+                        }
                         if let Err(e) = handle_client_message(
                             &state_clone,
                             &room_clone,
@@ -552,7 +578,21 @@ pub(super) async fn handle_socket(
                 },
                 Ok(Some(Err(_))) | Ok(None) => break,
                 Err(_) => {
-                    // Short timeout expired, check app-level activity
+                    // Short timeout expired. Reap idle sockets that have been
+                    // superseded by a newer connection for the same character.
+                    if state_clone
+                        .connection_epochs
+                        .get(&character_id)
+                        .map(|e| *e)
+                        != Some(connection_epoch)
+                    {
+                        warn!(
+                            "Closing superseded idle connection for player {} (newer tab/session took over)",
+                            player_id_clone
+                        );
+                        break;
+                    }
+                    // Check app-level activity
                     if last_app_msg.elapsed() > Duration::from_secs(45) {
                         warn!(
                             "Player {} connection timed out (no data for 45s)",
@@ -571,7 +611,24 @@ pub(super) async fn handle_socket(
         _ = &mut recv_task => send_task.abort(),
     }
 
-    // Cleanup — atomically claim session ownership first.
+    // Cleanup — if a newer connection for this character has taken over (e.g. a
+    // second tab that reused this session token), it now owns the shared player
+    // entity and session. Skip teardown entirely so we don't rip the live player
+    // out from under the newer connection.
+    if state
+        .connection_epochs
+        .get(&character_id)
+        .map(|e| *e)
+        != Some(connection_epoch)
+    {
+        info!(
+            "Connection for {} (session {}) superseded by a newer connection, skipping cleanup",
+            character_name, session_id
+        );
+        return;
+    }
+
+    // Atomically claim session ownership.
     // If another handler already took over this session, skip all cleanup.
     let removed_session = state.sessions.remove(&session_id);
     if removed_session.is_none() {
@@ -774,6 +831,10 @@ pub(super) async fn handle_socket(
 
     // Mark character as offline
     state.online_characters.remove(&character_id);
+    // Release our connection-epoch slot (only if we still own it).
+    state
+        .connection_epochs
+        .remove_if(&character_id, |_, &epoch| epoch == connection_epoch);
 
     room.remove_player(&player_id).await;
 

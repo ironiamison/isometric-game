@@ -62,6 +62,7 @@ impl AppState {
             player_entrance_positions: Arc::new(RwLock::new(HashMap::new())),
             play_time_anchors: Arc::new(DashMap::new()),
             online_characters: Arc::new(DashSet::new()),
+            connection_epochs: Arc::new(DashMap::new()),
             character_session_locks: Arc::new(DashMap::new()),
             log_buffer,
             perf_metrics: perf_metrics::PerfMetrics::new(),
