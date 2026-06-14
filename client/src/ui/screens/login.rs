@@ -41,9 +41,9 @@ fn open_external_url(url: &str) {
 /// (drawing) so the two can never drift apart.
 struct LoginLayout {
     panel: Rect,
+    logo: Rect,
     content_x: f32,
     content_w: f32,
-    title_baseline: f32,
     error_baseline: f32,
     tab_login: Rect,
     tab_register: Rect,
@@ -69,6 +69,7 @@ pub struct LoginScreen {
     error_message: Option<String>,
     auth_client: AuthClient,
     font: BitmapFont,
+    logo: Option<Texture2D>,
     discord_icon: Option<Texture2D>,
     news_icon: Option<Texture2D>,
     // Animation state
@@ -124,6 +125,7 @@ impl LoginScreen {
             error_message: None,
             auth_client: AuthClient::new(server_url),
             font: BitmapFont::default(),
+            logo: None,
             discord_icon: None,
             news_icon: None,
             frame_counter: 0.0,
@@ -164,6 +166,12 @@ impl LoginScreen {
                     .await;
         }
 
+        // Logo wordmark above the panel (falls back to text title if missing)
+        if let Ok(texture) = load_texture(&asset_path("assets/ui/logo.png")).await {
+            texture.set_filter(FilterMode::Nearest);
+            self.logo = Some(texture);
+        }
+
         // Footer social/news icons (fall back to primitive shapes if missing)
         if let Ok(texture) = load_texture(&asset_path("assets/ui/discord.png")).await {
             texture.set_filter(FilterMode::Nearest);
@@ -192,20 +200,28 @@ impl LoginScreen {
         }
     }
 
+    /// Native pixel size of the logo wordmark (drawn 1:1). Falls back to the
+    /// text-title footprint when the texture hasn't loaded.
+    fn logo_size(&self) -> (f32, f32) {
+        match &self.logo {
+            Some(tex) => (tex.width(), tex.height()),
+            None => (self.measure_text_sharp("NEW AEVEN", 32.0).width, 36.0),
+        }
+    }
+
     /// Compute every element rect/baseline for the centered login panel.
     /// Shared by `update` (hit-testing) and `render` (drawing).
-    fn compute_layout(sw: f32, sh: f32) -> LoginLayout {
+    fn compute_layout(sw: f32, sh: f32, logo_size: (f32, f32)) -> LoginLayout {
         let compact = sh < 480.0;
 
         // Inner content column (fields, button, tabs all share this width).
         let content_w = (sw - 48.0).clamp(220.0, 320.0).floor();
         let pad_x = 24.0;
-        let pad_top = 22.0;
-        let pad_bottom = 18.0;
+        let pad_top = 12.0;
+        let pad_bottom = 10.0;
         let panel_w = (content_w + pad_x * 2.0).floor();
 
         // Section heights
-        let title_h = 36.0;
         let tab_h = 30.0;
         let label_h = 18.0;
         let field_h = if compact { 32.0 } else { 40.0 };
@@ -214,21 +230,18 @@ impl LoginScreen {
         let footer_h = 24.0;
         let error_h = 18.0; // reserved row for the validation/error message
 
-        // Gaps (title/tab gaps kept tight so the error row fits without growth)
-        let g_after_title = if compact { 8.0 } else { 12.0 };
+        // Gaps (tab gaps kept tight so the error row fits without growth)
         let g_after_tabs = if compact { 10.0 } else { 14.0 };
         let g_label_field = 4.0;
         let g_after_field = if compact { 10.0 } else { 16.0 };
         let g_before_error = 6.0;
         let g_after_error = 6.0;
-        let g_footer_top = 22.0; // extra headroom below divider for the "soon" label
+        let g_footer_top = 18.0; // headroom below divider for the "soon" label
         let g_after_remember = if compact { 10.0 } else { 16.0 };
         let g_after_button = if compact { 10.0 } else { 16.0 };
         let g_divider = 12.0;
 
-        let content_h: f32 = title_h
-            + g_after_title
-            + tab_h
+        let content_h: f32 = tab_h
             + g_after_tabs
             + label_h
             + g_label_field
@@ -251,14 +264,23 @@ impl LoginScreen {
 
         let panel_h = (content_h + pad_top + pad_bottom).floor();
         let panel_x = ((sw - panel_w) / 2.0).floor();
-        let panel_y = ((sh - panel_h) / 2.0).max(8.0).floor();
+
+        // Logo wordmark sits above the panel, drawn 1:1 at its native size to
+        // stay pixel-crisp. The logo + gap + panel are centered together as one
+        // block.
+        let (logo_w, logo_h) = logo_size;
+        let logo_gap = if compact { 8.0 } else { 14.0 };
+
+        let block_h = logo_h + logo_gap + panel_h;
+        // Bias the block upward (sit at ~40% of the free space, not centered) so
+        // the form isn't pushed too low once the logo is stacked on top.
+        let block_y = ((sh - block_h) * 0.40).max(8.0).floor();
+        let logo_x = ((sw - logo_w) / 2.0).floor();
+        let logo = Rect::new(logo_x, block_y, logo_w, logo_h);
+        let panel_y = (block_y + logo_h + logo_gap).floor();
         let content_x = (panel_x + pad_x).floor();
 
         let mut y = panel_y + pad_top;
-
-        // Title (baseline sits near the bottom of its reserved band)
-        let title_baseline = (y + title_h - 8.0).floor();
-        y += title_h + g_after_title;
 
         // Tabs
         let tab_w = (content_w / 2.0).floor();
@@ -317,9 +339,9 @@ impl LoginScreen {
 
         LoginLayout {
             panel: Rect::new(panel_x, panel_y, panel_w, panel_h),
+            logo,
             content_x,
             content_w,
-            title_baseline,
             error_baseline,
             tab_login,
             tab_register,
@@ -631,7 +653,7 @@ impl Screen for LoginScreen {
 
         // Handle clicks against the shared layout
         if clicked {
-            let l = Self::compute_layout(sw, sh);
+            let l = Self::compute_layout(sw, sh, self.logo_size());
             let hit = |r: Rect| point_in_rect(mx, my, r.x, r.y, r.w, r.h);
 
             if hit(l.username_field) {
@@ -717,7 +739,7 @@ impl Screen for LoginScreen {
 
         // === FORM PANEL ===
 
-        let l = Self::compute_layout(sw, sh);
+        let l = Self::compute_layout(sw, sh, self.logo_size());
         let font_size = 16.0;
         let hit = |r: Rect| point_in_rect(mx, my, r.x, r.y, r.w, r.h);
 
@@ -725,23 +747,35 @@ impl Screen for LoginScreen {
         draw_panel_frame(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
         draw_corner_accents(l.panel.x, l.panel.y, l.panel.w, l.panel.h);
 
-        // Title wordmark — drawn as text at a native font size (32, falling back
-        // to 24 if it would overflow) to stay pixel-crisp. The logo.png is
-        // 384x244 and can't downscale into this panel without blurring.
-        let title = "NEW AEVEN";
-        let title_size = if self.measure_text_sharp(title, 32.0).width <= l.content_w {
-            32.0
+        // Logo wordmark above the panel. Falls back to crisp text if the
+        // texture failed to load.
+        if let Some(logo) = &self.logo {
+            draw_texture_ex(
+                logo,
+                l.logo.x,
+                l.logo.y,
+                Color::new(1.0, 1.0, 1.0, 1.0),
+                DrawTextureParams {
+                    dest_size: Some(vec2(l.logo.w, l.logo.h)),
+                    ..Default::default()
+                },
+            );
         } else {
-            24.0
-        };
-        let title_w = self.measure_text_sharp(title, title_size).width;
-        self.draw_text_sharp(
-            title,
-            (l.panel.x + (l.panel.w - title_w) / 2.0).floor(),
-            l.title_baseline,
-            title_size,
-            TEXT_TITLE,
-        );
+            let title = "NEW AEVEN";
+            let title_size = if self.measure_text_sharp(title, 32.0).width <= l.logo.w {
+                32.0
+            } else {
+                24.0
+            };
+            let title_w = self.measure_text_sharp(title, title_size).width;
+            self.draw_text_sharp(
+                title,
+                (l.logo.x + (l.logo.w - title_w) / 2.0).floor(),
+                (l.logo.y + l.logo.h / 2.0 + title_size / 2.0).floor(),
+                title_size,
+                TEXT_TITLE,
+            );
+        }
 
         // === TABS ===
         let draw_tab = |this: &Self, rect: Rect, label: &str, active: bool| {
