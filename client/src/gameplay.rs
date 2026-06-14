@@ -788,8 +788,6 @@ pub(crate) fn run_game_frame(
     game_state.frame_timings.render_overhead_ms = render_timings.overhead_ms;
     game_state.frame_timings.render_effects_ms = render_timings.effects_ms;
     game_state.frame_timings.render_ui_ms = render_timings.ui_ms;
-    game_state.frame_timings.render_ui_chat_ms = render_timings.ui_chat_ms;
-    game_state.frame_timings.render_ui_hud_ms = render_timings.ui_hud_ms;
     game_state.frame_timings.update_ms = update_ms;
     game_state.frame_timings.total_ms = total_ms;
     game_state.frame_timings.entity_count =
@@ -807,7 +805,7 @@ pub(crate) fn run_game_frame(
             4.0,
             debug_y_offset + 8.0,
             340.0,
-            500.0,
+            440.0,
             Color::from_rgba(0, 0, 0, 140),
         );
 
@@ -1015,50 +1013,23 @@ pub(crate) fn run_game_frame(
             ui_color,
         );
         renderer.draw_text_sharp(
-            &format!("    chat:   {:.2}", t.render_ui_chat_ms),
+            &format!("Update:   {:.2}", t.update_ms),
             10.0,
             y(330.0),
             16.0,
             timing_color,
         );
         renderer.draw_text_sharp(
-            &format!("    hud:    {:.2}", t.render_ui_hud_ms),
+            &format!("Total:    {:.2}", t.total_ms),
             10.0,
             y(350.0),
             16.0,
             timing_color,
         );
         renderer.draw_text_sharp(
-            &format!(
-                "    map {:.2} (collect {:.2}) port {:.2}",
-                renderer.dbg_ui_minimap_ms.get(),
-                renderer.dbg_ui_globes_ms.get(),
-                renderer.dbg_ui_portrait_ms.get()
-            ),
-            10.0,
-            y(370.0),
-            16.0,
-            timing_color,
-        );
-
-        renderer.draw_text_sharp(
-            &format!("Update:   {:.2}", t.update_ms),
-            10.0,
-            y(390.0),
-            16.0,
-            timing_color,
-        );
-        renderer.draw_text_sharp(
-            &format!("Total:    {:.2}", t.total_ms),
-            10.0,
-            y(410.0),
-            16.0,
-            timing_color,
-        );
-        renderer.draw_text_sharp(
             &format!("Entities: {} | Chunks: {}", t.entity_count, t.chunk_count),
             10.0,
-            y(430.0),
+            y(370.0),
             16.0,
             timing_color,
         );
@@ -1076,7 +1047,7 @@ pub(crate) fn run_game_frame(
                 t.delta_ms, t.delta_min_ms, t.delta_max_ms, delta_variance
             ),
             10.0,
-            y(450.0),
+            y(390.0),
             16.0,
             variance_color,
         );
@@ -1094,7 +1065,7 @@ pub(crate) fn run_game_frame(
                 t.next_frame_ms, t.next_frame_min_ms, t.next_frame_max_ms, nf_variance
             ),
             10.0,
-            y(470.0),
+            y(410.0),
             16.0,
             nf_color,
         );
@@ -1112,7 +1083,7 @@ pub(crate) fn run_game_frame(
                 t.smoothed_delta * 1000.0
             ),
             10.0,
-            y(490.0),
+            y(430.0),
             16.0,
             timing_color,
         );

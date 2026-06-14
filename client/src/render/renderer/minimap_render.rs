@@ -632,11 +632,7 @@ impl Renderer {
                     ..Default::default()
                 },
             );
-            let t_collect = macroquad::time::get_time();
             let markers = self.collect_minimap_markers(state, Some(&bounds), false);
-            // (debug) reuse the globes timer to show marker-collect cost
-            self.dbg_ui_globes_ms
-                .set((macroquad::time::get_time() - t_collect) * 1000.0);
             // use_scissor=false: source-clip icons instead, avoiding two gl.flush()/frame.
             self.draw_minimap_markers(state, &bounds, &markers, map_rect, 0.8, None, false, false);
         } else {

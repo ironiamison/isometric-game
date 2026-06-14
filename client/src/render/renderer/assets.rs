@@ -1545,11 +1545,6 @@ impl Renderer {
             tree_shake_offsets: RefCell::new(HashMap::new()),
             crumbling_rock_positions: RefCell::new(HashSet::new()),
             rock_shake_offsets: RefCell::new(HashMap::new()),
-            dbg_ui_chat_ms: Cell::new(0.0),
-            dbg_ui_hud_ms: Cell::new(0.0),
-            dbg_ui_minimap_ms: Cell::new(0.0),
-            dbg_ui_portrait_ms: Cell::new(0.0),
-            dbg_ui_globes_ms: Cell::new(0.0),
         }
     }
 }

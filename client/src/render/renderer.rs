@@ -81,9 +81,6 @@ pub struct RenderTimings {
     pub overhead_ms: f64,
     pub effects_ms: f64,
     pub ui_ms: f64,
-    /// Sub-breakdown of ui_ms: chat log block and HUD stat cluster.
-    pub ui_chat_ms: f64,
-    pub ui_hud_ms: f64,
     pub total_ms: f64,
 }
 
@@ -499,14 +496,6 @@ pub struct Renderer {
     tree_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
     crumbling_rock_positions: RefCell<HashSet<(i32, i32)>>,
     rock_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
-    /// Debug sub-timers for the UI render pass (ms). Written inside render_ui,
-    /// read out in frame.rs to break down where the "UI" frame timing goes.
-    dbg_ui_chat_ms: Cell<f64>,
-    dbg_ui_hud_ms: Cell<f64>,
-    /// Finer HUD sub-timers (ms), read directly by the debug overlay.
-    pub(crate) dbg_ui_minimap_ms: Cell<f64>,
-    pub(crate) dbg_ui_portrait_ms: Cell<f64>,
-    pub(crate) dbg_ui_globes_ms: Cell<f64>,
 }
 
 impl Renderer {}
