@@ -116,7 +116,9 @@ fi
 if [ -n "$SERVER_CHANGED" ] || [ -n "$SHARED_CHANGED" ]; then
     echo "Server changes detected, rebuilding..."
     cd "$REPO_DIR/rust-server"
-    cargo build --locked --release --target-dir "$REPO_DIR/rust-server/target"
+    # Build into the cargo workspace target dir (default). The systemd service's
+    # ExecStart points here, so manual `cargo build` and force-deploy.sh stay in sync.
+    cargo build --locked --release
     echo "Restarting game server..."
     systemctl restart isometric-server
     echo "Server restarted."
