@@ -2,6 +2,16 @@
 set -euo pipefail
 source "$HOME/.cargo/env" 2>/dev/null || true
 
+# drone-ssh runs this script non-interactively, so .bashrc (and nvm) is never
+# loaded and `node` would resolve to the stale /usr/bin/node. Load nvm here so
+# the deploy uses the managed Node toolchain.
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$NVM_DIR/nvm.sh"
+    nvm use default >/dev/null 2>&1 || nvm use node >/dev/null 2>&1 || true
+fi
+
 REPO_DIR="${REPO_DIR:-/root/isometric-game}"
 SITE_DEPLOY_DIR="${SITE_DEPLOY_DIR:-/var/www/aeven}"
 cd "$REPO_DIR"
@@ -15,8 +25,8 @@ require_node_toolchain() {
     local node_major npm_major
     node_major=$(node -p "process.versions.node.split('.')[0]")
     npm_major=$(npm --version | cut -d. -f1)
-    if [ "$node_major" != "22" ] || [ "$npm_major" != "10" ]; then
-        echo "ERROR: Node.js 22.x and npm 10.x are required; found node $(node --version), npm $(npm --version)."
+    if [ "$node_major" -lt 22 ] || [ "$npm_major" -lt 10 ]; then
+        echo "ERROR: Node.js 22+ and npm 10+ are required; found node $(node --version), npm $(npm --version)."
         exit 1
     fi
 }
