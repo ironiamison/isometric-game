@@ -613,14 +613,21 @@ impl CreateForm {
         let sprite_x = (p.x + (p.w - SPRITE_WIDTH) / 2.0).floor();
         let sprite_y = (p.y + (p.h - SPRITE_HEIGHT) / 2.0).floor();
         let empty_equip = SpritesheetStore::Individual(HashMap::new());
+        let empty_weapons = SpritesheetStore::Individual(HashMap::new());
+        let empty_weapon_sizes = HashMap::new();
         draw_character_preview(
             player_sprites,
             hair_sprites,
             &empty_equip,
+            &empty_weapons,
+            &empty_weapon_sizes,
             GENDERS[self.gender_index],
             SKINS[self.skin_index],
             self.hair_style_index.map(|i| i as i32),
             self.hair_color_index as i32,
+            None,
+            None,
+            None,
             None,
             None,
             None,

@@ -160,6 +160,12 @@ pub struct CharacterSelectScreen {
     player_sprites: SpritesheetStore,
     hair_sprites: SpritesheetStore,
     equipment_sprites: SpritesheetStore,
+    weapon_sprites: SpritesheetStore,
+    weapon_frame_sizes: HashMap<String, (f32, f32)>,
+    /// Head+hair composite shader (lazily loaded). `head_hair_material_loaded`
+    /// guards against retrying a failed load every frame.
+    head_hair_material: Option<Material>,
+    head_hair_material_loaded: bool,
     // Scroll state for character list on small screens
     list_scroll_offset: f32,
     touch_scroll_id: Option<u64>,
@@ -199,6 +205,10 @@ impl CharacterSelectScreen {
             player_sprites: SpritesheetStore::Individual(HashMap::new()),
             hair_sprites: SpritesheetStore::Individual(HashMap::new()),
             equipment_sprites: SpritesheetStore::Individual(HashMap::new()),
+            weapon_sprites: SpritesheetStore::Individual(HashMap::new()),
+            weapon_frame_sizes: HashMap::new(),
+            head_hair_material: None,
+            head_hair_material_loaded: false,
             list_scroll_offset: 0.0,
             touch_scroll_id: None,
             touch_scroll_last_y: 0.0,
@@ -223,11 +233,46 @@ impl CharacterSelectScreen {
         player: SpritesheetStore,
         hair: SpritesheetStore,
         equipment: SpritesheetStore,
+        weapons: SpritesheetStore,
+        weapon_frame_sizes: HashMap<String, (f32, f32)>,
     ) {
         self.font = font;
         self.player_sprites = player;
         self.hair_sprites = hair;
         self.equipment_sprites = equipment;
+        self.weapon_sprites = weapons;
+        self.weapon_frame_sizes = weapon_frame_sizes;
+    }
+
+    /// Lazily compile the head+hair composite shader (the same one the in-game
+    /// renderer uses) so helmets composite hair through their marker pixels on the
+    /// previews. Loaded on first render — needs an active GL context — and only
+    /// attempted once.
+    fn ensure_head_hair_material(&mut self) {
+        if self.head_hair_material_loaded {
+            return;
+        }
+        self.head_hair_material_loaded = true;
+        match load_material(
+            ShaderSource::Glsl {
+                vertex: crate::render::shaders::HEAD_HAIR_VERTEX,
+                fragment: crate::render::shaders::HEAD_HAIR_FRAGMENT,
+            },
+            MaterialParams {
+                textures: vec!["HairTexture".to_string()],
+                uniforms: vec![
+                    UniformDesc::new("HairUvTransform", UniformType::Float4),
+                    UniformDesc::new("Tint", UniformType::Float4),
+                ],
+                ..Default::default()
+            },
+        ) {
+            Ok(mat) => self.head_hair_material = Some(mat),
+            Err(e) => log::warn!(
+                "Character select: failed to load head+hair shader: {e}. \
+                 Helmets will render without hair masking."
+            ),
+        }
     }
 
     /// Load font and sprites asynchronously - call this after creating the screen
@@ -281,6 +326,21 @@ impl CharacterSelectScreen {
         }
 
         self.load_equipment_sprites(&manifest).await;
+
+        // Weapons live in their own atlas (separate from equipment).
+        if let Some(ref atlas_info) = manifest.weapons_atlas {
+            if let Some((tex, rects)) = load_spritesheet_atlas(atlas_info).await {
+                self.weapon_sprites = SpritesheetStore::Atlas {
+                    texture: tex,
+                    rects,
+                };
+            }
+        }
+        self.weapon_frame_sizes = manifest
+            .weapon_frame_sizes
+            .iter()
+            .map(|(k, v)| (k.clone(), (v[0], v[1])))
+            .collect();
     }
 
     async fn load_equipment_sprites(&mut self, manifest: &SpriteManifest) {
@@ -490,6 +550,8 @@ impl CharacterSelectScreen {
             &self.player_sprites,
             &self.hair_sprites,
             &self.equipment_sprites,
+            &self.weapon_sprites,
+            &self.weapon_frame_sizes,
             &character.gender,
             &character.skin,
             character.hair_style,
@@ -497,6 +559,9 @@ impl CharacterSelectScreen {
             character.sprite_body.as_deref(),
             character.sprite_back.as_deref(),
             character.sprite_feet.as_deref(),
+            character.sprite_head.as_deref(),
+            character.sprite_weapon.as_deref(),
+            self.head_hair_material.as_ref(),
             preview_x,
             preview_y,
             fade(WHITE, alpha),
@@ -962,6 +1027,9 @@ impl CharacterSelectScreen {
 
 impl Screen for CharacterSelectScreen {
     fn update(&mut self, audio: &AudioManager) -> ScreenState {
+        // Compile the head+hair shader on first frame (GL context now exists).
+        self.ensure_head_hair_material();
+
         // Advance the roster⇄create morph toward its target.
         let target = if self.mode == SelectMode::Create {
             1.0

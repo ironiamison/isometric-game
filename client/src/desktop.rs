@@ -112,6 +112,8 @@ pub(crate) async fn run() {
                                 renderer.player_sprites().clone(),
                                 renderer.hair_sprites().clone(),
                                 renderer.equipment_sprites().clone(),
+                                renderer.weapon_sprites().clone(),
+                                renderer.weapon_frame_sizes().clone(),
                             );
                             char_screen.load_font().await;
                             app_state = AppState::CharacterSelect(char_screen, spectator.take());
@@ -303,6 +305,8 @@ pub(crate) async fn run() {
                             renderer.player_sprites().clone(),
                             renderer.hair_sprites().clone(),
                             renderer.equipment_sprites().clone(),
+                            renderer.weapon_sprites().clone(),
+                            renderer.weapon_frame_sizes().clone(),
                         );
                         char_screen.load_font().await;
                         app_state = AppState::CharacterSelect(char_screen, spectator.take());

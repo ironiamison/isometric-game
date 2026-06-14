@@ -137,12 +137,99 @@ fn point_in_rect(px: f32, py: f32, rx: f32, ry: f32, rw: f32, rh: f32) -> bool {
 const HAIR_SPRITE_WIDTH: f32 = 28.0;
 const HAIR_SPRITE_HEIGHT: f32 = 54.0;
 
+// Head equipment (helmet) sprite dimensions (matching renderer)
+const HEAD_SPRITE_WIDTH: f32 = 30.0;
+const HEAD_SPRITE_HEIGHT: f32 = 34.0;
+// Default weapon frame dimensions (per-weapon sizes come from the manifest)
+const WEAPON_SPRITE_WIDTH: f32 = 68.0;
+const WEAPON_SPRITE_HEIGHT: f32 = 84.0;
+
+/// Composite a helmet (head equipment) with hair using the in-game head+hair
+/// shader, for the static idle/down pose. The shader fills the helmet's (8,0,0)
+/// marker pixels with hair and discards everything else that's transparent, so
+/// hair only peeks through where the artist intended (no spikes poking out).
+///
+/// The UV-transform math mirrors `render_player` in `render/renderer/player.rs`
+/// for `AnimationState::Idle` facing `Direction::Down` at zoom 1.0.
+#[allow(clippy::too_many_arguments)]
+fn draw_head_hair_composite(
+    material: &Material,
+    head_tex: &Texture2D,
+    head_offset: Option<(f32, f32)>,
+    hair_tex: &Texture2D,
+    hair_offset: Option<(f32, f32)>,
+    hair_color: i32,
+    x: f32,
+    y: f32,
+    tint: Color,
+) {
+    let (head_atlas_x, head_atlas_y) = head_offset.unwrap_or((0.0, 0.0));
+    let (hair_atlas_x, hair_atlas_y) = hair_offset.unwrap_or((0.0, 0.0));
+
+    // UVs are in full-texture space, so use the whole texture dimensions.
+    let head_full_w = head_tex.width();
+    let head_full_h = head_tex.height();
+    let hair_full_w = hair_tex.width();
+    let hair_full_h = hair_tex.height();
+
+    // Idle/down frame indices and offsets (front-facing).
+    let hair_src_x = (hair_color * 2) as f32 * HAIR_SPRITE_WIDTH; // front hair frame
+    let head_src_x = 0.0; // front head frame
+    let (hair_pos_x, hair_pos_y) = (-1.0_f32, -3.0_f32); // get_hair_offset(Idle, Down)
+    let (head_pos_x, head_pos_y) = (1.0_f32, -7.0_f32); // get_head_offset(Idle, Down)
+
+    // Pixel delta from the head origin to the (centered) hair origin.
+    let hair_base_x = (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 + hair_pos_x;
+    let delta_x = hair_base_x - head_pos_x;
+    let delta_y = hair_pos_y - head_pos_y;
+
+    let head_uv_x = (head_atlas_x + head_src_x) / head_full_w;
+    let head_uv_y = head_atlas_y / head_full_h;
+    let hair_uv_x = (hair_atlas_x + hair_src_x) / hair_full_w;
+    let hair_uv_y = hair_atlas_y / hair_full_h;
+    let hair_uv_w = HAIR_SPRITE_WIDTH / hair_full_w;
+    let hair_uv_h = HAIR_SPRITE_HEIGHT / hair_full_h;
+
+    let scale_x = head_full_w * hair_uv_w / HAIR_SPRITE_WIDTH;
+    let scale_y = head_full_h * hair_uv_h / HAIR_SPRITE_HEIGHT;
+    let off_x = hair_uv_x - head_uv_x * scale_x - delta_x * hair_uv_w / HAIR_SPRITE_WIDTH;
+    let off_y = hair_uv_y - head_uv_y * scale_y - delta_y * hair_uv_h / HAIR_SPRITE_HEIGHT;
+
+    material.set_texture("HairTexture", hair_tex.clone());
+    material.set_uniform("HairUvTransform", [off_x, off_y, scale_x, scale_y]);
+    // The shader tints via this uniform (it ignores vertex color), so route the
+    // fade alpha through here.
+    material.set_uniform("Tint", [tint.r, tint.g, tint.b, tint.a]);
+    gl_use_material(material);
+
+    draw_texture_ex(
+        head_tex,
+        x + head_pos_x,
+        y + head_pos_y,
+        WHITE,
+        DrawTextureParams {
+            source: Some(Rect::new(
+                head_atlas_x + head_src_x,
+                head_atlas_y,
+                HEAD_SPRITE_WIDTH,
+                HEAD_SPRITE_HEIGHT,
+            )),
+            ..Default::default()
+        },
+    );
+
+    gl_use_default_material();
+}
+
 /// Draw a character preview sprite at the given position.
 /// Renders at native pixel size (no scaling) for crisp pixel art.
+#[allow(clippy::too_many_arguments)]
 fn draw_character_preview(
     sprites: &SpritesheetStore,
     hair_sprites: &SpritesheetStore,
     equipment_sprites: &SpritesheetStore,
+    weapon_sprites: &SpritesheetStore,
+    weapon_frame_sizes: &HashMap<String, (f32, f32)>,
     gender: &str,
     skin: &str,
     hair_style: Option<i32>,
@@ -150,6 +237,11 @@ fn draw_character_preview(
     sprite_body: Option<&str>,
     sprite_back: Option<&str>,
     sprite_feet: Option<&str>,
+    sprite_head: Option<&str>,
+    sprite_weapon: Option<&str>,
+    // Head+hair composite shader. When `Some` and a helmet is equipped, hair is
+    // composited into the helmet's marker pixels (matches the in-game renderer).
+    head_hair_material: Option<&Material>,
     x: f32,
     y: f32,
     tint: Color,
@@ -157,6 +249,30 @@ fn draw_character_preview(
     let key = format!("{}_{}", gender, skin);
     if let Some((texture, player_offset)) = sprites.get(&key) {
         let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
+
+        // 0. Draw weapon under-layer (before everything, like the in-game renderer).
+        // Idle/down pose: weapon frame 0, no flip. Offset mirrors get_weapon_offset()
+        // for AnimationState::Idle facing Down: base (-17,-3) + state (-7,-6) = (-24,-9).
+        if let Some(weapon_id) = sprite_weapon {
+            if let Some((weapon_tex, weapon_offset)) = weapon_sprites.get(weapon_id) {
+                let (weapon_atlas_x, weapon_atlas_y) = weapon_offset.unwrap_or((0.0, 0.0));
+                let (fw, fh) = weapon_frame_sizes
+                    .get(weapon_id)
+                    .copied()
+                    .unwrap_or((WEAPON_SPRITE_WIDTH, WEAPON_SPRITE_HEIGHT));
+                draw_texture_ex(
+                    weapon_tex,
+                    x - 24.0,
+                    y - 9.0,
+                    tint,
+                    DrawTextureParams {
+                        // Frame 0 (standing front) is at the atlas origin.
+                        source: Some(Rect::new(weapon_atlas_x, weapon_atlas_y, fw, fh)),
+                        ..Default::default()
+                    },
+                );
+            }
+        }
 
         // 1. Draw back items behind player (quiver/cape - frame 1 for "down" direction)
         if let Some(back_id) = sprite_back {
@@ -250,17 +366,35 @@ fn draw_character_preview(
             }
         }
 
-        // 4. Draw hair (after body armor so it appears on top)
-        if let Some(style) = hair_style {
-            let hair_key = format!("{}_{}", gender, style);
-            if let Some((hair_tex, hair_offset)) = hair_sprites.get(&hair_key) {
-                let (hair_atlas_x, hair_atlas_y) = hair_offset.unwrap_or((0.0, 0.0));
-                let hair_frame_index = hair_color * 2; // front frame
-                let hair_src_x = hair_atlas_x + hair_frame_index as f32 * HAIR_SPRITE_WIDTH;
+        // 4. Hair + head equipment (helmet), composited like the in-game renderer.
+        //
+        // Helmet sprites paint a special marker color (8,0,0) on pixels where hair
+        // should peek through; every other transparent pixel shows nothing. Only
+        // the head+hair shader knows this, so when a helmet is equipped and the
+        // shader is available we composite head+hair through it (hair/spikes
+        // outside the marked area are correctly hidden). Otherwise we fall back to
+        // drawing hair, then the helmet on top.
+        // Resolve helmet + hair textures up front (both are Copy: references plus
+        // a Copy offset tuple), so they can be reused across both branches.
+        let hair_key = hair_style.map(|s| format!("{}_{}", gender, s));
+        let helmet = sprite_head.and_then(|id| equipment_sprites.get(id));
+        let hair = hair_key.as_deref().and_then(|k| hair_sprites.get(k));
+
+        if let (Some((head_tex, head_off)), Some((hair_tex, hair_off)), Some(material)) =
+            (helmet, hair, head_hair_material)
+        {
+            // Shader composite path (replaces both the hair and helmet draws).
+            draw_head_hair_composite(
+                material, head_tex, head_off, hair_tex, hair_off, hair_color, x, y, tint,
+            );
+        } else {
+            // Fallback: draw hair (after body armor so it appears on top)...
+            if let Some((hair_tex, hair_off)) = hair {
+                let (hair_atlas_x, hair_atlas_y) = hair_off.unwrap_or((0.0, 0.0));
+                let hair_src_x = hair_atlas_x + (hair_color * 2) as f32 * HAIR_SPRITE_WIDTH;
                 // Center hair on player: (34 - 28) / 2 = 3, then offset -1
                 let hair_x = x + (SPRITE_WIDTH - HAIR_SPRITE_WIDTH) / 2.0 - 1.0;
                 let hair_y = y - 3.0;
-
                 draw_texture_ex(
                     hair_tex,
                     hair_x,
@@ -272,6 +406,26 @@ fn draw_character_preview(
                             hair_atlas_y,
                             HAIR_SPRITE_WIDTH,
                             HAIR_SPRITE_HEIGHT,
+                        )),
+                        ..Default::default()
+                    },
+                );
+            }
+
+            // ...then the helmet on top (idle/down: frame 0, offset (1,-7)).
+            if let Some((head_tex, head_off)) = helmet {
+                let (head_atlas_x, head_atlas_y) = head_off.unwrap_or((0.0, 0.0));
+                draw_texture_ex(
+                    head_tex,
+                    x + 1.0,
+                    y - 7.0,
+                    tint,
+                    DrawTextureParams {
+                        source: Some(Rect::new(
+                            head_atlas_x,
+                            head_atlas_y,
+                            HEAD_SPRITE_WIDTH,
+                            HEAD_SPRITE_HEIGHT,
                         )),
                         ..Default::default()
                     },

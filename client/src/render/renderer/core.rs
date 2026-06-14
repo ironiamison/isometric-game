@@ -71,6 +71,16 @@ impl Renderer {
         &self.equipment_sprites
     }
 
+    /// Get reference to weapon sprites for sharing with UI screens
+    pub fn weapon_sprites(&self) -> &SpritesheetStore {
+        &self.weapon_sprites
+    }
+
+    /// Get reference to weapon frame sizes for sharing with UI screens
+    pub fn weapon_frame_sizes(&self) -> &HashMap<String, (f32, f32)> {
+        &self.weapon_frame_sizes
+    }
+
     /// Get reference to font for sharing with UI screens
     pub fn font(&self) -> &BitmapFont {
         &self.font
