@@ -7,6 +7,19 @@ use crate::ui::UiElementId;
 use crate::util::virtual_screen_size;
 use macroquad::prelude::*;
 
+/// Display data for a hotkey-bar spell tooltip, unified across built-in
+/// spells (`SpellDef`) and scroll spells (`ScrollSpellDef`) so both render
+/// with identical styling.
+struct SpellTooltipInfo<'a> {
+    name: &'a str,
+    spell_type: crate::game::spell::SpellType,
+    mana_cost: i32,
+    cooldown_ms: u64,
+    req_text: String,
+    req_color: Color,
+    description: &'a str,
+}
+
 impl Renderer {
     /// Render tooltip for hovered inventory/quick slot items
     pub(crate) fn render_item_tooltip(&self, state: &GameState) {
@@ -26,10 +39,51 @@ impl Renderer {
                 let binding = &state.ui_state.hotkey_bar.active().slots[*idx];
                 match binding {
                     crate::game::hotkey::HotkeySlotBinding::Spell { spell_id } => {
-                        if let Some(spell_def) =
+                        let green = Color::new(0.392, 0.784, 0.392, 1.0);
+                        let red = Color::new(1.0, 0.392, 0.392, 1.0);
+                        let info = if let Some(spell_def) =
                             crate::game::spell::SPELLS.iter().find(|s| s.id == spell_id)
                         {
-                            self.render_quick_slot_spell_tooltip(spell_def, state);
+                            let magic_level = state
+                                .get_local_player()
+                                .map(|p| p.skills.magic.level)
+                                .unwrap_or(1);
+                            let req_color = if magic_level >= spell_def.magic_level_req {
+                                green
+                            } else {
+                                red
+                            };
+                            Some(SpellTooltipInfo {
+                                name: spell_def.name,
+                                spell_type: spell_def.spell_type,
+                                mana_cost: spell_def.mana_cost,
+                                cooldown_ms: spell_def.cooldown_ms,
+                                req_text: format!("Requires {} Magic", spell_def.magic_level_req),
+                                req_color,
+                                description: spell_def.description,
+                            })
+                        } else if let Some(scroll) = state
+                            .scroll_spell_definitions
+                            .iter()
+                            .find(|s| s.id == *spell_id)
+                        {
+                            // Scroll spells (e.g. tornado, greater_heal) aren't in the
+                            // static SPELLS array — render them with the same styling.
+                            // No requirement line: a bound scroll spell is already unlocked.
+                            Some(SpellTooltipInfo {
+                                name: &scroll.name,
+                                spell_type: scroll.spell_type,
+                                mana_cost: scroll.mana_cost,
+                                cooldown_ms: scroll.cooldown_ms,
+                                req_text: String::new(),
+                                req_color: green,
+                                description: &scroll.description,
+                            })
+                        } else {
+                            None
+                        };
+                        if let Some(info) = info {
+                            self.render_quick_slot_spell_tooltip(&info);
                         }
                         return;
                     }
@@ -753,11 +807,7 @@ impl Renderer {
     }
 
     /// Render a spell tooltip near the mouse cursor (for quick slot spell bar)
-    fn render_quick_slot_spell_tooltip(
-        &self,
-        spell_def: &crate::game::spell::SpellDef,
-        state: &GameState,
-    ) {
+    fn render_quick_slot_spell_tooltip(&self, info: &SpellTooltipInfo) {
         let (mouse_x, mouse_y) = mouse_position();
         let padding = 10.0;
         let line_height = 20.0;
@@ -766,12 +816,13 @@ impl Renderer {
         let text_width_limit = max_tooltip_width - padding * 2.0;
 
         // Prepare text lines
-        let name_text = spell_def.name.to_string();
-        let mana_text = format!("Mana: {}", spell_def.mana_cost);
-        let cooldown_text = format!("Cooldown: {:.1}s", spell_def.cooldown_ms as f64 / 1000.0);
-        let req_text = format!("Requires {} Magic", spell_def.magic_level_req);
-        let desc_lines = if !spell_def.description.is_empty() {
-            self.wrap_text(spell_def.description, text_width_limit, font_size)
+        let name_text = info.name.to_string();
+        let mana_text = format!("Mana: {}", info.mana_cost);
+        let cooldown_text = format!("Cooldown: {:.1}s", info.cooldown_ms as f64 / 1000.0);
+        let req_text = info.req_text.to_string();
+        let has_req = !req_text.is_empty();
+        let desc_lines = if !info.description.is_empty() {
+            self.wrap_text(info.description, text_width_limit, font_size)
         } else {
             vec![]
         };
@@ -780,7 +831,9 @@ impl Renderer {
         let mut max_w = self.measure_text_sharp(&name_text, font_size).width;
         max_w = max_w.max(self.measure_text_sharp(&mana_text, font_size).width);
         max_w = max_w.max(self.measure_text_sharp(&cooldown_text, font_size).width);
-        max_w = max_w.max(self.measure_text_sharp(&req_text, font_size).width);
+        if has_req {
+            max_w = max_w.max(self.measure_text_sharp(&req_text, font_size).width);
+        }
         for line in &desc_lines {
             max_w = max_w.max(self.measure_text_sharp(line, font_size).width);
         }
@@ -792,7 +845,9 @@ impl Renderer {
         total_h += line_height; // Type badge
         total_h += line_height; // Mana cost
         total_h += line_height; // Cooldown
-        total_h += line_height; // Requirement
+        if has_req {
+            total_h += line_height; // Requirement
+        }
         if !desc_lines.is_empty() {
             total_h += 2.0;
             total_h += desc_lines.len() as f32 * line_height;
@@ -848,12 +903,12 @@ impl Renderer {
         y += line_height;
 
         // Type badge
-        let type_text = match spell_def.spell_type {
+        let type_text = match info.spell_type {
             crate::game::spell::SpellType::Damage => "DAMAGE",
             crate::game::spell::SpellType::Heal => "HEAL",
             crate::game::spell::SpellType::Teleport => "TELEPORT",
         };
-        let type_color = match spell_def.spell_type {
+        let type_color = match info.spell_type {
             crate::game::spell::SpellType::Damage => Color::new(0.824, 0.345, 0.345, 1.0),
             crate::game::spell::SpellType::Heal => Color::new(0.392, 0.784, 0.392, 1.0),
             crate::game::spell::SpellType::Teleport => Color::new(0.4, 0.55, 0.9, 1.0),
@@ -877,19 +932,11 @@ impl Renderer {
         self.draw_text_sharp(&cooldown_text, tooltip_x + padding, y, font_size, TEXT_DIM);
         y += line_height;
 
-        // Requirement
-        let magic_level = state
-            .get_local_player()
-            .map(|p| p.skills.magic.level)
-            .unwrap_or(1);
-        let meets_req = magic_level >= spell_def.magic_level_req;
-        let req_color = if meets_req {
-            Color::new(0.392, 0.784, 0.392, 1.0)
-        } else {
-            Color::new(1.0, 0.392, 0.392, 1.0)
-        };
-        self.draw_text_sharp(&req_text, tooltip_x + padding, y, font_size, req_color);
-        y += line_height;
+        // Requirement (built-in spells only; scroll spells in the bar are already unlocked)
+        if has_req {
+            self.draw_text_sharp(&req_text, tooltip_x + padding, y, font_size, info.req_color);
+            y += line_height;
+        }
 
         // Description
         if !desc_lines.is_empty() {
