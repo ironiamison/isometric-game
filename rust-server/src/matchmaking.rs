@@ -155,7 +155,7 @@ pub(super) async fn matchmake_join_or_create(
 
     // Load the specified character and verify ownership
     let character_id = options.character_id;
-    let character_data = match state.db.get_character(character_id).await {
+    let mut character_data = match state.db.get_character(character_id).await {
         Ok(Some(char)) => {
             if char.account_id != account_id {
                 warn!(
@@ -202,6 +202,7 @@ pub(super) async fn matchmake_join_or_create(
         .sessions
         .iter()
         .any(|session| session.character_id == character_id);
+    let mut took_over = false;
     if state.online_characters.contains(&character_id) || has_reserved_session {
         // Find the old session for this character
         let old_session_id = state
@@ -397,6 +398,7 @@ pub(super) async fn matchmake_join_or_create(
 
                 // Mark offline (will be re-marked online when new socket connects)
                 state.online_characters.remove(&character_id);
+                took_over = true;
             }
         } else {
             // Character marked online but no session found — clean up stale state
@@ -405,6 +407,26 @@ pub(super) async fn matchmake_join_or_create(
                 character_id
             );
             state.online_characters.remove(&character_id);
+        }
+    }
+
+    // The character_data loaded above predates the session-takeover flush, so it
+    // can be a stale (pre-trade) snapshot: e.g. a player who traded items away in
+    // the old session would have those items restored from the rolled-back row,
+    // duplicating them. Now that the old session's live state has been persisted,
+    // re-read so the new session spawns from authoritative post-flush data. The
+    // per-character session lock is still held, so no other login can race us.
+    if took_over {
+        match state.db.get_character(character_id).await {
+            Ok(Some(fresh)) => character_data = fresh,
+            Ok(None) => warn!(
+                "Session takeover: character {} not found on re-read after eviction",
+                character_id
+            ),
+            Err(e) => error!(
+                "Session takeover: failed to re-load character {} after eviction, using stale snapshot: {}",
+                character_id, e
+            ),
         }
     }
 

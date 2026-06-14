@@ -805,6 +805,21 @@ impl GameRoom {
             )
             .await;
         }
+
+        // Persist both sides immediately. A trade moves value between accounts, so
+        // it must not wait for the periodic auto-save: if a participant re-logs
+        // before the next save, the DB would still hold their pre-trade inventory
+        // and restore the traded-away items, duplicating them.
+        if let Some(db) = self.db.as_ref() {
+            for participant in [pa.as_str(), pb.as_str()] {
+                if let Some(character_id) = Self::parse_character_id(participant)
+                    && let Some(save_data) = self.get_player_save_data(participant).await
+                    && let Err(e) = db.save_character(character_id, &save_data, 0).await
+                {
+                    tracing::error!("Failed to persist trade result for {}: {}", participant, e);
+                }
+            }
+        }
     }
 
     pub async fn handle_trade_cancel(&self, player_id: &str) {
