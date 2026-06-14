@@ -15,7 +15,8 @@ impl AuthClient {
     pub fn register(&self, username: &str, password: &str) -> Result<AuthSession, AuthError> {
         let url = format!("{}/api/register", self.base_url);
 
-        let response = ureq::post(&url)
+        let response = crate::net_http::agent()
+            .post(&url)
             .set("Content-Type", "application/json")
             .send_json(ureq::json!({
                 "username": username,
@@ -55,7 +56,8 @@ impl AuthClient {
     pub fn login(&self, username: &str, password: &str) -> Result<AuthSession, AuthError> {
         let url = format!("{}/api/login", self.base_url);
 
-        let response = ureq::post(&url)
+        let response = crate::net_http::agent()
+            .post(&url)
             .set("Content-Type", "application/json")
             .send_json(ureq::json!({
                 "username": username,
@@ -94,7 +96,8 @@ impl AuthClient {
     pub fn logout(&self, token: &str) -> Result<(), AuthError> {
         let url = format!("{}/api/logout", self.base_url);
 
-        ureq::post(&url)
+        crate::net_http::agent()
+            .post(&url)
             .set("Authorization", &format!("Bearer {}", token))
             .set("Content-Type", "application/json")
             .send_json(ureq::json!({}))
@@ -107,7 +110,8 @@ impl AuthClient {
     pub fn get_characters(&self, token: &str) -> Result<Vec<CharacterInfo>, AuthError> {
         let url = format!("{}/api/characters", self.base_url);
 
-        let response = ureq::get(&url)
+        let response = crate::net_http::agent()
+            .get(&url)
             .set("Authorization", &format!("Bearer {}", token))
             .call()
             .map_err(|e| {
@@ -155,7 +159,8 @@ impl AuthClient {
         }
         log::info!("Create character request body: {}", body);
 
-        let response = ureq::post(&url)
+        let response = crate::net_http::agent()
+            .post(&url)
             .set("Authorization", &format!("Bearer {}", token))
             .set("Content-Type", "application/json")
             .send_json(body)
@@ -197,7 +202,8 @@ impl AuthClient {
     pub fn delete_character(&self, token: &str, character_id: i64) -> Result<(), AuthError> {
         let url = format!("{}/api/characters/{}", self.base_url, character_id);
 
-        ureq::delete(&url)
+        crate::net_http::agent()
+            .delete(&url)
             .set("Authorization", &format!("Bearer {}", token))
             .call()
             .map_err(|e| {
@@ -219,7 +225,8 @@ impl AuthClient {
     ) -> Result<(String, String), AuthError> {
         let url = format!("{}/matchmake/joinOrCreate/{}", self.base_url, room_type);
 
-        let response = ureq::post(&url)
+        let response = crate::net_http::agent()
+            .post(&url)
             .set("Authorization", &format!("Bearer {}", token))
             .set("Content-Type", "application/json")
             .send_json(ureq::json!({

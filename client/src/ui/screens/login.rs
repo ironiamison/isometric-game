@@ -593,7 +593,11 @@ impl Screen for LoginScreen {
                 let (tx, rx) = mpsc::channel();
                 let health_url = format!("{}/health", self.server_url);
                 std::thread::spawn(move || {
-                    let online = ureq::get(&health_url)
+                    // Per-request 2s timeout keeps the "Online/Offline" probe snappy
+                    // (overrides the shared agent's longer default); routing through
+                    // the shared agent also picks up debug latency injection.
+                    let online = crate::net_http::agent()
+                        .get(&health_url)
                         .timeout(std::time::Duration::from_secs(2))
                         .call()
                         .is_ok();

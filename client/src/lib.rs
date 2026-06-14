@@ -20,6 +20,8 @@ mod desktop;
 pub mod game;
 mod gameplay;
 pub mod input;
+#[cfg(not(target_arch = "wasm32"))]
+mod net_http;
 pub mod network;
 pub mod render;
 pub mod settings;

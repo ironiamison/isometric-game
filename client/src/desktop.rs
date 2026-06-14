@@ -181,7 +181,8 @@ pub(crate) async fn run() {
                                 let body = serde_json::json!({
                                     "characterId": character_id,
                                 });
-                                let result = ureq::post(&matchmake_url)
+                                let result = crate::net_http::agent()
+                                    .post(&matchmake_url)
                                     .set("Authorization", &format!("Bearer {}", session.token))
                                     .set("Content-Type", "application/json")
                                     .send_json(&body);

@@ -191,7 +191,9 @@ impl NetworkClient {
         let matchmake_url = format!("{}/matchmake/joinOrCreate/game_room", http_url);
 
         // Build request - auth is required
-        let request = ureq::post(&matchmake_url).set("Content-Type", "application/json");
+        let request = crate::net_http::agent()
+            .post(&matchmake_url)
+            .set("Content-Type", "application/json");
 
         let result = if let Some(token) = &self.auth_token {
             // Authenticated matchmaking - must have character_id
@@ -294,6 +296,9 @@ impl NetworkClient {
     }
 
     pub fn poll(&mut self, state: &mut GameState) {
+        #[cfg(debug_assertions)]
+        self.maybe_simulate_drop(state);
+
         match self.connection_state {
             ConnectionState::Disconnected => {
                 #[cfg(not(target_arch = "wasm32"))]
@@ -579,6 +584,49 @@ impl NetworkClient {
         self.room_id = None;
         self.session_token = None;
         log::info!("Disconnected from server");
+    }
+
+    /// Debug-only: periodically sever a live connection to emulate the flaky
+    /// uplink seen in the field — short sessions, the client flipping to
+    /// "offline", and the server logging a session takeover on every reconnect.
+    /// Enable with e.g. `AEVEN_NET_WS_DROP_SECS=20`.
+    ///
+    /// The socket is torn down but `was_connected` stays true, so the normal
+    /// reconnect path re-runs matchmaking (which the server treats as a
+    /// takeover), exactly matching the observed log pattern.
+    #[cfg(debug_assertions)]
+    fn maybe_simulate_drop(&mut self, state: &mut GameState) {
+        use std::sync::Mutex;
+        use std::time::Instant;
+        static LAST_DROP: Mutex<Option<Instant>> = Mutex::new(None);
+
+        if self.spectator_mode || self.connection_state != ConnectionState::Connected {
+            return;
+        }
+        let Some(secs) = std::env::var("AEVEN_NET_WS_DROP_SECS")
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|s| *s > 0.0)
+        else {
+            return;
+        };
+
+        let now = Instant::now();
+        let mut last = LAST_DROP.lock().unwrap();
+        match *last {
+            None => *last = Some(now),
+            Some(t) if now.duration_since(t).as_secs_f64() >= secs => {
+                *last = Some(now);
+                log::warn!(
+                    "[net-fault] AEVEN_NET_WS_DROP_SECS={secs} — forcing abrupt WebSocket drop"
+                );
+                self.sender = None;
+                self.receiver = None;
+                self.connection_state = ConnectionState::Disconnected;
+                state.connection_status = ConnectionStatus::Disconnected;
+            }
+            Some(_) => {}
+        }
     }
 }
 
