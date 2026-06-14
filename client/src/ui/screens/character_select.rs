@@ -6,6 +6,58 @@ use crate::render::ui::common::{
     ButtonVariant, CHIP_TEXT_DARK, DANGER_TEXT, FRAME_ACCENT, FRAME_INNER, FRAME_OUTER,
     FRAME_THICKNESS, PANEL_BG_DARK, TEXT_DIM, TEXT_GOLD, TEXT_NORMAL, TEXT_TITLE,
 };
+use std::cell::RefCell;
+
+/// The head+hair composite shader (used to mask hair through helmet markers on
+/// character previews). A macroquad `Material` is just a handle to a *global* GL
+/// pipeline, so it must outlive any single screen: if a screen owns it and is
+/// dropped mid-frame (e.g. on logout/ESC), the `Drop` deletes the pipeline while
+/// that frame's already-queued draw calls still reference it, panicking
+/// macroquad's batch flush (`quad_gl.rs` get_quad_pipeline_mut unwrap on None).
+///
+/// We compile it lazily once (an active GL context exists by first render),
+/// intentionally leak it for the program lifetime, and hand out a `&'static`
+/// reference. A dropped screen can never invalidate pending draws this way.
+/// Returns `None` if the shader fails to compile (previews then skip masking).
+fn head_hair_material() -> Option<&'static Material> {
+    thread_local! {
+        static MATERIAL: RefCell<Option<Option<&'static Material>>> = RefCell::new(None);
+    }
+    MATERIAL.with(|cell| {
+        let cached = *cell.borrow();
+        if let Some(result) = cached {
+            return result;
+        }
+        let compiled = match load_material(
+            ShaderSource::Glsl {
+                vertex: crate::render::shaders::HEAD_HAIR_VERTEX,
+                fragment: crate::render::shaders::HEAD_HAIR_FRAGMENT,
+            },
+            MaterialParams {
+                textures: vec!["HairTexture".to_string()],
+                uniforms: vec![
+                    UniformDesc::new("HairUvTransform", UniformType::Float4),
+                    UniformDesc::new("Tint", UniformType::Float4),
+                ],
+                ..Default::default()
+            },
+        ) {
+            Ok(mat) => {
+                let leaked: &'static Material = Box::leak(Box::new(mat));
+                Some(leaked)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Character select: failed to load head+hair shader: {e}. \
+                     Helmets will render without hair masking."
+                );
+                None
+            }
+        };
+        *cell.borrow_mut() = Some(compiled);
+        compiled
+    })
+}
 
 /// Which face of the character box is showing. `Create` overlays the roster
 /// with the in-place creation form; `anim_t` drives the crossfade + resize.
@@ -162,10 +214,6 @@ pub struct CharacterSelectScreen {
     equipment_sprites: SpritesheetStore,
     weapon_sprites: SpritesheetStore,
     weapon_frame_sizes: HashMap<String, (f32, f32)>,
-    /// Head+hair composite shader (lazily loaded). `head_hair_material_loaded`
-    /// guards against retrying a failed load every frame.
-    head_hair_material: Option<Material>,
-    head_hair_material_loaded: bool,
     // Scroll state for character list on small screens
     list_scroll_offset: f32,
     touch_scroll_id: Option<u64>,
@@ -207,8 +255,6 @@ impl CharacterSelectScreen {
             equipment_sprites: SpritesheetStore::Individual(HashMap::new()),
             weapon_sprites: SpritesheetStore::Individual(HashMap::new()),
             weapon_frame_sizes: HashMap::new(),
-            head_hair_material: None,
-            head_hair_material_loaded: false,
             list_scroll_offset: 0.0,
             touch_scroll_id: None,
             touch_scroll_last_y: 0.0,
@@ -242,37 +288,6 @@ impl CharacterSelectScreen {
         self.equipment_sprites = equipment;
         self.weapon_sprites = weapons;
         self.weapon_frame_sizes = weapon_frame_sizes;
-    }
-
-    /// Lazily compile the head+hair composite shader (the same one the in-game
-    /// renderer uses) so helmets composite hair through their marker pixels on the
-    /// previews. Loaded on first render — needs an active GL context — and only
-    /// attempted once.
-    fn ensure_head_hair_material(&mut self) {
-        if self.head_hair_material_loaded {
-            return;
-        }
-        self.head_hair_material_loaded = true;
-        match load_material(
-            ShaderSource::Glsl {
-                vertex: crate::render::shaders::HEAD_HAIR_VERTEX,
-                fragment: crate::render::shaders::HEAD_HAIR_FRAGMENT,
-            },
-            MaterialParams {
-                textures: vec!["HairTexture".to_string()],
-                uniforms: vec![
-                    UniformDesc::new("HairUvTransform", UniformType::Float4),
-                    UniformDesc::new("Tint", UniformType::Float4),
-                ],
-                ..Default::default()
-            },
-        ) {
-            Ok(mat) => self.head_hair_material = Some(mat),
-            Err(e) => log::warn!(
-                "Character select: failed to load head+hair shader: {e}. \
-                 Helmets will render without hair masking."
-            ),
-        }
     }
 
     /// Load font and sprites asynchronously - call this after creating the screen
@@ -561,7 +576,7 @@ impl CharacterSelectScreen {
             character.sprite_feet.as_deref(),
             character.sprite_head.as_deref(),
             character.sprite_weapon.as_deref(),
-            self.head_hair_material.as_ref(),
+            head_hair_material(),
             preview_x,
             preview_y,
             fade(WHITE, alpha),
@@ -1027,9 +1042,6 @@ impl CharacterSelectScreen {
 
 impl Screen for CharacterSelectScreen {
     fn update(&mut self, audio: &AudioManager) -> ScreenState {
-        // Compile the head+hair shader on first frame (GL context now exists).
-        self.ensure_head_hair_material();
-
         // Advance the roster⇄create morph toward its target.
         let target = if self.mode == SelectMode::Create {
             1.0
