@@ -137,9 +137,9 @@ impl CraftingOrderRegistry {
             .iter()
             .filter(|o| player_skills.get(&o.skill).copied().unwrap_or(1) >= o.min_level)
             .filter(|o| {
-                !o.items
-                    .iter()
-                    .any(|item| crate::game::resource_contracts::is_contract_excluded_item(&item.id))
+                !o.items.iter().any(|item| {
+                    crate::game::resource_contracts::is_contract_excluded_item(&item.id)
+                })
             })
             .collect();
 
