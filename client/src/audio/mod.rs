@@ -21,12 +21,22 @@ pub struct AudioSettings {
 impl Default for AudioSettings {
     fn default() -> Self {
         Self {
-            music_volume: 0.7,
-            sfx_volume: 0.7,
+            music_volume: 0.5,
+            sfx_volume: 0.5,
             music_muted: false,
             sfx_muted: false,
         }
     }
+}
+
+/// Map a 0..1 slider position to an amplitude multiplier with a perceptual
+/// taper. Human loudness perception is roughly logarithmic, so feeding the raw
+/// linear slider value straight into the audio engine makes the bottom ~70% of
+/// the slider barely attenuate anything. Squaring gives a curve that feels
+/// linear to the ear (e.g. slider 0.5 -> 0.25 amplitude, ~-12 dB).
+fn perceptual_volume(slider: f32) -> f32 {
+    let s = slider.clamp(0.0, 1.0);
+    s * s
 }
 
 pub struct AudioManager {
@@ -318,7 +328,7 @@ impl AudioManager {
         if self.settings.music_muted {
             0.0
         } else {
-            self.settings.music_volume
+            perceptual_volume(self.settings.music_volume)
         }
     }
 
@@ -326,7 +336,7 @@ impl AudioManager {
         if self.settings.sfx_muted {
             0.0
         } else {
-            self.settings.sfx_volume
+            perceptual_volume(self.settings.sfx_volume)
         }
     }
 
