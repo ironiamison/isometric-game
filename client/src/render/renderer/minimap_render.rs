@@ -1,18 +1,18 @@
 use super::*;
 
 impl Renderer {
-    pub(super) fn draw_minimap_contents(
+    /// Draws the static minimap raster (background, sampled ground tiles, chunk
+    /// outlines) for the given bounds. This is the expensive part — separated so
+    /// callers can cache it into a render target instead of redrawing thousands
+    /// of tile rectangles every frame.
+    pub(super) fn draw_minimap_raster(
         &self,
         state: &GameState,
         bounds: &MinimapBounds,
-        markers: &[MinimapMarker],
         map_rect: Rect,
-        marker_scale: f32,
-        hovered_marker: Option<usize>,
-        capture_hitboxes: bool,
         tile_budget: usize,
         use_world_map_snapshot: bool,
-    ) -> Vec<(usize, Rect)> {
+    ) {
         draw_rectangle(
             map_rect.x,
             map_rect.y,
@@ -230,17 +230,62 @@ impl Renderer {
                 );
             }
         }
+    }
 
+    /// Draws the full minimap (cached-able raster + live markers) directly to the
+    /// current render target. Used by the expanded map panel; the small HUD
+    /// preview uses a cached-raster fast path (see `render_minimap_preview`).
+    pub(super) fn draw_minimap_contents(
+        &self,
+        state: &GameState,
+        bounds: &MinimapBounds,
+        markers: &[MinimapMarker],
+        map_rect: Rect,
+        marker_scale: f32,
+        hovered_marker: Option<usize>,
+        capture_hitboxes: bool,
+        tile_budget: usize,
+        use_world_map_snapshot: bool,
+    ) -> Vec<(usize, Rect)> {
+        self.draw_minimap_raster(state, bounds, map_rect, tile_budget, use_world_map_snapshot);
+        self.draw_minimap_markers(
+            state,
+            bounds,
+            markers,
+            map_rect,
+            marker_scale,
+            hovered_marker,
+            capture_hitboxes,
+            true,
+        )
+    }
+
+    /// Draws the dynamic minimap markers (players, NPCs, items, destination flag)
+    /// on top of an already-drawn raster. Returns marker hitboxes when requested.
+    pub(super) fn draw_minimap_markers(
+        &self,
+        state: &GameState,
+        bounds: &MinimapBounds,
+        markers: &[MinimapMarker],
+        map_rect: Rect,
+        marker_scale: f32,
+        hovered_marker: Option<usize>,
+        capture_hitboxes: bool,
+        // When false, clip icon markers in source space instead of via a GL scissor.
+        // A scissor costs two gl.flush() (mid-frame batch submits); the always-on HUD
+        // preview can't afford that every frame, while the on-demand panel keeps it.
+        use_scissor: bool,
+    ) -> Vec<(usize, Rect)> {
         let mut hitboxes: Vec<(usize, Rect)> =
             Vec::with_capacity(if capture_hitboxes { markers.len() } else { 0 });
 
         // Scissor clip markers to the map rect so icons don't bleed over bevels
-        let physical_w = screen_width();
-        let physical_h = screen_height();
-        let (vw, vh) = virtual_screen_size();
-        let clip_sx = physical_w / vw;
-        let clip_sy = physical_h / vh;
-        {
+        if use_scissor {
+            let physical_w = screen_width();
+            let physical_h = screen_height();
+            let (vw, vh) = virtual_screen_size();
+            let clip_sx = physical_w / vw;
+            let clip_sy = physical_h / vh;
             let mut gl = unsafe { get_internal_gl() };
             gl.flush();
             gl.quad_gl.scissor(Some((
@@ -278,17 +323,23 @@ impl Renderer {
                     let src = Rect::new(marker.icon_index as f32 * 16.0, 0.0, 16.0, 16.0);
                     let dest_x = sx - icon_size * 0.5;
                     let dest_y = sy - icon_size * 0.5;
-                    draw_texture_ex(
-                        tex,
-                        dest_x,
-                        dest_y,
-                        WHITE,
-                        DrawTextureParams {
-                            dest_size: Some(macroquad::math::Vec2::new(icon_size, icon_size)),
-                            source: Some(src),
-                            ..Default::default()
-                        },
-                    );
+                    if use_scissor {
+                        draw_texture_ex(
+                            tex,
+                            dest_x,
+                            dest_y,
+                            WHITE,
+                            DrawTextureParams {
+                                dest_size: Some(macroquad::math::Vec2::new(icon_size, icon_size)),
+                                source: Some(src),
+                                ..Default::default()
+                            },
+                        );
+                    } else {
+                        self.draw_texture_box_clipped(
+                            tex, dest_x, dest_y, icon_size, icon_size, src, map_rect,
+                        );
+                    }
                     if hovered {
                         if let Some(outline_tex) = &self.map_icons_outlines {
                             let outline_src =
@@ -349,22 +400,34 @@ impl Renderer {
                     let flag_w = flag_tex.width();
                     let flag_h = flag_tex.height();
                     // Anchor the flag's bottom-center pole to the destination point
-                    draw_texture_ex(
-                        flag_tex,
-                        sx - flag_w * 0.5,
-                        sy - flag_h,
-                        WHITE,
-                        DrawTextureParams {
-                            dest_size: Some(macroquad::math::Vec2::new(flag_w, flag_h)),
-                            ..Default::default()
-                        },
-                    );
+                    if use_scissor {
+                        draw_texture_ex(
+                            flag_tex,
+                            sx - flag_w * 0.5,
+                            sy - flag_h,
+                            WHITE,
+                            DrawTextureParams {
+                                dest_size: Some(macroquad::math::Vec2::new(flag_w, flag_h)),
+                                ..Default::default()
+                            },
+                        );
+                    } else {
+                        self.draw_texture_box_clipped(
+                            flag_tex,
+                            sx - flag_w * 0.5,
+                            sy - flag_h,
+                            flag_w,
+                            flag_h,
+                            Rect::new(0.0, 0.0, flag_w, flag_h),
+                            map_rect,
+                        );
+                    }
                 }
             }
         }
 
         // Disable scissor clipping
-        {
+        if use_scissor {
             let mut gl = unsafe { get_internal_gl() };
             gl.flush();
             gl.quad_gl.scissor(None);
@@ -500,19 +563,82 @@ impl Renderer {
             preview_rect.h - 30.0 * s,
         );
 
-        if let Some(bounds) = self.minimap_preview_bounds(state) {
-            let markers = self.collect_minimap_markers(state, Some(&bounds), false);
-            self.draw_minimap_contents(
-                state,
-                &bounds,
-                &markers,
-                map_rect,
-                0.8,
-                None,
-                false,
-                MINIMAP_PREVIEW_TILE_BUDGET,
-                false,
+        if let Some(player) = state.get_local_player() {
+            // Quantize the view center to the nearest tile so the cached raster only
+            // regenerates when the player crosses a tile boundary (not on every
+            // sub-pixel interpolation step). Markers are still drawn live against
+            // these same bounds, so the raster and markers never drift apart.
+            let center_tx = player.x.round() as i32;
+            let center_ty = player.y.round() as i32;
+            let half_span = CHUNK_SIZE as f32 * (MINIMAP_VISIBLE_CHUNK_RADIUS + 0.5);
+            let bounds = MinimapBounds {
+                min_x: center_tx as f32 - half_span,
+                min_y: center_ty as f32 - half_span,
+                max_x: center_tx as f32 + half_span,
+                max_y: center_ty as f32 + half_span,
+            };
+            let key = (center_tx, center_ty, state.chunk_manager.revision());
+
+            // Lazily create the off-screen raster buffer. sample_count: 0 skips the
+            // resolve path (glDrawBuffers), which is unavailable on WebGL 1.
+            {
+                let mut rt_opt = self.minimap_preview_rt.borrow_mut();
+                if rt_opt.is_none() {
+                    let rt = render_target_ex(
+                        MINIMAP_PREVIEW_RT_W,
+                        MINIMAP_PREVIEW_RT_H,
+                        RenderTargetParams {
+                            sample_count: 0,
+                            depth: false,
+                        },
+                    );
+                    rt.texture.set_filter(FilterMode::Nearest);
+                    *rt_opt = Some(rt);
+                }
+            }
+            let rt = self.minimap_preview_rt.borrow().as_ref().unwrap().clone();
+
+            // Re-rasterize only when the cache key changed. This is the expensive
+            // part (thousands of tile rects) — skipping it while standing still
+            // takes the HUD minimap from ~3.9ms/frame to a single textured blit.
+            if self.minimap_preview_key.get() != Some(key) {
+                let rt_rect =
+                    Rect::new(0.0, 0.0, MINIMAP_PREVIEW_RT_W as f32, MINIMAP_PREVIEW_RT_H as f32);
+                set_camera(&Camera2D {
+                    render_target: Some(rt.clone()),
+                    ..Camera2D::from_display_rect(rt_rect)
+                });
+                clear_background(Color::new(0.0, 0.0, 0.0, 0.0));
+                self.draw_minimap_raster(
+                    state,
+                    &bounds,
+                    rt_rect,
+                    MINIMAP_PREVIEW_TILE_BUDGET,
+                    false,
+                );
+                set_default_camera();
+                self.minimap_preview_key.set(Some(key));
+            }
+
+            // Blit the cached raster into the preview, then draw live markers on top.
+            draw_texture_ex(
+                &rt.texture,
+                map_rect.x,
+                map_rect.y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(map_rect.w, map_rect.h)),
+                    flip_y: true,
+                    ..Default::default()
+                },
             );
+            let t_collect = macroquad::time::get_time();
+            let markers = self.collect_minimap_markers(state, Some(&bounds), false);
+            // (debug) reuse the globes timer to show marker-collect cost
+            self.dbg_ui_globes_ms
+                .set((macroquad::time::get_time() - t_collect) * 1000.0);
+            // use_scissor=false: source-clip icons instead, avoiding two gl.flush()/frame.
+            self.draw_minimap_markers(state, &bounds, &markers, map_rect, 0.8, None, false, false);
         } else {
             draw_rectangle(
                 map_rect.x,

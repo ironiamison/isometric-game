@@ -254,6 +254,10 @@ pub struct ChunkManager {
     interior_size: Option<(u32, u32)>,
     /// Cached overworld chunks while inside an interior
     overworld_cache: Option<OverworldCache>,
+    /// Bumped whenever the loaded chunk set changes (load/unload/interior swap).
+    /// Lets renderers cache derived data (e.g. the minimap raster) and invalidate
+    /// only when the underlying tiles actually change.
+    revision: u64,
 }
 
 struct OverworldCache {
@@ -277,7 +281,13 @@ impl ChunkManager {
             view_radius: WORLD_VIEW_RADIUS.max(MINIMAP_VISIBLE_RADIUS + MINIMAP_PRELOAD_RING),
             interior_size: None,
             overworld_cache: None,
+            revision: 0,
         }
+    }
+
+    /// Monotonic counter that changes whenever the loaded chunk set changes.
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     /// Check if we're in an interior and get its size
@@ -404,6 +414,7 @@ impl ChunkManager {
 
         // Store chunk
         self.chunks.insert(coord, chunk);
+        self.revision = self.revision.wrapping_add(1);
     }
 
     /// Pick the tile under a screen position, accounting for elevation.
@@ -527,9 +538,13 @@ impl ChunkManager {
         let keep_radius = self.view_radius + 1;
         let current = self.current_chunk;
 
+        let before = self.chunks.len();
         self.chunks.retain(|coord, _| {
             (coord.x - current.x).abs() <= keep_radius && (coord.y - current.y).abs() <= keep_radius
         });
+        if self.chunks.len() != before {
+            self.revision = self.revision.wrapping_add(1);
+        }
     }
 
     /// Find a portal at the given world position
@@ -661,6 +676,7 @@ impl ChunkManager {
 
         self.chunks.insert(coord, chunk);
         self.current_chunk = coord;
+        self.revision = self.revision.wrapping_add(1);
     }
 
     /// Clear interior and prepare for overworld
@@ -673,5 +689,6 @@ impl ChunkManager {
         } else {
             self.chunks.clear();
         }
+        self.revision = self.revision.wrapping_add(1);
     }
 }

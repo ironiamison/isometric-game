@@ -423,7 +423,12 @@ impl Renderer {
             let hud_below = self.hud_below_bars_offset();
 
             if !cfg!(target_os = "android") && self.minimap_preview_enabled(state) {
+                let t = macroquad::time::get_time();
                 self.render_minimap_preview(state);
+                self.dbg_ui_minimap_ms
+                    .set((macroquad::time::get_time() - t) * 1000.0);
+            } else {
+                self.dbg_ui_minimap_ms.set(0.0);
             }
 
             // Downstream anchors for indicators/chips
@@ -637,7 +642,10 @@ impl Renderer {
                     HUD_FILL_TRANSLUCENT,
                 );
 
+                let t_portrait = macroquad::time::get_time();
                 self.draw_player_head_portrait(player, portrait_x, name_tag_y, portrait_size);
+                self.dbg_ui_portrait_ms
+                    .set((macroquad::time::get_time() - t_portrait) * 1000.0);
                 self.draw_text_sharp(
                     name,
                     txt_x,
@@ -1032,6 +1040,8 @@ impl Renderer {
             let drop_start_y = stack_bottom + extra_offset + 145.0;
             self.xp_drop_pos.set(Some((bar_x, drop_start_y)));
         }
+        self.dbg_ui_hud_ms
+            .set((macroquad::time::get_time() - dbg_hud_t0) * 1000.0);
 
         // Note: Interactive UI (inventory, crafting, dialogue, quick slots) is rendered
         // by render_interactive_ui() which is called by the main render loop.

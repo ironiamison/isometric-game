@@ -1537,12 +1537,19 @@ impl Renderer {
             font_scale: Cell::new(1.0),
             xp_drop_pos: Cell::new(None),
             silhouette_rt: RefCell::new(None),
+            minimap_preview_rt: RefCell::new(None),
+            minimap_preview_key: Cell::new(None),
             animated_objects,
             animated_walls,
             falling_tree_positions: RefCell::new(HashSet::new()),
             tree_shake_offsets: RefCell::new(HashMap::new()),
             crumbling_rock_positions: RefCell::new(HashSet::new()),
             rock_shake_offsets: RefCell::new(HashMap::new()),
+            dbg_ui_chat_ms: Cell::new(0.0),
+            dbg_ui_hud_ms: Cell::new(0.0),
+            dbg_ui_minimap_ms: Cell::new(0.0),
+            dbg_ui_portrait_ms: Cell::new(0.0),
+            dbg_ui_globes_ms: Cell::new(0.0),
         }
     }
 }

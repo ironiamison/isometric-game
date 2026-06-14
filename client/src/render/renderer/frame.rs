@@ -1243,6 +1243,8 @@ impl Renderer {
             self.render_deferred_xp_drops(state);
         }
         timings.ui_ms = (get_time() - t4) * 1000.0;
+        timings.ui_chat_ms = self.dbg_ui_chat_ms.get();
+        timings.ui_hud_ms = self.dbg_ui_hud_ms.get();
 
         timings.total_ms = (get_time() - render_start) * 1000.0;
         (layout, timings)

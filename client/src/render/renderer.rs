@@ -81,6 +81,9 @@ pub struct RenderTimings {
     pub overhead_ms: f64,
     pub effects_ms: f64,
     pub ui_ms: f64,
+    /// Sub-breakdown of ui_ms: chat log block and HUD stat cluster.
+    pub ui_chat_ms: f64,
+    pub ui_hud_ms: f64,
     pub total_ms: f64,
 }
 
@@ -323,6 +326,11 @@ const MINIMAP_PREVIEW_HEIGHT: f32 = 140.0;
 const MINIMAP_WORLD_TEXT_SIZE: f32 = 16.0;
 const MINIMAP_VISIBLE_CHUNK_RADIUS: f32 = 0.8;
 const MINIMAP_PREVIEW_TILE_BUDGET: usize = 9_000;
+/// Off-screen buffer size for the cached HUD minimap preview raster. The raster
+/// maps bounds proportionally, so this only sets sampling resolution; sized to
+/// cover the preview rect at max UI scale so the blit stays crisp.
+const MINIMAP_PREVIEW_RT_W: u32 = 384;
+const MINIMAP_PREVIEW_RT_H: u32 = 288;
 const MINIMAP_PANEL_TILE_BUDGET: usize = 16_000;
 const MINIMAP_PANEL_MIN_ZOOM: f32 = 1.0;
 const MINIMAP_PANEL_MAX_ZOOM: f32 = 6.0;
@@ -465,6 +473,13 @@ pub struct Renderer {
     xp_drop_pos: Cell<Option<(f32, f32)>>,
     /// Off-screen render target for compositing the player silhouette at full opacity
     silhouette_rt: RefCell<Option<RenderTarget>>,
+    /// Cached raster for the HUD minimap preview. Regenerated only when the player
+    /// crosses a tile or the loaded chunk set changes (see `minimap_preview_key`),
+    /// instead of redrawing thousands of tile rectangles every frame.
+    minimap_preview_rt: RefCell<Option<RenderTarget>>,
+    /// Cache key the preview raster was generated for: (player_tile_x, player_tile_y,
+    /// chunk revision). None until first render.
+    minimap_preview_key: Cell<Option<(i32, i32, u64)>>,
     /// Animated object sprites: sprite_id -> frame_count
     animated_objects: HashMap<u32, u32>,
     /// Animated wall sprites: sprite_id -> frame_count
@@ -484,6 +499,14 @@ pub struct Renderer {
     tree_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
     crumbling_rock_positions: RefCell<HashSet<(i32, i32)>>,
     rock_shake_offsets: RefCell<HashMap<(i32, i32), f32>>,
+    /// Debug sub-timers for the UI render pass (ms). Written inside render_ui,
+    /// read out in frame.rs to break down where the "UI" frame timing goes.
+    dbg_ui_chat_ms: Cell<f64>,
+    dbg_ui_hud_ms: Cell<f64>,
+    /// Finer HUD sub-timers (ms), read directly by the debug overlay.
+    pub(crate) dbg_ui_minimap_ms: Cell<f64>,
+    pub(crate) dbg_ui_portrait_ms: Cell<f64>,
+    pub(crate) dbg_ui_globes_ms: Cell<f64>,
 }
 
 impl Renderer {}

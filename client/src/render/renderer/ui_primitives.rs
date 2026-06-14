@@ -457,6 +457,50 @@ impl Renderer {
     /// Draw a live head portrait of the player (base head + hair), cropped to the head
     /// and rendered at the UI scale (pixel-perfect) inside the gold portrait box. Falls
     /// back to the generic silhouette if the player's base sprite isn't loaded.
+    /// Draw a sub-region of a texture clipped to an axis-aligned box, clipping in
+    /// source space rather than with a GL scissor. A scissor change forces two
+    /// `gl.flush()` calls (a mid-frame batch submission on each side); for a simple
+    /// rectangular clip this produces identical pixels with neither flush. The clip
+    /// is proportional, so the source:dest ratio (texel size) is preserved.
+    pub(super) fn draw_texture_box_clipped(
+        &self,
+        tex: &Texture2D,
+        dest_x: f32,
+        dest_y: f32,
+        dest_w: f32,
+        dest_h: f32,
+        src: Rect,
+        clip: Rect,
+    ) {
+        let l = dest_x.max(clip.x);
+        let t = dest_y.max(clip.y);
+        let r = (dest_x + dest_w).min(clip.x + clip.w);
+        let b = (dest_y + dest_h).min(clip.y + clip.h);
+        if r <= l || b <= t {
+            return;
+        }
+        let fx0 = (l - dest_x) / dest_w;
+        let fy0 = (t - dest_y) / dest_h;
+        let fx1 = (r - dest_x) / dest_w;
+        let fy1 = (b - dest_y) / dest_h;
+        draw_texture_ex(
+            tex,
+            l,
+            t,
+            WHITE,
+            DrawTextureParams {
+                source: Some(Rect::new(
+                    src.x + fx0 * src.w,
+                    src.y + fy0 * src.h,
+                    (fx1 - fx0) * src.w,
+                    (fy1 - fy0) * src.h,
+                )),
+                dest_size: Some(Vec2::new(r - l, b - t)),
+                ..Default::default()
+            },
+        );
+    }
+
     pub(crate) fn draw_player_head_portrait(&self, player: &Player, x: f32, y: f32, size: f32) {
         // No frame — the head sits directly on the cluster's panel fill (keeps the
         // cluster compact). Base player sprite (front idle); bail to silhouette if missing.
@@ -506,32 +550,18 @@ impl Renderer {
         let ox = (ix + inner / 2.0 - 17.0 * scale + hair_nudge).floor();
         let oy = (iy + inner / 2.0 - 13.0 * scale - bald_rise - female_rise).floor();
 
-        // Clip to the recessed interior so only the head shows.
-        let (vw, vh) = virtual_screen_size();
-        let sx = macroquad::window::screen_width() / vw;
-        let sy = macroquad::window::screen_height() / vh;
-        {
-            let mut gl = unsafe { get_internal_gl() };
-            gl.flush();
-            gl.quad_gl.scissor(Some((
-                (ix * sx) as i32,
-                (iy * sy) as i32,
-                (inner * sx) as i32,
-                (inner * sy) as i32,
-            )));
-        }
+        // Clip the head to the box in source space (no scissor → no gl.flush).
+        let clip = Rect::new(ix, iy, inner, inner);
 
         // 1. Base body (head shows at the top).
-        draw_texture_ex(
+        self.draw_texture_box_clipped(
             base_tex,
             ox,
             oy,
-            WHITE,
-            DrawTextureParams {
-                source: Some(Rect::new(patlas_x, patlas_y, SW, SH)),
-                dest_size: Some(Vec2::new(SW * scale, SH * scale)),
-                ..Default::default()
-            },
+            SW * scale,
+            SH * scale,
+            Rect::new(patlas_x, patlas_y, SW, SH),
+            clip,
         );
 
         // 2. Hair (front frame = color * 2).
@@ -541,25 +571,16 @@ impl Renderer {
                 let (hatlas_x, hatlas_y) = hair_off.unwrap_or((0.0, 0.0));
                 let color = player.hair_color.unwrap_or(0).max(0);
                 let hair_src_x = hatlas_x + (color * 2) as f32 * HAIRW;
-                draw_texture_ex(
+                self.draw_texture_box_clipped(
                     hair_tex,
                     ox + 2.0 * scale,
                     oy - 3.0 * scale,
-                    WHITE,
-                    DrawTextureParams {
-                        source: Some(Rect::new(hair_src_x, hatlas_y, HAIRW, HAIRH)),
-                        dest_size: Some(Vec2::new(HAIRW * scale, HAIRH * scale)),
-                        ..Default::default()
-                    },
+                    HAIRW * scale,
+                    HAIRH * scale,
+                    Rect::new(hair_src_x, hatlas_y, HAIRW, HAIRH),
+                    clip,
                 );
             }
-        }
-
-        // Clear the clip.
-        {
-            let mut gl = unsafe { get_internal_gl() };
-            gl.flush();
-            gl.quad_gl.scissor(None);
         }
     }
 
