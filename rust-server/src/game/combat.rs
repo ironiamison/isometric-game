@@ -15,13 +15,45 @@ impl GameRoom {
             .unwrap()
             .as_millis() as u64;
 
-        // Manual attacks (not from auto-action) reset the auto-retaliate idle timer
-        if forced_target_id.is_none() {
+        // Atomically check the attack cooldown and claim the swing slot in a single
+        // lock acquisition. This is the one choke point that prevents double-swings:
+        // a manual attack and an auto-retaliate action can both reach handle_attack
+        // within the same cooldown window, and without an atomic check-and-set both
+        // would read the old last_attack_time (across the many .await points below)
+        // and each fire a swing. Claiming here means whichever arrives first wins and
+        // the other is rejected.
+        {
             let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+            if player.is_dead {
+                return;
+            }
+            let weapon_type = player
+                .equipped_weapon
+                .as_ref()
+                .and_then(|wid| self.item_registry.get(wid))
+                .and_then(|def| def.equipment.as_ref())
+                .map(|e| e.weapon_type)
+                .unwrap_or(WeaponType::Melee);
+            let cooldown = if weapon_type == WeaponType::Ranged {
+                RANGED_ATTACK_COOLDOWN_MS
+            } else {
+                ATTACK_COOLDOWN_MS
+            };
+            if current_time.saturating_sub(player.last_attack_time) < cooldown {
+                return;
+            }
+            player.last_attack_time = current_time;
+            // Stop movement when attacking (player must stand still to attack). Done
+            // here so it happens exactly when the swing is claimed.
+            player.reject_pending_move();
+            // Manual attacks (not from auto-action) reset the auto-retaliate idle timer
+            if forced_target_id.is_none() {
                 player.last_activity_time = current_time;
             }
-            drop(players);
         }
 
         // Get attacker info including combat stats
@@ -32,7 +64,6 @@ impl GameRoom {
             attacker_x,
             attacker_y,
             attacker_dir,
-            last_attack,
             attack_level,
             strength_level,
             attack_bonus,
@@ -81,7 +112,6 @@ impl GameRoom {
                 player.x,
                 player.y,
                 player.direction,
-                player.last_attack_time,
                 player.skills.attack.level,
                 player.skills.strength.level,
                 atk_bonus,
@@ -134,15 +164,8 @@ impl GameRoom {
             }
         };
 
-        // Check cooldown (ranged has a longer cooldown to balance range advantage)
-        let cooldown = if weapon_type == WeaponType::Ranged {
-            RANGED_ATTACK_COOLDOWN_MS
-        } else {
-            ATTACK_COOLDOWN_MS
-        };
-        if current_time - last_attack < cooldown {
-            return;
-        }
+        // Cooldown was already checked and claimed atomically at the top of this
+        // function (see the claim block), so we can proceed straight to the swing.
 
         // For ranged weapons, override attack/strength with ranged level and apply style bonuses
         let (attack_level, strength_level) = if weapon_type == WeaponType::Ranged {
@@ -211,16 +234,7 @@ impl GameRoom {
         )
         .await;
 
-        // Update attacker's last attack time and stop movement BEFORE target scan.
-        // This prevents rapid-fire when attacks miss (no target found in scan direction).
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                player.last_attack_time = current_time;
-                // Stop movement when attacking (player must stand still to attack)
-                player.reject_pending_move();
-            }
-        }
+        // last_attack_time and movement were already updated in the claim block above.
 
         // Find target based on weapon range
         let mut target_id: Option<String> = None;

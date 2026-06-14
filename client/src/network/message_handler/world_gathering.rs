@@ -547,7 +547,10 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                     state.woodcutting_started_at = macroquad::time::get_time();
                 }
 
-                // Server says player swung - play attack animation (always) and sound (if in range)
+                // Server says player swung - play the swing animation. Swings are
+                // server-authoritative (no local prediction), so this echo is the
+                // single source of the animation for everyone, including the local
+                // player.
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.play_attack();
                 }
@@ -733,7 +736,10 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                         .unwrap_or(false)
                 };
 
-                // Server says player swung - play attack animation (always) and sound (if in range)
+                // Server says player swung - play the swing animation. Swings are
+                // server-authoritative (no local prediction), so this echo is the
+                // single source of the animation for everyone, including the local
+                // player.
                 if let Some(player) = state.players.get_mut(&player_id) {
                     player.play_attack();
                 }

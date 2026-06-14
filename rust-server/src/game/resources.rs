@@ -1,4 +1,4 @@
-use super::{Direction, GameRoom};
+use super::{ATTACK_COOLDOWN_MS, Direction, GameRoom};
 use crate::protocol::ServerMessage;
 use std::collections::HashMap;
 
@@ -183,6 +183,24 @@ impl GameRoom {
             .unwrap()
             .as_millis() as u64;
 
+        // Atomically check and claim the swing cooldown (see handle_attack for the
+        // rationale). Prevents double-swings when a manual ChopTree command and the
+        // auto-action chop both fire within the same cooldown window.
+        {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+            if player.is_dead {
+                return;
+            }
+            if current_time.saturating_sub(player.last_attack_time) < ATTACK_COOLDOWN_MS {
+                return;
+            }
+            player.last_attack_time = current_time;
+        }
+
         let (woodcutting_level, player_x, player_y, equipped_weapon) = {
             let players = self.players.read().await;
             match players.get(player_id) {
@@ -292,12 +310,7 @@ impl GameRoom {
         );
         drop(woodcutting);
 
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                player.last_attack_time = current_time;
-            }
-        }
+        // last_attack_time was already claimed atomically at the top of this function.
 
         match chop_result {
             Ok(result) => {
@@ -427,6 +440,24 @@ impl GameRoom {
             .unwrap()
             .as_millis() as u64;
 
+        // Atomically check and claim the swing cooldown (see handle_attack for the
+        // rationale). Prevents double-swings when a manual MineRock command and the
+        // auto-action mine both fire within the same cooldown window.
+        {
+            let mut players = self.players.write().await;
+            let player = match players.get_mut(player_id) {
+                Some(p) => p,
+                None => return,
+            };
+            if player.is_dead {
+                return;
+            }
+            if current_time.saturating_sub(player.last_attack_time) < ATTACK_COOLDOWN_MS {
+                return;
+            }
+            player.last_attack_time = current_time;
+        }
+
         let (mining_level, player_x, player_y, equipped_weapon) = {
             let players = self.players.read().await;
             match players.get(player_id) {
@@ -536,12 +567,7 @@ impl GameRoom {
         );
         drop(mining);
 
-        {
-            let mut players = self.players.write().await;
-            if let Some(player) = players.get_mut(player_id) {
-                player.last_attack_time = current_time;
-            }
-        }
+        // last_attack_time was already claimed atomically at the top of this function.
 
         match mine_result {
             Ok(result) => {

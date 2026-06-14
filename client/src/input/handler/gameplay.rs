@@ -983,7 +983,17 @@ impl InputHandler {
                 commands.push(InputCommand::CancelAutoAction);
             }
 
-            let attack_cooldown = 0.8;
+            // Client-side send throttle for held attacks/gathering. The server is
+            // authoritative for the real cooldown (ATTACK_COOLDOWN_MS = 700ms) and
+            // silently ignores requests that arrive early, so we intentionally send
+            // several times per cooldown window rather than once. This keeps manual
+            // attacks on the SAME 700ms beat as server-driven auto-attacks
+            // (auto-retaliate / click-to-attack) instead of a slower 800ms beat, and
+            // makes the auto->manual hand-off snappy: a fresh request is always ready
+            // when the server's cooldown opens, instead of waiting out a slow,
+            // mis-phased client timer. Kept a divisor of the server cooldown (700/4)
+            // so accepted swings land on a steady beat rather than aliasing slower.
+            let attack_cooldown = 0.175;
             if current_time - self.last_attack_time >= attack_cooldown {
                 // Check if we should gather instead of attack
                 let should_gather = if let Some(player) = state.get_local_player() {
@@ -1105,34 +1115,13 @@ impl InputHandler {
                     });
                     self.last_attack_time = current_time;
                 } else {
+                    // Swing animation is server-authoritative (driven by the server's
+                    // PlayerAttack echo), so we only send the command here — no local
+                    // animation prediction. This avoids a phantom swing animation when
+                    // the server rejects this attack for cooldown (e.g. an auto-retaliate
+                    // swing already used the cooldown window).
                     commands.push(InputCommand::Attack);
                     self.last_attack_time = current_time;
-
-                    // Set attack animation based on weapon type
-                    let anim_state = if let Some(player) = state.get_local_player() {
-                        if let Some(ref weapon_id) = player.equipped_weapon {
-                            if let Some(item_def) = state.item_registry.get(weapon_id) {
-                                if item_def.weapon_type.as_deref() == Some("ranged") {
-                                    AnimationState::ShootingBow
-                                } else {
-                                    AnimationState::Attacking
-                                }
-                            } else {
-                                AnimationState::Attacking
-                            }
-                        } else {
-                            AnimationState::Attacking
-                        }
-                    } else {
-                        AnimationState::Attacking
-                    };
-
-                    // Now apply the animation to the player
-                    if let Some(local_id) = &state.local_player_id.clone() {
-                        if let Some(player) = state.players.get_mut(local_id) {
-                            player.animation.set_state(anim_state);
-                        }
-                    }
                 }
             }
         }

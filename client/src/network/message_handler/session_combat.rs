@@ -51,20 +51,11 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
 
                 let is_local = state.local_player_id.as_ref() == Some(&player_id);
 
-                // Check if already in attack animation BEFORE calling play_attack.
-                // Manual attacks play animation+sound locally; auto-attacks rely on
-                // this server event. set_state is idempotent (no-op if already in
-                // same state), so always triggering the animation is safe.
-                let already_attacking = is_local
-                    && state.players.get(&player_id).is_some_and(|p| {
-                        matches!(
-                            p.animation.state,
-                            crate::render::animation::AnimationState::Attacking
-                                | crate::render::animation::AnimationState::ShootingBow
-                                | crate::render::animation::AnimationState::Casting
-                        )
-                    });
-
+                // Swing feedback is server-authoritative: the client does not predict
+                // attacks locally, so every PlayerAttack echo drives the animation
+                // (and, for the local player, the sound). This is exactly one event
+                // per actual swing, so manual and auto-retaliate swings can never
+                // double up.
                 if let Some(player) = state.players.get_mut(&player_id) {
                     // Update facing direction from server (fixes visual mismatch
                     // during auto-action ranged/spell attacks)
@@ -81,10 +72,8 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                     }
                 }
 
-                // Play attack sound for server-driven attacks (auto-attacks).
-                // Manual attacks already played the sound locally, so skip if the
-                // player was already mid-animation when this event arrived.
-                if is_local && !already_attacking {
+                // Play attack sound for the local player's swings.
+                if is_local {
                     if let Some(player) = state.players.get(&player_id) {
                         let sound_type = if attack_type == "ranged" {
                             crate::game::state::AttackSoundType::Ranged

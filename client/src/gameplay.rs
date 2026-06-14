@@ -216,9 +216,14 @@ pub(crate) fn run_game_frame(
                 if let Some(tutorial) = &mut game_state.tutorial {
                     tutorial.on_combat_action();
                 }
-                // Trigger attack animation and sound on local player
+                // The swing animation and sound are server-authoritative: they are
+                // driven by the server's PlayerAttack echo, not predicted locally.
+                // This prevents phantom/double swings when a manual attack and an
+                // auto-retaliate swing overlap (the client can't know the server will
+                // reject a swing for cooldown until the echo, or lack of one, arrives).
+                // We still validate arrows client-side so we can give immediate
+                // feedback and avoid sending an attack that can't land.
                 if let Some(local_id) = &game_state.local_player_id {
-                    // Check weapon type to determine animation
                     let is_ranged = game_state
                         .players
                         .get(local_id)
@@ -227,7 +232,6 @@ pub(crate) fn run_game_frame(
                         .map(|item_def| item_def.weapon_type.as_deref() == Some("ranged"))
                         .unwrap_or(false);
 
-                    // For ranged weapons, check if player has arrows
                     if is_ranged {
                         let has_arrows = game_state.inventory.slots.iter().any(|slot| {
                             slot.as_ref().is_some_and(|s| s.item_id.ends_with("_arrow"))
@@ -238,22 +242,6 @@ pub(crate) fn run_game_frame(
                             game_state.push_system_chat("You have no arrows!".to_string());
                             continue;
                         }
-                    }
-
-                    if let Some(player) = game_state.players.get_mut(local_id) {
-                        if is_ranged {
-                            player.play_shoot_bow();
-                        } else {
-                            player.play_attack();
-                        }
-                        let sound_type = if is_ranged {
-                            crate::game::state::AttackSoundType::Ranged
-                        } else if player.equipped_weapon.is_some() {
-                            crate::game::state::AttackSoundType::Melee
-                        } else {
-                            crate::game::state::AttackSoundType::Unarmed
-                        };
-                        audio.play_attack_sound(sound_type);
                     }
                 }
                 ClientMessage::Attack
@@ -435,12 +423,9 @@ pub(crate) fn run_game_frame(
                 portal_id: portal_id.clone(),
             },
             InputCommand::StartGathering { marker_x, marker_y } => {
-                // Play attack animation so it looks like the player is casting/throwing
-                if let Some(local_id) = &game_state.local_player_id {
-                    if let Some(player) = game_state.players.get_mut(local_id) {
-                        player.play_attack();
-                    }
-                }
+                // Swing animation is server-authoritative (driven by the gatheringStarted
+                // echo), so no local prediction here — keeps it consistent with combat
+                // and gathering and avoids double animations.
                 ClientMessage::StartGathering {
                     marker_x: *marker_x,
                     marker_y: *marker_y,
@@ -452,12 +437,8 @@ pub(crate) fn run_game_frame(
                 tree_y,
                 tree_gid,
             } => {
-                // Play attack animation for chopping (server will also broadcast this)
-                if let Some(local_id) = &game_state.local_player_id {
-                    if let Some(player) = game_state.players.get_mut(local_id) {
-                        player.play_attack();
-                    }
-                }
+                // Swing animation is server-authoritative (driven by the woodcuttingSwing
+                // echo), so no local prediction here.
                 // Optimistically show the woodcutting indicator. Woodcutting has
                 // no server "started" session, so we drive the indicator off swing
                 // messages (and time it out in GameState::update); setting it here
@@ -476,12 +457,8 @@ pub(crate) fn run_game_frame(
                 rock_y,
                 rock_gid,
             } => {
-                // Play attack animation for mining (server will also broadcast this)
-                if let Some(local_id) = &game_state.local_player_id {
-                    if let Some(player) = game_state.players.get_mut(local_id) {
-                        player.play_attack();
-                    }
-                }
+                // Swing animation is server-authoritative (driven by the miningSwing
+                // echo), so no local prediction here.
                 ClientMessage::MineRock {
                     rock_x: *rock_x,
                     rock_y: *rock_y,
