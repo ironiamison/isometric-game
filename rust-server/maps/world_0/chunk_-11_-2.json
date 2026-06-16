@@ -366,6 +366,7 @@
       1316,
       1316,
       1316,
+      646,
       1316,
       1316,
       1316,
@@ -385,7 +386,6 @@
       1316,
       1316,
       1316,
-      1316,
       1326,
       1326,
       1326,
@@ -456,7 +456,6 @@
       1326,
       1326,
       1326,
-      1316,
       1316,
       1316,
       1316,
@@ -478,6 +477,7 @@
       1316,
       1316,
       1316,
+      646,
       1316,
       1316,
       1316,
@@ -794,6 +794,7 @@
       1316,
       1316,
       1316,
+      646,
       1316,
       1316,
       1316,
@@ -806,9 +807,7 @@
       1316,
       1316,
       1316,
-      1316,
       1326,
-      1316,
       1316,
       1316,
       1316,
@@ -827,6 +826,7 @@
       1316,
       1316,
       1316,
+      646,
       1316,
       1316,
       1316,
@@ -3086,7 +3086,13 @@
     ]
   },
   "collision": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "biter",
+      "x": 30,
+      "y": 9
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2430,

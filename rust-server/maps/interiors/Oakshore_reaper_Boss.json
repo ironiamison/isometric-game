@@ -2725,7 +2725,8 @@
     {
       "entityId": "reaper",
       "x": 12,
-      "y": 6
+      "y": 6,
+      "level": 1
     }
   ],
   "mapObjects": [
@@ -3367,5 +3368,6 @@
       "edge": "down"
     }
   ],
-  "portals": []
+  "portals": [],
+  "gatheringZones": []
 }

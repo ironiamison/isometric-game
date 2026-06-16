@@ -6933,72 +6933,7 @@
     ]
   },
   "collision": "AP7/////AHb9IqCvACJ4IAaHAAZwAAyAAAIAABjAAOIDYAD/AMb//4P/AML/////AAYQfgfmAA4AAADAAB4AAACAAD4AAACAAP4BAICAAP7zIIyAAH7+//+BAAK+LUyAAAIGAACAAAICAACAAAIAAACAAAIAAACAAAICIACAAAICIACAwP+Pf///QFoOz8+PwAAGwAOOwAACQA+OQAAAQAOgwACAAQDwQACAAQD4wAcCAADwwAcGwADgQAACwAOgQAADwAegQAADwA+AwOP//wf8QAIjQAaAwAAjQA2AwAAjwByAwAEjQHjwwIEjAHDgwAEiAMDhwIADAIDBwIADAADAwIAjQACAwAAiQACAwIAiQH2AQAAiQPiAwP///v//",
-  "entities": [
-    {
-      "entityId": "prof_oddwick",
-      "x": 24,
-      "y": 44,
-      "uniqueId": "oddwick_1",
-      "facing": "south",
-      "respawn": false
-    },
-    {
-      "entityId": "barnaby_ghost",
-      "x": 30,
-      "y": 22,
-      "uniqueId": "barnaby_1",
-      "facing": "south",
-      "respawn": false
-    },
-    {
-      "entityId": "haunted_poltergeist",
-      "x": 8,
-      "y": 10,
-      "uniqueId": "poltergeist_1",
-      "facing": "south",
-      "respawn": false
-    },
-    {
-      "entityId": "haunted_bookshelf",
-      "x": 20,
-      "y": 40,
-      "uniqueId": "bookshelf_1",
-      "facing": "south",
-      "respawn": false
-    },
-    {
-      "entityId": "haunted_candles",
-      "x": 32,
-      "y": 45,
-      "uniqueId": "candle_1",
-      "facing": "south",
-      "respawn": false
-    },
-    {
-      "entityId": "haunted_candles",
-      "x": 32,
-      "y": 36,
-      "uniqueId": "candle_2",
-      "facing": "south",
-      "respawn": false
-    },
-    {
-      "entityId": "haunted_candles",
-      "x": 45,
-      "y": 45,
-      "uniqueId": "candle_3",
-      "facing": "south",
-      "respawn": false
-    },
-    {
-      "entityId": "haunted_candles",
-      "x": 45,
-      "y": 36,
-      "uniqueId": "candle_4",
-      "facing": "south",
-      "respawn": false
-    }
-  ],
+  "entities": [],
   "mapObjects": [
     {
       "gid": 1564,

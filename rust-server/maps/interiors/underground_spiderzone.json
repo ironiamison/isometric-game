@@ -7,7 +7,7 @@
     "height": 50
   },
   "spawn_points": {
-    "entrance": {
+    "enter": {
       "x": 20,
       "y": 49
     }
@@ -7525,42 +7525,50 @@
     {
       "entityId": "wolf_spider",
       "x": 6,
-      "y": 6
+      "y": 6,
+      "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 22,
-      "y": 17
+      "y": 17,
+      "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 31,
-      "y": 9
+      "y": 9,
+      "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 34,
-      "y": 26
+      "y": 26,
+      "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 7,
-      "y": 28
+      "y": 28,
+      "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 21,
-      "y": 29
+      "y": 29,
+      "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 8,
-      "y": 17
+      "y": 17,
+      "level": 1
     },
     {
       "entityId": "wolf_spider",
       "x": 17,
-      "y": 6
+      "y": 6,
+      "level": 1
     }
   ],
   "mapObjects": [
@@ -9877,5 +9885,6 @@
       "target_x": 0,
       "target_y": 0
     }
-  ]
+  ],
+  "gatheringZones": []
 }

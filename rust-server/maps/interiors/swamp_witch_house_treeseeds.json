@@ -797,7 +797,8 @@
     {
       "entityId": "witch_hazel",
       "x": 7,
-      "y": 7
+      "y": 7,
+      "level": 1
     }
   ],
   "mapObjects": [
@@ -1359,5 +1360,6 @@
       "target_x": 0,
       "target_y": 0
     }
-  ]
+  ],
+  "gatheringZones": []
 }

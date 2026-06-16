@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "ABAAAABIAAAACAAAAIkCAMASAAAgFAABEBoQPnAK8CNQDgggyAUEoI8XBqDBHwIgAAACIAAAMmAAADIgwA8CIIAYBCDBCAgkwQhwoIFLAKABFwCgARMAoAETkKAeOQSg4KUAoBwnACHkdgAgAHcQYBBEA2CAhwEgIPgBICAABj8=",
+  "collision": "ABAAAABIAAAACAAAAIkCAMASAAAgFAAAEBoQPnAK8CNQDgggyAUEoI8XBqDBHwIgAAACIAAAMmAAADIgwA8CIIAYBCDBCAgkwQhwoIFLAKABFwCgARMAoAETkKAeOQSg4KUAoBwnACHkdgAgAHcQYBBEA2CAhwEgYPgBICAABj8=",
   "entities": [
     {
       "entityId": "crow",
@@ -3145,12 +3145,6 @@
       "entityId": "crow",
       "x": 14,
       "y": 10,
-      "level": 1
-    },
-    {
-      "entityId": "adventure_board",
-      "x": 5,
-      "y": 15,
       "level": 1
     },
     {

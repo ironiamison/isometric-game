@@ -1221,13 +1221,7 @@
     ]
   },
   "collision": "/w8QpgBtCtCGAAEIEIAAMQgQgwAx+F8DADEAEAMAMfgfgAEBGBCAAWEY0IYBDR4QoAE=",
-  "entities": [
-    {
-      "entityId": "arcane_scholar",
-      "x": 10,
-      "y": 8
-    }
-  ],
+  "entities": [],
   "mapObjects": [
     {
       "gid": 1363,
@@ -2346,5 +2340,6 @@
       "target_x": 0,
       "target_y": 0
     }
-  ]
+  ],
+  "gatheringZones": []
 }

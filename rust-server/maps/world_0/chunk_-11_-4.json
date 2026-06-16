@@ -8,7 +8,7 @@
   "layers": {
     "ground": [
       649,
-      649,
+      646,
       649,
       649,
       1364,
@@ -40,7 +40,7 @@
       1316,
       1316,
       649,
-      649,
+      646,
       649,
       1364,
       1345,
@@ -3088,9 +3088,19 @@
   "collision": "AEAACABAMIgAQIyFAEAARACAAEAAgBBAAAAAQAAAAUAAAAJAAAAMgAMAMICMAMABMgAAAsABAAwADgAQEHAAYACAAIAAAAEAAAACAAAQBAAEAAQAAAAEAAAABAAAAAIAEAACAAAAAgAAAAEAgAABAAAAAQAAgAAACIAAAACAAAA=",
   "entities": [
     {
-      "entityId": "evil_cactus",
-      "x": 6,
-      "y": 6
+      "entityId": "biter",
+      "x": 4,
+      "y": 7
+    },
+    {
+      "entityId": "biter",
+      "x": 19,
+      "y": 12
+    },
+    {
+      "entityId": "biter",
+      "x": 20,
+      "y": 30
     }
   ],
   "mapObjects": [

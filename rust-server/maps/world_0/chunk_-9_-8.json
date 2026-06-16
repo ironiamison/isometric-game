@@ -3093,10 +3093,9 @@
       "y": 28
     },
     {
-      "entityId": "master_artisan",
+      "entityId": "anvil",
       "x": 16,
-      "y": 28,
-      "level": 1
+      "y": 28
     },
     {
       "entityId": "furnace",
@@ -3136,6 +3135,13 @@
     {
       "gid": 1950,
       "x": 13,
+      "y": 28,
+      "width": 39,
+      "height": 44
+    },
+    {
+      "gid": 1987,
+      "x": 16,
       "y": 28,
       "width": 39,
       "height": 44

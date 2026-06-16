@@ -3088,12 +3088,6 @@
   "collision": "AgAAAAUAAAAIAAAAEAAAACHwAQAg8AMAQGACAEBAAgBCgAMAgAAgAIcAAAAIAQAAEAEEACABAABAAQAAQAIAAEACAABABACAQASAfyAKYAAgCRwAEAgDAAj4AAAIAAAABwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
   "entities": [
     {
-      "entityId": "camp_cook",
-      "x": 20,
-      "y": 6,
-      "level": 1
-    },
-    {
       "entityId": "fire_pit",
       "x": 21,
       "y": 9

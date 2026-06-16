@@ -3458,169 +3458,134 @@
   "portals": [],
   "gatheringZones": [
     {
-      "x": 5,
-      "y": 12,
-      "zoneId": "pond"
-    },
-    {
-      "x": 5,
-      "y": 11,
-      "zoneId": "pond"
-    },
-    {
-      "x": 5,
-      "y": 10,
-      "zoneId": "pond"
-    },
-    {
-      "x": 5,
-      "y": 9,
-      "zoneId": "pond"
-    },
-    {
-      "x": 5,
-      "y": 8,
-      "zoneId": "pond"
-    },
-    {
-      "x": 6,
-      "y": 8,
-      "zoneId": "pond"
-    },
-    {
-      "x": 7,
-      "y": 8,
-      "zoneId": "pond"
-    },
-    {
-      "x": 8,
-      "y": 8,
-      "zoneId": "pond"
-    },
-    {
-      "x": 8,
-      "y": 7,
-      "zoneId": "pond"
-    },
-    {
-      "x": 8,
-      "y": 6,
-      "zoneId": "pond"
-    },
-    {
-      "x": 8,
-      "y": 5,
-      "zoneId": "pond"
-    },
-    {
-      "x": 12,
-      "y": 4,
-      "zoneId": "pond"
-    },
-    {
-      "x": 12,
-      "y": 5,
-      "zoneId": "pond"
-    },
-    {
-      "x": 12,
-      "y": 6,
-      "zoneId": "pond"
-    },
-    {
-      "x": 12,
-      "y": 7,
-      "zoneId": "pond"
-    },
-    {
-      "x": 12,
-      "y": 8,
-      "zoneId": "pond"
-    },
-    {
       "x": 13,
       "y": 8,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 14,
       "y": 8,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 15,
       "y": 8,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 16,
       "y": 9,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 16,
-      "y": 11,
-      "zoneId": "pond"
+      "y": 8,
+      "zoneId": "river"
     },
     {
       "x": 16,
       "y": 10,
-      "zoneId": "pond"
+      "zoneId": "river"
+    },
+    {
+      "x": 16,
+      "y": 11,
+      "zoneId": "river"
     },
     {
       "x": 16,
       "y": 12,
-      "zoneId": "pond"
+      "zoneId": "river"
+    },
+    {
+      "x": 16,
+      "y": 13,
+      "zoneId": "river"
     },
     {
       "x": 15,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 14,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 13,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 12,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 11,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 10,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 9,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 8,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 7,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
     },
     {
       "x": 6,
       "y": 13,
-      "zoneId": "pond"
+      "zoneId": "river"
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "zoneId": "river"
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "zoneId": "river"
+    },
+    {
+      "x": 5,
+      "y": 11,
+      "zoneId": "river"
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "zoneId": "river"
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "zoneId": "river"
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "zoneId": "river"
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "zoneId": "river"
     }
   ]
 }

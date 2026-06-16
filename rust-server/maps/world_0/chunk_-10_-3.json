@@ -963,7 +963,7 @@
       1316,
       1316,
       1316,
-      1316,
+      646,
       1316,
       1316,
       1316,
@@ -3086,7 +3086,18 @@
     ]
   },
   "collision": "EgAIDCAAEAAgAOAAkD8AAZDAHwJ4ACgGCAAIDAgABBAMAARgDgEEgAyAAwASeAAAEQCAAxEAcBwRAAxgIAADgIDwAABADgAAAAoAAAABAQCAAAAAQAAAAiEAAAAQAAQACAAAAAYAAAAxAAECAAACAAAAAAAAAAAAAIAAAAAAAAA=",
-  "entities": [],
+  "entities": [
+    {
+      "entityId": "biter",
+      "x": 14,
+      "y": 29
+    },
+    {
+      "entityId": "biter",
+      "x": 30,
+      "y": 28
+    }
+  ],
   "mapObjects": [
     {
       "gid": 2429,

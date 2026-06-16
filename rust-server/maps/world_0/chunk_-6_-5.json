@@ -37,7 +37,7 @@
       1326,
       1326,
       1326,
-      1316,
+      1326,
       1316,
       1370,
       1400,
@@ -450,7 +450,7 @@
       1326,
       1326,
       1326,
-      1396,
+      1326,
       1396,
       1326,
       1326,
@@ -3085,12 +3085,27 @@
       0
     ]
   },
-  "collision": "MAAAwAAAAAAAEAAAQBAAAAAQAAAAFAAAABAAABAQAAAAEAAAADgAAAAoAAACKAAAADgAAAA4AAAAOAAARTgAAAI4AAAEKAAACCgAABAwAAAQMAAAIDgAAEA4AACAOAAAACkAAAAuAAAAKAAAACgAAAD4AAAAAAMAAAAMAAAAMAA=",
+  "collision": "MAAAgAAAAAAAEAAAQBAAAAAQAAAAEAAAABAAABAQAAAAMAEAADgAAAAoAAACKAAIADgEAAA4AAAAOAAARTgAAAI4AAAEKAQCCCgAABAwAAIQMAAAIHgAAEA4AACAOAAAACkgAAAuAAAAKAAAACgCCAD4AAAAAAMCAAAMAAAAMAA=",
   "entities": [
     {
       "entityId": "bandit_1",
       "x": 13,
       "y": 3
+    },
+    {
+      "entityId": "cactus",
+      "x": 21,
+      "y": 12
+    },
+    {
+      "entityId": "cactus",
+      "x": 16,
+      "y": 20
+    },
+    {
+      "entityId": "cactus",
+      "x": 31,
+      "y": 31
     }
   ],
   "mapObjects": [
@@ -3156,6 +3171,97 @@
       "y": 0,
       "width": 33,
       "height": 45
+    },
+    {
+      "gid": 1614,
+      "x": 25,
+      "y": 19,
+      "width": 31,
+      "height": 41
+    },
+    {
+      "gid": 1620,
+      "x": 18,
+      "y": 12,
+      "width": 33,
+      "height": 45
+    },
+    {
+      "gid": 1620,
+      "x": 21,
+      "y": 24,
+      "width": 33,
+      "height": 45
+    },
+    {
+      "gid": 1618,
+      "x": 16,
+      "y": 8,
+      "width": 55,
+      "height": 72
+    },
+    {
+      "gid": 1615,
+      "x": 31,
+      "y": 0,
+      "width": 51,
+      "height": 81
+    },
+    {
+      "gid": 1615,
+      "x": 13,
+      "y": 8,
+      "width": 51,
+      "height": 81
+    },
+    {
+      "gid": 1618,
+      "x": 17,
+      "y": 27,
+      "width": 55,
+      "height": 72
+    },
+    {
+      "gid": 1619,
+      "x": 27,
+      "y": 27,
+      "width": 33,
+      "height": 45
+    },
+    {
+      "gid": 1618,
+      "x": 25,
+      "y": 17,
+      "width": 55,
+      "height": 72
+    },
+    {
+      "gid": 1772,
+      "x": 27,
+      "y": 11,
+      "width": 31,
+      "height": 65
+    },
+    {
+      "gid": 1772,
+      "x": 18,
+      "y": 17,
+      "width": 31,
+      "height": 65
+    },
+    {
+      "gid": 1772,
+      "x": 25,
+      "y": 29,
+      "width": 31,
+      "height": 65
+    },
+    {
+      "gid": 1770,
+      "x": 14,
+      "y": 21,
+      "width": 32,
+      "height": 55
     }
   ],
   "walls": [
@@ -3530,12 +3636,6 @@
       "x": 12,
       "y": 2,
       "edge": "right"
-    },
-    {
-      "gid": 1297,
-      "x": 30,
-      "y": 0,
-      "edge": "down"
     }
   ],
   "portals": [],

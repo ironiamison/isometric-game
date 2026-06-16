@@ -7,7 +7,7 @@
     "height": 16
   },
   "spawn_points": {
-    "entrance": {
+    "enter": {
       "x": 8,
       "y": 15
     }
@@ -1432,5 +1432,6 @@
       "target_x": 0,
       "target_y": 0
     }
-  ]
+  ],
+  "gatheringZones": []
 }

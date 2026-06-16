@@ -871,7 +871,7 @@
       707,
       695,
       707,
-      686,
+      666,
       686,
       686,
       686,
@@ -903,8 +903,8 @@
       695,
       695,
       707,
-      686,
-      686,
+      666,
+      666,
       686,
       686,
       686,
@@ -935,9 +935,9 @@
       707,
       707,
       707,
-      686,
-      686,
-      686,
+      666,
+      666,
+      666,
       686,
       686,
       686,
@@ -968,8 +968,8 @@
       707,
       707,
       686,
-      686,
-      686,
+      666,
+      666,
       686,
       686,
       686,
@@ -1000,9 +1000,9 @@
       707,
       707,
       686,
-      686,
-      686,
-      686,
+      666,
+      666,
+      666,
       686,
       686,
       686,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "wAMAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAHgAAACEAAADBAAAAAAMAAAQEAACGGAAAgCAAAIBgAACAgAEAgAECAIAADgA=",
+  "collision": "wAMAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAHwAAACkAAADBAAAAAAMAAAQGAACGHAAAgCAAAIBgAACAgAEAgAECAIAADgA=",
   "entities": [],
   "mapObjects": [
     {
@@ -3094,13 +3094,6 @@
       "y": 25,
       "width": 59,
       "height": 97
-    },
-    {
-      "gid": 1665,
-      "x": 15,
-      "y": 31,
-      "width": 47,
-      "height": 53
     },
     {
       "gid": 1665,
@@ -3304,6 +3297,55 @@
       "y": 22,
       "width": 72,
       "height": 63
+    },
+    {
+      "gid": 1694,
+      "x": 0,
+      "y": 21,
+      "width": 64,
+      "height": 55
+    },
+    {
+      "gid": 1694,
+      "x": 3,
+      "y": 22,
+      "width": 64,
+      "height": 55
+    },
+    {
+      "gid": 1694,
+      "x": 2,
+      "y": 21,
+      "width": 64,
+      "height": 55
+    },
+    {
+      "gid": 1694,
+      "x": 6,
+      "y": 23,
+      "width": 64,
+      "height": 55
+    },
+    {
+      "gid": 1694,
+      "x": 8,
+      "y": 24,
+      "width": 64,
+      "height": 55
+    },
+    {
+      "gid": 1694,
+      "x": 10,
+      "y": 26,
+      "width": 64,
+      "height": 55
+    },
+    {
+      "gid": 1694,
+      "x": 9,
+      "y": 25,
+      "width": 64,
+      "height": 55
     }
   ],
   "walls": [],
