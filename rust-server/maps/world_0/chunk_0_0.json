@@ -38,7 +38,7 @@
       294,
       432,
       381,
-      170,
+      381,
       294,
       1024,
       424,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AA4QQAAOAAAADgAAAAAAAABAAAACAAAAAAAAAAEAgAAA/AAAAf5BAAAHAwAAQwYAAAMcAAIDOPAABkCoAQaACQAWgAkADQAPBxiAHwMYgA8DMIAHA2CAHwHA4g8DwPsBAwAfBSAAHAUBQJz/IBAcEAAAHxAgABEQINDxfjjA//A=",
+  "collision": "AA4QAAAOAAAADgAAAAAAAABAAAACAAAAAAAAAAEAgAAA/AAAAf5BAAAHAwAAQwYAAAMcAAIDOPAABkCoAQaACQAWgAkADQAPBxiAHwMYgA8DMIAHA2CAHwHA4g8DwPsBAwAfBSAAHAUBQJz/IBAcEAAAHxAgABEQINDxfjjA//A=",
   "entities": [
     {
       "entityId": "crow",
@@ -3122,6 +3122,11 @@
       "x": 15,
       "y": 24,
       "level": 1
+    },
+    {
+      "entityId": "adventure_board",
+      "x": 31,
+      "y": 1
     }
   ],
   "mapObjects": [
@@ -3680,13 +3685,6 @@
       "y": 27,
       "width": 180,
       "height": 59
-    },
-    {
-      "gid": 1470,
-      "x": 30,
-      "y": 0,
-      "width": 35,
-      "height": 52
     },
     {
       "gid": 2343,
@@ -4402,5 +4400,6 @@
       "y": 10,
       "zoneId": "pond"
     }
-  ]
+  ],
+  "farmingPlots": []
 }

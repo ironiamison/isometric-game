@@ -540,6 +540,40 @@ impl Database {
 
         Ok(())
     }
+
+    /// Returns the unix-millis timestamp of the player's most recent contract
+    /// abandonment, or 0 if they've never abandoned one. Used to enforce the
+    /// post-abandon cooldown that blocks cancel-and-reroll contract farming.
+    pub async fn get_contract_abandon_time(&self, player_id: &str) -> Result<u64, sqlx::Error> {
+        let row: Option<i64> = sqlx::query_scalar(
+            "SELECT last_abandon_at FROM resource_contract_stats WHERE player_id = ?",
+        )
+        .bind(player_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.unwrap_or(0).max(0) as u64)
+    }
+
+    /// Records when a player abandoned a contract (unix millis). Upserts so it works
+    /// for players who have no stats row yet.
+    pub async fn set_contract_abandon_time(
+        &self,
+        player_id: &str,
+        at_ms: u64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO resource_contract_stats (player_id, last_abandon_at)
+            VALUES (?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET last_abandon_at = excluded.last_abandon_at
+            "#,
+        )
+        .bind(player_id)
+        .bind(at_ms as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -615,5 +649,34 @@ mod tests {
         let before = bank_of(&db, character.id).await;
         db.retire_legacy_farming_patches(&[]).await.unwrap();
         assert_eq!(bank_of(&db, character.id).await, before, "empty plan leaves the bank unchanged");
+    }
+
+    #[tokio::test]
+    async fn contract_abandon_time_round_trips_and_upserts() {
+        let (_dir, db) = temp_db().await;
+
+        // Never-abandoned players (no stats row) read as 0 so the cooldown is clear.
+        assert_eq!(db.get_contract_abandon_time("char_1").await.unwrap(), 0);
+
+        // First abandon inserts a fresh stats row.
+        db.set_contract_abandon_time("char_1", 1_700_000_000_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            db.get_contract_abandon_time("char_1").await.unwrap(),
+            1_700_000_000_000
+        );
+
+        // A later abandon overwrites the timestamp (upsert, not duplicate row).
+        db.set_contract_abandon_time("char_1", 1_700_000_600_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            db.get_contract_abandon_time("char_1").await.unwrap(),
+            1_700_000_600_000
+        );
+
+        // The stamp is per-player.
+        assert_eq!(db.get_contract_abandon_time("char_2").await.unwrap(), 0);
     }
 }

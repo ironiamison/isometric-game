@@ -70,6 +70,13 @@ impl Database {
             "TEXT NOT NULL DEFAULT ''",
         )
         .await?;
+        add_column_if_missing(
+            pool,
+            "resource_contract_stats",
+            "last_abandon_at",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
+        .await?;
         Ok(())
     }
 

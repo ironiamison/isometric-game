@@ -69,6 +69,7 @@ export class EntityRegistryLoader {
       `${basePath}/npcs/slayer_masters.toml`,
       `${basePath}/npcs/port_masters.toml`,
       `${basePath}/npcs/camel_transport.toml`,
+      `${basePath}/npcs/boards.toml`,
       // Monsters
       `${basePath}/monsters/pig.toml`,
       `${basePath}/monsters/forest_creatures.toml`,

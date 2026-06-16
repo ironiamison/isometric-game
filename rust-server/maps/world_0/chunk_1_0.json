@@ -7,7 +7,7 @@
   "size": 32,
   "layers": {
     "ground": [
-      170,
+      381,
       407,
       396,
       396,
@@ -3744,5 +3744,6 @@
     }
   ],
   "portals": [],
-  "gatheringZones": []
+  "gatheringZones": [],
+  "farmingPlots": []
 }

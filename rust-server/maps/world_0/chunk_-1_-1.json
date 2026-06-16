@@ -3085,25 +3085,8 @@
       0
     ]
   },
-  "collision": "wIBAPgADQD4ADEAAABBAAAAgQDYAIEA2AEBEAACAQAAAgEA+AABBPgAAQQAAAEEAAABCAAAA/v8AAAIAAAAEQAAAKAAAAJBAAAAQAQAAIAUAACAAAAAgAAAA4AAAAMAAAACAAAAA8AAAANz4AAB8+ACABPwAAAIcIAARHQDgCRg=",
-  "entities": [
-    {
-      "entityId": "wild_boar",
-      "x": 21,
-      "y": 2,
-      "level": 1
-    },
-    {
-      "entityId": "crow",
-      "x": 18,
-      "y": 9
-    },
-    {
-      "entityId": "crow",
-      "x": 20,
-      "y": 5
-    }
-  ],
+  "collision": "wIBAPgADQD4ADEAAABBAAAAgQDYAIEA2AEBEAACAQAAAgEA+AABBPgAAQQAAAEEAAADC/wAAfgAAAAIAAAAEQAAAKAAAAJBAAAAQAQAAIAUAACAAAAAgAAAA4AAAAMAAAACAAAAA8AAAANz4AAB8+ACABPwAAAIcIAARHQDgCRg=",
+  "entities": [],
   "mapObjects": [
     {
       "gid": 1576,
@@ -3404,60 +3387,6 @@
       "edge": "down"
     },
     {
-      "gid": 1462,
-      "x": 31,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 30,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 29,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 28,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 24,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 23,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 25,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 26,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 1462,
-      "x": 27,
-      "y": 13,
-      "edge": "down"
-    },
-    {
       "gid": 1461,
       "x": 22,
       "y": 0,
@@ -3575,6 +3504,60 @@
       "gid": 580,
       "x": 31,
       "y": 28,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 23,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 24,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 25,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 26,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 27,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 28,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 31,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 30,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 1462,
+      "x": 29,
+      "y": 12,
       "edge": "down"
     }
   ],

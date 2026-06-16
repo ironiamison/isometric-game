@@ -12,6 +12,18 @@ use std::collections::{HashMap, HashSet};
 const ADVENTURE_BOARD_NAME: &str = "Adventure Board";
 const DAILY_CONTRACT_LIMIT: i32 = 5;
 
+/// How long a player must wait after abandoning a contract before they can accept a
+/// new one. Stops the "accept, peek at the randomized roll, abandon, re-accept" loop
+/// that would otherwise let players cherry-pick easy contracts for free.
+const ABANDON_COOLDOWN_MS: u64 = 10 * 60 * 1000;
+
+/// Formats a remaining-cooldown duration as `M:SS` (e.g. `10:00`, `0:42`) for player
+/// messages. Rounds up so a player on cooldown is never told "0:00".
+fn format_cooldown(remaining_ms: u64) -> String {
+    let total_secs = remaining_ms.div_ceil(1000);
+    format!("{}:{:02}", total_secs / 60, total_secs % 60)
+}
+
 /// Item id prefixes that are never eligible for contracts or crafting orders. Rune is in the
 /// recipe/ore data (so it can be smithed once obtainable) but there is no rune-mineable rock in
 /// the world yet, so players can't actually source rune ore/bars/gear. Exclude the whole tier
@@ -744,6 +756,26 @@ impl GameRoom {
         .await;
     }
 
+    /// Returns `Some(remaining_ms)` if the player is still within the abandon
+    /// cooldown and cannot take a new contract yet, or `None` if they're clear.
+    /// Without a database the cooldown can't be persisted, so it's treated as clear.
+    async fn contract_abandon_cooldown_remaining(
+        &self,
+        player_id: &str,
+        now_ms: u64,
+    ) -> Option<u64> {
+        let last_abandon = self.db.as_ref()?.get_contract_abandon_time(player_id).await;
+        let last_abandon = match last_abandon {
+            Ok(value) => value,
+            Err(e) => {
+                tracing::warn!("Failed to read contract abandon time: {}", e);
+                return None;
+            }
+        };
+        let elapsed = now_ms.saturating_sub(last_abandon);
+        (elapsed < ABANDON_COOLDOWN_MS).then(|| ABANDON_COOLDOWN_MS - elapsed)
+    }
+
     pub(in crate::game) async fn handle_accept_resource_contract(
         &self,
         player_id: &str,
@@ -804,6 +836,26 @@ impl GameRoom {
                     kind.display_name(),
                     difficulty.level_required(),
                     difficulty.display_name()
+                ),
+            )
+            .await;
+            return;
+        }
+
+        // Enforce the post-abandon cooldown before handing out a fresh roll.
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        if let Some(remaining) = self
+            .contract_abandon_cooldown_remaining(player_id, now_ms)
+            .await
+        {
+            self.send_system_message(
+                player_id,
+                &format!(
+                    "You abandoned a contract recently. You can take a new one in {}.",
+                    format_cooldown(remaining)
                 ),
             )
             .await;
@@ -943,6 +995,26 @@ impl GameRoom {
                     kind.display_name(),
                     difficulty.level_required(),
                     difficulty.display_name()
+                ),
+            )
+            .await;
+            return;
+        }
+
+        // Enforce the post-abandon cooldown before handing out a fresh roll.
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        if let Some(remaining) = self
+            .contract_abandon_cooldown_remaining(player_id, now_ms)
+            .await
+        {
+            self.send_system_message(
+                player_id,
+                &format!(
+                    "You abandoned a contract recently. You can take a new one in {}.",
+                    format_cooldown(remaining)
                 ),
             )
             .await;
@@ -1240,6 +1312,11 @@ impl GameRoom {
             return;
         };
 
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
         if let Some(ref db) = self.db {
             if let Err(e) = db.delete_resource_contract(player_id).await {
                 tracing::error!("Failed to delete resource contract: {}", e);
@@ -1249,10 +1326,21 @@ impl GameRoom {
             {
                 tracing::warn!("Failed to delete legacy farming contract: {}", e);
             }
+            // Stamp the abandon so the accept handlers can enforce the cooldown and
+            // players can't cancel-and-reroll contracts for free.
+            if let Err(e) = db.set_contract_abandon_time(player_id, now_ms).await {
+                tracing::warn!("Failed to record contract abandon time: {}", e);
+            }
         }
 
-        self.send_system_message(player_id, "Contract abandoned.")
-            .await;
+        self.send_system_message(
+            player_id,
+            &format!(
+                "Contract abandoned. You can take a new one in {}.",
+                format_cooldown(ABANDON_COOLDOWN_MS)
+            ),
+        )
+        .await;
         self.send_resource_contract_update(player_id).await;
     }
 
@@ -1538,6 +1626,18 @@ impl GameRoom {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_cooldown_renders_minutes_and_seconds() {
+        assert_eq!(format_cooldown(ABANDON_COOLDOWN_MS), "10:00");
+        assert_eq!(format_cooldown(42_000), "0:42");
+        assert_eq!(format_cooldown(60_000), "1:00");
+        // Rounds up so a player still on cooldown never sees "0:00".
+        assert_eq!(format_cooldown(1), "0:01");
+        assert_eq!(format_cooldown(0), "0:00");
+        // Sub-second remainder rounds up into the displayed second count.
+        assert_eq!(format_cooldown(90_500), "1:31");
+    }
 
     fn offer(kind_id: &str, difficulties: &[&str]) -> AdventureBoardOfferData {
         AdventureBoardOfferData {
