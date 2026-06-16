@@ -1,175 +1,282 @@
 # Farming crop definitions
 # Each crop defines what seed is needed, what it produces, level requirements,
 # growth timing, harvest yields, and XP rewards.
+#
+# category    = which patch type the crop must be planted in:
+#               "allotment" | "herb" | "cactus" | "tree"
+# lives_min/max = how many times the crop can be harvested before the patch empties
+#               (rolled at plant time; +1 if the patch was composted). Trees = 1.
+# disease_chance = per-growth-cycle probability the crop becomes diseased
+#               (compost halves this). A diseased crop dies if not cured in time.
+
+# =============================================================================
+# Allotment crops (vegetables) — multi-harvest, moderate growth
+# =============================================================================
 
 [potato]
 seed_item = "potato_seed"
 produce_item = "potato"
 level_required = 1
-growth_time_minutes = 5
+growth_time_minutes = 20
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 2
 xp_per_harvest = 8
 seed_return_chance = 0.15
+category = "allotment"
+lives_min = 3
+lives_max = 3
+disease_chance = 0.10
 
 [onion]
 seed_item = "onion_seed"
 produce_item = "onion"
 level_required = 1
-growth_time_minutes = 5
+growth_time_minutes = 22
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 2
 xp_per_harvest = 8
 seed_return_chance = 0.15
+category = "allotment"
+lives_min = 3
+lives_max = 3
+disease_chance = 0.10
 
 [tomato]
 seed_item = "tomato_seed"
 produce_item = "tomato"
 level_required = 15
-growth_time_minutes = 8
+growth_time_minutes = 28
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 3
 xp_planting = 4
 xp_per_harvest = 15
 seed_return_chance = 0.15
+category = "allotment"
+lives_min = 3
+lives_max = 3
+disease_chance = 0.10
 
 [cabbage]
 seed_item = "cabbage_seed"
 produce_item = "cabbage"
 level_required = 15
-growth_time_minutes = 8
+growth_time_minutes = 30
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 3
 xp_planting = 4
 xp_per_harvest = 18
 seed_return_chance = 0.15
+category = "allotment"
+lives_min = 3
+lives_max = 3
+disease_chance = 0.10
 
 [strawberry]
 seed_item = "strawberry_seed"
 produce_item = "strawberry"
 level_required = 30
-growth_time_minutes = 12
+growth_time_minutes = 36
 growth_stages = 4
 harvest_amount_min = 2
 harvest_amount_max = 4
 xp_planting = 6
 xp_per_harvest = 25
 seed_return_chance = 0.15
+category = "allotment"
+lives_min = 3
+lives_max = 3
+disease_chance = 0.10
 
 [sweetcorn]
 seed_item = "sweetcorn_seed"
 produce_item = "sweetcorn"
 level_required = 30
-growth_time_minutes = 12
+growth_time_minutes = 34
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 3
 xp_planting = 6
 xp_per_harvest = 22
 seed_return_chance = 0.15
+category = "allotment"
+lives_min = 3
+lives_max = 3
+disease_chance = 0.10
 
 [watermelon]
 seed_item = "watermelon_seed"
 produce_item = "watermelon"
 level_required = 45
-growth_time_minutes = 15
+growth_time_minutes = 40
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 8
 xp_per_harvest = 35
 seed_return_chance = 0.15
+category = "allotment"
+lives_min = 3
+lives_max = 3
+disease_chance = 0.10
 
 # =============================================================================
-# Herbs (Alchemy)
+# Herbs (Alchemy) — multi-harvest, slower growth, higher disease risk
 # =============================================================================
 
 [greenleaf]
 seed_item = "greenleaf_seed"
 produce_item = "greenleaf"
 level_required = 1
-growth_time_minutes = 5
+growth_time_minutes = 40
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 3
 xp_per_harvest = 10
 seed_return_chance = 0.15
+category = "herb"
+lives_min = 3
+lives_max = 5
+disease_chance = 0.14
 
 [tangleroots]
 seed_item = "tangleroots_seed"
 produce_item = "tangleroots"
 level_required = 10
-growth_time_minutes = 8
+growth_time_minutes = 50
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 5
 xp_per_harvest = 18
 seed_return_chance = 0.15
+category = "herb"
+lives_min = 3
+lives_max = 5
+disease_chance = 0.14
 
 [marshbloom]
 seed_item = "marshbloom_seed"
 produce_item = "marshbloom"
 level_required = 20
-growth_time_minutes = 12
+growth_time_minutes = 60
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 8
 xp_per_harvest = 28
 seed_return_chance = 0.15
+category = "herb"
+lives_min = 3
+lives_max = 5
+disease_chance = 0.14
 
 [ashveil]
 seed_item = "ashveil_seed"
 produce_item = "ashveil"
 level_required = 35
-growth_time_minutes = 15
+growth_time_minutes = 70
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 12
 xp_per_harvest = 40
 seed_return_chance = 0.15
+category = "herb"
+lives_min = 3
+lives_max = 5
+disease_chance = 0.14
 
 [nightthorn]
 seed_item = "nightthorn_seed"
 produce_item = "nightthorn"
 level_required = 50
-growth_time_minutes = 20
+growth_time_minutes = 80
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 2
 xp_planting = 18
 xp_per_harvest = 55
 seed_return_chance = 0.15
-
-[cactus]
-seed_item = "cactus_seed"
-produce_item = "cactus"
-level_required = 50
-growth_time_minutes = 20
-growth_stages = 4
-harvest_amount_min = 1
-harvest_amount_max = 2
-xp_planting = 18
-xp_per_harvest = 55
-seed_return_chance = 0.15
+category = "herb"
+lives_min = 3
+lives_max = 5
+disease_chance = 0.14
 
 [bloodcap]
 seed_item = "bloodcap_seed"
 produce_item = "bloodcap"
 level_required = 70
-growth_time_minutes = 25
+growth_time_minutes = 80
 growth_stages = 4
 harvest_amount_min = 1
 harvest_amount_max = 1
 xp_planting = 25
 xp_per_harvest = 75
 seed_return_chance = 0.10
+category = "herb"
+lives_min = 3
+lives_max = 5
+disease_chance = 0.14
+
+# =============================================================================
+# Cactus — spiky multi-harvest, low disease risk
+# =============================================================================
+
+[cactus]
+seed_item = "cactus_seed"
+produce_item = "cactus"
+level_required = 50
+growth_time_minutes = 50
+growth_stages = 4
+harvest_amount_min = 1
+harvest_amount_max = 2
+xp_planting = 18
+xp_per_harvest = 55
+seed_return_chance = 0.15
+category = "cactus"
+lives_min = 2
+lives_max = 3
+disease_chance = 0.08
+
+# =============================================================================
+# Trees — single harvest, very slow growth, low disease risk
+# =============================================================================
+
+[oak]
+seed_item = "oak_seed"
+produce_item = "oak_logs"
+level_required = 15
+growth_time_minutes = 120
+growth_stages = 4
+harvest_amount_min = 4
+harvest_amount_max = 6
+xp_planting = 14
+xp_per_harvest = 60
+seed_return_chance = 0.0
+category = "tree"
+lives_min = 1
+lives_max = 1
+disease_chance = 0.05
+
+[apple]
+seed_item = "apple_seed"
+produce_item = "apple"
+level_required = 27
+growth_time_minutes = 180
+growth_stages = 4
+harvest_amount_min = 3
+harvest_amount_max = 5
+xp_planting = 22
+xp_per_harvest = 90
+seed_return_chance = 0.0
+category = "tree"
+lives_min = 1
+lives_max = 1
+disease_chance = 0.05

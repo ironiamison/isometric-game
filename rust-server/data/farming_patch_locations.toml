@@ -1,462 +1,197 @@
-# Farming patch locations in the world
-# Each patch is a fixed allotment that players can plant seeds in.
-# Plot 1: 4x4 grid from (-7,-30) to (-4,-27)
-# Plot 2: 4x4 grid from (-2,-30) to (1,-27)
-# Plot 3: 4x4 grid from (-2,-25) to (1,-22)
-# Plot 4: 4x4 grid from (-7,-25) to (-4,-22)
+# Farming patch locations in the world.
+#
+# (x, y) is the NW anchor tile; the patch footprint spans width × height tiles.
+# `capacity` = how many plants the patch holds (seeds consumed at planting,
+# yield multiplier). Omitted width/height/capacity default to 1.
+#
+#  - Allotment "beds" are 2×2 (capacity 4): plant 4 seeds, harvest ~4× produce.
+#  - Trees are 2×2 (capacity 1): one sapling, rendered centered, chopped down.
+#  - Herb/cactus patches stay 1×1.
+#
+# Patches are spaced so 2×2 footprints never overlap, kept within the original
+# farmland area (x -7..1, y -30..-22). A seed can only be planted in a patch
+# whose `patch_type` matches the crop's `category`.
 
-# ===== Plot 1 (x: -7 to -4, y: -30 to -27) =====
+# ===== Plot 1 (free) =====
 
 [[patches]]
-id = "allotment_1"
+id = "p1_allotment_1"
 x = -7
 y = -30
 patch_type = "allotment"
 plot = 1
+width = 2
+height = 2
+capacity = 4
 
 [[patches]]
-id = "allotment_2"
-x = -6
-y = -30
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_3"
+id = "p1_tree_1"
 x = -5
 y = -30
-patch_type = "allotment"
+patch_type = "tree"
 plot = 1
+width = 2
+height = 2
+capacity = 1
 
 [[patches]]
-id = "allotment_4"
-x = -4
-y = -30
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_5"
-x = -7
-y = -29
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_6"
-x = -6
-y = -29
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_7"
-x = -5
-y = -29
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_8"
-x = -4
-y = -29
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_9"
+id = "p1_herb_1"
 x = -7
 y = -28
-patch_type = "allotment"
+patch_type = "herb"
 plot = 1
 
 [[patches]]
-id = "allotment_10"
+id = "p1_cactus_1"
 x = -6
 y = -28
-patch_type = "allotment"
+patch_type = "cactus"
 plot = 1
 
 [[patches]]
-id = "allotment_11"
+id = "p1_allotment_2"
 x = -5
 y = -28
 patch_type = "allotment"
 plot = 1
+width = 2
+height = 2
+capacity = 4
+
+# ===== Plot 2 =====
 
 [[patches]]
-id = "allotment_12"
-x = -4
-y = -28
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_13"
-x = -7
-y = -27
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_14"
-x = -6
-y = -27
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_15"
-x = -5
-y = -27
-patch_type = "allotment"
-plot = 1
-
-[[patches]]
-id = "allotment_16"
-x = -4
-y = -27
-patch_type = "allotment"
-plot = 1
-
-# ===== Plot 2 (x: -2 to 1, y: -30 to -27) =====
-
-[[patches]]
-id = "allotment_17"
+id = "p2_allotment_1"
 x = -2
 y = -30
 patch_type = "allotment"
 plot = 2
+width = 2
+height = 2
+capacity = 4
 
 [[patches]]
-id = "allotment_18"
-x = -1
-y = -30
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_19"
+id = "p2_tree_1"
 x = 0
 y = -30
-patch_type = "allotment"
+patch_type = "tree"
 plot = 2
+width = 2
+height = 2
+capacity = 1
 
 [[patches]]
-id = "allotment_20"
-x = 1
-y = -30
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_21"
-x = -2
-y = -29
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_22"
-x = -1
-y = -29
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_23"
-x = 0
-y = -29
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_24"
-x = 1
-y = -29
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_25"
+id = "p2_herb_1"
 x = -2
 y = -28
-patch_type = "allotment"
+patch_type = "herb"
 plot = 2
 
 [[patches]]
-id = "allotment_26"
+id = "p2_cactus_1"
 x = -1
 y = -28
-patch_type = "allotment"
+patch_type = "cactus"
 plot = 2
 
 [[patches]]
-id = "allotment_27"
+id = "p2_allotment_2"
 x = 0
 y = -28
 patch_type = "allotment"
 plot = 2
+width = 2
+height = 2
+capacity = 4
+
+# ===== Plot 3 =====
 
 [[patches]]
-id = "allotment_28"
-x = 1
-y = -28
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_29"
-x = -2
-y = -27
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_30"
-x = -1
-y = -27
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_31"
-x = 0
-y = -27
-patch_type = "allotment"
-plot = 2
-
-[[patches]]
-id = "allotment_32"
-x = 1
-y = -27
-patch_type = "allotment"
-plot = 2
-
-# ===== Plot 3 (x: -2 to 1, y: -25 to -22) =====
-
-[[patches]]
-id = "allotment_33"
+id = "p3_allotment_1"
 x = -2
 y = -25
 patch_type = "allotment"
 plot = 3
+width = 2
+height = 2
+capacity = 4
 
 [[patches]]
-id = "allotment_34"
-x = -1
-y = -25
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_35"
+id = "p3_tree_1"
 x = 0
 y = -25
-patch_type = "allotment"
+patch_type = "tree"
 plot = 3
+width = 2
+height = 2
+capacity = 1
 
 [[patches]]
-id = "allotment_36"
-x = 1
-y = -25
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_37"
-x = -2
-y = -24
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_38"
-x = -1
-y = -24
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_39"
-x = 0
-y = -24
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_40"
-x = 1
-y = -24
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_41"
+id = "p3_herb_1"
 x = -2
 y = -23
-patch_type = "allotment"
+patch_type = "herb"
 plot = 3
 
 [[patches]]
-id = "allotment_42"
+id = "p3_cactus_1"
 x = -1
 y = -23
-patch_type = "allotment"
+patch_type = "cactus"
 plot = 3
 
 [[patches]]
-id = "allotment_43"
+id = "p3_allotment_2"
 x = 0
 y = -23
 patch_type = "allotment"
 plot = 3
+width = 2
+height = 2
+capacity = 4
+
+# ===== Plot 4 =====
 
 [[patches]]
-id = "allotment_44"
-x = 1
-y = -23
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_45"
-x = -2
-y = -22
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_46"
-x = -1
-y = -22
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_47"
-x = 0
-y = -22
-patch_type = "allotment"
-plot = 3
-
-[[patches]]
-id = "allotment_48"
-x = 1
-y = -22
-patch_type = "allotment"
-plot = 3
-
-# ===== Plot 4 (x: -7 to -4, y: -25 to -22) =====
-
-[[patches]]
-id = "allotment_49"
+id = "p4_allotment_1"
 x = -7
 y = -25
 patch_type = "allotment"
 plot = 4
+width = 2
+height = 2
+capacity = 4
 
 [[patches]]
-id = "allotment_50"
-x = -6
-y = -25
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_51"
+id = "p4_tree_1"
 x = -5
 y = -25
-patch_type = "allotment"
+patch_type = "tree"
 plot = 4
+width = 2
+height = 2
+capacity = 1
 
 [[patches]]
-id = "allotment_52"
-x = -4
-y = -25
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_53"
-x = -7
-y = -24
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_54"
-x = -6
-y = -24
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_55"
-x = -5
-y = -24
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_56"
-x = -4
-y = -24
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_57"
+id = "p4_herb_1"
 x = -7
 y = -23
-patch_type = "allotment"
+patch_type = "herb"
 plot = 4
 
 [[patches]]
-id = "allotment_58"
+id = "p4_herb_2"
 x = -6
 y = -23
-patch_type = "allotment"
+patch_type = "herb"
 plot = 4
 
 [[patches]]
-id = "allotment_59"
+id = "p4_allotment_2"
 x = -5
 y = -23
 patch_type = "allotment"
 plot = 4
-
-[[patches]]
-id = "allotment_60"
-x = -4
-y = -23
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_61"
-x = -7
-y = -22
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_62"
-x = -6
-y = -22
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_63"
-x = -5
-y = -22
-patch_type = "allotment"
-plot = 4
-
-[[patches]]
-id = "allotment_64"
-x = -4
-y = -22
-patch_type = "allotment"
-plot = 4
+width = 2
+height = 2
+capacity = 4

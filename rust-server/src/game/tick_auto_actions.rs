@@ -341,6 +341,64 @@ impl GameRoom {
                     }
                 }
 
+                (AutoActionTarget::FarmTree { patch_id }, AutoActionType::Chop) => {
+                    // Validate the patch is still a mature, healthy tree.
+                    let footprint = {
+                        let farming = self.farming.read().await;
+                        let key = (patch_id.clone(), pid.clone());
+                        let is_tree = farming
+                            .patches
+                            .get(patch_id)
+                            .map(|p| p.patch_type == "tree")
+                            .unwrap_or(false);
+                        let mature = farming
+                            .player_states
+                            .get(&key)
+                            .map(|s| s.is_harvestable(&farming.crops, current_time))
+                            .unwrap_or(false);
+                        if is_tree && mature {
+                            farming
+                                .patches
+                                .get(patch_id)
+                                .map(|p| (p.x, p.y, p.width as i32, p.height as i32))
+                        } else {
+                            None
+                        }
+                    };
+                    let Some((px0, py0, w, h)) = footprint else {
+                        self.clear_auto_action(&pid, "target_depleted").await;
+                        continue;
+                    };
+
+                    let (adjacent, cooldown_ready, face_x, face_y) = {
+                        let players = self.players.read().await;
+                        if let Some(player) = players.get(&pid) {
+                            // Nearest footprint tile, then cardinal-adjacency to it.
+                            let cx = player.x.clamp(px0, px0 + w - 1);
+                            let cy = player.y.clamp(py0, py0 + h - 1);
+                            let adjacent =
+                                (player.x - cx).abs() + (player.y - cy).abs() == 1;
+                            let cooldown_ready =
+                                current_time - player.last_attack_time >= ATTACK_COOLDOWN_MS;
+                            (adjacent, cooldown_ready, cx, cy)
+                        } else {
+                            (false, false, px0, py0)
+                        }
+                    };
+
+                    if adjacent && cooldown_ready {
+                        {
+                            let mut players = self.players.write().await;
+                            if let Some(player) = players.get_mut(&pid) {
+                                let ddx = face_x - player.x;
+                                let ddy = face_y - player.y;
+                                player.direction = direction_from_delta(ddx, ddy);
+                            }
+                        }
+                        self.handle_chop_farm_tree(&pid, patch_id).await;
+                    }
+                }
+
                 // Invalid combinations (e.g. Attack on Resource) — just clear
                 _ => {
                     self.clear_auto_action(&pid, "interrupted").await;

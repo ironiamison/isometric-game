@@ -48,6 +48,12 @@ pub struct GameState {
     /// Pending chair to sit on after pathfinding completes
     pub pending_chair_sit: Option<(i32, i32)>,
     pub pending_harvest_patch: Option<String>,
+    /// Pending diseased patch to cure after pathfinding completes
+    pub pending_cure_patch: Option<String>,
+    /// Pending dead patch to clear after pathfinding completes
+    pub pending_clear_patch: Option<String>,
+    /// Pending patch to compost after pathfinding completes
+    pub pending_compost_patch: Option<String>,
     /// Timestamp when gathering started (for cast animation delay)
     pub gathering_started_at: f64,
 
@@ -286,6 +292,9 @@ impl GameState {
             chest_positions: Vec::new(),
             pending_chair_sit: None,
             pending_harvest_patch: None,
+            pending_cure_patch: None,
+            pending_clear_patch: None,
+            pending_compost_patch: None,
             gathering_started_at: 0.0,
 
             gathering_buff: None,

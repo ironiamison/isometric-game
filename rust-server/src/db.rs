@@ -22,6 +22,19 @@ mod social;
 mod unlocks;
 mod world_state;
 
+/// A persisted farming patch row.
+#[derive(Debug, Clone)]
+pub struct FarmingPatchRow {
+    pub patch_id: String,
+    pub player_id: String,
+    pub crop_id: String,
+    pub planted_at: u64,
+    pub lives_remaining: u32,
+    pub health: String,
+    pub composted: bool,
+    pub disease_cycle_marker: u32,
+}
+
 /// Account data - separate from character data
 #[derive(Debug, Clone)]
 pub struct AccountData {

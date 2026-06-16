@@ -523,15 +523,61 @@ impl Renderer {
         };
         let zoom = state.camera.zoom;
         let time = macroquad::time::get_time();
-        let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+        let w = patch.width.max(1) as i32;
+        let h = patch.height.max(1) as i32;
 
+        if patch.patch_type == "tree" {
+            // One sprite, centered on the footprint.
+            let cx = patch.x as f32 + (w - 1) as f32 * 0.5;
+            let cy = patch.y as f32 + (h - 1) as f32 * 0.5;
+            let (sx, sy) = world_to_screen(cx, cy, &state.camera);
+            self.draw_patch_at(patch, sx, sy, zoom, time);
+        } else {
+            // Draw the crop on every footprint tile (filled-bed look).
+            for dy in 0..h {
+                for dx in 0..w {
+                    let (sx, sy) = world_to_screen(
+                        (patch.x + dx) as f32,
+                        (patch.y + dy) as f32,
+                        &state.camera,
+                    );
+                    self.draw_patch_at(patch, sx, sy, zoom, time);
+                }
+            }
+        }
+    }
+
+    /// Draw one patch tile's crop/tree sprite + overlays at the given screen position.
+    fn draw_patch_at(
+        &self,
+        patch: &crate::game::state::FarmingPatch,
+        screen_x: f32,
+        screen_y: f32,
+        zoom: f32,
+        time: f64,
+    ) {
         // Legacy sprite dimensions
         let legacy_frame_w = 16.0;
         let legacy_frame_h = 32.0;
 
-        let sprite_name = match patch.state.as_str() {
-            "growing" | "harvestable" => Some(Self::crop_to_sprite_name(&patch.crop_id)),
-            _ => None,
+        // Trees render with tall object sprites (gid-based), not the farming crop atlas.
+        let is_tree = patch.patch_type == "tree";
+        let sprite_name = if is_tree {
+            None
+        } else {
+            match patch.state.as_str() {
+                "growing" | "harvestable" | "diseased" => {
+                    Some(Self::crop_to_sprite_name(&patch.crop_id))
+                }
+                _ => None,
+            }
+        };
+
+        // Diseased crops are rendered in a sickly, washed-out tint.
+        let crop_tint = if patch.state == "diseased" {
+            Color::new(0.55, 0.5, 0.25, 1.0)
+        } else {
+            WHITE
         };
 
         // Draw sign behind crop (legacy sprites only)
@@ -569,8 +615,17 @@ impl Renderer {
             }
         }
 
-        // Draw crop sprite
-        let drew_sprite = if let Some(name) = sprite_name {
+        // Draw crop sprite (or tall tree object sprite for tree patches)
+        let drew_sprite = if is_tree {
+            self.draw_tree_object_sprite(
+                &patch.state,
+                patch.growth_stage,
+                screen_x,
+                screen_y,
+                zoom,
+                crop_tint,
+            )
+        } else if let Some(name) = sprite_name {
             if let Some((crop_texture, crop_atlas_offset)) = self.farming_sprites.get(name) {
                 let (crop_atlas_x, crop_atlas_y) = crop_atlas_offset.unwrap_or((0.0, 0.0));
                 // Check if large format using dimensions (avoids extra lookup)
@@ -585,7 +640,7 @@ impl Renderer {
                     let fh = sheet_h;
 
                     let frame_index = match patch.state.as_str() {
-                        "growing" => patch.growth_stage.min(num_frames - 1),
+                        "growing" | "diseased" => patch.growth_stage.min(num_frames - 1),
                         "harvestable" => num_frames - 1,
                         _ => 0,
                     };
@@ -598,7 +653,7 @@ impl Renderer {
                         crop_texture,
                         screen_x - draw_w / 2.0,
                         screen_y - draw_h + 8.0 * zoom,
-                        WHITE,
+                        crop_tint,
                         DrawTextureParams {
                             source: Some(Rect::new(src_x, crop_atlas_y, fw, fh)),
                             dest_size: Some(Vec2::new(draw_w, draw_h)),
@@ -608,7 +663,7 @@ impl Renderer {
                 } else {
                     // Legacy format: 16x32 frames, frame mapping with gaps
                     let frame_index = match patch.state.as_str() {
-                        "growing" => match patch.growth_stage {
+                        "growing" | "diseased" => match patch.growth_stage {
                             0 => 0,
                             1 => 2,
                             2 => 3,
@@ -627,7 +682,7 @@ impl Renderer {
                         crop_texture,
                         screen_x - draw_w / 2.0,
                         screen_y - draw_h + draw_h * 0.25,
-                        WHITE,
+                        crop_tint,
                         DrawTextureParams {
                             source: Some(Rect::new(
                                 src_x,
@@ -652,8 +707,18 @@ impl Renderer {
         if !drew_sprite {
             let half_w = 16.0 * zoom;
             let half_h = 8.0 * zoom;
-            let base_color = Color::new(0.35, 0.25, 0.15, 0.5);
-            let border_color = Color::new(0.45, 0.35, 0.2, 0.6);
+            // Dead crops render as a dark, withered patch of soil.
+            let (base_color, border_color) = if patch.state == "dead" {
+                (
+                    Color::new(0.15, 0.12, 0.1, 0.7),
+                    Color::new(0.28, 0.18, 0.12, 0.85),
+                )
+            } else {
+                (
+                    Color::new(0.35, 0.25, 0.15, 0.5),
+                    Color::new(0.45, 0.35, 0.2, 0.6),
+                )
+            };
 
             draw_triangle(
                 Vec2::new(screen_x, screen_y - half_h),
@@ -720,6 +785,93 @@ impl Renderer {
                 glow,
             );
         }
+
+        // Draw a reddish-brown warning pulse on diseased crops
+        if patch.state == "diseased" {
+            let half_w = 16.0 * zoom;
+            let half_h = 8.0 * zoom;
+            let pulse_alpha = ((time * 2.0).sin() as f32 * 0.06 + 0.15).clamp(0.08, 0.22);
+            let glow = Color::new(0.65, 0.2, 0.1, pulse_alpha);
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x - half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                glow,
+            );
+            draw_triangle(
+                Vec2::new(screen_x, screen_y - half_h),
+                Vec2::new(screen_x + half_w, screen_y),
+                Vec2::new(screen_x, screen_y + half_h),
+                glow,
+            );
+        }
+    }
+
+    /// Object-tileset sprite id for a tree patch's current growth stage.
+    /// Stage 1->285, stage 2->286, stage 3->288, stage 4 (complete)->287.
+    /// None for empty/dead patches (which draw the soil-diamond fallback).
+    fn tree_sprite_id(patch_state: &str, growth_stage: u32) -> Option<u32> {
+        if !matches!(patch_state, "growing" | "harvestable" | "diseased") {
+            return None;
+        }
+        Some(if patch_state == "harvestable" {
+            287
+        } else {
+            match growth_stage {
+                0 => 285,
+                1 => 286,
+                2 => 288,
+                _ => 287,
+            }
+        })
+    }
+
+    /// Source height (in texture pixels) of the current tree-stage sprite, if any.
+    fn tree_sprite_height(&self, patch_state: &str, growth_stage: u32) -> Option<f32> {
+        let gid = super::OBJECTS_FIRSTGID + Self::tree_sprite_id(patch_state, growth_stage)?;
+        let (texture, source_rect) = self.get_object_sprite(gid)?;
+        Some(source_rect.map(|r| r.h).unwrap_or(texture.height()))
+    }
+
+    /// Draw a tree patch using tall object-tileset sprites keyed by growth stage.
+    /// Returns false (so the caller draws the withered-soil fallback) for dead trees
+    /// or when the object sprite can't be resolved.
+    fn draw_tree_object_sprite(
+        &self,
+        patch_state: &str,
+        growth_stage: u32,
+        screen_x: f32,
+        screen_y: f32,
+        zoom: f32,
+        tint: Color,
+    ) -> bool {
+        let Some(sprite_id) = Self::tree_sprite_id(patch_state, growth_stage) else {
+            return false;
+        };
+        let gid = super::OBJECTS_FIRSTGID + sprite_id;
+        let Some((texture, source_rect)) = self.get_object_sprite(gid) else {
+            return false;
+        };
+        let (w, h) = source_rect
+            .map(|r| (r.w, r.h))
+            .unwrap_or((texture.width(), texture.height()));
+        let draw_w = (w * zoom).round();
+        let draw_h = (h * zoom).round();
+        // Bottom-center the tree on the patch tile.
+        let draw_x = (screen_x - draw_w / 2.0).round();
+        let draw_y = (screen_y - draw_h).round();
+        draw_texture_ex(
+            texture,
+            draw_x,
+            draw_y,
+            tint,
+            DrawTextureParams {
+                dest_size: Some(Vec2::new(draw_w, draw_h)),
+                source: source_rect,
+                ..Default::default()
+            },
+        );
+        true
     }
 
     /// Map crop_id from farming config to sprite sheet name
@@ -753,58 +905,89 @@ impl Renderer {
         let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
         let zoom = state.camera.zoom;
 
+        // Title-case a snake_case id for display, e.g. "tangleroots" -> "Tangleroots"
+        let prettify = |id: &str| {
+            id.replace('_', " ")
+                .split_whitespace()
+                .map(|w| {
+                    let mut c = w.chars();
+                    match c.next() {
+                        Some(f) => f.to_uppercase().to_string() + c.as_str(),
+                        None => String::new(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+
+        // Friendly name for an empty patch based on its type.
+        let patch_label = match patch.patch_type.as_str() {
+            "allotment" => "Allotment".to_string(),
+            "herb" => "Herb patch".to_string(),
+            "cactus" => "Cactus patch".to_string(),
+            "tree" => "Tree patch".to_string(),
+            other if !other.is_empty() => format!("{} patch", prettify(other)),
+            _ => "Allotment".to_string(),
+        };
+
         // Build label text
         let (label, color) = match patch.state.as_str() {
-            "empty" => (
-                "Allotment (Empty)".to_string(),
-                Color::new(0.7, 0.6, 0.4, 1.0),
-            ),
+            "empty" => {
+                let suffix = if patch.composted { " (Composted)" } else { " (Empty)" };
+                (
+                    format!("{}{}", patch_label, suffix),
+                    Color::new(0.7, 0.6, 0.4, 1.0),
+                )
+            }
             "growing" => {
-                let crop_name = patch.crop_id.replace('_', " ");
-                let crop_name = crop_name
-                    .split_whitespace()
-                    .map(|w| {
-                        let mut c = w.chars();
-                        match c.next() {
-                            Some(f) => f.to_uppercase().to_string() + c.as_str(),
-                            None => String::new(),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                let crop_name = prettify(&patch.crop_id);
                 (
                     format!("{} (Stage {}/4)", crop_name, patch.growth_stage),
                     Color::new(0.4, 0.8, 0.3, 1.0),
                 )
             }
             "harvestable" => {
-                let crop_name = patch.crop_id.replace('_', " ");
-                let crop_name = crop_name
-                    .split_whitespace()
-                    .map(|w| {
-                        let mut c = w.chars();
-                        match c.next() {
-                            Some(f) => f.to_uppercase().to_string() + c.as_str(),
-                            None => String::new(),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                let crop_name = prettify(&patch.crop_id);
+                let lives = if patch.lives_remaining > 1 {
+                    format!(" x{}", patch.lives_remaining)
+                } else {
+                    String::new()
+                };
                 (
-                    format!("{} (Ready!)", crop_name),
+                    format!("{} (Ready!{})", crop_name, lives),
                     Color::new(1.0, 0.9, 0.3, 1.0),
                 )
             }
-            _ => ("Allotment".to_string(), Color::new(0.7, 0.7, 0.7, 1.0)),
+            "diseased" => {
+                let crop_name = prettify(&patch.crop_id);
+                (
+                    format!("{} (Diseased!)", crop_name),
+                    Color::new(0.9, 0.4, 0.3, 1.0),
+                )
+            }
+            "dead" => {
+                let crop_name = prettify(&patch.crop_id);
+                (
+                    format!("{} (Dead)", crop_name),
+                    Color::new(0.6, 0.6, 0.6, 1.0),
+                )
+            }
+            _ => (patch_label.clone(), Color::new(0.7, 0.7, 0.7, 1.0)),
         };
 
         // Scale text with zoom for readability
         let font_size = 16.0 * zoom;
         let label_width = self.measure_text_sharp(&label, font_size).width;
         let label_x = screen_x - label_width / 2.0;
-        // Position label above the sprite - large sprites need more offset
+        // Position label above the sprite - tall sprites need more offset
         let sprite_name = Self::crop_to_sprite_name(&patch.crop_id);
-        let label_offset = if self.is_large_farming_sprite(sprite_name) {
+        let label_offset = if patch.patch_type == "tree" {
+            // Trees use tall object sprites; clear the canopy.
+            match self.tree_sprite_height(&patch.state, patch.growth_stage) {
+                Some(h) => (h + 4.0) * zoom,
+                None => 16.0 * zoom,
+            }
+        } else if self.is_large_farming_sprite(sprite_name) {
             // Large sprite: offset by sprite height minus ground anchor
             let (_, sh) = self
                 .farming_sprites

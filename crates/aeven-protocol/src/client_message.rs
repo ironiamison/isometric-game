@@ -178,6 +178,18 @@ pub enum ClientMessage {
     #[serde(rename = "harvestCrop")]
     HarvestCrop { patch_id: String },
 
+    /// Apply compost to a farming patch (reduces disease, adds a harvest life)
+    #[serde(rename = "applyCompost")]
+    ApplyCompost { patch_id: String, item_id: String },
+
+    /// Cure a diseased farming patch
+    #[serde(rename = "curePatch")]
+    CurePatch { patch_id: String },
+
+    /// Clear a dead crop from a farming patch
+    #[serde(rename = "clearPatch")]
+    ClearPatch { patch_id: String },
+
     // ===== Friend System Messages =====
     /// Send a friend request to a player by name
     #[serde(rename = "sendFriendRequest")]
@@ -463,6 +475,9 @@ impl ClientMessage {
             ClientMessage::StandUp => "StandUp",
             ClientMessage::PlantSeed { .. } => "PlantSeed",
             ClientMessage::HarvestCrop { .. } => "HarvestCrop",
+            ClientMessage::ApplyCompost { .. } => "ApplyCompost",
+            ClientMessage::CurePatch { .. } => "CurePatch",
+            ClientMessage::ClearPatch { .. } => "ClearPatch",
             ClientMessage::SendFriendRequest { .. } => "SendFriendRequest",
             ClientMessage::AcceptFriendRequest { .. } => "AcceptFriendRequest",
             ClientMessage::DeclineFriendRequest { .. } => "DeclineFriendRequest",

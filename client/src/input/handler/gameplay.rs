@@ -908,6 +908,19 @@ impl InputHandler {
                 if let Some(patch_id) = state.pending_harvest_patch.take() {
                     commands.push(InputCommand::HarvestCrop { patch_id });
                 }
+                // Handle farming cure/clear/compost targets
+                if let Some(patch_id) = state.pending_cure_patch.take() {
+                    commands.push(InputCommand::CurePatch { patch_id });
+                }
+                if let Some(patch_id) = state.pending_clear_patch.take() {
+                    commands.push(InputCommand::ClearPatch { patch_id });
+                }
+                if let Some(patch_id) = state.pending_compost_patch.take() {
+                    commands.push(InputCommand::ApplyCompost {
+                        patch_id,
+                        item_id: "compost".to_string(),
+                    });
+                }
                 // Handle auto-action: send StartAutoAction now that we've arrived
                 let auto_action_snapshot = state.auto_action_state.as_ref().map(|aa| {
                     (

@@ -140,6 +140,16 @@ mod tests {
             quantity: 3,
         });
         round_trip(ClientMessage::KothContinue);
+        round_trip(ClientMessage::ApplyCompost {
+            patch_id: "p1_herb_1".to_string(),
+            item_id: "compost".to_string(),
+        });
+        round_trip(ClientMessage::CurePatch {
+            patch_id: "p1_herb_1".to_string(),
+        });
+        round_trip(ClientMessage::ClearPatch {
+            patch_id: "p1_tree_1".to_string(),
+        });
     }
 
     #[test]

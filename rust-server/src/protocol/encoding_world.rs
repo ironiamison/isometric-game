@@ -676,6 +676,34 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
                         Value::String("owner_id".into()),
                         Value::String(p.owner_id.clone().into()),
                     ));
+                    pmap.push((
+                        Value::String("health".into()),
+                        Value::String(p.health.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("lives_remaining".into()),
+                        Value::Integer((p.lives_remaining as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("composted".into()),
+                        Value::Boolean(p.composted),
+                    ));
+                    pmap.push((
+                        Value::String("patch_type".into()),
+                        Value::String(p.patch_type.clone().into()),
+                    ));
+                    pmap.push((
+                        Value::String("width".into()),
+                        Value::Integer((p.width as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("height".into()),
+                        Value::Integer((p.height as i64).into()),
+                    ));
+                    pmap.push((
+                        Value::String("capacity".into()),
+                        Value::Integer((p.capacity as i64).into()),
+                    ));
                     Value::Map(pmap)
                 })
                 .collect();
@@ -719,6 +747,10 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
             crop_id,
             growth_stage,
             owner_id,
+            health,
+            lives_remaining,
+            composted,
+            patch_type,
         } => {
             let mut map = Vec::new();
             map.push((
@@ -740,6 +772,22 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
             map.push((
                 Value::String("owner_id".into()),
                 Value::String(owner_id.clone().into()),
+            ));
+            map.push((
+                Value::String("health".into()),
+                Value::String(health.clone().into()),
+            ));
+            map.push((
+                Value::String("lives_remaining".into()),
+                Value::Integer((*lives_remaining as i64).into()),
+            ));
+            map.push((
+                Value::String("composted".into()),
+                Value::Boolean(*composted),
+            ));
+            map.push((
+                Value::String("patch_type".into()),
+                Value::String(patch_type.clone().into()),
             ));
             Value::Map(map)
         }

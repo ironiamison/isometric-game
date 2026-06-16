@@ -178,6 +178,15 @@ pub(super) async fn handle_client_message(
         ClientMessage::HarvestCrop { patch_id } => {
             room.handle_harvest_crop(player_id, &patch_id).await;
         }
+        ClientMessage::ApplyCompost { patch_id, item_id } => {
+            room.handle_apply_compost(player_id, &patch_id, &item_id).await;
+        }
+        ClientMessage::CurePatch { patch_id } => {
+            room.handle_cure_patch(player_id, &patch_id).await;
+        }
+        ClientMessage::ClearPatch { patch_id } => {
+            room.handle_clear_patch(player_id, &patch_id).await;
+        }
         // Friend system messages
         ClientMessage::SendFriendRequest { target_name } => {
             room.handle_send_friend_request(player_id, &target_name)

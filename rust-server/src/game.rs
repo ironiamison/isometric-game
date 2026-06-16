@@ -354,6 +354,8 @@ pub enum AutoActionTarget {
     Npc { npc_id: String },
     Player { player_id: String },
     Resource { x: i32, y: i32, gid: u32 },
+    /// A mature farmed tree patch the player is chopping down.
+    FarmTree { patch_id: String },
 }
 
 /// What type of action to repeat

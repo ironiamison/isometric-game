@@ -168,18 +168,36 @@ impl InputHandler {
                             state.farming_patch_positions.get(&(tile_x, tile_y))
                         {
                             if let Some(patch) = state.farming_patches.get(patch_id) {
-                                if patch.state == "empty" {
-                                    if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
-                                        if slot.item_id.ends_with("_seed") {
-                                            commands.push(InputCommand::PlantSeed {
-                                                patch_id: patch_id.clone(),
-                                                item_id: slot.item_id.clone(),
-                                            });
-                                            audio.play_sfx("item_put");
-                                            true
-                                        } else {
-                                            false
-                                        }
+                                if let Some(Some(slot)) = state.inventory.slots.get(*from_idx) {
+                                    let item_id = slot.item_id.clone();
+                                    if patch.state == "empty" && item_id.ends_with("_seed") {
+                                        commands.push(InputCommand::PlantSeed {
+                                            patch_id: patch_id.clone(),
+                                            item_id,
+                                        });
+                                        audio.play_sfx("item_put");
+                                        true
+                                    } else if item_id == "compost"
+                                        && !patch.composted
+                                        && matches!(
+                                            patch.state.as_str(),
+                                            "empty" | "growing" | "harvestable"
+                                        )
+                                    {
+                                        commands.push(InputCommand::ApplyCompost {
+                                            patch_id: patch_id.clone(),
+                                            item_id,
+                                        });
+                                        audio.play_sfx("item_put");
+                                        true
+                                    } else if item_id == "plant_cure_potion"
+                                        && patch.state == "diseased"
+                                    {
+                                        commands.push(InputCommand::CurePatch {
+                                            patch_id: patch_id.clone(),
+                                        });
+                                        audio.play_sfx("item_put");
+                                        true
                                     } else {
                                         false
                                     }

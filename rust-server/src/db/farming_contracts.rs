@@ -1,23 +1,86 @@
 use super::*;
 
 impl Database {
+    #[allow(clippy::too_many_arguments)]
     pub async fn save_farming_patch(
         &self,
         patch_id: &str,
         player_id: &str,
         crop_id: &str,
         planted_at: u64,
+        lives_remaining: u32,
+        health: &str,
+        composted: bool,
+        disease_cycle_marker: u32,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT OR REPLACE INTO farming_patches (patch_id, player_id, crop_id, planted_at)
-            VALUES (?, ?, ?, ?)
+            INSERT OR REPLACE INTO farming_patches
+                (patch_id, player_id, crop_id, planted_at, lives_remaining, health, composted, disease_cycle_marker)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(patch_id)
         .bind(player_id)
         .bind(crop_id)
         .bind(planted_at as i64)
+        .bind(lives_remaining as i64)
+        .bind(health)
+        .bind(composted as i64)
+        .bind(disease_cycle_marker as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_farming_patch_lives(
+        &self,
+        patch_id: &str,
+        player_id: &str,
+        lives_remaining: u32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE farming_patches SET lives_remaining = ? WHERE patch_id = ? AND player_id = ?",
+        )
+        .bind(lives_remaining as i64)
+        .bind(patch_id)
+        .bind(player_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_farming_patch_health(
+        &self,
+        patch_id: &str,
+        player_id: &str,
+        health: &str,
+        disease_cycle_marker: u32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE farming_patches SET health = ?, disease_cycle_marker = ? WHERE patch_id = ? AND player_id = ?",
+        )
+        .bind(health)
+        .bind(disease_cycle_marker as i64)
+        .bind(patch_id)
+        .bind(player_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_farming_patch_composted(
+        &self,
+        patch_id: &str,
+        player_id: &str,
+        composted: bool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE farming_patches SET composted = ? WHERE patch_id = ? AND player_id = ?",
+        )
+        .bind(composted as i64)
+        .bind(patch_id)
+        .bind(player_id)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -36,22 +99,30 @@ impl Database {
         Ok(())
     }
 
-    pub async fn load_farming_patches(
-        &self,
-    ) -> Result<Vec<(String, String, String, u64)>, sqlx::Error> {
-        let rows =
-            sqlx::query("SELECT patch_id, player_id, crop_id, planted_at FROM farming_patches")
-                .fetch_all(&self.pool)
-                .await?;
+    pub async fn load_farming_patches(&self) -> Result<Vec<FarmingPatchRow>, sqlx::Error> {
+        let rows = sqlx::query(
+            "SELECT patch_id, player_id, crop_id, planted_at, lives_remaining, health, composted, disease_cycle_marker FROM farming_patches",
+        )
+        .fetch_all(&self.pool)
+        .await?;
 
         let patches = rows
             .iter()
             .map(|row| {
-                let patch_id: String = row.get("patch_id");
-                let player_id: String = row.get("player_id");
-                let crop_id: String = row.get("crop_id");
                 let planted_at: i64 = row.get("planted_at");
-                (patch_id, player_id, crop_id, planted_at as u64)
+                let lives_remaining: i64 = row.get("lives_remaining");
+                let composted: i64 = row.get("composted");
+                let disease_cycle_marker: i64 = row.get("disease_cycle_marker");
+                FarmingPatchRow {
+                    patch_id: row.get("patch_id"),
+                    player_id: row.get("player_id"),
+                    crop_id: row.get("crop_id"),
+                    planted_at: planted_at as u64,
+                    lives_remaining: lives_remaining as u32,
+                    health: row.get("health"),
+                    composted: composted != 0,
+                    disease_cycle_marker: disease_cycle_marker as u32,
+                }
             })
             .collect();
 

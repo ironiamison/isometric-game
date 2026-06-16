@@ -527,6 +527,10 @@ pub enum ServerMessage {
         crop_id: String,
         growth_stage: u32,
         owner_id: String,
+        health: String,
+        lives_remaining: u32,
+        composted: bool,
+        patch_type: String,
     },
 
     // ===== Friend System Messages =====
@@ -986,10 +990,17 @@ pub struct FarmingPatchData {
     pub patch_id: String,
     pub x: i32,
     pub y: i32,
-    pub state: String, // "empty", "growing", "harvestable"
+    pub state: String, // "empty", "growing", "harvestable", "diseased", "dead"
     pub crop_id: String,
     pub growth_stage: u32,
     pub owner_id: String,
+    pub health: String,
+    pub lives_remaining: u32,
+    pub composted: bool,
+    pub patch_type: String,
+    pub width: u32,
+    pub height: u32,
+    pub capacity: u32,
 }
 
 /// Depleted tree data for client synchronization

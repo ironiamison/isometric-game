@@ -477,6 +477,16 @@ pub(crate) fn run_game_frame(
             InputCommand::HarvestCrop { patch_id } => ClientMessage::HarvestCrop {
                 patch_id: patch_id.clone(),
             },
+            InputCommand::ApplyCompost { patch_id, item_id } => ClientMessage::ApplyCompost {
+                patch_id: patch_id.clone(),
+                item_id: item_id.clone(),
+            },
+            InputCommand::CurePatch { patch_id } => ClientMessage::CurePatch {
+                patch_id: patch_id.clone(),
+            },
+            InputCommand::ClearPatch { patch_id } => ClientMessage::ClearPatch {
+                patch_id: patch_id.clone(),
+            },
             // Friend system commands
             InputCommand::SendFriendRequest { target_name } => ClientMessage::SendFriendRequest {
                 target_name: target_name.clone(),

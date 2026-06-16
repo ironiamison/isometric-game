@@ -882,9 +882,22 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                         let crop_id = extract_string(p, "crop_id").unwrap_or_default();
                         let growth_stage = extract_u32(p, "growth_stage").unwrap_or(0);
                         let owner_id = extract_string(p, "owner_id").unwrap_or_default();
-                        state
-                            .farming_patch_positions
-                            .insert((x, y), patch_id.clone());
+                        let health =
+                            extract_string(p, "health").unwrap_or_else(|| "healthy".to_string());
+                        let lives_remaining = extract_u32(p, "lives_remaining").unwrap_or(0);
+                        let composted = extract_bool(p, "composted").unwrap_or(false);
+                        let patch_type = extract_string(p, "patch_type").unwrap_or_default();
+                        let width = extract_u32(p, "width").unwrap_or(1).max(1);
+                        let height = extract_u32(p, "height").unwrap_or(1).max(1);
+                        let capacity = extract_u32(p, "capacity").unwrap_or(1).max(1);
+                        // Index every footprint tile so a click anywhere on the bed resolves.
+                        for dy in 0..height as i32 {
+                            for dx in 0..width as i32 {
+                                state
+                                    .farming_patch_positions
+                                    .insert((x + dx, y + dy), patch_id.clone());
+                            }
+                        }
                         state.farming_patches.insert(
                             patch_id.clone(),
                             FarmingPatch {
@@ -895,6 +908,13 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                                 crop_id,
                                 growth_stage,
                                 owner_id,
+                                health,
+                                lives_remaining,
+                                composted,
+                                patch_type,
+                                width,
+                                height,
+                                capacity,
                             },
                         );
                     }
@@ -935,16 +955,34 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                 let crop_id = extract_string(value, "crop_id").unwrap_or_default();
                 let growth_stage = extract_u32(value, "growth_stage").unwrap_or(0);
                 let owner_id = extract_string(value, "owner_id").unwrap_or_default();
+                let health =
+                    extract_string(value, "health").unwrap_or_else(|| "healthy".to_string());
+                let lives_remaining = extract_u32(value, "lives_remaining").unwrap_or(0);
+                let composted = extract_bool(value, "composted").unwrap_or(false);
+                let patch_type = extract_string(value, "patch_type").unwrap_or_default();
 
                 if let Some(patch) = state.farming_patches.get_mut(&patch_id) {
-                    // Detect harvest: was harvestable, now empty
-                    if patch.state == "harvestable" && patch_state == "empty" {
+                    // Detect harvest: was harvestable, now empty/harvestable with fewer lives
+                    if patch.state == "harvestable"
+                        && (patch_state == "empty" || patch_state == "harvestable")
+                    {
                         state.pending_sfx.push("pop".to_string());
+                    }
+                    // Crop just became diseased or died
+                    if patch.health == "healthy" && (health == "diseased" || health == "dead") {
+                        state.pending_sfx.push("error".to_string());
                     }
                     patch.state = patch_state;
                     patch.crop_id = crop_id;
                     patch.growth_stage = growth_stage;
                     patch.owner_id = owner_id;
+                    patch.health = health;
+                    patch.lives_remaining = lives_remaining;
+                    patch.composted = composted;
+                    // patch_type is stable; only overwrite if the server sent a non-empty value
+                    if !patch_type.is_empty() {
+                        patch.patch_type = patch_type;
+                    }
                 }
             }
         }

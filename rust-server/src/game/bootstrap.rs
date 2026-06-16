@@ -222,8 +222,17 @@ impl GameRoom {
             match db.load_farming_patches().await {
                 Ok(saved_patches) => {
                     let count = saved_patches.len();
-                    for (patch_id, player_id, crop_id, planted_at) in saved_patches {
-                        farming.restore_patch(&patch_id, &player_id, &crop_id, planted_at);
+                    for row in saved_patches {
+                        farming.restore_patch(
+                            &row.patch_id,
+                            &row.player_id,
+                            &row.crop_id,
+                            row.planted_at,
+                            row.lives_remaining,
+                            &row.health,
+                            row.composted,
+                            row.disease_cycle_marker,
+                        );
                     }
                     if count > 0 {
                         tracing::info!("Restored {} planted farming patches from database", count);

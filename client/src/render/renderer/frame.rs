@@ -237,8 +237,9 @@ impl Renderer {
         // Add farming patches (depth-sorted with entities)
         if state.current_interior.is_none() {
             for (id, patch) in &state.farming_patches {
-                let wx = patch.x as f32;
-                let wy = patch.y as f32;
+                // Sort multi-tile patches by their centered footprint position (like NPCs).
+                let wx = patch.x as f32 + (patch.width.max(1) as f32 - 1.0) * 0.5;
+                let wy = patch.y as f32 + (patch.height.max(1) as f32 - 1.0) * 0.5;
                 if !is_visible_world(wx, wy) {
                     continue;
                 }
@@ -744,6 +745,50 @@ impl Renderer {
                                     is_hovered,
                                 },
                             ));
+                        }
+                    }
+                }
+
+                // When dragging a patch-targeting item (seed/compost/cure) over a plot it
+                // can be used on, light up the WHOLE footprint as droppable.
+                let hovered_patch = state
+                    .hovered_tile
+                    .and_then(|h| state.farming_patch_positions.get(&h))
+                    .and_then(|id| state.farming_patches.get(id));
+                if let Some(patch) = hovered_patch {
+                    let item_id = drag.item_id.as_str();
+                    let valid = if item_id.ends_with("_seed") {
+                        patch.state == "empty"
+                    } else if item_id == "compost" {
+                        !patch.composted
+                            && matches!(patch.state.as_str(), "empty" | "growing" | "harvestable")
+                    } else if item_id == "plant_cure_potion" {
+                        patch.state == "diseased"
+                    } else {
+                        false
+                    };
+                    if valid {
+                        for dy in 0..patch.height.max(1) as i32 {
+                            for dx in 0..patch.width.max(1) as i32 {
+                                let tile_x = patch.x + dx;
+                                let tile_y = patch.y + dy;
+                                let tile_z = state.chunk_manager.get_height(tile_x, tile_y) as i32;
+                                let depth = calculate_depth_z(
+                                    tile_x as f32,
+                                    tile_y as f32,
+                                    tile_z as f32,
+                                    1,
+                                ) + 0.02;
+                                renderables.push((
+                                    depth,
+                                    Renderable::DropZone {
+                                        tile_x,
+                                        tile_y,
+                                        tile_z,
+                                        is_hovered: true,
+                                    },
+                                ));
+                            }
                         }
                     }
                 }

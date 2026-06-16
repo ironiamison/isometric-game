@@ -124,8 +124,28 @@ sellable = true
 [cactus_seed]
 display_name = "Cactus Seed"
 sprite = "strawberry_seed"
-description = "A prickly seed from the deep desert. Plant it in a farming patch."
+description = "A prickly seed from the deep desert. Plant it in a cactus patch."
 category = "material"
 max_stack = 99
 base_price = 100
+sellable = true
+
+# Tree saplings - plant in a tree patch. (Sprites are placeholders for now.)
+
+[oak_seed]
+display_name = "Acorn"
+sprite = "potato_seed"
+description = "An acorn that grows into a mighty oak. Plant it in a tree patch. Requires Farming level 15."
+category = "material"
+max_stack = 99
+base_price = 60
+sellable = true
+
+[apple_seed]
+display_name = "Apple Sapling"
+sprite = "strawberry_seed"
+description = "A young apple tree. Plant it in a tree patch to grow fresh apples. Requires Farming level 27."
+category = "material"
+max_stack = 99
+base_price = 120
 sellable = true

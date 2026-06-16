@@ -171,11 +171,37 @@ impl Renderer {
                 name
             }
             ContextMenuTarget::FarmingPatch { patch_id } => {
+                let has_compost = state.inventory.count_item_by_id("compost") > 0;
                 if let Some(patch) = state.farming_patches.get(patch_id) {
-                    if patch.state == "harvestable" {
-                        push_option(&mut options, "Harvest");
-                    } else if patch.state == "empty" {
-                        push_option(&mut options, "Plant");
+                    match patch.state.as_str() {
+                        "harvestable" => {
+                            if patch.patch_type == "tree" {
+                                push_option(&mut options, "Chop");
+                            } else {
+                                push_option(&mut options, "Harvest");
+                                if has_compost && !patch.composted {
+                                    push_option(&mut options, "Compost");
+                                }
+                            }
+                        }
+                        "empty" => {
+                            push_option(&mut options, "Plant");
+                            if has_compost && !patch.composted {
+                                push_option(&mut options, "Compost");
+                            }
+                        }
+                        "growing" => {
+                            if has_compost && !patch.composted {
+                                push_option(&mut options, "Compost");
+                            }
+                        }
+                        "diseased" => {
+                            push_option(&mut options, "Cure");
+                        }
+                        "dead" => {
+                            push_option(&mut options, "Clear");
+                        }
+                        _ => {}
                     }
                 }
                 push_option(&mut options, "Examine");

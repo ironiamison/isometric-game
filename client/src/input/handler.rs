@@ -173,6 +173,16 @@ pub enum InputCommand {
     HarvestCrop {
         patch_id: String,
     },
+    ApplyCompost {
+        patch_id: String,
+        item_id: String,
+    },
+    CurePatch {
+        patch_id: String,
+    },
+    ClearPatch {
+        patch_id: String,
+    },
     // Friend system commands
     SendFriendRequest {
         target_name: String,

@@ -622,6 +622,10 @@ pub(super) fn auto_action_target_pos(
             }
             None
         }
+        "farm_tree" => state
+            .farming_patches
+            .get(&aa.target_id)
+            .map(|p| (p.x as f32, p.y as f32)),
         _ => None,
     }
 }

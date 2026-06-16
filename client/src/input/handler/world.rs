@@ -759,39 +759,67 @@ impl InputHandler {
                 .cloned()
             {
                 // Clicked on a farming patch
-                if let Some(patch) = state.farming_patches.get(&patch_id) {
-                    if patch.state == "harvestable" {
-                        if let Some(local_id) = &state.local_player_id {
-                            if let Some(player) = state.players.get(local_id) {
-                                let px = player.server_x.round() as i32;
-                                let py = player.server_y.round() as i32;
-                                let cdx = (px - clicked_tile_x).abs();
-                                let cdy = (py - clicked_tile_y).abs();
-                                if cdx <= 1 && cdy <= 1 {
-                                    commands.push(InputCommand::HarvestCrop { patch_id });
+                let patch_meta = state.farming_patches.get(&patch_id).map(|p| {
+                    (
+                        p.state == "harvestable",
+                        p.patch_type == "tree",
+                        p.x,
+                        p.y,
+                        p.width,
+                        p.height,
+                    )
+                });
+                if let Some((harvestable, is_tree, anchor_x, anchor_y, pw, ph)) = patch_meta {
+                    if harvestable {
+                        let player_pos = state
+                            .get_local_player()
+                            .map(|p| (p.server_x.round() as i32, p.server_y.round() as i32));
+                        if let Some((px, py)) = player_pos {
+                            // Cardinal-adjacency to the nearest footprint tile.
+                            let cx = px.clamp(anchor_x, anchor_x + pw.max(1) as i32 - 1);
+                            let cy = py.clamp(anchor_y, anchor_y + ph.max(1) as i32 - 1);
+                            let adjacent = (px - cx).abs() <= 1 && (py - cy).abs() <= 1;
+                            if is_tree {
+                                // Mature trees are chopped down, RS-style.
+                                state.auto_action_state = Some(crate::game::AutoActionState {
+                                    target_type: "farm_tree".to_string(),
+                                    target_id: patch_id.clone(),
+                                    action: "chop".to_string(),
+                                    confirmed: false,
+                                });
+                                if adjacent {
+                                    commands.push(InputCommand::StartAutoAction {
+                                        target_type: "farm_tree".to_string(),
+                                        target_id: patch_id,
+                                        action: "chop".to_string(),
+                                    });
                                 } else {
-                                    // Out of range - pathfind to adjacent tile
-                                    let occupied = build_occupied_set(state, true, true);
-                                    const MAX_PATH_DISTANCE: i32 = 32;
-                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                        (px, py),
-                                        (clicked_tile_x, clicked_tile_y),
-                                        &state.chunk_manager,
-                                        &occupied,
-                                        MAX_PATH_DISTANCE,
-                                    ) {
-                                        state.auto_path = Some(PathState {
-                                            path,
-                                            current_index: 0,
-                                            destination: dest,
-                                            pickup_target: None,
-                                            interact_target: None,
-                                            interact_object_target: None,
-                                            waystone_target: None,
-                                            browse_stall_target: None,
-                                        });
-                                        state.pending_harvest_patch = Some(patch_id);
-                                    }
+                                    start_pathfind_to_patch(state, anchor_x, anchor_y, pw, ph);
+                                }
+                            } else if adjacent {
+                                commands.push(InputCommand::HarvestCrop { patch_id });
+                            } else {
+                                // Out of range - pathfind to adjacent tile
+                                let occupied = build_occupied_set(state, true, true);
+                                const MAX_PATH_DISTANCE: i32 = 32;
+                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                    (px, py),
+                                    (clicked_tile_x, clicked_tile_y),
+                                    &state.chunk_manager,
+                                    &occupied,
+                                    MAX_PATH_DISTANCE,
+                                ) {
+                                    state.auto_path = Some(PathState {
+                                        path,
+                                        current_index: 0,
+                                        destination: dest,
+                                        pickup_target: None,
+                                        interact_target: None,
+                                        interact_object_target: None,
+                                        waystone_target: None,
+                                        browse_stall_target: None,
+                                    });
+                                    state.pending_harvest_patch = Some(patch_id);
                                 }
                             }
                         }

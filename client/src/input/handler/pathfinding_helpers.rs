@@ -613,6 +613,48 @@ pub(super) fn pathfind_and_resource(
 }
 
 /// Pathfind to a tile.
+/// Start an auto-path to a tile adjacent to a farming patch (footprint-aware).
+/// Returns true if a path was found.
+pub(super) fn start_pathfind_to_patch(
+    state: &mut GameState,
+    patch_x: i32,
+    patch_y: i32,
+    width: u32,
+    height: u32,
+) -> bool {
+    let Some(player) = state.get_local_player() else {
+        return false;
+    };
+    let px = player.server_x.round() as i32;
+    let py = player.server_y.round() as i32;
+    // Target the footprint tile nearest the player, then path to one of its neighbors.
+    let tx = px.clamp(patch_x, patch_x + width.max(1) as i32 - 1);
+    let ty = py.clamp(patch_y, patch_y + height.max(1) as i32 - 1);
+    let occupied = build_occupied_set(state, true, true);
+    const MAX_PATH_DISTANCE: i32 = 32;
+    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+        (px, py),
+        (tx, ty),
+        &state.chunk_manager,
+        &occupied,
+        MAX_PATH_DISTANCE,
+    ) {
+        state.auto_path = Some(PathState {
+            path,
+            current_index: 0,
+            destination: dest,
+            pickup_target: None,
+            interact_target: None,
+            interact_object_target: None,
+            waystone_target: None,
+            browse_stall_target: None,
+        });
+        true
+    } else {
+        false
+    }
+}
+
 pub(super) fn pathfind_to_tile(
     state: &mut GameState,
     commands: &mut Vec<InputCommand>,
@@ -854,7 +896,13 @@ pub(super) fn rebuild_current_auto_path(state: &mut GameState) -> bool {
         return false;
     }
 
-    if let Some(patch_id) = state.pending_harvest_patch.clone() {
+    let pending_patch = state
+        .pending_harvest_patch
+        .clone()
+        .or_else(|| state.pending_cure_patch.clone())
+        .or_else(|| state.pending_clear_patch.clone())
+        .or_else(|| state.pending_compost_patch.clone());
+    if let Some(patch_id) = pending_patch {
         if let Some(patch) = state.farming_patches.get(&patch_id) {
             let occupied = build_occupied_set(state, true, true);
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(

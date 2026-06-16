@@ -25,19 +25,17 @@ fn farming_xp_message(player_id: &str, xp_gained: i64, total_xp: i64, level: i32
     }
 }
 
-fn patch_state_update(
-    patch_id: &str,
-    state: &str,
-    crop_id: &str,
-    growth_stage: u32,
-    owner_id: &str,
-) -> ServerMessage {
+fn patch_update_message(update: &crate::farming::PatchUpdate) -> ServerMessage {
     ServerMessage::PatchStateUpdate {
-        patch_id: patch_id.to_string(),
-        state: state.to_string(),
-        crop_id: crop_id.to_string(),
-        growth_stage,
-        owner_id: owner_id.to_string(),
+        patch_id: update.patch_id.clone(),
+        state: update.state.clone(),
+        crop_id: update.crop_id.clone(),
+        growth_stage: update.growth_stage,
+        owner_id: update.owner_id.clone(),
+        health: update.health.clone(),
+        lives_remaining: update.lives_remaining,
+        composted: update.composted,
+        patch_type: update.patch_type.clone(),
     }
 }
 

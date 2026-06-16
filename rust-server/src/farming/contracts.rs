@@ -241,6 +241,10 @@ mod tests {
             xp_planting: 10,
             xp_per_harvest: 5,
             seed_return_chance: 0.0,
+            category: "allotment".to_string(),
+            lives_min: 1,
+            lives_max: 1,
+            disease_chance: 0.0,
         }
     }
 

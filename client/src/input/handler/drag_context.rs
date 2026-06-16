@@ -1090,85 +1090,156 @@ impl InputHandler {
                                         let patch_state = patch.state.clone();
                                         let patch_x = patch.x;
                                         let patch_y = patch.y;
+                                        let patch_w = patch.width;
+                                        let patch_h = patch.height;
+                                        let composted = patch.composted;
+                                        let is_tree = patch.patch_type == "tree";
                                         let pid = patch_id.clone();
-                                        if patch_state == "harvestable" {
-                                            // Options: 0=Harvest, 1=Examine
-                                            match option_idx {
-                                                0 => {
-                                                    if let Some(player) = state.get_local_player() {
-                                                        let px = player.server_x.round() as i32;
-                                                        let py = player.server_y.round() as i32;
-                                                        let cdx = (px - patch_x).abs();
-                                                        let cdy = (py - patch_y).abs();
-                                                        if cdx <= 1 && cdy <= 1 {
-                                                            commands.push(
-                                                                InputCommand::HarvestCrop {
-                                                                    patch_id: pid,
-                                                                },
-                                                            );
-                                                        } else {
-                                                            let occupied = build_occupied_set(
-                                                                state, true, true,
-                                                            );
-                                                            const MAX_PATH_DISTANCE: i32 = 32;
-                                                            if let Some((dest, path)) =
-                                                                pathfinding::find_path_to_adjacent(
-                                                                    (px, py),
-                                                                    (patch_x, patch_y),
-                                                                    &state.chunk_manager,
-                                                                    &occupied,
-                                                                    MAX_PATH_DISTANCE,
-                                                                )
-                                                            {
-                                                                state.auto_path = Some(PathState {
-                                                                    path,
-                                                                    current_index: 0,
-                                                                    destination: dest,
-                                                                    pickup_target: None,
-                                                                    interact_target: None,
-                                                                    interact_object_target: None,
-                                                                    waystone_target: None,
-                                                                    browse_stall_target: None,
-                                                                });
-                                                                state.pending_harvest_patch =
-                                                                    Some(pid);
-                                                            }
-                                                        }
+
+                                        // Rebuild the same option ordering as the context menu so
+                                        // the index maps to the right action.
+                                        let has_compost =
+                                            state.inventory.count_item_by_id("compost") > 0;
+                                        let mut opts: Vec<&str> = Vec::new();
+                                        match patch_state.as_str() {
+                                            "harvestable" => {
+                                                if is_tree {
+                                                    opts.push("Chop");
+                                                } else {
+                                                    opts.push("Harvest");
+                                                    if has_compost && !composted {
+                                                        opts.push("Compost");
                                                     }
                                                 }
-                                                1 => {
-                                                    state.push_system_chat(
-                                                        "This crop is ready to harvest."
-                                                            .to_string(),
-                                                    );
-                                                }
-                                                _ => {}
                                             }
-                                        } else if patch_state == "empty" {
-                                            // Options: 0=Plant, 1=Examine
-                                            match option_idx {
-                                                0 => {
-                                                    // TODO: Open seed selection UI or plant first seed
-                                                    state.push_system_chat(
-                                                        "Use a seed on this patch to plant it."
-                                                            .to_string(),
-                                                    );
+                                            "empty" => {
+                                                opts.push("Plant");
+                                                if has_compost && !composted {
+                                                    opts.push("Compost");
                                                 }
-                                                1 => {
-                                                    state.push_system_chat(
-                                                        "An empty farming patch.".to_string(),
-                                                    );
-                                                }
-                                                _ => {}
                                             }
-                                        } else {
-                                            // Growing state - only Examine
-                                            if *option_idx == 0 {
+                                            "growing" => {
+                                                if has_compost && !composted {
+                                                    opts.push("Compost");
+                                                }
+                                            }
+                                            "diseased" => opts.push("Cure"),
+                                            "dead" => opts.push("Clear"),
+                                            _ => {}
+                                        }
+                                        opts.push("Examine");
+                                        let action = opts.get(*option_idx).copied().unwrap_or("");
+
+                                        let adjacent =
+                                            state.get_local_player().is_some_and(|player| {
+                                                let px = player.server_x.round() as i32;
+                                                let py = player.server_y.round() as i32;
+                                                let cx = px.clamp(
+                                                    patch_x,
+                                                    patch_x + patch_w.max(1) as i32 - 1,
+                                                );
+                                                let cy = py.clamp(
+                                                    patch_y,
+                                                    patch_y + patch_h.max(1) as i32 - 1,
+                                                );
+                                                (px - cx).abs() <= 1 && (py - cy).abs() <= 1
+                                            });
+
+                                        match action {
+                                            "Chop" => {
+                                                // RS-style: keep swinging until the tree falls.
+                                                state.auto_action_state =
+                                                    Some(crate::game::AutoActionState {
+                                                        target_type: "farm_tree".to_string(),
+                                                        target_id: pid.clone(),
+                                                        action: "chop".to_string(),
+                                                        confirmed: false,
+                                                    });
+                                                if adjacent {
+                                                    commands.push(
+                                                        InputCommand::StartAutoAction {
+                                                            target_type: "farm_tree".to_string(),
+                                                            target_id: pid,
+                                                            action: "chop".to_string(),
+                                                        },
+                                                    );
+                                                } else {
+                                                    start_pathfind_to_patch(
+                                                        state, patch_x, patch_y, patch_w, patch_h,
+                                                    );
+                                                }
+                                            }
+                                            "Harvest" => {
+                                                if adjacent {
+                                                    commands.push(InputCommand::HarvestCrop {
+                                                        patch_id: pid,
+                                                    });
+                                                } else if start_pathfind_to_patch(
+                                                    state, patch_x, patch_y, patch_w, patch_h,
+                                                ) {
+                                                    state.pending_harvest_patch = Some(pid);
+                                                }
+                                            }
+                                            "Cure" => {
+                                                if adjacent {
+                                                    commands.push(InputCommand::CurePatch {
+                                                        patch_id: pid,
+                                                    });
+                                                } else if start_pathfind_to_patch(
+                                                    state, patch_x, patch_y, patch_w, patch_h,
+                                                ) {
+                                                    state.pending_cure_patch = Some(pid);
+                                                }
+                                            }
+                                            "Clear" => {
+                                                if adjacent {
+                                                    commands.push(InputCommand::ClearPatch {
+                                                        patch_id: pid,
+                                                    });
+                                                } else if start_pathfind_to_patch(
+                                                    state, patch_x, patch_y, patch_w, patch_h,
+                                                ) {
+                                                    state.pending_clear_patch = Some(pid);
+                                                }
+                                            }
+                                            "Compost" => {
+                                                if adjacent {
+                                                    commands.push(InputCommand::ApplyCompost {
+                                                        patch_id: pid,
+                                                        item_id: "compost".to_string(),
+                                                    });
+                                                } else if start_pathfind_to_patch(
+                                                    state, patch_x, patch_y, patch_w, patch_h,
+                                                ) {
+                                                    state.pending_compost_patch = Some(pid);
+                                                }
+                                            }
+                                            "Plant" => {
                                                 state.push_system_chat(
-                                                    "A farming patch with something growing."
+                                                    "Use a seed on this patch to plant it."
                                                         .to_string(),
                                                 );
                                             }
+                                            "Examine" => {
+                                                let msg = match patch_state.as_str() {
+                                                    "empty" => "An empty farming patch.",
+                                                    "growing" => {
+                                                        "A farming patch with something growing."
+                                                    }
+                                                    "harvestable" => {
+                                                        "This crop is ready to harvest."
+                                                    }
+                                                    "diseased" => {
+                                                        "This crop is diseased. Cure it before it dies."
+                                                    }
+                                                    "dead" => {
+                                                        "This crop has died. Clear it to replant."
+                                                    }
+                                                    _ => "A farming patch.",
+                                                };
+                                                state.push_system_chat(msg.to_string());
+                                            }
+                                            _ => {}
                                         }
                                     }
                                 }

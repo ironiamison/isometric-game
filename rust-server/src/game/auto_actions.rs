@@ -151,6 +151,34 @@ impl GameRoom {
 
                 AutoActionTarget::Resource { x, y, gid }
             }
+            "farm_tree" => {
+                // Farming patches only exist in the overworld.
+                if self.player_instances.read().await.contains_key(player_id) {
+                    return;
+                }
+                let valid = {
+                    let farming = self.farming.read().await;
+                    let now = now_ms();
+                    let is_tree = farming
+                        .patches
+                        .get(target_id)
+                        .map(|p| p.patch_type == "tree")
+                        .unwrap_or(false);
+                    let key = (target_id.to_string(), player_id.to_string());
+                    let mature = farming
+                        .player_states
+                        .get(&key)
+                        .map(|s| s.is_harvestable(&farming.crops, now))
+                        .unwrap_or(false);
+                    is_tree && mature
+                };
+                if !valid {
+                    return;
+                }
+                AutoActionTarget::FarmTree {
+                    patch_id: target_id.to_string(),
+                }
+            }
             _ => {
                 tracing::warn!("Invalid auto-action target_type: {}", target_type);
                 return;

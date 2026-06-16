@@ -281,6 +281,48 @@ max_stack = 99
 base_price = 90
 sellable = true
 
+# Tree produce (sprites are placeholders for now)
+
+[oak_logs]
+display_name = "Oak Logs"
+sprite = "cactus"
+description = "Sturdy logs harvested from a farmed oak tree."
+category = "material"
+max_stack = 99
+base_price = 40
+sellable = true
+
+[apple]
+display_name = "Apple"
+sprite = "strawberry"
+description = "A crisp, sweet apple picked from a farmed tree."
+category = "material"
+max_stack = 99
+base_price = 35
+sellable = true
+
+# Compost — treat a farming patch to reduce disease and add a harvest life
+
+[compost]
+display_name = "Compost"
+sprite = "cabbage"
+description = "Spread on a farming patch before planting to reduce disease and improve yield."
+category = "material"
+max_stack = 99
+base_price = 30
+sellable = true
+
+# Plant Cure Potion — cure a diseased crop before it dies
+
+[plant_cure_potion]
+display_name = "Plant Cure Potion"
+sprite = "vial_of_water"
+description = "A potion that cures a diseased farming crop. Used on a diseased patch."
+category = "material"
+max_stack = 99
+base_price = 25
+sellable = true
+
 [vial_of_water]
 display_name = "Vial of Water"
 sprite = "vial_of_water"
