@@ -1024,13 +1024,13 @@
       381,
       381,
       386,
+      1066,
+      1066,
+      1066,
+      1066,
+      1066,
       381,
-      381,
-      1066,
-      1066,
-      1066,
-      1066,
-      1066
+      381
     ],
     "objects": [
       0,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkABAADEAT8AQAA=",
+  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMQAAQBEAAEABAABAEQAAQB8AAEAOAABAAAAAQAAAAkAAAABEAD8AQAA=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3538,6 +3538,27 @@
       "y": 21,
       "width": 30,
       "height": 140
+    },
+    {
+      "gid": 1575,
+      "x": 31,
+      "y": 21,
+      "width": 45,
+      "height": 35
+    },
+    {
+      "gid": 1572,
+      "x": 29,
+      "y": 26,
+      "width": 45,
+      "height": 35
+    },
+    {
+      "gid": 1576,
+      "x": 29,
+      "y": 23,
+      "width": 42,
+      "height": 27
     }
   ],
   "walls": [
@@ -3605,24 +3626,6 @@
       "gid": 905,
       "x": 28,
       "y": 20,
-      "edge": "right"
-    },
-    {
-      "gid": 2037,
-      "x": 24,
-      "y": 30,
-      "edge": "down"
-    },
-    {
-      "gid": 2038,
-      "x": 24,
-      "y": 30,
-      "edge": "right"
-    },
-    {
-      "gid": 2039,
-      "x": 24,
-      "y": 29,
       "edge": "right"
     },
     {

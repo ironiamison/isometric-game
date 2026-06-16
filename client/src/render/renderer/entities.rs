@@ -533,9 +533,10 @@ impl Renderer {
             let cx = patch.x as f32 + w as f32 * 0.5;
             let cy = patch.y as f32 + h as f32 * 0.5;
             let (sx, sy) = world_to_screen(cx, cy, &state.camera);
-            // Nudge the trunk up slightly so it reads as sitting in the soil
-            // rather than the geometric center of the bed.
-            let sy = sy - 10.0 * zoom;
+            // Pass the true footprint center so the empty-patch indicator and the
+            // harvest/disease overlays sit centered on the soil. The trunk's
+            // upward nudge is applied inside draw_tree_object_sprite so it only
+            // moves the tree sprite, not the ground indicator.
             self.draw_patch_at(patch, sx, sy, zoom, time);
         } else {
             // Draw the crop on every footprint tile (filled-bed look).
@@ -816,7 +817,8 @@ impl Renderer {
     }
 
     /// Object-tileset sprite id for a tree patch's current growth stage.
-    /// Stage 1->285, stage 2->286, stage 3->288, stage 4 (complete)->287.
+    /// Stage 1->286, stage 2->286, stage 3->288, stage 4 (complete)->287.
+    /// (285 isn't a tree, so the first growth stage starts at 286.)
     /// None for empty patches (which draw the soil-diamond fallback). Dead trees show
     /// the full tree (287), tinted withered by the caller.
     fn tree_sprite_id(patch_state: &str, growth_stage: u32) -> Option<u32> {
@@ -827,7 +829,7 @@ impl Renderer {
             287
         } else {
             match growth_stage {
-                0 => 285,
+                0 => 286,
                 1 => 286,
                 2 => 288,
                 _ => 287,
@@ -867,9 +869,10 @@ impl Renderer {
             .unwrap_or((texture.width(), texture.height()));
         let draw_w = (w * zoom).round();
         let draw_h = (h * zoom).round();
-        // Bottom-center the tree on the patch tile.
+        // Bottom-center the tree on the patch tile, nudged up slightly so the
+        // trunk reads as sitting in the soil rather than at the geometric center.
         let draw_x = (screen_x - draw_w / 2.0).round();
-        let draw_y = (screen_y - draw_h).round();
+        let draw_y = (screen_y - draw_h - 10.0 * zoom).round();
         draw_texture_ex(
             texture,
             draw_x,

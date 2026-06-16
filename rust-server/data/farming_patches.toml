@@ -10,7 +10,8 @@
 #               (compost halves this). A diseased crop dies if not cured in time.
 
 # =============================================================================
-# Allotment crops (vegetables) — multi-harvest, moderate growth
+# Allotment crops (vegetables) — single harvest, moderate growth
+# (capacity-12 beds: one big harvest of the whole bed; compost adds a 2nd life)
 # =============================================================================
 
 [potato]
@@ -25,8 +26,8 @@ xp_planting = 2
 xp_per_harvest = 8
 seed_return_chance = 0.15
 category = "allotment"
-lives_min = 3
-lives_max = 3
+lives_min = 1
+lives_max = 1
 disease_chance = 0.10
 
 [onion]
@@ -41,8 +42,8 @@ xp_planting = 2
 xp_per_harvest = 8
 seed_return_chance = 0.15
 category = "allotment"
-lives_min = 3
-lives_max = 3
+lives_min = 1
+lives_max = 1
 disease_chance = 0.10
 
 [tomato]
@@ -52,13 +53,13 @@ level_required = 15
 growth_time_minutes = 28
 growth_stages = 4
 harvest_amount_min = 1
-harvest_amount_max = 3
+harvest_amount_max = 2
 xp_planting = 4
 xp_per_harvest = 15
 seed_return_chance = 0.15
 category = "allotment"
-lives_min = 3
-lives_max = 3
+lives_min = 1
+lives_max = 1
 disease_chance = 0.10
 
 [cabbage]
@@ -68,13 +69,13 @@ level_required = 15
 growth_time_minutes = 30
 growth_stages = 4
 harvest_amount_min = 1
-harvest_amount_max = 3
+harvest_amount_max = 2
 xp_planting = 4
 xp_per_harvest = 18
 seed_return_chance = 0.15
 category = "allotment"
-lives_min = 3
-lives_max = 3
+lives_min = 1
+lives_max = 1
 disease_chance = 0.10
 
 [strawberry]
@@ -83,14 +84,14 @@ produce_item = "strawberry"
 level_required = 30
 growth_time_minutes = 36
 growth_stages = 4
-harvest_amount_min = 2
-harvest_amount_max = 4
+harvest_amount_min = 1
+harvest_amount_max = 3
 xp_planting = 6
 xp_per_harvest = 25
 seed_return_chance = 0.15
 category = "allotment"
-lives_min = 3
-lives_max = 3
+lives_min = 1
+lives_max = 1
 disease_chance = 0.10
 
 [sweetcorn]
@@ -100,13 +101,13 @@ level_required = 30
 growth_time_minutes = 34
 growth_stages = 4
 harvest_amount_min = 1
-harvest_amount_max = 3
+harvest_amount_max = 2
 xp_planting = 6
 xp_per_harvest = 22
 seed_return_chance = 0.15
 category = "allotment"
-lives_min = 3
-lives_max = 3
+lives_min = 1
+lives_max = 1
 disease_chance = 0.10
 
 [watermelon]
@@ -121,12 +122,12 @@ xp_planting = 8
 xp_per_harvest = 35
 seed_return_chance = 0.15
 category = "allotment"
-lives_min = 3
-lives_max = 3
+lives_min = 1
+lives_max = 1
 disease_chance = 0.10
 
 # =============================================================================
-# Herbs (Alchemy) — multi-harvest, slower growth, higher disease risk
+# Herbs (Alchemy) — single harvest, slower growth, higher disease risk
 # =============================================================================
 
 [greenleaf]
@@ -141,8 +142,8 @@ xp_planting = 3
 xp_per_harvest = 10
 seed_return_chance = 0.15
 category = "herb"
-lives_min = 3
-lives_max = 5
+lives_min = 1
+lives_max = 1
 disease_chance = 0.14
 
 [tangleroots]
@@ -157,8 +158,8 @@ xp_planting = 5
 xp_per_harvest = 18
 seed_return_chance = 0.15
 category = "herb"
-lives_min = 3
-lives_max = 5
+lives_min = 1
+lives_max = 1
 disease_chance = 0.14
 
 [marshbloom]
@@ -173,8 +174,8 @@ xp_planting = 8
 xp_per_harvest = 28
 seed_return_chance = 0.15
 category = "herb"
-lives_min = 3
-lives_max = 5
+lives_min = 1
+lives_max = 1
 disease_chance = 0.14
 
 [ashveil]
@@ -189,8 +190,8 @@ xp_planting = 12
 xp_per_harvest = 40
 seed_return_chance = 0.15
 category = "herb"
-lives_min = 3
-lives_max = 5
+lives_min = 1
+lives_max = 1
 disease_chance = 0.14
 
 [nightthorn]
@@ -205,8 +206,8 @@ xp_planting = 18
 xp_per_harvest = 55
 seed_return_chance = 0.15
 category = "herb"
-lives_min = 3
-lives_max = 5
+lives_min = 1
+lives_max = 1
 disease_chance = 0.14
 
 [bloodcap]
@@ -221,8 +222,8 @@ xp_planting = 25
 xp_per_harvest = 75
 seed_return_chance = 0.10
 category = "herb"
-lives_min = 3
-lives_max = 5
+lives_min = 1
+lives_max = 1
 disease_chance = 0.14
 
 # =============================================================================
