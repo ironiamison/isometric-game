@@ -305,7 +305,7 @@ sellable = true
 
 [compost]
 display_name = "Compost"
-sprite = "cabbage"
+sprite = "compost"
 description = "Spread on a farming patch before planting to reduce disease and improve yield."
 category = "material"
 max_stack = 99
@@ -316,7 +316,7 @@ sellable = true
 
 [plant_cure_potion]
 display_name = "Plant Cure Potion"
-sprite = "vial_of_water"
+sprite = "plant_cure"
 description = "A potion that cures a diseased farming crop. Used on a diseased patch."
 category = "material"
 max_stack = 99
