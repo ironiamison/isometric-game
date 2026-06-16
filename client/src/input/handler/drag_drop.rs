@@ -161,7 +161,19 @@ impl InputHandler {
                     let player_y = player.y.round() as i32;
                     let dx = (tile_x - player_x).abs();
                     let dy = (tile_y - player_y).abs();
-                    let is_adjacent = dx <= 1 && dy <= 1;
+                    // For farming patches, allow the drop from anywhere adjacent to the whole
+                    // footprint, so dropping on a far bed tile works while standing at its edge.
+                    let footprint_adjacent = state
+                        .farming_patch_positions
+                        .get(&(tile_x, tile_y))
+                        .and_then(|id| state.farming_patches.get(id))
+                        .map(|p| {
+                            let cx = player_x.clamp(p.x, p.x + p.width.max(1) as i32 - 1);
+                            let cy = player_y.clamp(p.y, p.y + p.height.max(1) as i32 - 1);
+                            (player_x - cx).abs() <= 1 && (player_y - cy).abs() <= 1
+                        })
+                        .unwrap_or(false);
+                    let is_adjacent = (dx <= 1 && dy <= 1) || footprint_adjacent;
 
                     if is_adjacent {
                         let is_seed_on_patch = if let Some(patch_id) =

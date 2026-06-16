@@ -750,14 +750,21 @@ impl Renderer {
                 }
 
                 // When dragging a patch-targeting item (seed/compost/cure) over a plot it
-                // can be used on, light up the WHOLE footprint as droppable.
+                // can be used on — and standing next to that plot — light up the WHOLE
+                // footprint as droppable.
                 let hovered_patch = state
                     .hovered_tile
                     .and_then(|h| state.farming_patch_positions.get(&h))
                     .and_then(|id| state.farming_patches.get(id));
-                if let Some(patch) = hovered_patch {
+                if let (Some(patch), Some(player)) = (hovered_patch, state.get_local_player()) {
+                    let px = player.x.round() as i32;
+                    let py = player.y.round() as i32;
+                    let cx = px.clamp(patch.x, patch.x + patch.width.max(1) as i32 - 1);
+                    let cy = py.clamp(patch.y, patch.y + patch.height.max(1) as i32 - 1);
+                    let adjacent = (px - cx).abs() <= 1 && (py - cy).abs() <= 1;
                     let item_id = drag.item_id.as_str();
-                    let valid = if item_id.ends_with("_seed") {
+                    let valid = adjacent
+                        && if item_id.ends_with("_seed") {
                         patch.state == "empty"
                     } else if item_id == "compost" {
                         !patch.composted
@@ -779,13 +786,16 @@ impl Renderer {
                                     tile_z as f32,
                                     1,
                                 ) + 0.02;
+                                // The whole bed reads as droppable (faint green); the tile
+                                // directly under the cursor gets the bright hover highlight.
+                                let is_hovered = state.hovered_tile == Some((tile_x, tile_y));
                                 renderables.push((
                                     depth,
                                     Renderable::DropZone {
                                         tile_x,
                                         tile_y,
                                         tile_z,
-                                        is_hovered: true,
+                                        is_hovered,
                                     },
                                 ));
                             }

@@ -566,18 +566,19 @@ impl Renderer {
             None
         } else {
             match patch.state.as_str() {
-                "growing" | "harvestable" | "diseased" => {
+                "growing" | "harvestable" | "diseased" | "dead" => {
                     Some(Self::crop_to_sprite_name(&patch.crop_id))
                 }
                 _ => None,
             }
         };
 
-        // Diseased crops are rendered in a sickly, washed-out tint.
-        let crop_tint = if patch.state == "diseased" {
-            Color::new(0.55, 0.5, 0.25, 1.0)
-        } else {
-            WHITE
+        // Diseased crops get a sickly, washed-out tint; dead crops a dark withered
+        // brown so the existing sprite reads as a wilted, lifeless plant (no new art).
+        let crop_tint = match patch.state.as_str() {
+            "diseased" => Color::new(0.55, 0.5, 0.25, 1.0),
+            "dead" => Color::new(0.42, 0.3, 0.18, 1.0),
+            _ => WHITE,
         };
 
         // Draw sign behind crop (legacy sprites only)
@@ -641,7 +642,8 @@ impl Renderer {
 
                     let frame_index = match patch.state.as_str() {
                         "growing" | "diseased" => patch.growth_stage.min(num_frames - 1),
-                        "harvestable" => num_frames - 1,
+                        // Dead crops show the fully-grown frame, tinted to look withered.
+                        "harvestable" | "dead" => num_frames - 1,
                         _ => 0,
                     };
 
@@ -670,7 +672,8 @@ impl Renderer {
                             3 => 4,
                             _ => 4,
                         },
-                        "harvestable" => 4,
+                        // Dead crops show the fully-grown frame, tinted to look withered.
+                        "harvestable" | "dead" => 4,
                         _ => 0,
                     };
 
@@ -809,12 +812,13 @@ impl Renderer {
 
     /// Object-tileset sprite id for a tree patch's current growth stage.
     /// Stage 1->285, stage 2->286, stage 3->288, stage 4 (complete)->287.
-    /// None for empty/dead patches (which draw the soil-diamond fallback).
+    /// None for empty patches (which draw the soil-diamond fallback). Dead trees show
+    /// the full tree (287), tinted withered by the caller.
     fn tree_sprite_id(patch_state: &str, growth_stage: u32) -> Option<u32> {
-        if !matches!(patch_state, "growing" | "harvestable" | "diseased") {
+        if !matches!(patch_state, "growing" | "harvestable" | "diseased" | "dead") {
             return None;
         }
-        Some(if patch_state == "harvestable" {
+        Some(if matches!(patch_state, "harvestable" | "dead") {
             287
         } else {
             match growth_stage {
@@ -834,8 +838,9 @@ impl Renderer {
     }
 
     /// Draw a tree patch using tall object-tileset sprites keyed by growth stage.
-    /// Returns false (so the caller draws the withered-soil fallback) for dead trees
-    /// or when the object sprite can't be resolved.
+    /// Returns false (so the caller draws the soil-diamond fallback) for empty patches
+    /// or when the object sprite can't be resolved. Dead trees draw the full tree with
+    /// the caller's withered tint.
     fn draw_tree_object_sprite(
         &self,
         patch_state: &str,
