@@ -1025,12 +1025,12 @@
       381,
       386,
       381,
-      386,
       381,
-      381,
-      381,
-      381,
-      381
+      1066,
+      1066,
+      1066,
+      1066,
+      1066
     ],
     "objects": [
       0,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkABAADEAT8AQPg=",
+  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkABAADEAT8AQAA=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3146,6 +3146,11 @@
       "x": 29,
       "y": 18,
       "level": 1
+    },
+    {
+      "entityId": "farmer_barley",
+      "x": 30,
+      "y": 28
     }
   ],
   "mapObjects": [
@@ -3533,41 +3538,6 @@
       "y": 21,
       "width": 30,
       "height": 140
-    },
-    {
-      "gid": 1507,
-      "x": 31,
-      "y": 31,
-      "width": 64,
-      "height": 32
-    },
-    {
-      "gid": 1507,
-      "x": 30,
-      "y": 31,
-      "width": 64,
-      "height": 32
-    },
-    {
-      "gid": 1507,
-      "x": 29,
-      "y": 31,
-      "width": 64,
-      "height": 32
-    },
-    {
-      "gid": 1507,
-      "x": 28,
-      "y": 31,
-      "width": 64,
-      "height": 32
-    },
-    {
-      "gid": 1507,
-      "x": 27,
-      "y": 31,
-      "width": 64,
-      "height": 32
     }
   ],
   "walls": [

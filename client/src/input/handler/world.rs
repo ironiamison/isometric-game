@@ -761,7 +761,7 @@ impl InputHandler {
                 // Clicked on a farming patch
                 let patch_meta = state.farming_patches.get(&patch_id).map(|p| {
                     (
-                        p.state == "harvestable",
+                        p.state.clone(),
                         p.patch_type == "tree",
                         p.x,
                         p.y,
@@ -769,57 +769,93 @@ impl InputHandler {
                         p.height,
                     )
                 });
-                if let Some((harvestable, is_tree, anchor_x, anchor_y, pw, ph)) = patch_meta {
-                    if harvestable {
-                        let player_pos = state
-                            .get_local_player()
-                            .map(|p| (p.server_x.round() as i32, p.server_y.round() as i32));
-                        if let Some((px, py)) = player_pos {
-                            // Cardinal-adjacency to the nearest footprint tile.
-                            let cx = px.clamp(anchor_x, anchor_x + pw.max(1) as i32 - 1);
-                            let cy = py.clamp(anchor_y, anchor_y + ph.max(1) as i32 - 1);
-                            let adjacent = (px - cx).abs() <= 1 && (py - cy).abs() <= 1;
-                            if is_tree {
-                                // Mature trees are chopped down, RS-style.
-                                state.auto_action_state = Some(crate::game::AutoActionState {
+                if let Some((patch_state, is_tree, anchor_x, anchor_y, pw, ph)) = patch_meta {
+                    let player_pos = state
+                        .get_local_player()
+                        .map(|p| (p.server_x.round() as i32, p.server_y.round() as i32));
+                    if let Some((px, py)) = player_pos {
+                        // Cardinal-adjacency to the nearest footprint tile.
+                        let cx = px.clamp(anchor_x, anchor_x + pw.max(1) as i32 - 1);
+                        let cy = py.clamp(anchor_y, anchor_y + ph.max(1) as i32 - 1);
+                        let adjacent = (px - cx).abs() <= 1 && (py - cy).abs() <= 1;
+
+                        if is_tree && patch_state == "harvestable" {
+                            // Mature trees are chopped down, RS-style.
+                            state.auto_action_state = Some(crate::game::AutoActionState {
+                                target_type: "farm_tree".to_string(),
+                                target_id: patch_id.clone(),
+                                action: "chop".to_string(),
+                                confirmed: false,
+                            });
+                            if adjacent {
+                                commands.push(InputCommand::StartAutoAction {
                                     target_type: "farm_tree".to_string(),
-                                    target_id: patch_id.clone(),
+                                    target_id: patch_id,
                                     action: "chop".to_string(),
-                                    confirmed: false,
                                 });
+                            } else {
+                                start_pathfind_to_patch(state, anchor_x, anchor_y, pw, ph);
+                            }
+                        } else {
+                            // Map the patch state to its default left-click action so
+                            // players can harvest / cure / clear without opening the
+                            // right-click menu.
+                            #[derive(Clone, Copy)]
+                            enum PatchClick {
+                                Harvest,
+                                Cure,
+                                Clear,
+                            }
+                            let click = match patch_state.as_str() {
+                                "harvestable" => Some(PatchClick::Harvest),
+                                "diseased" => Some(PatchClick::Cure),
+                                "dead" => Some(PatchClick::Clear),
+                                _ => None,
+                            };
+                            if let Some(click) = click {
                                 if adjacent {
-                                    commands.push(InputCommand::StartAutoAction {
-                                        target_type: "farm_tree".to_string(),
-                                        target_id: patch_id,
-                                        action: "chop".to_string(),
+                                    commands.push(match click {
+                                        PatchClick::Harvest => {
+                                            InputCommand::HarvestCrop { patch_id }
+                                        }
+                                        PatchClick::Cure => InputCommand::CurePatch { patch_id },
+                                        PatchClick::Clear => {
+                                            InputCommand::ClearPatch { patch_id }
+                                        }
                                     });
                                 } else {
-                                    start_pathfind_to_patch(state, anchor_x, anchor_y, pw, ph);
-                                }
-                            } else if adjacent {
-                                commands.push(InputCommand::HarvestCrop { patch_id });
-                            } else {
-                                // Out of range - pathfind to adjacent tile
-                                let occupied = build_occupied_set(state, true, true);
-                                const MAX_PATH_DISTANCE: i32 = 32;
-                                if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
-                                    (px, py),
-                                    (clicked_tile_x, clicked_tile_y),
-                                    &state.chunk_manager,
-                                    &occupied,
-                                    MAX_PATH_DISTANCE,
-                                ) {
-                                    state.auto_path = Some(PathState {
-                                        path,
-                                        current_index: 0,
-                                        destination: dest,
-                                        pickup_target: None,
-                                        interact_target: None,
-                                        interact_object_target: None,
-                                        waystone_target: None,
-                                        browse_stall_target: None,
-                                    });
-                                    state.pending_harvest_patch = Some(patch_id);
+                                    // Out of range - pathfind to adjacent tile, act on arrival.
+                                    let occupied = build_occupied_set(state, true, true);
+                                    const MAX_PATH_DISTANCE: i32 = 32;
+                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                        (px, py),
+                                        (clicked_tile_x, clicked_tile_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    ) {
+                                        state.auto_path = Some(PathState {
+                                            path,
+                                            current_index: 0,
+                                            destination: dest,
+                                            pickup_target: None,
+                                            interact_target: None,
+                                            interact_object_target: None,
+                                            waystone_target: None,
+                                            browse_stall_target: None,
+                                        });
+                                        match click {
+                                            PatchClick::Harvest => {
+                                                state.pending_harvest_patch = Some(patch_id)
+                                            }
+                                            PatchClick::Cure => {
+                                                state.pending_cure_patch = Some(patch_id)
+                                            }
+                                            PatchClick::Clear => {
+                                                state.pending_clear_patch = Some(patch_id)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

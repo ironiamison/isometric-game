@@ -622,10 +622,24 @@ pub(super) fn auto_action_target_pos(
             }
             None
         }
-        "farm_tree" => state
-            .farming_patches
-            .get(&aa.target_id)
-            .map(|p| (p.x as f32, p.y as f32)),
+        "farm_tree" => state.farming_patches.get(&aa.target_id).map(|p| {
+            // Tree beds are multi-tile (e.g. 2x2). Target the footprint tile
+            // nearest the player so the range/chase checks match the server,
+            // which clamps to the nearest footprint tile. Anchoring on the
+            // corner (p.x, p.y) leaves the player perpetually "out of range"
+            // whenever they stand adjacent to a non-corner footprint tile.
+            let w = p.width.max(1) as i32;
+            let h = p.height.max(1) as i32;
+            if let Some(player) = state.get_local_player() {
+                let px = player.server_x.round() as i32;
+                let py = player.server_y.round() as i32;
+                let cx = px.clamp(p.x, p.x + w - 1);
+                let cy = py.clamp(p.y, p.y + h - 1);
+                (cx as f32, cy as f32)
+            } else {
+                (p.x as f32, p.y as f32)
+            }
+        }),
         _ => None,
     }
 }

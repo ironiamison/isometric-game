@@ -527,10 +527,15 @@ impl Renderer {
         let h = patch.height.max(1) as i32;
 
         if patch.patch_type == "tree" {
-            // One sprite, centered on the footprint.
-            let cx = patch.x as f32 + (w - 1) as f32 * 0.5;
-            let cy = patch.y as f32 + (h - 1) as f32 * 0.5;
+            // One sprite, centered on the footprint. The visual center of a w×h
+            // bed is world (x + w/2, y + h/2): a tile's center sits half a tile
+            // below its integer corner, so (w-1)/2 would anchor half a tile high.
+            let cx = patch.x as f32 + w as f32 * 0.5;
+            let cy = patch.y as f32 + h as f32 * 0.5;
             let (sx, sy) = world_to_screen(cx, cy, &state.camera);
+            // Nudge the trunk up slightly so it reads as sitting in the soil
+            // rather than the geometric center of the bed.
+            let sy = sy - 10.0 * zoom;
             self.draw_patch_at(patch, sx, sy, zoom, time);
         } else {
             // Draw the crop on every footprint tile (filled-bed look).
@@ -907,7 +912,18 @@ impl Renderer {
             None => return,
         };
 
-        let (screen_x, screen_y) = world_to_screen(patch.x as f32, patch.y as f32, &state.camera);
+        // Multi-tile beds (allotments) index every footprint tile to the same
+        // patch, so anchor the label over the tile actually under the cursor
+        // instead of the patch origin. Single-sprite patches (e.g. trees) anchor
+        // on the footprint center so the label sits over the canopy.
+        let (anchor_x, anchor_y) = if patch.patch_type == "allotment" {
+            (hovered_tile.0 as f32, hovered_tile.1 as f32)
+        } else {
+            let w = patch.width.max(1) as f32;
+            let h = patch.height.max(1) as f32;
+            (patch.x as f32 + w * 0.5, patch.y as f32 + h * 0.5)
+        };
+        let (screen_x, screen_y) = world_to_screen(anchor_x, anchor_y, &state.camera);
         let zoom = state.camera.zoom;
 
         // Title-case a snake_case id for display, e.g. "tangleroots" -> "Tangleroots"

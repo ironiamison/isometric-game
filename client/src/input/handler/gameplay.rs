@@ -1051,11 +1051,19 @@ impl InputHandler {
                             let face_x = px + fdx as i32;
                             let face_y = py + fdy as i32;
 
-                            // Check if facing tile has a tree object and is not depleted
+                            // Check if facing tile has a *tree* object and is not
+                            // depleted. The gid filter matters: decorative map
+                            // objects (fences, bushes) sit next to trees and farm
+                            // patches, and without it we'd fire a ChopTree at them
+                            // and the server replies "Not a valid tree".
                             if !state.depleted_trees.contains_key(&(face_x, face_y)) {
-                                let obj_result =
-                                    state.chunk_manager.get_object_at_exact(face_x, face_y);
-                                obj_result.map(|obj| (face_x, face_y, obj.gid))
+                                state
+                                    .chunk_manager
+                                    .get_object_at_exact(face_x, face_y)
+                                    .filter(|obj| {
+                                        crate::game::tree_types::is_tree_gid(obj.gid)
+                                    })
+                                    .map(|obj| (face_x, face_y, obj.gid))
                             } else {
                                 None
                             }

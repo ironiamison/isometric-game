@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "//D/AcgAgAEAEIAAAACAAAAAgAEAAICBAACAAACAoAAAAIAAIACAAQgAgAEAAIABAACAAAABkAEAYIABAADAfwAAAOAAAAAAAAAAAAAAAABAQAAAAACAIAAAADwAAAAEAAEAAAAAQAAAAAAAhACA/wAAwAAAAEAAAABAAAAAQgA=",
+  "collision": "f/D/AcgAgAEAEIAAAACAAAAAgAEAAICBAACAAACAoAAAAIAAIACAAQgAgAEAAIABAACAAAABkAEAYIABAADAfwAAAOAAAAAAAAAAAAAAAABAQAAAAACAIAAAADwAAAAEAAEAAAAAQAAAAAAAhACA/wAAwAAAAEAAAABAAAAAQgA=",
   "entities": [
     {
       "entityId": "crow",
@@ -3575,20 +3575,6 @@
       "y": 2,
       "width": 64,
       "height": 32
-    },
-    {
-      "gid": 1601,
-      "x": 7,
-      "y": 0,
-      "width": 64,
-      "height": 186
-    },
-    {
-      "gid": 1601,
-      "x": 11,
-      "y": 0,
-      "width": 64,
-      "height": 186
     },
     {
       "gid": 1263,
@@ -4150,5 +4136,6 @@
     }
   ],
   "portals": [],
-  "gatheringZones": []
+  "gatheringZones": [],
+  "farmingPlots": []
 }
