@@ -25,6 +25,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/mapper/, ''),
       },
+      // Login/logout must reach the backend so the session cookie is set; without
+      // these, logging in through the Vite dev server silently fails and every
+      // /mapper/api call returns 401.
+      '/mapper/login': { target: 'http://localhost:3000', changeOrigin: true },
+      '/mapper/logout': { target: 'http://localhost:3000', changeOrigin: true },
       '/mapper-config.json': {
         target: 'http://localhost:3000',
         changeOrigin: true,

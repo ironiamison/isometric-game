@@ -3,7 +3,7 @@ import { useEditorStore } from '@/state/store';
 import { isometricRenderer } from '@/core/IsometricRenderer';
 import { screenToWorldTile, worldToChunk, getBrushTiles } from '@/core/coords';
 import { Tool, Layer } from '@/types';
-import type { DevNote } from '@/types';
+import type { DevNote, FarmingPlot, FarmingPatchType } from '@/types';
 import { history } from '@/core/History';
 import { ContextMenu } from '@/components/ContextMenu';
 import { notesStorage } from '@/core/NotesStorage';
@@ -63,6 +63,10 @@ export function Canvas() {
     toggleGatheringZone,
     findGatheringZoneAtWorld,
     setSelectedGatheringZone,
+    findFarmingPlotAtWorld,
+    addFarmingPlot,
+    setSelectedFarmingPlot,
+    selectedFarmingPatchType,
     setBrushSize,
     setSelectedTileId,
     findEntityAtWorld,
@@ -640,6 +644,41 @@ export function Canvas() {
           }
           break;
         }
+        case Tool.FarmingPlot: {
+          const existingPlot = findFarmingPlotAtWorld(worldTile);
+          if (existingPlot) {
+            setSelectedFarmingPlot({
+              chunkCoord: existingPlot.chunkCoord,
+              plotId: existingPlot.plot.id,
+            });
+          } else {
+            // Click to place a plot with a sensible default footprint for its type;
+            // resize / set capacity in the properties panel.
+            const cx = Math.floor(worldTile.wx / 32);
+            const cy = Math.floor(worldTile.wy / 32);
+            const lx = ((worldTile.wx % 32) + 32) % 32;
+            const ly = ((worldTile.wy % 32) + 32) % 32;
+            const patchType = selectedFarmingPatchType as FarmingPatchType;
+            const defaults: Record<FarmingPatchType, { w: number; h: number; cap: number }> = {
+              allotment: { w: 2, h: 2, cap: 4 },
+              herb: { w: 1, h: 1, cap: 1 },
+              cactus: { w: 1, h: 1, cap: 1 },
+              tree: { w: 2, h: 2, cap: 1 },
+            };
+            const d = defaults[patchType];
+            const plot: FarmingPlot = {
+              id: `fp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+              x: lx,
+              y: ly,
+              width: d.w,
+              height: d.h,
+              patchType,
+              capacity: d.cap,
+            };
+            addFarmingPlot({ cx, cy }, plot);
+          }
+          break;
+        }
         case Tool.HeightRaise:
           for (const t of tiles) {
             adjustHeight(t, 1);
@@ -676,6 +715,10 @@ export function Canvas() {
       toggleGatheringZone,
       findGatheringZoneAtWorld,
       setSelectedGatheringZone,
+      findFarmingPlotAtWorld,
+      addFarmingPlot,
+      setSelectedFarmingPlot,
+      selectedFarmingPatchType,
       setSelectedTileId,
       findEntityAtWorld,
       setSelectedEntitySpawn,

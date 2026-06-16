@@ -69,6 +69,24 @@ pub struct GatheringZoneMarker {
     pub zone_id: String,
 }
 
+/// A farming plot authored in the map. `(world_x, world_y)` is the NW anchor tile;
+/// the footprint spans `width`×`height` tiles. Loaded into the FarmingSystem at bootstrap.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FarmingPlotMarker {
+    /// Stable id used to key per-player crop state + DB rows.
+    pub id: String,
+    /// World tile X coordinate of the NW anchor.
+    pub world_x: i32,
+    /// World tile Y coordinate of the NW anchor.
+    pub world_y: i32,
+    /// "allotment" | "herb" | "cactus" | "tree".
+    pub patch_type: String,
+    pub width: u32,
+    pub height: u32,
+    /// Number of plants the plot holds (seeds consumed, yield multiplier).
+    pub capacity: u32,
+}
+
 /// A portal that teleports players to another map
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -242,6 +260,8 @@ pub struct Chunk {
     pub portals: Vec<Portal>,
     /// Gathering zone markers (fishing spots, etc.)
     pub gathering_zones: Vec<GatheringZoneMarker>,
+    /// Farming plots authored in the map
+    pub farming_plots: Vec<FarmingPlotMarker>,
     /// Optional height data for block-based terrain (None = flat z=0)
     pub height_data: Option<HeightData>,
 }
@@ -262,6 +282,7 @@ impl Chunk {
             walls: Vec::new(),
             portals: Vec::new(),
             gathering_zones: Vec::new(),
+            farming_plots: Vec::new(),
             height_data: None,
         }
     }

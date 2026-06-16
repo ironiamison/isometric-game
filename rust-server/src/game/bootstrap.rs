@@ -210,6 +210,25 @@ impl GameRoom {
         // Load farming system
         let mut farming = crate::farming::FarmingSystem::load(std::path::Path::new("data"))
             .unwrap_or_else(|error| panic!("farming content validation failed: {error}"));
+
+        // Register map-authored farming plots from every chunk's `farmingPlots`.
+        for coord in &chunk_coords {
+            if let Some(chunk) = world.get_or_load_chunk(*coord).await {
+                for plot in &chunk.farming_plots {
+                    farming.register_patch(crate::farming::FarmingPatch {
+                        id: plot.id.clone(),
+                        x: plot.world_x,
+                        y: plot.world_y,
+                        patch_type: plot.patch_type.clone(),
+                        plot: 1,
+                        width: plot.width,
+                        height: plot.height,
+                        capacity: plot.capacity,
+                    });
+                }
+            }
+        }
+
         tracing::info!(
             "Loaded farming system with {} crops, {} patches",
             farming.crops.len(),
@@ -217,25 +236,98 @@ impl GameRoom {
         );
         let mut resource_contracts = crate::resource_contracts::ResourceContractManager::new();
 
-        // Restore planted patches from database
+        // Restore planted patches from database. Rows still keyed to a legacy
+        // hardcoded patch id (e.g. "p1_allotment_2") that no longer exists in the
+        // map are retired: their seeds are refunded to the player's bank and the
+        // dead rows deleted. Map-authored plots use "fp_*" ids, so they're never
+        // mistaken for legacy — and we never touch an *unknown* unregistered id, so
+        // a chunk that fails to load this boot can't cause us to delete live crops.
         if let Some(ref db) = db {
             match db.load_farming_patches().await {
                 Ok(saved_patches) => {
-                    let count = saved_patches.len();
-                    for row in saved_patches {
-                        farming.restore_patch(
-                            &row.patch_id,
-                            &row.player_id,
-                            &row.crop_id,
-                            row.planted_at,
-                            row.lives_remaining,
-                            &row.health,
-                            row.composted,
-                            row.disease_cycle_marker,
-                        );
+                    let mut restored = 0usize;
+                    let mut legacy_refunds: HashMap<i64, crate::db::LegacyFarmingRefund> =
+                        HashMap::new();
+                    for row in &saved_patches {
+                        if farming.patches.contains_key(&row.patch_id) {
+                            farming.restore_patch(
+                                &row.patch_id,
+                                &row.player_id,
+                                &row.crop_id,
+                                row.planted_at,
+                                row.lives_remaining,
+                                &row.health,
+                                row.composted,
+                                row.disease_cycle_marker,
+                            );
+                            restored += 1;
+                            continue;
+                        }
+                        if !is_legacy_farming_patch_id(&row.patch_id) {
+                            continue;
+                        }
+                        let Some(character_id) = row
+                            .player_id
+                            .strip_prefix("char_")
+                            .and_then(|id| id.parse::<i64>().ok())
+                        else {
+                            tracing::warn!(
+                                "Legacy farming patch {} has unparseable player_id {}, skipping",
+                                row.patch_id,
+                                row.player_id
+                            );
+                            continue;
+                        };
+                        let plan = legacy_refunds.entry(character_id).or_insert_with(|| {
+                            crate::db::LegacyFarmingRefund {
+                                character_id,
+                                player_id: row.player_id.clone(),
+                                seeds: Vec::new(),
+                                patch_ids: Vec::new(),
+                            }
+                        });
+                        plan.patch_ids.push(row.patch_id.clone());
+                        // Refund what the player sank into the bed: one seed per
+                        // plant, i.e. the patch capacity. Allotment beds hold 4;
+                        // every other patch type holds 1.
+                        match farming.crops.get(&row.crop_id) {
+                            Some(crop) => {
+                                let quantity = if crop.category == "allotment" { 4 } else { 1 };
+                                if let Some(seed) =
+                                    plan.seeds.iter_mut().find(|(id, _)| *id == crop.seed_item)
+                                {
+                                    seed.1 += quantity;
+                                } else {
+                                    plan.seeds.push((crop.seed_item.clone(), quantity));
+                                }
+                            }
+                            None => tracing::warn!(
+                                "Legacy farming patch {} references unknown crop {}; dropping row without refund",
+                                row.patch_id,
+                                row.crop_id
+                            ),
+                        }
                     }
-                    if count > 0 {
-                        tracing::info!("Restored {} planted farming patches from database", count);
+                    if restored > 0 {
+                        tracing::info!("Restored {} planted farming patches from database", restored);
+                    }
+                    if !legacy_refunds.is_empty() {
+                        let plans: Vec<_> = legacy_refunds.into_values().collect();
+                        let rows_retired: usize = plans.iter().map(|p| p.patch_ids.len()).sum();
+                        let seeds_refunded: i32 =
+                            plans.iter().flat_map(|p| p.seeds.iter().map(|(_, q)| *q)).sum();
+                        match db.retire_legacy_farming_patches(&plans).await {
+                            Ok(()) => tracing::info!(
+                                "Retired {} legacy farming patch row(s) across {} character(s), refunding {} seed(s) to banks",
+                                rows_retired,
+                                plans.len(),
+                                seeds_refunded
+                            ),
+                            Err(e) => tracing::error!(
+                                "Failed to retire legacy farming patches: {}",
+                                e
+                            ),
+                        }
                     }
                 }
                 Err(e) => {
@@ -672,5 +764,28 @@ impl GameRoom {
             second_level_player_name: RwLock::new(None),
             second_level_value: RwLock::new(0),
         }
+    }
+}
+
+/// Legacy hardcoded farming patches used ids like "p1_allotment_2" (a leading
+/// `p` followed by a digit). Map-authored plots use "fp_*" ids, so this never
+/// matches a live plot — letting us safely retire stale planted rows.
+fn is_legacy_farming_patch_id(id: &str) -> bool {
+    let mut chars = id.chars();
+    chars.next() == Some('p') && chars.next().is_some_and(|c| c.is_ascii_digit())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_legacy_farming_patch_id;
+
+    #[test]
+    fn legacy_ids_match_but_map_authored_ids_do_not() {
+        assert!(is_legacy_farming_patch_id("p1_allotment_2"));
+        assert!(is_legacy_farming_patch_id("p3_tree_1"));
+        // Map-authored plots must never be treated as legacy/retirable.
+        assert!(!is_legacy_farming_patch_id("fp_1781635030232_hdtbt9w"));
+        assert!(!is_legacy_farming_patch_id("patch_1"));
+        assert!(!is_legacy_farming_patch_id(""));
     }
 }

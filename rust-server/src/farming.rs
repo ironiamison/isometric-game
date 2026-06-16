@@ -13,7 +13,7 @@ use std::path::Path;
 use tracing::info;
 
 pub use self::contracts::{ContractDifficulty, FarmingContract};
-pub use self::patches::{FarmingPatch, PLOT_REQUIREMENTS, PlayerPatchState, PlotRequirement};
+pub use self::patches::{FarmingPatch, PlayerPatchState};
 #[allow(unused_imports)]
 pub use self::patches::{HarvestResult, PatchHealth, PatchUpdate};
 
@@ -55,38 +55,6 @@ fn default_lives() -> u32 {
     1
 }
 
-#[derive(Deserialize, Debug, Clone)]
-struct PatchLocationEntry {
-    pub id: String,
-    pub x: i32,
-    pub y: i32,
-    pub patch_type: String,
-    #[serde(default = "default_plot")]
-    pub plot: u32,
-    /// Footprint width in tiles (anchor is the NW tile). Defaults to 1.
-    #[serde(default = "default_one")]
-    pub width: u32,
-    /// Footprint height in tiles. Defaults to 1.
-    #[serde(default = "default_one")]
-    pub height: u32,
-    /// Number of plants the patch holds (seeds consumed at planting, yield multiplier).
-    #[serde(default = "default_one")]
-    pub capacity: u32,
-}
-
-fn default_plot() -> u32 {
-    1
-}
-
-fn default_one() -> u32 {
-    1
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct PatchLocationsFile {
-    patches: Vec<PatchLocationEntry>,
-}
-
 /// The farming system - patch locations are global, patch states are per-player.
 pub struct FarmingSystem {
     pub crops: HashMap<String, CropConfig>,
@@ -117,7 +85,9 @@ impl FarmingSystem {
         }
     }
 
-    /// Load farming config from data directory
+    /// Load farming config from data directory. Patch *definitions* now come from the
+    /// map (chunk `farmingPlots`, registered via `register_patch` at bootstrap); this
+    /// only loads crop definitions.
     pub fn load(data_dir: &Path) -> Result<Self, String> {
         let mut system = Self::new();
 
@@ -132,37 +102,15 @@ impl FarmingSystem {
             system.crops = crops;
         }
 
-        // Load patch locations
-        let locations_path = data_dir.join("farming_patch_locations.toml");
-        if locations_path.exists() {
-            let content = std::fs::read_to_string(&locations_path)
-                .map_err(|e| format!("Failed to read farming_patch_locations.toml: {}", e))?;
-            let locations: PatchLocationsFile = toml::from_str(&content)
-                .map_err(|e| format!("Failed to parse farming_patch_locations.toml: {}", e))?;
-
-            for entry in locations.patches {
-                let width = entry.width.max(1);
-                let height = entry.height.max(1);
-                let patch = FarmingPatch {
-                    id: entry.id.clone(),
-                    x: entry.x,
-                    y: entry.y,
-                    patch_type: entry.patch_type,
-                    plot: entry.plot,
-                    width,
-                    height,
-                    capacity: entry.capacity.max(1),
-                };
-                // Index every tile of the footprint so a click anywhere on the
-                // bed resolves to this patch.
-                for (tx, ty) in patches::patch_occupied_tiles(entry.x, entry.y, width, height) {
-                    system.patch_positions.insert((tx, ty), entry.id.clone());
-                }
-                system.patches.insert(entry.id, patch);
-            }
-            info!("Loaded {} farming patch locations", system.patches.len());
-        }
-
         Ok(system)
+    }
+
+    /// Register a map-authored farming patch, indexing every tile of its footprint
+    /// so a click anywhere on the bed resolves to this patch.
+    pub fn register_patch(&mut self, patch: FarmingPatch) {
+        for (tx, ty) in patches::patch_occupied_tiles(patch.x, patch.y, patch.width, patch.height) {
+            self.patch_positions.insert((tx, ty), patch.id.clone());
+        }
+        self.patches.insert(patch.id.clone(), patch);
     }
 }

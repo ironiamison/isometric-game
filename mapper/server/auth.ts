@@ -78,7 +78,26 @@ export async function installMapperAuth(
   if (isProduction && (!configuredAuthSecret || configuredAuthSecret.length < 32)) {
     throw new Error('MAPPER_AUTH_SECRET must be set to at least 32 characters in production');
   }
-  const AUTH_SECRET = configuredAuthSecret || crypto.randomBytes(32).toString('hex');
+  let AUTH_SECRET = configuredAuthSecret || '';
+  if (!AUTH_SECRET) {
+    // Dev only: persist a generated secret to disk so the frequent dev-server
+    // restarts (tsx watch) don't invalidate everyone's login cookie each boot.
+    const secretPath = path.join(mapperRoot, 'mapper-data', '.auth-secret');
+    try {
+      AUTH_SECRET = (await fs.readFile(secretPath, 'utf-8')).trim();
+    } catch {
+      // no persisted secret yet
+    }
+    if (!AUTH_SECRET) {
+      AUTH_SECRET = crypto.randomBytes(32).toString('hex');
+      try {
+        await fs.mkdir(path.dirname(secretPath), { recursive: true });
+        await fs.writeFile(secretPath, AUTH_SECRET, { mode: 0o600 });
+      } catch (err) {
+        console.warn('Could not persist dev auth secret; sessions will reset on restart:', err);
+      }
+    }
+  }
   const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
   const COOKIE_SECURITY = isProduction ? '; Secure' : '';
   const COOKIE_PRIORITY = '; Priority=High';

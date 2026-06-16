@@ -313,6 +313,9 @@ function App() {
         case 'f':
           store.setActiveTool('gatheringZone');
           break;
+        case 'm':
+          store.setActiveTool('farmingPlot');
+          break;
         case 'd':
           store.setActiveTool('wallDown');
           break;

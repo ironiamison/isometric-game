@@ -816,6 +816,10 @@ export class IsometricRenderer {
       this.renderGatheringZones(chunk, viewport);
     }
 
+    for (const chunk of sortedChunks) {
+      this.renderFarmingPlots(chunk, viewport);
+    }
+
     if (this.options.showHeights) {
       for (const chunk of sortedChunks) {
         this.renderHeightLabels(chunk, viewport);
@@ -1689,6 +1693,60 @@ export class IsometricRenderer {
           screen.sx,
           screen.sy + (TILE_HEIGHT / 2) * viewport.zoom,
         );
+      }
+    }
+  }
+
+  private renderFarmingPlots(chunk: Chunk, viewport: Viewport): void {
+    if (!this.ctx || !chunk.farmingPlots || chunk.farmingPlots.length === 0) return;
+
+    // [fill, stroke] per patch type.
+    const COLORS: Record<string, [string, string]> = {
+      allotment: ["rgba(150, 95, 45, 0.35)", "rgba(220, 150, 80, 0.95)"],
+      herb: ["rgba(45, 165, 75, 0.35)", "rgba(95, 230, 120, 0.95)"],
+      cactus: ["rgba(55, 155, 120, 0.35)", "rgba(95, 220, 180, 0.95)"],
+      tree: ["rgba(115, 80, 40, 0.35)", "rgba(180, 135, 75, 0.95)"],
+    };
+    const hw = (TILE_WIDTH / 2) * viewport.zoom;
+    const hh = (TILE_HEIGHT / 2) * viewport.zoom;
+    const fullH = TILE_HEIGHT * viewport.zoom;
+
+    for (const plot of chunk.farmingPlots) {
+      const [fill, stroke] = COLORS[plot.patchType] ?? COLORS.allotment;
+      let sumX = 0;
+      let sumY = 0;
+      let n = 0;
+      for (let dy = 0; dy < plot.height; dy++) {
+        for (let dx = 0; dx < plot.width; dx++) {
+          const worldCoord = chunkLocalToWorld(chunk.coord, {
+            lx: plot.x + dx,
+            ly: plot.y + dy,
+          });
+          const screen = worldToScreen(worldCoord, viewport);
+          this.ctx.fillStyle = fill;
+          this.ctx.beginPath();
+          this.ctx.moveTo(screen.sx, screen.sy);
+          this.ctx.lineTo(screen.sx + hw, screen.sy + hh);
+          this.ctx.lineTo(screen.sx, screen.sy + fullH);
+          this.ctx.lineTo(screen.sx - hw, screen.sy + hh);
+          this.ctx.closePath();
+          this.ctx.fill();
+          this.ctx.strokeStyle = stroke;
+          this.ctx.lineWidth = 1.5;
+          this.ctx.stroke();
+          sumX += screen.sx;
+          sumY += screen.sy + hh;
+          n++;
+        }
+      }
+      if (viewport.zoom >= 0.4 && n > 0) {
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.font = `bold ${9 * Math.max(1, viewport.zoom)}px sans-serif`;
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "middle";
+        const label =
+          plot.capacity > 1 ? `${plot.patchType} x${plot.capacity}` : plot.patchType;
+        this.ctx.fillText(label, sumX / n, sumY / n);
       }
     }
   }

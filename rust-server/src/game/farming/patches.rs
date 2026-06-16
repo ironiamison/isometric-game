@@ -1,5 +1,5 @@
 use super::*;
-use crate::protocol::{DialogueChoice, FarmingPatchData, TileOverride};
+use crate::protocol::{FarmingPatchData, TileOverride};
 
 /// Per-swing chance a farmed tree falls when chopped (gives roughly 1–10 chops).
 const FARM_TREE_FELL_CHANCE: f32 = 0.30;
@@ -666,135 +666,6 @@ impl GameRoom {
         }
     }
 
-    pub(in crate::game) async fn show_plot_purchase_dialogue(&self, player_id: &str, npc_id: &str) {
-        let npc_name = self.master_farmer_name(npc_id).await;
-        let (farming_level, gold) = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(player) => (player.skills.farming.level, player.inventory.gold),
-                None => return,
-            }
-        };
-        let unlocked = {
-            let farming = self.farming.read().await;
-            farming.get_unlocked_plots(player_id)
-        };
-
-        let mut choices: Vec<DialogueChoice> = crate::farming::PLOT_REQUIREMENTS
-            .iter()
-            .map(|req| {
-                plot_purchase_choice(req, unlocked.contains(&req.plot_id), farming_level, gold)
-            })
-            .collect();
-        choices.push(DialogueChoice {
-            id: "nevermind".to_string(),
-            text: "Go back".to_string(),
-        });
-
-        let text = format!(
-            "Each plot unlocks a new mixed garden with allotment, herb, cactus, and tree patches.\n\nYour gold: {}gp | Farming level: {}",
-            gold, farming_level
-        );
-
-        self.send_to_player(
-            player_id,
-            ServerMessage::ShowDialogue {
-                quest_id: format!("plot_seller:{}", npc_id),
-                npc_id: npc_id.to_string(),
-                speaker: npc_name,
-                text,
-                choices,
-            },
-        )
-        .await;
-    }
-
-    pub(in crate::game) async fn handle_plot_purchase(&self, player_id: &str, plot_id: u32) {
-        let Some(req) = crate::farming::PLOT_REQUIREMENTS
-            .iter()
-            .find(|req| req.plot_id == plot_id)
-        else {
-            self.send_system_message(player_id, "Invalid plot.").await;
-            return;
-        };
-
-        let already_unlocked = {
-            let farming = self.farming.read().await;
-            farming.is_plot_unlocked(player_id, plot_id)
-        };
-        if already_unlocked {
-            self.send_system_message(player_id, "You already own this plot.")
-                .await;
-            return;
-        }
-
-        let (farming_level, gold) = {
-            let players = self.players.read().await;
-            match players.get(player_id) {
-                Some(player) => (player.skills.farming.level, player.inventory.gold),
-                None => return,
-            }
-        };
-
-        if farming_level < req.farming_level {
-            self.send_system_message(
-                player_id,
-                &format!(
-                    "You need Farming level {} to unlock this plot.",
-                    req.farming_level
-                ),
-            )
-            .await;
-            return;
-        }
-
-        if gold < req.gold_cost {
-            self.send_system_message(
-                player_id,
-                &format!(
-                    "You need {}gp to unlock this plot. You have {}gp.",
-                    req.gold_cost, gold
-                ),
-            )
-            .await;
-            return;
-        }
-
-        let inv_msg = {
-            let mut players = self.players.write().await;
-            let Some(player) = players.get_mut(player_id) else {
-                return;
-            };
-            player.inventory.gold -= req.gold_cost;
-            inventory_update_message(player_id, &player.inventory)
-        };
-
-        self.send_to_player(player_id, inv_msg).await;
-
-        {
-            let mut farming = self.farming.write().await;
-            farming.unlock_plot(player_id, plot_id);
-        }
-
-        if let Some(ref db) = self.db
-            && let Err(e) = db.save_plot_unlock(player_id, plot_id).await
-        {
-            tracing::error!("Failed to save plot unlock: {}", e);
-        }
-
-        self.send_system_message(
-            player_id,
-            &format!(
-                "You've unlocked Plot {}! A new garden with fresh farming patches is now available.",
-                plot_id
-            ),
-        )
-        .await;
-
-        let patches_msg = self.get_farming_patches_message(player_id).await;
-        self.send_to_player(player_id, patches_msg).await;
-    }
-
     pub async fn get_farming_patches_message(&self, player_id: &str) -> ServerMessage {
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -884,31 +755,6 @@ impl GameRoom {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn plot_purchase_choice_reflects_owned_locked_and_affordable_states() {
-        let req = crate::farming::PlotRequirement {
-            plot_id: 2,
-            farming_level: 15,
-            gold_cost: 500,
-        };
-
-        let owned = plot_purchase_choice(&req, true, 99, 9999);
-        assert_eq!(owned.id, "owned_2");
-        assert_eq!(owned.text, "Plot 2 (Owned)");
-
-        let level_locked = plot_purchase_choice(&req, false, 10, 9999);
-        assert_eq!(level_locked.id, "locked_2");
-        assert!(level_locked.text.contains("Requires Farming 15"));
-
-        let gold_locked = plot_purchase_choice(&req, false, 20, 100);
-        assert_eq!(gold_locked.id, "locked_2");
-        assert!(gold_locked.text.contains("Not enough gold"));
-
-        let affordable = plot_purchase_choice(&req, false, 20, 500);
-        assert_eq!(affordable.id, "unlock_2");
-        assert_eq!(affordable.text, "Plot 2 - 500gp");
-    }
 
     #[test]
     fn plot_tile_id_matches_locked_and_unlocked_tiles() {

@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useEditorStore } from '@/state/store';
 import { objectLoader } from '@/core/ObjectLoader';
 import { interiorStorage } from '@/core/InteriorStorage';
-import type { EntitySpawn, Portal, ExitPortal } from '@/types';
+import type { EntitySpawn, Portal, ExitPortal, FarmingPatchType } from '@/types';
+import { FARMING_PATCH_TYPES, Tool } from '@/types';
 import styles from './PropertiesPanel.module.css';
 
 const GATHERING_ZONE_TYPES = [
@@ -37,6 +38,12 @@ export function PropertiesPanel() {
     removePortal,
     removeGatheringZone,
     updateGatheringZone,
+    selectedFarmingPlot,
+    setSelectedFarmingPlot,
+    removeFarmingPlot,
+    updateFarmingPlot,
+    selectedFarmingPatchType,
+    setSelectedFarmingPatchType,
     updateExitPortal,
     removeExitPortal,
     jumpToPortalTarget,
@@ -102,6 +109,17 @@ export function PropertiesPanel() {
   };
 
   // Get the actual gathering zone from the selection
+  const getSelectedFarmingPlotData = () => {
+    if (!selectedFarmingPlot) return null;
+    const chunk = chunks.get(
+      `${selectedFarmingPlot.chunkCoord.cx},${selectedFarmingPlot.chunkCoord.cy}`
+    );
+    if (!chunk) return null;
+    const plot = chunk.farmingPlots.find((p) => p.id === selectedFarmingPlot.plotId);
+    if (!plot) return null;
+    return { plot, chunkCoord: selectedFarmingPlot.chunkCoord };
+  };
+
   const getSelectedGatheringZoneData = () => {
     if (!selectedGatheringZone) return null;
     const chunk = chunks.get(
@@ -149,6 +167,7 @@ export function PropertiesPanel() {
   const selectedPortalData = getSelectedPortalData();
   const selectedExitPortalData = getSelectedExitPortalData();
   const selectedGatheringZoneData = getSelectedGatheringZoneData();
+  const selectedFarmingPlotData = getSelectedFarmingPlotData();
   const interiorEntityData = getSelectedInteriorEntityData();
   const interiorObjectData = getSelectedInteriorMapObjectData();
   const interiorWallData = getSelectedInteriorWallData();
@@ -177,6 +196,10 @@ export function PropertiesPanel() {
           e.preventDefault();
           removeGatheringZone(selectedGatheringZoneData.chunkCoord, selectedGatheringZoneData.zone.id);
           setSelectedGatheringZone(null);
+        } else if (selectedFarmingPlotData) {
+          e.preventDefault();
+          removeFarmingPlot(selectedFarmingPlotData.chunkCoord, selectedFarmingPlotData.plot.id);
+          setSelectedFarmingPlot(null);
         } else if (selectedExitPortalData) {
           e.preventDefault();
           removeExitPortal(selectedExitPortalData.id);
@@ -203,7 +226,7 @@ export function PropertiesPanel() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedEntity, selectedObject, selectedWallData, selectedPortalData, selectedGatheringZoneData, selectedExitPortalData, interiorEntityData, interiorObjectData, interiorWallData, removeEntity, removeMapObject, removeWall, removePortal, removeGatheringZone, removeExitPortal, removeInteriorEntity, removeInteriorMapObject, removeInteriorWall, setSelectedEntitySpawn, setSelectedMapObject, setSelectedWall, setSelectedPortal, setSelectedGatheringZone, setSelectedExitPortal, setSelectedInteriorEntity, setSelectedInteriorMapObject, setSelectedInteriorWall]);
+  }, [selectedEntity, selectedObject, selectedWallData, selectedPortalData, selectedGatheringZoneData, selectedFarmingPlotData, selectedExitPortalData, interiorEntityData, interiorObjectData, interiorWallData, removeEntity, removeMapObject, removeWall, removePortal, removeGatheringZone, removeFarmingPlot, removeExitPortal, removeInteriorEntity, removeInteriorMapObject, removeInteriorWall, setSelectedEntitySpawn, setSelectedMapObject, setSelectedWall, setSelectedPortal, setSelectedGatheringZone, setSelectedFarmingPlot, setSelectedExitPortal, setSelectedInteriorEntity, setSelectedInteriorMapObject, setSelectedInteriorWall]);
 
   // Show portal properties
   if (selectedPortalData) {
@@ -482,6 +505,84 @@ export function PropertiesPanel() {
             <button className={styles.deleteButton} onClick={handleDeleteZone}>
               Delete Zone
             </button>
+          </div>
+          <div className={styles.hint}>Press Delete to remove</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show farming plot properties
+  if (selectedFarmingPlotData) {
+    const { plot, chunkCoord } = selectedFarmingPlotData;
+    const worldX = chunkCoord.cx * 32 + plot.x;
+    const worldY = chunkCoord.cy * 32 + plot.y;
+
+    const handleChange = (updates: Partial<typeof plot>) => {
+      updateFarmingPlot(chunkCoord, plot.id, updates);
+    };
+    const handleDelete = () => {
+      removeFarmingPlot(chunkCoord, plot.id);
+      setSelectedFarmingPlot(null);
+    };
+
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Farming Plot</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Patch Type</label>
+            <select
+              className={styles.select}
+              value={plot.patchType}
+              onChange={(e) => handleChange({ patchType: e.target.value as FarmingPatchType })}
+            >
+              {FARMING_PATCH_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Width</label>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              max={32}
+              value={plot.width}
+              onChange={(e) => handleChange({ width: Math.max(1, Number(e.target.value) || 1) })}
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Height</label>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              max={32}
+              value={plot.height}
+              onChange={(e) => handleChange({ height: Math.max(1, Number(e.target.value) || 1) })}
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Capacity (seeds / yield)</label>
+            <input
+              type="number"
+              className={styles.input}
+              min={1}
+              value={plot.capacity}
+              onChange={(e) => handleChange({ capacity: Math.max(1, Number(e.target.value) || 1) })}
+            />
+          </div>
+          <div className={styles.info}>
+            Anchor: {worldX}, {worldY}
+            <br />
+            Chunk: {chunkCoord.cx}, {chunkCoord.cy}
+            <br />
+            Local: {plot.x}, {plot.y}
+          </div>
+          <div className={styles.actions}>
+            <button className={styles.deleteButton} onClick={handleDelete}>Delete Plot</button>
           </div>
           <div className={styles.hint}>Press Delete to remove</div>
         </div>
@@ -898,6 +999,32 @@ export function PropertiesPanel() {
             </select>
           </div>
           <div className={styles.hint}>Click tiles to place zones. Click existing zones to edit.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeTool === Tool.FarmingPlot) {
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>Farming Plot</div>
+        <div className={styles.content}>
+          <div className={styles.field}>
+            <label className={styles.label}>Place Patch Type</label>
+            <select
+              className={styles.select}
+              value={selectedFarmingPatchType}
+              onChange={(e) => setSelectedFarmingPatchType(e.target.value as FarmingPatchType)}
+            >
+              {FARMING_PATCH_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.hint}>
+            Click to place a plot (default footprint for its type). Click a plot to edit
+            its size, capacity, and type.
+          </div>
         </div>
       </div>
     );

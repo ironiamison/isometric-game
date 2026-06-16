@@ -486,6 +486,7 @@ function convertChunkToMapperFormat(gameChunk: Record<string, unknown>): Record<
     walls: gameChunk.walls || [],
     portals: gameChunk.portals || [],
     gatheringZones: gameChunk.gatheringZones || [],
+    farmingPlots: gameChunk.farmingPlots || [],
   };
 }
 
@@ -594,6 +595,7 @@ function convertChunkToGameFormat(mapperChunk: Record<string, unknown>): Record<
     walls: mapperChunk.walls || [],
     portals: mapperChunk.portals || [],
     gatheringZones: mapperChunk.gatheringZones || [],
+    farmingPlots: mapperChunk.farmingPlots || [],
   };
 }
 

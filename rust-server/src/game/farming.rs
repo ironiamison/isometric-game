@@ -39,41 +39,6 @@ fn patch_update_message(update: &crate::farming::PatchUpdate) -> ServerMessage {
     }
 }
 
-fn plot_purchase_choice(
-    req: &crate::farming::PlotRequirement,
-    owned: bool,
-    farming_level: i32,
-    gold: i32,
-) -> crate::protocol::DialogueChoice {
-    if owned {
-        crate::protocol::DialogueChoice {
-            id: format!("owned_{}", req.plot_id),
-            text: format!("Plot {} (Owned)", req.plot_id),
-        }
-    } else if farming_level < req.farming_level {
-        crate::protocol::DialogueChoice {
-            id: format!("locked_{}", req.plot_id),
-            text: format!(
-                "Plot {} - {}gp (Requires Farming {})",
-                req.plot_id, req.gold_cost, req.farming_level
-            ),
-        }
-    } else if gold < req.gold_cost {
-        crate::protocol::DialogueChoice {
-            id: format!("locked_{}", req.plot_id),
-            text: format!(
-                "Plot {} - {}gp (Not enough gold)",
-                req.plot_id, req.gold_cost
-            ),
-        }
-    } else {
-        crate::protocol::DialogueChoice {
-            id: format!("unlock_{}", req.plot_id),
-            text: format!("Plot {} - {}gp", req.plot_id, req.gold_cost),
-        }
-    }
-}
-
 fn contract_choice(
     difficulty: &crate::farming::ContractDifficulty,
     farming_level: i32,

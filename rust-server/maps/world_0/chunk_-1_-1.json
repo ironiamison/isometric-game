@@ -3811,5 +3811,43 @@
       "targetSpawn": ""
     }
   ],
-  "gatheringZones": []
+  "gatheringZones": [],
+  "farmingPlots": [
+    {
+      "id": "fp_1781635030232_hdtbt9w",
+      "x": 31,
+      "y": 4,
+      "width": 2,
+      "height": 2,
+      "patchType": "tree",
+      "capacity": 4
+    },
+    {
+      "id": "fp_1781635033839_pcfijev",
+      "x": 27,
+      "y": 4,
+      "width": 2,
+      "height": 2,
+      "patchType": "herb",
+      "capacity": 4
+    },
+    {
+      "id": "fp_1781635043494_diyokr7",
+      "x": 27,
+      "y": 8,
+      "width": 6,
+      "height": 2,
+      "patchType": "allotment",
+      "capacity": 4
+    },
+    {
+      "id": "fp_1781635053973_ttskeva",
+      "x": 27,
+      "y": 0,
+      "width": 6,
+      "height": 2,
+      "patchType": "allotment",
+      "capacity": 4
+    }
+  ]
 }

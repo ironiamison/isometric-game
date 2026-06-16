@@ -508,10 +508,7 @@ impl GameRoom {
 
         // Handle plot seller dialogue choices (format: "plot_seller:{npc_id}")
         if let Some(npc_id) = quest_id.strip_prefix("plot_seller:") {
-            if choice_id == "buy_plots" {
-                // Show the plot purchase screen
-                self.show_plot_purchase_dialogue(player_id, npc_id).await;
-            } else if choice_id == "contracts" {
+            if choice_id == "contracts" {
                 self.show_resource_contract_dialogue(player_id, npc_id, "master_farmer")
                     .await;
             } else if let Some(diff_str) = choice_id.strip_prefix("accept_") {
@@ -527,12 +524,6 @@ impl GameRoom {
                 self.send_to_player(player_id, ServerMessage::DialogueClosed)
                     .await;
                 self.handle_abandon_resource_contract(player_id).await;
-            } else if let Some(plot_str) = choice_id.strip_prefix("unlock_") {
-                self.send_to_player(player_id, ServerMessage::DialogueClosed)
-                    .await;
-                if let Ok(plot_id) = plot_str.parse::<u32>() {
-                    self.handle_plot_purchase(player_id, plot_id).await;
-                }
             } else if choice_id == "nevermind" {
                 // Go back to main master farmer dialogue
                 self.show_master_farmer_dialogue(player_id, npc_id).await;

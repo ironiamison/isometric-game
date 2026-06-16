@@ -457,6 +457,44 @@ impl World {
             }
         }
 
+        // Parse farming plots
+        if let Some(plots_value) = value.get("farmingPlots") {
+            let plots_array = plots_value
+                .as_array()
+                .ok_or("farmingPlots must be an array")?;
+            for plot in plots_array {
+                let id = plot
+                    .get("id")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|id| !id.is_empty())
+                    .ok_or("farmingPlots.id must be a non-empty string")?;
+                let x = parse_local_coordinate(plot.get("x"), "farmingPlots.x")?;
+                let y = parse_local_coordinate(plot.get("y"), "farmingPlots.y")?;
+                let patch_type = plot
+                    .get("patchType")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|s| !s.is_empty())
+                    .ok_or("farmingPlots.patchType must be a non-empty string")?;
+                let read_dim = |key: &str| {
+                    plot.get(key)
+                        .and_then(serde_json::Value::as_u64)
+                        .and_then(|v| u32::try_from(v).ok())
+                };
+                let width = read_dim("width").unwrap_or(1).max(1);
+                let height = read_dim("height").unwrap_or(1).max(1);
+                let capacity = read_dim("capacity").unwrap_or(width * height).max(1);
+                chunk.farming_plots.push(crate::chunk::FarmingPlotMarker {
+                    id: id.to_string(),
+                    world_x: coord.x * CHUNK_SIZE as i32 + x as i32,
+                    world_y: coord.y * CHUNK_SIZE as i32 + y as i32,
+                    patch_type: patch_type.to_string(),
+                    width,
+                    height,
+                    capacity,
+                });
+            }
+        }
+
         Ok(chunk)
     }
 
@@ -924,5 +962,40 @@ mod tests {
 
         // Should have 9 chunks loaded (3x3)
         assert_eq!(world.loaded_chunk_count().await, 9);
+    }
+
+    #[test]
+    fn parse_simplified_json_reads_farming_plots() {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        let world = World::new("nonexistent_dir");
+        let coord = ChunkCoord::new(-1, -1);
+        let n = (CHUNK_SIZE * CHUNK_SIZE) as usize;
+        let layer: Vec<u32> = vec![0; n];
+        let collision = BASE64.encode(vec![0u8; n.div_ceil(8)]);
+        let value = serde_json::json!({
+            "version": 2,
+            "coord": { "cx": -1, "cy": -1 },
+            "size": CHUNK_SIZE,
+            "layers": { "ground": layer, "objects": layer, "overhead": layer },
+            "collision": collision,
+            "farmingPlots": [
+                { "id": "fp_bed", "x": 25, "y": 2, "width": 2, "height": 2, "patchType": "allotment", "capacity": 4 },
+                { "id": "fp_herb", "x": 30, "y": 4, "patchType": "herb" }
+            ]
+        });
+
+        let chunk = world.parse_simplified_json(coord, &value).unwrap();
+        assert_eq!(chunk.farming_plots.len(), 2);
+
+        let bed = &chunk.farming_plots[0];
+        assert_eq!(bed.id, "fp_bed");
+        assert_eq!(bed.patch_type, "allotment");
+        // local (25, 2) in chunk (-1, -1) -> world (-7, -30)
+        assert_eq!((bed.world_x, bed.world_y), (-7, -30));
+        assert_eq!((bed.width, bed.height, bed.capacity), (2, 2, 4));
+
+        // herb omits dims -> defaults to 1x1 capacity 1
+        let herb = &chunk.farming_plots[1];
+        assert_eq!((herb.width, herb.height, herb.capacity), (1, 1, 1));
     }
 }

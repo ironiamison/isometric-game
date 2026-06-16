@@ -13,6 +13,8 @@ import type {
   WallEdge,
   Portal,
   GatheringZone,
+  FarmingPlot,
+  FarmingPatchType,
   InteriorMap,
   SpawnPoint,
   ExitPortal,
@@ -102,6 +104,7 @@ interface EditorState {
   selectedWall: { chunkCoord: ChunkCoord; wallId: string } | null;
   selectedPortal: { chunkCoord: ChunkCoord; portalId: string } | null;
   selectedGatheringZone: { chunkCoord: ChunkCoord; zoneId: string } | null;
+  selectedFarmingPlot: { chunkCoord: ChunkCoord; plotId: string } | null;
 
   // Magic wand tile selection
   selectedTiles: Set<string>; // Set of "wx,wy" coordinate strings
@@ -223,6 +226,15 @@ interface EditorActions {
   setSelectedGatheringZoneId: (zoneId: string) => void;
   removeGatheringZone: (chunkCoord: ChunkCoord, zoneId: string) => void;
   updateGatheringZone: (chunkCoord: ChunkCoord, zoneId: string, updates: Partial<GatheringZone>) => void;
+
+  // Farming plot actions
+  selectedFarmingPatchType: FarmingPatchType;
+  setSelectedFarmingPatchType: (patchType: FarmingPatchType) => void;
+  setSelectedFarmingPlot: (selection: { chunkCoord: ChunkCoord; plotId: string } | null) => void;
+  findFarmingPlotAtWorld: (world: WorldCoord) => { chunkCoord: ChunkCoord; plot: FarmingPlot } | null;
+  addFarmingPlot: (chunkCoord: ChunkCoord, plot: FarmingPlot) => void;
+  removeFarmingPlot: (chunkCoord: ChunkCoord, plotId: string) => void;
+  updateFarmingPlot: (chunkCoord: ChunkCoord, plotId: string, updates: Partial<FarmingPlot>) => void;
 
   // Asset actions
   setTilesets: (tilesets: Tileset[]) => void;
@@ -377,6 +389,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   selectedPortal: null,
   selectedGatheringZone: null,
   selectedGatheringZoneId: 'pond',
+  selectedFarmingPlot: null,
+  selectedFarmingPatchType: 'allotment',
   selectedTiles: new Set(),
 
   tilesets: [],
@@ -1503,6 +1517,107 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     }));
   },
 
+  // Farming plot actions
+  setSelectedFarmingPatchType: (patchType) => set({ selectedFarmingPatchType: patchType }),
+  setSelectedFarmingPlot: (selection) => set({ selectedFarmingPlot: selection }),
+
+  findFarmingPlotAtWorld: (world) => {
+    const chunkCoord = worldToChunk(world);
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk || !chunk.farmingPlots) return null;
+    const local = worldToLocal(world);
+    // The clicked tile falls inside a plot's footprint [x, x+width) × [y, y+height).
+    const plot = chunk.farmingPlots.find(
+      (p) =>
+        local.lx >= p.x &&
+        local.lx < p.x + p.width &&
+        local.ly >= p.y &&
+        local.ly < p.y + p.height
+    );
+    return plot ? { chunkCoord, plot } : null;
+  },
+
+  addFarmingPlot: (chunkCoord, plot) => {
+    history.push({
+      type: 'addFarmingPlot',
+      description: `Add ${plot.patchType} plot (${plot.width}x${plot.height})`,
+      undo: () => {
+        get().updateChunk(chunkCoord, (c) => ({
+          ...c,
+          farmingPlots: (c.farmingPlots || []).filter((p) => p.id !== plot.id),
+          dirty: true,
+        }));
+      },
+      redo: () => {
+        get().updateChunk(chunkCoord, (c) => ({
+          ...c,
+          farmingPlots: [...(c.farmingPlots || []), plot],
+          dirty: true,
+        }));
+      },
+    });
+    get().updateChunk(chunkCoord, (c) => ({
+      ...c,
+      farmingPlots: [...(c.farmingPlots || []), plot],
+      dirty: true,
+    }));
+    set({ selectedFarmingPlot: { chunkCoord, plotId: plot.id } });
+  },
+
+  removeFarmingPlot: (chunkCoord, plotId) => {
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk) return;
+    const existing = (chunk.farmingPlots || []).find((p) => p.id === plotId);
+    if (!existing) return;
+
+    history.push({
+      type: 'removeFarmingPlot',
+      description: `Remove ${existing.patchType} plot`,
+      undo: () => {
+        get().updateChunk(chunkCoord, (c) => ({
+          ...c,
+          farmingPlots: [...(c.farmingPlots || []), existing],
+          dirty: true,
+        }));
+      },
+      redo: () => get().removeFarmingPlot(chunkCoord, plotId),
+    });
+
+    get().updateChunk(chunkCoord, (c) => ({
+      ...c,
+      farmingPlots: (c.farmingPlots || []).filter((p) => p.id !== plotId),
+      dirty: true,
+    }));
+    set({ selectedFarmingPlot: null });
+  },
+
+  updateFarmingPlot: (chunkCoord, plotId, updates) => {
+    const chunk = get().getChunk(chunkCoord);
+    if (!chunk) return;
+    const existing = (chunk.farmingPlots || []).find((p) => p.id === plotId);
+    if (!existing) return;
+
+    const oldValues: Partial<FarmingPlot> = {};
+    for (const key of Object.keys(updates) as (keyof FarmingPlot)[]) {
+      oldValues[key] = existing[key] as never;
+    }
+
+    history.push({
+      type: 'updateFarmingPlot',
+      description: `Update farming plot`,
+      undo: () => get().updateFarmingPlot(chunkCoord, plotId, oldValues),
+      redo: () => get().updateFarmingPlot(chunkCoord, plotId, updates),
+    });
+
+    get().updateChunk(chunkCoord, (c) => ({
+      ...c,
+      farmingPlots: (c.farmingPlots || []).map((p) =>
+        p.id === plotId ? { ...p, ...updates } : p
+      ),
+      dirty: true,
+    }));
+  },
+
   // Asset actions
   setTilesets: (tilesets) => set({ tilesets }),
   setEntityRegistry: (registry) => set({ entityRegistry: registry }),
@@ -1617,6 +1732,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       // Clear overworld selections when entering interior
       selectedPortal: null,
       selectedGatheringZone: null,
+      selectedFarmingPlot: null,
       selectedEntitySpawn: null,
       selectedMapObject: null,
       selectedWall: null,

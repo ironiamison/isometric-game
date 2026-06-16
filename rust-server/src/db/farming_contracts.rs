@@ -99,6 +99,76 @@ impl Database {
         Ok(())
     }
 
+    /// One-time retirement of legacy hardcoded farming patches: credit each
+    /// character's bank with the refunded seeds and delete the dead patch rows.
+    /// Everything runs in a single transaction so a mid-way crash can't refund a
+    /// player twice — either the seeds land and the rows vanish, or neither does.
+    /// Idempotent across restarts because the rows are gone after a success.
+    pub async fn retire_legacy_farming_patches(
+        &self,
+        refunds: &[LegacyFarmingRefund],
+    ) -> Result<(), sqlx::Error> {
+        if refunds.is_empty() {
+            return Ok(());
+        }
+        let mut tx = self.pool.begin().await?;
+        for refund in refunds {
+            // Merge the refunded seeds into the character's bank (one stack per
+            // item, matching the consolidated bank_json layout).
+            if !refund.seeds.is_empty() {
+                let bank_json: Option<String> =
+                    sqlx::query_scalar("SELECT bank_json FROM characters WHERE id = ?")
+                        .bind(refund.character_id)
+                        .fetch_optional(&mut *tx)
+                        .await?;
+                if let Some(bank_json) = bank_json {
+                    let mut slots: Vec<(usize, String, i32)> = serde_json::from_str(&bank_json)
+                        .map_err(|error| {
+                            sqlx::Error::Protocol(format!(
+                                "character {} has invalid bank_json: {error}",
+                                refund.character_id
+                            ))
+                        })?;
+                    for (seed_id, quantity) in &refund.seeds {
+                        if let Some(slot) = slots.iter_mut().find(|(_, item, _)| item == seed_id) {
+                            slot.2 = slot.2.saturating_add(*quantity);
+                        } else {
+                            let next_slot =
+                                slots.iter().map(|(index, ..)| index + 1).max().unwrap_or(0);
+                            slots.push((next_slot, seed_id.clone(), *quantity));
+                        }
+                    }
+                    let updated = serde_json::to_string(&slots).map_err(|error| {
+                        sqlx::Error::Protocol(format!(
+                            "failed to serialize bank for character {}: {error}",
+                            refund.character_id
+                        ))
+                    })?;
+                    sqlx::query("UPDATE characters SET bank_json = ? WHERE id = ?")
+                        .bind(updated)
+                        .bind(refund.character_id)
+                        .execute(&mut *tx)
+                        .await?;
+                } else {
+                    tracing::warn!(
+                        "Legacy farming refund: character {} not found, skipping seed credit",
+                        refund.character_id
+                    );
+                }
+            }
+            // Drop the dead rows now that their seeds are accounted for.
+            for patch_id in &refund.patch_ids {
+                sqlx::query("DELETE FROM farming_patches WHERE patch_id = ? AND player_id = ?")
+                    .bind(patch_id)
+                    .bind(&refund.player_id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn load_farming_patches(&self) -> Result<Vec<FarmingPatchRow>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT patch_id, player_id, crop_id, planted_at, lives_remaining, health, composted, disease_cycle_marker FROM farming_patches",
@@ -469,5 +539,81 @@ impl Database {
         .await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::LegacyFarmingRefund;
+
+    async fn temp_db() -> (tempfile::TempDir, Database) {
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("sqlite://{}?mode=rwc", dir.path().join("test.db").display());
+        let db = Database::new(&url).await.unwrap();
+        (dir, db)
+    }
+
+    async fn bank_of(db: &Database, character_id: i64) -> Vec<(usize, String, i32)> {
+        let json: String = sqlx::query_scalar("SELECT bank_json FROM characters WHERE id = ?")
+            .bind(character_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        serde_json::from_str(&json).unwrap()
+    }
+
+    #[tokio::test]
+    async fn retire_legacy_patches_refunds_seeds_and_deletes_rows() {
+        let (_dir, db) = temp_db().await;
+        let account = db.create_account("farmer", "password123").await.unwrap();
+        let character = db
+            .create_character(account, "Nyx", "female", "tan", None, None)
+            .await
+            .unwrap();
+        let player_id = format!("char_{}", character.id);
+
+        // Seed an existing bank stack so we can prove merge-vs-append behaviour.
+        sqlx::query("UPDATE characters SET bank_json = ? WHERE id = ?")
+            .bind(r#"[[0,"oak_seed",2],[1,"rune_axe",1]]"#)
+            .bind(character.id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        // A planted legacy row that will be retired, plus a live "fp_" row that must survive.
+        db.save_farming_patch("p1_allotment_2", &player_id, "potato", 0, 1, "healthy", false, 0)
+            .await
+            .unwrap();
+        db.save_farming_patch("fp_live", &player_id, "potato", 0, 1, "healthy", false, 0)
+            .await
+            .unwrap();
+
+        let refund = LegacyFarmingRefund {
+            character_id: character.id,
+            player_id: player_id.clone(),
+            // Refund 4 potato (new stack) + 1 oak (merges into existing stack of 2).
+            seeds: vec![("potato_seed".to_string(), 4), ("oak_seed".to_string(), 1)],
+            patch_ids: vec!["p1_allotment_2".to_string()],
+        };
+        db.retire_legacy_farming_patches(&[refund.clone()]).await.unwrap();
+
+        let bank = bank_of(&db, character.id).await;
+        let qty = |item: &str| bank.iter().find(|(_, id, _)| id == item).map(|(_, _, q)| *q);
+        assert_eq!(qty("oak_seed"), Some(3), "oak_seed merges into the existing stack");
+        assert_eq!(qty("potato_seed"), Some(4), "potato_seed is appended as a new stack");
+        assert_eq!(qty("rune_axe"), Some(1), "unrelated items are untouched");
+
+        // The legacy row is gone; the live fp_ row remains. Bootstrap derives its
+        // refund plan only from rows still present, so on the next boot there is
+        // nothing left to retire — that's what makes the migration idempotent.
+        let remaining = db.load_farming_patches().await.unwrap();
+        let ids: Vec<_> = remaining.iter().map(|r| r.patch_id.as_str()).collect();
+        assert_eq!(ids, vec!["fp_live"]);
+
+        // An empty plan (what a re-boot now produces) is a no-op.
+        let before = bank_of(&db, character.id).await;
+        db.retire_legacy_farming_patches(&[]).await.unwrap();
+        assert_eq!(bank_of(&db, character.id).await, before, "empty plan leaves the bank unchanged");
     }
 }

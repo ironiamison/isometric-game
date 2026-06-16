@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkABAADEAT8AQAA=",
+  "collision": "AABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAgBAAAAAQAAAAEAAAARAAAAAQAAAAEAAAADAAAAAwAAAAMD/AAFAAAAAQAYAAEAAAABAAEBAQAAAAsAfAABAMAAAQBAAAEAAAADAEQAAQB8AAEAOAABAAAAAwAAAAkABAADEAT8AQPg=",
   "entities": [
     {
       "entityId": "wild_boar",
@@ -3533,6 +3533,41 @@
       "y": 21,
       "width": 30,
       "height": 140
+    },
+    {
+      "gid": 1507,
+      "x": 31,
+      "y": 31,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1507,
+      "x": 30,
+      "y": 31,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1507,
+      "x": 29,
+      "y": 31,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1507,
+      "x": 28,
+      "y": 31,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "gid": 1507,
+      "x": 27,
+      "y": 31,
+      "width": 64,
+      "height": 32
     }
   ],
   "walls": [
@@ -3877,5 +3912,6 @@
       "targetSpawn": ""
     }
   ],
-  "gatheringZones": []
+  "gatheringZones": [],
+  "farmingPlots": []
 }

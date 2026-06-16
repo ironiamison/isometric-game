@@ -67,6 +67,32 @@ export interface SimplifiedGatheringZone {
   zoneId: string;
 }
 
+// Patch type for a farming plot
+export const FARMING_PATCH_TYPES = ['allotment', 'herb', 'cactus', 'tree'] as const;
+export type FarmingPatchType = typeof FARMING_PATCH_TYPES[number];
+
+// Farming plot region (rectangle) placed in a chunk. `(x,y)` is the NW anchor;
+// the footprint spans width×height tiles. Saved to the chunk JSON `farmingPlots`.
+export interface FarmingPlot {
+  id: string; // stable id, kept in the saved JSON (keys per-player crop state)
+  x: number; // local tile X within chunk (NW anchor)
+  y: number; // local tile Y within chunk
+  width: number;
+  height: number;
+  patchType: FarmingPatchType;
+  capacity: number; // plants the plot holds (seeds consumed / yield multiplier)
+}
+
+export interface SimplifiedFarmingPlot {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  patchType: string;
+  capacity: number;
+}
+
 // Tool types
 export const Tool = {
   Select: 'select',
@@ -84,6 +110,7 @@ export const Tool = {
   SpawnPoint: 'spawnPoint',
   ExitPortal: 'exitPortal',
   GatheringZone: 'gatheringZone',
+  FarmingPlot: 'farmingPlot',
   HeightRaise: 'heightRaise',
   BlockType: 'blockType',
 } as const;
@@ -162,6 +189,7 @@ export interface Chunk {
   walls: Wall[];
   portals: Portal[];
   gatheringZones: GatheringZone[];
+  farmingPlots: FarmingPlot[];
   dirty: boolean;
 }
 
@@ -282,6 +310,7 @@ export interface SimplifiedChunk {
   walls: SimplifiedWall[];
   portals: SimplifiedPortal[];
   gatheringZones: SimplifiedGatheringZone[];
+  farmingPlots: SimplifiedFarmingPlot[];
 }
 
 export interface SimplifiedEntitySpawn {

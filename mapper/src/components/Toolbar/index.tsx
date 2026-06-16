@@ -19,6 +19,7 @@ import {
   LogOut,
   Mountain,
   Layers,
+  Sprout,
   type LucideIcon,
 } from 'lucide-react';
 import styles from './Toolbar.module.css';
@@ -45,6 +46,7 @@ const tools: ToolDef[] = [
   { id: Tool.Object, label: 'Object', shortcut: 'O', icon: Box, group: 'main' },
   { id: Tool.Portal, label: 'Portal', shortcut: 'P', icon: DoorOpen, group: 'main', mode: 'overworld' },
   { id: Tool.GatheringZone, label: 'Gathering', shortcut: 'F', icon: Pickaxe, group: 'main' },
+  { id: Tool.FarmingPlot, label: 'Farm Plot', shortcut: 'M', icon: Sprout, group: 'main', mode: 'overworld' },
   { id: Tool.HeightRaise, label: 'Height', shortcut: 'H', icon: Mountain, group: 'main', mode: 'overworld' },
   { id: Tool.BlockType, label: 'Block Type', shortcut: 'T', icon: Layers, group: 'main', mode: 'overworld' },
   { id: Tool.WallDown, label: 'Wall Down', shortcut: 'D', icon: House, group: 'walls', composite: { icon: ArrowDown } },

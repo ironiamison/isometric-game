@@ -12,6 +12,8 @@ import type {
   SimplifiedWall,
   SimplifiedPortal,
   SimplifiedGatheringZone,
+  SimplifiedFarmingPlot,
+  FarmingPatchType,
 } from '@/types';
 import { chunkKey, CHUNK_SIZE } from './coords';
 import { BitSet } from './BitSet';
@@ -71,6 +73,7 @@ export class ChunkManager {
       walls: [],
       portals: [],
       gatheringZones: [],
+      farmingPlots: [],
       dirty: false,
     };
 
@@ -248,6 +251,19 @@ export class ChunkManager {
         y: g.y,
         zoneId: g.zoneId,
       })),
+      farmingPlots: (data.farmingPlots || []).map((p, i) => {
+        const width = p.width ?? 1;
+        const height = p.height ?? 1;
+        return {
+          id: p.id || `fp_${i}`,
+          x: p.x,
+          y: p.y,
+          width,
+          height,
+          patchType: (p.patchType ?? 'allotment') as FarmingPatchType,
+          capacity: p.capacity ?? width * height,
+        };
+      }),
       heights: heights && heights.length > 0
         ? new Uint8Array(heights)
         : undefined,
@@ -425,6 +441,16 @@ export class ChunkManager {
       zoneId: g.zoneId,
     }));
 
+    const farmingPlots: SimplifiedFarmingPlot[] = (chunk.farmingPlots || []).map((p) => ({
+      id: p.id,
+      x: p.x,
+      y: p.y,
+      width: p.width,
+      height: p.height,
+      patchType: p.patchType,
+      capacity: p.capacity,
+    }));
+
     return {
       version: 2,
       coord: chunk.coord,
@@ -443,6 +469,7 @@ export class ChunkManager {
       walls,
       portals,
       gatheringZones,
+      farmingPlots,
     };
   }
 
@@ -478,6 +505,7 @@ export class ChunkManager {
       walls: [],
       portals: [],
       gatheringZones: [],
+      farmingPlots: [],
       dirty: true,
     };
 

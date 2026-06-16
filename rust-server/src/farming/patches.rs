@@ -178,31 +178,6 @@ pub struct HarvestResult {
     pub patch_emptied: bool,
 }
 
-/// Plot unlock requirements
-pub struct PlotRequirement {
-    pub plot_id: u32,
-    pub farming_level: i32,
-    pub gold_cost: i32,
-}
-
-pub const PLOT_REQUIREMENTS: &[PlotRequirement] = &[
-    PlotRequirement {
-        plot_id: 2,
-        farming_level: 15,
-        gold_cost: 500,
-    },
-    PlotRequirement {
-        plot_id: 3,
-        farming_level: 30,
-        gold_cost: 2000,
-    },
-    PlotRequirement {
-        plot_id: 4,
-        farming_level: 45,
-        gold_cost: 5000,
-    },
-];
-
 /// Info about a patch state update to send to clients
 #[derive(Debug, Clone)]
 pub struct PatchUpdate {

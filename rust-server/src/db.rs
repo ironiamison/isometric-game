@@ -35,6 +35,20 @@ pub struct FarmingPatchRow {
     pub disease_cycle_marker: u32,
 }
 
+/// One character's slice of the legacy-farming-patch retirement: seeds to refund
+/// into their bank and the dead patch rows to delete. See
+/// [`Database::retire_legacy_farming_patches`].
+#[derive(Debug, Clone)]
+pub struct LegacyFarmingRefund {
+    pub character_id: i64,
+    /// The farming `player_id` ("char_<id>") keying the rows to delete.
+    pub player_id: String,
+    /// (seed_item_id, quantity) to credit to the bank.
+    pub seeds: Vec<(String, i32)>,
+    /// `patch_id`s of the dead rows to delete for this player.
+    pub patch_ids: Vec<String>,
+}
+
 /// Account data - separate from character data
 #[derive(Debug, Clone)]
 pub struct AccountData {

@@ -153,6 +153,7 @@ class StorageManager {
             walls: stored.walls || [],
             portals: stored.portals || [],
             gatheringZones: stored.gatheringZones || [],
+            farmingPlots: stored.farmingPlots || [],
             dirty: stored.dirty,
           };
           chunks.set(stored.key, chunk);
@@ -231,6 +232,7 @@ class StorageManager {
       walls: (stored.walls as Chunk['walls']) || [],
       portals: (stored.portals as Chunk['portals']) || [],
       gatheringZones: (stored.gatheringZones as Chunk['gatheringZones']) || [],
+      farmingPlots: (stored.farmingPlots as Chunk['farmingPlots']) || [],
       dirty: false,
     };
   }

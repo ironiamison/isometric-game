@@ -29,10 +29,6 @@ impl GameRoom {
                         text: "Farming contracts".to_string(),
                     },
                     DialogueChoice {
-                        id: "buy_plots".to_string(),
-                        text: "Buy allotment plot".to_string(),
-                    },
-                    DialogueChoice {
                         id: "close".to_string(),
                         text: "Nevermind".to_string(),
                     },
