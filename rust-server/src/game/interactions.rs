@@ -211,14 +211,15 @@ impl GameRoom {
         }
 
         // Boss rewards NPC - show pending boss loot
-        let is_boss_rewards = self
+        let boss_rewards_speaker = self
             .entity_registry
             .get(&entity_type)
-            .map(|p| p.behaviors.boss_rewards)
-            .unwrap_or(false);
+            .filter(|p| p.behaviors.boss_rewards)
+            .map(|p| p.display_name.clone());
 
-        if is_boss_rewards {
-            self.show_boss_rewards_dialogue(player_id, npc_id).await;
+        if let Some(speaker) = boss_rewards_speaker {
+            self.show_boss_rewards_dialogue(player_id, npc_id, &speaker)
+                .await;
             return;
         }
 

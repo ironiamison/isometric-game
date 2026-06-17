@@ -111,6 +111,8 @@ class InteriorStorageManager {
       height: p.height || 1,
       targetX: p.target_x,
       targetY: p.target_y,
+      targetMap: p.target_map || 'overworld',
+      targetSpawn: p.target_spawn || '',
     }));
 
     return {
@@ -214,7 +216,8 @@ class InteriorStorageManager {
         y: p.y,
         width: p.width,
         height: p.height,
-        target_map: 'overworld',
+        target_map: p.targetMap || 'overworld',
+        target_spawn: p.targetSpawn || '',
         target_x: p.targetX,
         target_y: p.targetY,
       })),

@@ -370,15 +370,18 @@ export interface SimplifiedPortal {
   targetSpawn: string;
 }
 
-// Exit portal (for interior maps - links back to overworld)
+// Exit portal (for interior maps). Links back to the overworld OR to another
+// interior map (inter-instance portal).
 export interface ExitPortal {
   id: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  targetX: number;      // World X coordinate in overworld
+  targetX: number;      // World X coordinate in overworld (when targeting overworld)
   targetY: number;      // World Y coordinate in overworld
+  targetMap?: string;   // "overworld" (default) or an interior map id
+  targetSpawn?: string; // Spawn point name when targeting another interior
 }
 
 // Spawn point in interior map
@@ -436,6 +439,7 @@ export interface SerializedInteriorMap {
     width: number;
     height: number;
     target_map: string;
+    target_spawn: string;
     target_x: number;
     target_y: number;
   }>;

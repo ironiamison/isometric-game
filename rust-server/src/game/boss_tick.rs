@@ -218,8 +218,9 @@ impl GameRoom {
         );
     }
 
-    /// Show pending boss rewards dialogue to a player
-    pub async fn show_boss_rewards_dialogue(&self, player_id: &str, npc_id: &str) {
+    /// Show pending boss rewards dialogue to a player. `speaker` labels the
+    /// dialogue (e.g. an NPC name, or a chest name like "Reaper's Hoard").
+    pub async fn show_boss_rewards_dialogue(&self, player_id: &str, npc_id: &str, speaker: &str) {
         let pending = if let Some(ref db) = self.db {
             match db.get_boss_pending_rewards(player_id).await {
                 Ok(rewards) => rewards,
@@ -242,12 +243,11 @@ impl GameRoom {
                 ServerMessage::ShowDialogue {
                     quest_id: String::new(),
                     npc_id: npc_id.to_string(),
-                    speaker: "Battle Master".to_string(),
-                    text: "Hail, hunter! Defeat the Desert Wurm and I'll distribute the spoils."
-                        .to_string(),
+                    speaker: speaker.to_string(),
+                    text: "You have no unclaimed rewards right now.".to_string(),
                     choices: vec![crate::protocol::DialogueChoice {
                         id: "close".to_string(),
-                        text: "Farewell".to_string(),
+                        text: "Close".to_string(),
                     }],
                 },
             )
@@ -282,7 +282,7 @@ impl GameRoom {
             ServerMessage::ShowDialogue {
                 quest_id: format!("boss_rewards:{}", npc_id),
                 npc_id: npc_id.to_string(),
-                speaker: "Battle Master".to_string(),
+                speaker: speaker.to_string(),
                 text,
                 choices: vec![
                     crate::protocol::DialogueChoice {

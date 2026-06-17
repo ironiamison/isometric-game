@@ -213,6 +213,22 @@ impl GameRoom {
             crate::chest::ChestManager::overworld_key(x, y)
         };
 
+        // Boss-reward chest: claim the player's own pending rewards (per-player,
+        // one-time) via the reward dialogue instead of opening shared storage.
+        let reward_chest_name = {
+            let chest_manager = self.chest_manager.read().await;
+            chest_manager
+                .get(&chest_key)
+                .and_then(|chest| self.chest_registry.get(&chest.chest_def_id))
+                .filter(|def| def.boss_rewards)
+                .map(|def| def.name.clone())
+        };
+        if let Some(name) = reward_chest_name {
+            self.show_boss_rewards_dialogue(player_id, &chest_key, &name)
+                .await;
+            return;
+        }
+
         let mut chest_manager = self.chest_manager.write().await;
         if let Some(chest) = chest_manager.get_mut(&chest_key) {
             chest.viewers.insert(player_id.to_string());
@@ -532,6 +548,7 @@ max_stack = 999
             name: "Chest".to_string(),
             slots: 2,
             spawn_items: vec![],
+            boss_rewards: false,
         };
         let mut chests = HashMap::new();
         chests.insert(
@@ -556,6 +573,7 @@ max_stack = 999
             name: "Chest".to_string(),
             slots: 3,
             spawn_items: vec![],
+            boss_rewards: false,
         };
         let mut chest = ChestInstance::new("test_chest", &def);
         chest.slots[0] = Some(InventorySlot::new("coin_bag".to_string(), 3));

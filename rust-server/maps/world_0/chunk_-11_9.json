@@ -3392,5 +3392,6 @@
   ],
   "walls": [],
   "portals": [],
-  "gatheringZones": []
+  "gatheringZones": [],
+  "farmingPlots": []
 }

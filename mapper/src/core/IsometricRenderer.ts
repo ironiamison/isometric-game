@@ -1243,6 +1243,12 @@ export class IsometricRenderer {
     if (!this.ctx) return;
 
     for (const exitPortal of interior.exitPortals) {
+      // Interior->interior portals are cyan; overworld exits stay orange.
+      const isInterior =
+        !!exitPortal.targetMap && exitPortal.targetMap !== "overworld";
+      const fill = isInterior ? "rgba(0, 200, 255, 0.5)" : "rgba(255, 165, 0, 0.5)";
+      const stroke = isInterior ? "rgba(0, 200, 255, 0.9)" : "rgba(255, 165, 0, 0.9)";
+
       for (let py = 0; py < exitPortal.height; py++) {
         for (let px = 0; px < exitPortal.width; px++) {
           const worldCoord: WorldCoord = {
@@ -1254,7 +1260,7 @@ export class IsometricRenderer {
           const hw = (TILE_WIDTH / 2) * viewport.zoom;
           const hh = (TILE_HEIGHT / 2) * viewport.zoom;
 
-          this.ctx.fillStyle = "rgba(255, 165, 0, 0.5)";
+          this.ctx.fillStyle = fill;
           this.ctx.beginPath();
           this.ctx.moveTo(screen.sx, screen.sy);
           this.ctx.lineTo(screen.sx + hw, screen.sy + hh);
@@ -1263,7 +1269,7 @@ export class IsometricRenderer {
           this.ctx.closePath();
           this.ctx.fill();
 
-          this.ctx.strokeStyle = "rgba(255, 165, 0, 0.9)";
+          this.ctx.strokeStyle = stroke;
           this.ctx.lineWidth = 2;
           this.ctx.stroke();
         }
@@ -1278,7 +1284,7 @@ export class IsometricRenderer {
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
         this.ctx.fillText(
-          "EXIT",
+          isInterior ? `→ ${exitPortal.targetMap}` : "EXIT",
           screen.sx,
           screen.sy + (TILE_HEIGHT / 2) * viewport.zoom,
         );

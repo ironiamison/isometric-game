@@ -3090,5 +3090,6 @@
   "mapObjects": [],
   "walls": [],
   "portals": [],
-  "gatheringZones": []
+  "gatheringZones": [],
+  "farmingPlots": []
 }

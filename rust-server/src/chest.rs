@@ -36,6 +36,10 @@ pub struct ChestDef {
     pub slots: usize,
     #[serde(default)]
     pub spawn_items: Vec<ChestSpawnItem>,
+    /// When true, opening this chest claims the player's pending boss rewards
+    /// (per-player, one-time) instead of acting as shared storage.
+    #[serde(default)]
+    pub boss_rewards: bool,
 }
 
 fn default_name() -> String {

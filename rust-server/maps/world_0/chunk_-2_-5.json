@@ -3770,5 +3770,6 @@
       "targetSpawn": ""
     }
   ],
-  "gatheringZones": []
+  "gatheringZones": [],
+  "farmingPlots": []
 }

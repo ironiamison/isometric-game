@@ -362,7 +362,7 @@ export function PropertiesPanel() {
   if (selectedExitPortalData && currentInterior) {
     const portal = selectedExitPortalData;
 
-    const handleExitPortalChange = (field: keyof ExitPortal, value: number) => {
+    const handleExitPortalChange = (field: keyof ExitPortal, value: number | string) => {
       updateExitPortal(portal.id, { [field]: value });
     };
 
@@ -376,44 +376,98 @@ export function PropertiesPanel() {
     };
 
     const handleApplyToAll = () => {
-      // Apply current targetX/targetY to all exit portals in this interior
+      // Copy this portal's full destination config to every exit portal here.
       const exitPortals = currentInterior.exitPortals || [];
       for (const p of exitPortals) {
-        updateExitPortal(p.id, { targetX: portal.targetX, targetY: portal.targetY });
+        updateExitPortal(p.id, {
+          targetMap: portal.targetMap,
+          targetSpawn: portal.targetSpawn,
+          targetX: portal.targetX,
+          targetY: portal.targetY,
+        });
       }
     };
+
+    const isOverworldTarget = !portal.targetMap || portal.targetMap === 'overworld';
+    const exitSpawnPoints = !isOverworldTarget
+      ? interiorStorage.getSpawnPoints(portal.targetMap as string)
+      : [];
 
     return (
       <div className={styles.panel}>
         <div className={styles.title}>Exit Portal Properties</div>
         <div className={styles.content}>
           <div className={styles.field}>
-            <label className={styles.label}>Exit Target X (world)</label>
-            <input
-              type="number"
-              className={styles.input}
-              value={portal.targetX}
-              onChange={(e) => handleExitPortalChange('targetX', parseFloat(e.target.value) || 0)}
-            />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>Exit Target Y (world)</label>
-            <input
-              type="number"
-              className={styles.input}
-              value={portal.targetY}
-              onChange={(e) => handleExitPortalChange('targetY', parseFloat(e.target.value) || 0)}
-            />
-          </div>
-
-          {(portal.targetX !== 0 || portal.targetY !== 0) && (
-            <button
-              className={styles.jumpButton}
-              onClick={handleJumpToTarget}
+            <label className={styles.label}>Destination</label>
+            <select
+              className={styles.select}
+              value={portal.targetMap || 'overworld'}
+              onChange={(e) => handleExitPortalChange('targetMap', e.target.value)}
             >
-              Jump To Exit Location
-            </button>
+              <option value="overworld">Overworld</option>
+              {availableInteriors
+                .filter((id) => id !== currentInterior.id)
+                .map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+            </select>
+          </div>
+
+          {isOverworldTarget ? (
+            <>
+              <div className={styles.field}>
+                <label className={styles.label}>Exit Target X (world)</label>
+                <input
+                  type="number"
+                  className={styles.input}
+                  value={portal.targetX}
+                  onChange={(e) => handleExitPortalChange('targetX', parseFloat(e.target.value) || 0)}
+                />
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label}>Exit Target Y (world)</label>
+                <input
+                  type="number"
+                  className={styles.input}
+                  value={portal.targetY}
+                  onChange={(e) => handleExitPortalChange('targetY', parseFloat(e.target.value) || 0)}
+                />
+              </div>
+
+              {(portal.targetX !== 0 || portal.targetY !== 0) && (
+                <button
+                  className={styles.jumpButton}
+                  onClick={handleJumpToTarget}
+                >
+                  Jump To Exit Location
+                </button>
+              )}
+            </>
+          ) : (
+            <div className={styles.field}>
+              <label className={styles.label}>Target Spawn</label>
+              {exitSpawnPoints.length > 0 ? (
+                <select
+                  className={styles.select}
+                  value={portal.targetSpawn || ''}
+                  onChange={(e) => handleExitPortalChange('targetSpawn', e.target.value)}
+                >
+                  <option value="">Select spawn point...</option>
+                  {exitSpawnPoints.map((sp) => (
+                    <option key={sp.name} value={sp.name}>{sp.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={portal.targetSpawn || ''}
+                  placeholder="e.g., entrance"
+                  onChange={(e) => handleExitPortalChange('targetSpawn', e.target.value)}
+                />
+              )}
+            </div>
           )}
 
           <button

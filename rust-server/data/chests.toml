@@ -12,6 +12,13 @@ respawn_secs = 30
 name = "Storage Chest"
 slots = 10
 
+# Boss-reward chest: opening it claims YOUR pending Reaper rewards (per-player,
+# one-time) via the reward dialogue, rather than acting as shared storage.
+[reaper_reward_chest]
+name = "Reaper's Hoard"
+slots = 1
+boss_rewards = true
+
 [oakshore_workshop_chest]
 name = "Supply Chest"
 slots = 5

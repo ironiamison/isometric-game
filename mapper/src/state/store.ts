@@ -2096,6 +2096,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       height: 1,
       targetX: 0,
       targetY: 0,
+      targetMap: 'overworld',
+      targetSpawn: '',
     };
 
     set({
