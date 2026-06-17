@@ -2,6 +2,10 @@ import { Router, type Request, type RequestParamHandler } from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 import { HttpError } from '../http.js';
 
@@ -653,11 +657,37 @@ router.post('/api/deploy', async (req, res) => {
     }
 
     console.log(`Deployed ${chunksCopied} chunks and ${interiorsCopied} interiors to game server (${world})`);
+
+    // Optionally restart the game server so the deployed maps go live.
+    // Gated on GAME_SERVER_SERVICE so this is a no-op unless an environment
+    // (e.g. staging) explicitly opts in by naming a systemd unit to restart.
+    let restarted = false;
+    let restartError: string | undefined;
+    const gameService = process.env.GAME_SERVER_SERVICE;
+    if (req.body?.restart === true) {
+      if (!gameService) {
+        restartError = 'GAME_SERVER_SERVICE is not configured; skipped restart';
+        console.warn(restartError);
+      } else {
+        try {
+          await execFileAsync('systemctl', ['restart', gameService], { timeout: 30000 });
+          restarted = true;
+          console.log(`Restarted game server service: ${gameService}`);
+        } catch (err) {
+          restartError = (err as Error).message;
+          console.error(`Failed to restart ${gameService}:`, err);
+        }
+      }
+    }
+
     res.json({
       success: true,
       chunksCopied,
       interiorsCopied,
-      destination: GAME_SERVER_DIR
+      destination: GAME_SERVER_DIR,
+      restarted,
+      service: gameService,
+      ...(restartError ? { restartError } : {}),
     });
   } catch (err) {
     console.error('Deploy failed:', err);

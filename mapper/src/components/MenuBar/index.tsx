@@ -83,6 +83,7 @@ export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => vo
   );
 
   const [rebuildingAtlas, setRebuildingAtlas] = useState(false);
+  const [deploying, setDeploying] = useState(false);
 
   const importInputRef = useRef<HTMLInputElement>(null);
   const importFullInputRef = useRef<HTMLInputElement>(null);
@@ -433,6 +434,62 @@ export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => vo
     }
   };
 
+  // Deploy the current world to the game server and restart it so the
+  // changes are live in-game. Flushes any unsaved edits first.
+  const handleDeployToStaging = async () => {
+    if (!isConnected) {
+      alert('Not connected to server. Connect before deploying.');
+      return;
+    }
+
+    // Flush unsaved edits to the mapper server so the deploy includes them.
+    cancelPendingSave();
+    try {
+      if (getDirtyChunks().length > 0) {
+        await storage.saveDirtyChunks(chunks);
+        markAllClean();
+      }
+    } catch (err) {
+      alert(`Could not save changes before deploy: ${(err as Error).message}`);
+      return;
+    }
+
+    if (
+      !confirm(
+        `Deploy "${currentWorld}" to the game server and restart it?\n\n` +
+          `This writes the current map to the live game and restarts the server — ` +
+          `anyone in-game will be briefly disconnected.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeploying(true);
+    try {
+      const result = await storage.deployToGameServer(true);
+      if (!result.success) {
+        alert(`Deploy failed: ${result.error}`);
+      } else if (result.restartError) {
+        alert(
+          `Deployed ${result.chunksCopied} chunk(s) to ${currentWorld}, but the server ` +
+            `restart failed: ${result.restartError}`,
+        );
+      } else if (result.restarted) {
+        alert(
+          `Deployed ${result.chunksCopied} chunk(s) + ${result.interiorsCopied} interior(s) ` +
+            `to ${currentWorld} and restarted the game server. Changes are live.`,
+        );
+      } else {
+        alert(
+          `Deployed ${result.chunksCopied} chunk(s) + ${result.interiorsCopied} interior(s) ` +
+            `to ${currentWorld}. Server restart was skipped (no game server configured).`,
+        );
+      }
+    } finally {
+      setDeploying(false);
+    }
+  };
+
   // Interior handlers
   const handleNewInterior = () => {
     setNewInteriorId('');
@@ -685,6 +742,15 @@ export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => vo
                 </button>
                 <button className={styles.dropdownItem} onClick={handleSaveAll}>
                   Download Modified ({getDirtyChunks().length})
+                </button>
+                <div className={styles.separator} />
+                <div className={styles.dropdownLabel}>Deploy</div>
+                <button
+                  className={styles.dropdownItem}
+                  onClick={handleDeployToStaging}
+                  disabled={deploying}
+                >
+                  {deploying ? 'Deploying…' : 'Deploy to Game Server & Restart'}
                 </button>
                 <div className={styles.separator} />
                 <div className={styles.dropdownLabel}>Export</div>

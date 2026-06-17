@@ -435,6 +435,35 @@ class StorageManager {
     }
   }
 
+  /**
+   * Deploy the current world's map to the game server (mapper format ->
+   * game-server format) and optionally restart the game server so the
+   * changes go live. Returns the server's result, or an error field.
+   */
+  async deployToGameServer(restart: boolean): Promise<{
+    success: boolean;
+    chunksCopied?: number;
+    interiorsCopied?: number;
+    restarted?: boolean;
+    restartError?: string;
+    error?: string;
+  }> {
+    try {
+      const response = await fetch(this.worldParam(`${API_BASE}/api/deploy`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restart }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { success: false, error: result.error || `Deploy failed: ${response.status}` };
+      }
+      return { success: true, ...result };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
   // --- Export/Import ---
 
   async exportMapData(): Promise<string> {
