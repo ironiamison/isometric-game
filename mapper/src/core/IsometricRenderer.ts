@@ -274,8 +274,6 @@ class ChunkTileCache {
               ctx.lineTo(bottomX, bottomY + faceH);
               ctx.closePath();
               ctx.clip();
-              // Directional tint: right face (+X, SE) catches more light
-              ctx.globalAlpha = 0.82;
               // Tile sprites from bottom up, overlapping by halfTileH for seamless parallelogram tiling
               const effectiveH = Math.max(spriteH - halfTileH, 1);
               const count = Math.ceil(faceH / effectiveH) + 1;
@@ -286,7 +284,6 @@ class ChunkTileCache {
                   bottomX, bottomY + faceH - spriteH - i * effectiveH, spriteW, spriteH,
                 );
               }
-              ctx.globalAlpha = 1.0;
               ctx.restore();
             } else {
               const faceH = rightDiff * halfTileH;
@@ -320,8 +317,6 @@ class ChunkTileCache {
               ctx.lineTo(bottomX, bottomY + faceH);
               ctx.closePath();
               ctx.clip();
-              // Directional tint: down face (+Y, SW) faces away from light
-              ctx.globalAlpha = 0.65;
               // Tile sprites from bottom up, overlapping by halfTileH for seamless parallelogram tiling
               const effectiveH = Math.max(spriteH - halfTileH, 1);
               const count = Math.ceil(faceH / effectiveH) + 1;
@@ -332,7 +327,6 @@ class ChunkTileCache {
                   bottomX - spriteW, bottomY + faceH - spriteH - i * effectiveH, spriteW, spriteH,
                 );
               }
-              ctx.globalAlpha = 1.0;
               ctx.restore();
             } else {
               const faceH = downDiff * halfTileH;
