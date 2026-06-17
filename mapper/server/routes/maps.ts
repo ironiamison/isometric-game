@@ -479,6 +479,11 @@ function convertChunkToMapperFormat(gameChunk: Record<string, unknown>): Record<
     collisionArray = gameChunk.collision;
   }
 
+  // Preserve elevation data so sync round-trips raised tiles / cliffs.
+  const heightmap = (gameChunk.heightmap ?? gameChunk.heights) as number[] | undefined;
+  const blockTypesDown = gameChunk.blockTypesDown as number[] | undefined;
+  const blockTypesRight = gameChunk.blockTypesRight as number[] | undefined;
+
   return {
     coord: gameChunk.coord,
     width: size,
@@ -491,6 +496,9 @@ function convertChunkToMapperFormat(gameChunk: Record<string, unknown>): Record<
     portals: gameChunk.portals || [],
     gatheringZones: gameChunk.gatheringZones || [],
     farmingPlots: gameChunk.farmingPlots || [],
+    ...(Array.isArray(heightmap) && heightmap.length > 0 ? { heightmap } : {}),
+    ...(Array.isArray(blockTypesDown) && blockTypesDown.length > 0 ? { blockTypesDown } : {}),
+    ...(Array.isArray(blockTypesRight) && blockTypesRight.length > 0 ? { blockTypesRight } : {}),
   };
 }
 
@@ -588,6 +596,13 @@ function convertChunkToGameFormat(mapperChunk: Record<string, unknown>): Record<
   const collisionArray = mapperChunk.collision as number[] || [];
   const collisionBase64 = collisionToBase64(collisionArray, size * size);
 
+  // Height/elevation data (raised tiles / cliffs). The game loader only
+  // builds height data when `heightmap` is present, so emit these only when
+  // the chunk actually has elevation — otherwise it stays flat as before.
+  const heightmap = (mapperChunk.heightmap ?? mapperChunk.heights) as number[] | undefined;
+  const blockTypesDown = mapperChunk.blockTypesDown as number[] | undefined;
+  const blockTypesRight = mapperChunk.blockTypesRight as number[] | undefined;
+
   return {
     version: 2,
     coord: mapperChunk.coord,
@@ -600,6 +615,9 @@ function convertChunkToGameFormat(mapperChunk: Record<string, unknown>): Record<
     portals: mapperChunk.portals || [],
     gatheringZones: mapperChunk.gatheringZones || [],
     farmingPlots: mapperChunk.farmingPlots || [],
+    ...(Array.isArray(heightmap) && heightmap.length > 0 ? { heightmap } : {}),
+    ...(Array.isArray(blockTypesDown) && blockTypesDown.length > 0 ? { blockTypesDown } : {}),
+    ...(Array.isArray(blockTypesRight) && blockTypesRight.length > 0 ? { blockTypesRight } : {}),
   };
 }
 
