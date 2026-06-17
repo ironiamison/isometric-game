@@ -41,6 +41,8 @@ export interface RenderOptions {
   showPortals: boolean;
   showNotes: boolean;
   showHeights: boolean;
+  showGatheringZones: boolean;
+  showFarmingPlots: boolean;
   visibleLayers: {
     ground: boolean;
     objects: boolean;
@@ -57,6 +59,8 @@ const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showPortals: true,
   showNotes: true,
   showHeights: false,
+  showGatheringZones: true,
+  showFarmingPlots: true,
   visibleLayers: {
     ground: true,
     objects: true,
@@ -709,6 +713,23 @@ export class IsometricRenderer {
   private cacheBuildBudget = 4;
   /** Tracks how many caches were built this frame. */
   private cacheBuildCount = 0;
+  /**
+   * Set during a render whenever animated sprites are drawn. The Canvas render
+   * loop reads this to decide whether to keep ticking (for animation) or go
+   * fully idle when nothing is moving. See hasAnimatedContent().
+   */
+  private animatedThisFrame = false;
+
+  /** Whether the most recent render drew any animated sprites still in view. */
+  hasAnimatedContent(): boolean {
+    return this.animatedThisFrame;
+  }
+
+  /** TEMP perf instrumentation: visible chunk count from the last render(). */
+  private lastVisibleChunks = 0;
+  getFrameStats(): { cacheBuilds: number; visibleChunks: number } {
+    return { cacheBuilds: this.cacheBuildCount, visibleChunks: this.lastVisibleChunks };
+  }
 
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
@@ -760,6 +781,7 @@ export class IsometricRenderer {
 
     this.clear();
     this.cacheBuildCount = 0;
+    this.animatedThisFrame = false;
     // At low zoom, each cache build is cheaper (drawn smaller) so allow more per frame.
     // At zoom=1.0 → budget 4, at zoom=0.25 → budget 8
     this.cacheBuildBudget = Math.max(4, Math.round(4 / Math.max(viewport.zoom, 0.1)));
@@ -768,6 +790,7 @@ export class IsometricRenderer {
     const visibleChunks = chunks.filter((chunk) =>
       this.isChunkVisible(chunk, viewport),
     );
+    this.lastVisibleChunks = visibleChunks.length;
 
     // Sort chunks for proper depth ordering (back to front)
     const sortedChunks = visibleChunks.sort((a, b) => {
@@ -812,12 +835,16 @@ export class IsometricRenderer {
       }
     }
 
-    for (const chunk of sortedChunks) {
-      this.renderGatheringZones(chunk, viewport);
+    if (this.options.showGatheringZones) {
+      for (const chunk of sortedChunks) {
+        this.renderGatheringZones(chunk, viewport);
+      }
     }
 
-    for (const chunk of sortedChunks) {
-      this.renderFarmingPlots(chunk, viewport);
+    if (this.options.showFarmingPlots) {
+      for (const chunk of sortedChunks) {
+        this.renderFarmingPlots(chunk, viewport);
+      }
     }
 
     if (this.options.showHeights) {
@@ -900,6 +927,9 @@ export class IsometricRenderer {
     this.ctx.drawImage(cached.canvas, destX, destY, destW, destH);
 
     // Draw animated sprites dynamically on top
+    if (cached.animatedSprites.length > 0) {
+      this.animatedThisFrame = true;
+    }
     for (const anim of cached.animatedSprites) {
       if (anim.type === "object" && anim.obj) {
         this.renderMapObject(anim.obj, chunk, viewport);
@@ -914,6 +944,9 @@ export class IsometricRenderer {
     if (!this.ctx || !this.canvas) return;
 
     this.clear();
+    // Interiors are small and cheap; conservatively keep the animation tick
+    // alive whenever objects/walls (which may animate) are shown.
+    this.animatedThisFrame = this.options.showMapObjects;
 
     // ── Blit cached interior tiles ──
     const cached = this.interiorCache.getOrRender(
@@ -958,7 +991,9 @@ export class IsometricRenderer {
     this.renderInteriorExitPortals(interior, viewport);
 
     // Render gathering zones
-    this.renderInteriorGatheringZones(interior, viewport);
+    if (this.options.showGatheringZones) {
+      this.renderInteriorGatheringZones(interior, viewport);
+    }
 
     // Render dev notes
     this.renderNotes(viewport);

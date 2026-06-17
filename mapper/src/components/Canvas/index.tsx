@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useViewportStore } from '@/state/viewportStore';
 import { isometricRenderer } from '@/core/IsometricRenderer';
 import { screenToWorldTile, worldToChunk, getBrushTiles } from '@/core/coords';
 import { Tool, Layer } from '@/types';
@@ -18,10 +19,10 @@ export function Canvas() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; wx: number; wy: number } | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const heightDelta = useRef(0); // +1 for raise, -1 for lower (during drag)
+  const dirtyRef = useRef(true); // render loop repaints only when this is set
 
   const {
     chunks,
-    viewport,
     hoveredTile,
     activeTool,
     activeLayer,
@@ -38,13 +39,13 @@ export function Canvas() {
     showMapObjects,
     showPortals,
     showNotes,
+    showGatheringZones,
+    showFarmingPlots,
     visibleLayers,
     notes,
     selectedNoteId,
     editorMode,
     currentInterior,
-    pan,
-    zoom,
     setHoveredTile,
     setTile,
     toggleCollision,
@@ -101,6 +102,9 @@ export function Canvas() {
     setNotesPanelCollapsed,
   } = useEditorStore();
 
+  // Viewport lives in its own store so pan/zoom never re-renders the panels.
+  const { pan, zoom } = useViewportStore.getState();
+
   // Setup canvas and renderer
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -112,6 +116,8 @@ export function Canvas() {
       if (containerRef.current) {
         canvas.width = containerRef.current.clientWidth;
         canvas.height = containerRef.current.clientHeight;
+        // Resizing a canvas clears it, so force a repaint.
+        dirtyRef.current = true;
       }
     });
 
@@ -181,32 +187,67 @@ export function Canvas() {
       showMapObjects,
       showPortals,
       showNotes,
+      showGatheringZones,
+      showFarmingPlots,
       showHeights: activeTool === Tool.HeightRaise,
       visibleLayers,
     });
-  }, [showGrid, showChunkBounds, showCollision, showEntities, showMapObjects, showPortals, showNotes, visibleLayers, activeTool]);
+  }, [showGrid, showChunkBounds, showCollision, showEntities, showMapObjects, showPortals, showNotes, showGatheringZones, showFarmingPlots, visibleLayers, activeTool]);
 
   // Pass notes to renderer
   useEffect(() => {
     isometricRenderer.setNotes(notes, selectedNoteId);
   }, [notes, selectedNoteId]);
 
-  // Render loop
+  // Mark the canvas dirty whenever anything that affects what's drawn changes.
+  // The render loop below only repaints when dirty, instead of every frame.
+  useEffect(() => {
+    dirtyRef.current = true;
+  }, [
+    chunks, hoveredTile, brushSize, selectedTiles, selectedPortal,
+    editorMode, currentInterior, showGrid, showChunkBounds, showCollision,
+    showEntities, showMapObjects, showPortals, showNotes, showGatheringZones,
+    showFarmingPlots, visibleLayers, activeTool, notes, selectedNoteId,
+  ]);
+
+  // Viewport changes (pan/zoom) live in a separate store and intentionally do
+  // NOT re-render this component. Subscribe imperatively to mark the canvas
+  // dirty so the render loop repaints — without any React reconciliation.
+  useEffect(() => useViewportStore.subscribe(() => {
+    dirtyRef.current = true;
+  }), []);
+
+  // Render loop: mounts once and reads live state via getState(). Repaints only
+  // when the scene is dirty, plus a low-rate tick while animated sprites are in
+  // view so animations keep playing — instead of redrawing 60×/sec when idle.
   useEffect(() => {
     let animationId: number;
+    let lastAnimDraw = 0;
+    const ANIM_INTERVAL_MS = 1000 / 12; // animated sprites refresh ~12fps
 
-    const render = () => {
-      if (editorMode === 'interior' && currentInterior) {
-        // Render interior map
-        isometricRenderer.renderInterior(currentInterior, viewport);
+    // TEMP perf instrumentation — logs once/sec; remove once diagnosed.
+    let perfFrames = 0;
+    let perfTicks = 0;
+    let perfTotalMs = 0;
+    let perfMaxMs = 0;
+    let perfMaxGap = 0;
+    let perfPrevTick = performance.now();
+    let perfLastLog = performance.now();
+
+    const draw = () => {
+      const s = useEditorStore.getState();
+      const viewport = useViewportStore.getState().viewport;
+      const { chunks, selectedPortal, hoveredTile, brushSize } = s;
+
+      if (s.editorMode === 'interior' && s.currentInterior) {
+        isometricRenderer.renderInterior(s.currentInterior, viewport);
       } else {
-        // Render overworld chunks
         const allChunks = Array.from(chunks.values());
         isometricRenderer.render(allChunks, viewport);
 
         // Highlight selected tiles (magic wand selection)
-        if (selectedTiles.size > 0) {
-          for (const tileKey of selectedTiles) {
+        if (s.selectedTiles.size > 0) {
+          for (const tileKey of s.selectedTiles) {
             const [wxStr, wyStr] = tileKey.split(',');
             const wx = parseInt(wxStr, 10);
             const wy = parseInt(wyStr, 10);
@@ -217,20 +258,18 @@ export function Canvas() {
         // Highlight selected portal
         if (selectedPortal) {
           const chunk = chunks.get(`${selectedPortal.chunkCoord.cx},${selectedPortal.chunkCoord.cy}`);
-          if (chunk && chunk.portals) {
-            const portal = chunk.portals.find((p) => p.id === selectedPortal.portalId);
-            if (portal) {
-              const baseX = selectedPortal.chunkCoord.cx * 32;
-              const baseY = selectedPortal.chunkCoord.cy * 32;
-              for (let py = 0; py < portal.height; py++) {
-                for (let px = 0; px < portal.width; px++) {
-                  isometricRenderer.highlightTile(
-                    { wx: baseX + portal.x + px, wy: baseY + portal.y + py },
-                    viewport,
-                    'rgba(200, 0, 255, 0.6)',
-                    true
-                  );
-                }
+          const portal = chunk?.portals?.find((p) => p.id === selectedPortal.portalId);
+          if (portal) {
+            const baseX = selectedPortal.chunkCoord.cx * 32;
+            const baseY = selectedPortal.chunkCoord.cy * 32;
+            for (let py = 0; py < portal.height; py++) {
+              for (let px = 0; px < portal.width; px++) {
+                isometricRenderer.highlightTile(
+                  { wx: baseX + portal.x + px, wy: baseY + portal.y + py },
+                  viewport,
+                  'rgba(200, 0, 255, 0.6)',
+                  true
+                );
               }
             }
           }
@@ -246,16 +285,54 @@ export function Canvas() {
         // Outline the center tile more prominently
         isometricRenderer.highlightTile(hoveredTile, viewport, '#ffffff');
       }
-
-      animationId = requestAnimationFrame(render);
     };
 
-    render();
+    const loop = () => {
+      const now = performance.now();
+      // TEMP perf instrumentation — count every rAF tick + max gap between ticks
+      perfTicks++;
+      const gap = now - perfPrevTick;
+      if (gap > perfMaxGap) perfMaxGap = gap;
+      perfPrevTick = now;
+
+      let shouldDraw = dirtyRef.current;
+      if (!shouldDraw && isometricRenderer.hasAnimatedContent() && now - lastAnimDraw >= ANIM_INTERVAL_MS) {
+        shouldDraw = true;
+      }
+      if (shouldDraw) {
+        const t0 = performance.now();
+        draw();
+        const dt = performance.now() - t0;
+        dirtyRef.current = false;
+        if (isometricRenderer.hasAnimatedContent()) lastAnimDraw = now;
+
+        // TEMP perf instrumentation
+        perfFrames++;
+        perfTotalMs += dt;
+        if (dt > perfMaxMs) perfMaxMs = dt;
+      }
+      // TEMP perf instrumentation — report once/sec
+      if (now - perfLastLog >= 1000) {
+        const stats = isometricRenderer.getFrameStats();
+        console.log(
+          `[mapper perf] rAF ${perfTicks} ticks/s | ${perfFrames} draws/s | avg ${perfFrames ? (perfTotalMs / perfFrames).toFixed(1) : '0'}ms | maxGap ${perfMaxGap.toFixed(0)}ms | visibleChunks=${stats.visibleChunks} cacheBuilds=${stats.cacheBuilds}`,
+        );
+        perfFrames = 0;
+        perfTicks = 0;
+        perfTotalMs = 0;
+        perfMaxMs = 0;
+        perfMaxGap = 0;
+        perfLastLog = now;
+      }
+      animationId = requestAnimationFrame(loop);
+    };
+
+    loop();
 
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [chunks, viewport, hoveredTile, brushSize, selectedTiles, selectedPortal, editorMode, currentInterior]);
+  }, []);
 
   // Handle tool action at position
   const handleToolAction = useCallback(
@@ -266,6 +343,7 @@ export function Canvas() {
       const rect = canvas.getBoundingClientRect();
       const screenX = clientX - rect.left;
       const screenY = clientY - rect.top;
+      const { viewport } = useViewportStore.getState();
       const worldTile = screenToWorldTile({ sx: screenX, sy: screenY }, viewport);
 
       const tiles = getBrushTiles(worldTile, brushSize);
@@ -692,7 +770,6 @@ export function Canvas() {
       }
     },
     [
-      viewport,
       activeTool,
       activeLayer,
       brushSize,
@@ -776,6 +853,7 @@ export function Canvas() {
           const rect = canvas.getBoundingClientRect();
           const screenX = e.clientX - rect.left;
           const screenY = e.clientY - rect.top;
+          const { viewport } = useViewportStore.getState();
           const worldTile = screenToWorldTile({ sx: screenX, sy: screenY }, viewport);
           const brushTiles = getBrushTiles(worldTile, brushSize);
           for (const t of brushTiles) {
@@ -801,7 +879,7 @@ export function Canvas() {
         handleToolAction(e.clientX, e.clientY);
       }
     },
-    [activeTool, handleToolAction, viewport, adjustHeight, brushSize]
+    [activeTool, handleToolAction, adjustHeight, brushSize]
   );
 
   const handleMouseMove = useCallback(
@@ -812,6 +890,7 @@ export function Canvas() {
       const rect = canvas.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
+      const { viewport } = useViewportStore.getState();
       const worldTile = screenToWorldTile({ sx: screenX, sy: screenY }, viewport);
       setHoveredTile(worldTile);
 
@@ -841,7 +920,7 @@ export function Canvas() {
         }
       }
     },
-    [viewport, isPanning, isPainting, activeTool, brushSize, pan, setHoveredTile, handleToolAction, adjustHeight, setBlockType, selectedBlockTypeDown, selectedBlockTypeRight]
+    [isPanning, isPainting, activeTool, brushSize, pan, setHoveredTile, handleToolAction, adjustHeight, setBlockType, selectedBlockTypeDown, selectedBlockTypeRight]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -899,7 +978,7 @@ export function Canvas() {
           if (!rect) return;
           const tile = screenToWorldTile(
             { sx: e.clientX - rect.left, sy: e.clientY - rect.top },
-            viewport
+            useViewportStore.getState().viewport
           );
           if (tile) {
             setContextMenu({ x: e.clientX, y: e.clientY, wx: tile.wx, wy: tile.wy });

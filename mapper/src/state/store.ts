@@ -1,9 +1,9 @@
 import { create } from 'zustand';
+import { useViewportStore } from './viewportStore';
 import type {
   Chunk,
   ChunkCoord,
   WorldCoord,
-  Viewport,
   EntitySpawn,
   EntityRegistry,
   Tileset,
@@ -83,8 +83,7 @@ interface EditorState {
   selectedInteriorMapObject: string | null;
   selectedInteriorWall: string | null;
 
-  // View state
-  viewport: Viewport;
+  // View state (viewport lives in useViewportStore to avoid pan re-renders)
   hoveredTile: WorldCoord | null;
   selection: Selection | null;
 
@@ -120,6 +119,8 @@ interface EditorState {
   showEntities: boolean;
   showMapObjects: boolean;
   showPortals: boolean;
+  showGatheringZones: boolean;
+  showFarmingPlots: boolean;
   visibleLayers: {
     ground: boolean;
     objects: boolean;
@@ -161,9 +162,6 @@ interface EditorActions {
   setWorldBounds: (bounds: EditorState['worldBounds']) => void;
 
   // View actions
-  setViewport: (viewport: Partial<Viewport>) => void;
-  pan: (dx: number, dy: number) => void;
-  zoom: (factor: number, centerX: number, centerY: number) => void;
   setHoveredTile: (tile: WorldCoord | null) => void;
   setSelection: (selection: Selection | null) => void;
 
@@ -247,6 +245,8 @@ interface EditorActions {
   toggleEntitiesOverlay: () => void;
   toggleMapObjectsOverlay: () => void;
   togglePortalsOverlay: () => void;
+  toggleGatheringZonesOverlay: () => void;
+  toggleFarmingPlotsOverlay: () => void;
   setLayerVisibility: (layer: keyof EditorState['visibleLayers'], visible: boolean) => void;
 
   // History actions
@@ -366,11 +366,6 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   selectedInteriorMapObject: null,
   selectedInteriorWall: null,
 
-  viewport: {
-    offsetX: 400,
-    offsetY: 200,
-    zoom: 1,
-  },
   hoveredTile: null,
   selection: null,
 
@@ -402,6 +397,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   showEntities: true,
   showMapObjects: true,
   showPortals: true,
+  showGatheringZones: true,
+  showFarmingPlots: true,
   visibleLayers: {
     ground: true,
     objects: true,
@@ -448,41 +445,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
   setWorldBounds: (bounds) => set({ worldBounds: bounds }),
 
-  // View actions
-  setViewport: (viewport) => {
-    set((state) => ({
-      viewport: { ...state.viewport, ...viewport },
-    }));
-  },
-
-  pan: (dx, dy) => {
-    set((state) => ({
-      viewport: {
-        ...state.viewport,
-        offsetX: state.viewport.offsetX + dx,
-        offsetY: state.viewport.offsetY + dy,
-      },
-    }));
-  },
-
-  zoom: (factor, centerX, centerY) => {
-    set((state) => {
-      const newZoom = Math.max(0.25, Math.min(4, state.viewport.zoom * factor));
-      const zoomRatio = newZoom / state.viewport.zoom;
-
-      // Adjust offset to zoom toward center point
-      const newOffsetX = centerX - (centerX - state.viewport.offsetX) * zoomRatio;
-      const newOffsetY = centerY - (centerY - state.viewport.offsetY) * zoomRatio;
-
-      return {
-        viewport: {
-          offsetX: newOffsetX,
-          offsetY: newOffsetY,
-          zoom: newZoom,
-        },
-      };
-    });
-  },
+  // View actions live in useViewportStore (see viewportStore.ts).
 
   setHoveredTile: (tile) => set({ hoveredTile: tile }),
   setSelection: (selection) => set({ selection }),
@@ -1629,6 +1592,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   toggleEntitiesOverlay: () => set((state) => ({ showEntities: !state.showEntities })),
   toggleMapObjectsOverlay: () => set((state) => ({ showMapObjects: !state.showMapObjects })),
   togglePortalsOverlay: () => set((state) => ({ showPortals: !state.showPortals })),
+  toggleGatheringZonesOverlay: () => set((state) => ({ showGatheringZones: !state.showGatheringZones })),
+  toggleFarmingPlotsOverlay: () => set((state) => ({ showFarmingPlots: !state.showFarmingPlots })),
   setLayerVisibility: (layer, visible) =>
     set((state) => ({
       visibleLayers: { ...state.visibleLayers, [layer]: visible },
@@ -1716,7 +1681,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   // Interior actions
   createInterior: (id, name, width = 16, height = 16) => {
     const interior = interiorStorage.createInterior(id, name, width, height);
-    const viewport = get().viewport;
+    const { viewport, setViewport } = useViewportStore.getState();
     // Center viewport on interior map
     const centerX = width / 2;
     const centerY = height / 2;
@@ -1739,11 +1704,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
       selectedInteriorEntity: null,
       selectedInteriorMapObject: null,
       selectedInteriorWall: null,
-      viewport: {
-        ...viewport,
-        offsetX: 400 - screenX * viewport.zoom,
-        offsetY: 100 - screenY * viewport.zoom,
-      },
+    });
+    setViewport({
+      offsetX: 400 - screenX * viewport.zoom,
+      offsetY: 100 - screenY * viewport.zoom,
     });
     // Auto-save to server
     interiorStorage.saveInterior(interior).then((success) => {
@@ -1760,7 +1724,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
   loadInterior: async (id) => {
     const interior = await interiorStorage.loadInterior(id);
     if (interior) {
-      const viewport = get().viewport;
+      const { viewport, setViewport } = useViewportStore.getState();
       // Center viewport on interior map
       const centerX = interior.width / 2;
       const centerY = interior.height / 2;
@@ -1779,11 +1743,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         selectedInteriorEntity: null,
         selectedInteriorMapObject: null,
         selectedInteriorWall: null,
-        viewport: {
-          ...viewport,
-          offsetX: 400 - screenX * viewport.zoom,
-          offsetY: 100 - screenY * viewport.zoom,
-        },
+      });
+      setViewport({
+        offsetX: 400 - screenX * viewport.zoom,
+        offsetY: 100 - screenY * viewport.zoom,
       });
     }
     return interior;
@@ -2272,18 +2235,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     if (spawnPoint) {
       // Center viewport on spawn point
       // This will need to be adjusted based on tile size and viewport
-      const { viewport } = get();
+      const { viewport, setViewport } = useViewportStore.getState();
       const TILE_WIDTH = 64;
       const TILE_HEIGHT = 32;
       const screenX = (spawnPoint.x - spawnPoint.y) * (TILE_WIDTH / 2);
       const screenY = (spawnPoint.x + spawnPoint.y) * (TILE_HEIGHT / 2);
 
-      set({
-        viewport: {
-          ...viewport,
-          offsetX: 400 - screenX * viewport.zoom,
-          offsetY: 200 - screenY * viewport.zoom,
-        },
+      setViewport({
+        offsetX: 400 - screenX * viewport.zoom,
+        offsetY: 200 - screenY * viewport.zoom,
       });
     }
   },
@@ -2292,18 +2252,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // Switch to overworld and center on target coordinates
     get().switchToOverworld();
 
-    const { viewport } = get();
+    const { viewport, setViewport } = useViewportStore.getState();
     const TILE_WIDTH = 64;
     const TILE_HEIGHT = 32;
     const screenX = (portal.targetX - portal.targetY) * (TILE_WIDTH / 2);
     const screenY = (portal.targetX + portal.targetY) * (TILE_HEIGHT / 2);
 
-    set({
-      viewport: {
-        ...viewport,
-        offsetX: 400 - screenX * viewport.zoom,
-        offsetY: 200 - screenY * viewport.zoom,
-      },
+    setViewport({
+      offsetX: 400 - screenX * viewport.zoom,
+      offsetY: 200 - screenY * viewport.zoom,
     });
   },
 

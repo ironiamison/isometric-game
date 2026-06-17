@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import { useEditorStore, cancelPendingSave } from '@/state/store';
+import { useViewportStore } from '@/state/viewportStore';
 import { chunkManager } from '@/core/ChunkManager';
 import { history } from '@/core/History';
 import { storage } from '@/core/Storage';
@@ -28,8 +29,6 @@ export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => vo
     showChunkBounds,
     toggleGrid,
     toggleChunkBounds,
-    viewport,
-    setViewport,
     getDirtyChunks,
     markAllClean,
     setChunks,
@@ -219,16 +218,21 @@ export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => vo
     alert(`Downloaded map_export.zip with ${exportedChunks} chunk(s) and ${exportedInteriors} interior(s).\n\nExtract to: rust-server/maps/world_0/`);
   };
 
+  // Subscribe to zoom only — panning (offset) must not re-render the menu bar.
+  const zoomLevel = useViewportStore((s) => s.viewport.zoom);
+
   const handleZoomIn = () => {
+    const { viewport, setViewport } = useViewportStore.getState();
     setViewport({ zoom: Math.min(4, viewport.zoom * 1.25) });
   };
 
   const handleZoomOut = () => {
+    const { viewport, setViewport } = useViewportStore.getState();
     setViewport({ zoom: Math.max(0.25, viewport.zoom / 1.25) });
   };
 
   const handleResetView = () => {
-    setViewport({ offsetX: 400, offsetY: 200, zoom: 1 });
+    useViewportStore.getState().setViewport({ offsetX: 400, offsetY: 200, zoom: 1 });
   };
 
   const handleClearLocalData = async () => {
@@ -815,7 +819,7 @@ export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => vo
             Editing: {currentInteriorId} {currentInterior?.dirty ? '*' : ''}
           </span>
         )}
-        <span className={styles.statusItem}>Zoom: {Math.round(viewport.zoom * 100)}%</span>
+        <span className={styles.statusItem}>Zoom: {Math.round(zoomLevel * 100)}%</span>
         {editorMode === 'overworld' && (
           <span className={styles.statusItem}>
             {getDirtyChunks().length > 0 && `${getDirtyChunks().length} unsaved`}

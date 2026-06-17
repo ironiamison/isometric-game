@@ -3,7 +3,7 @@ import { Layer } from '@/types';
 import styles from './LayerPanel.module.css';
 
 // Add a special 'portals' layer type for visibility toggle
-type ExtendedLayer = Layer | 'portals';
+type ExtendedLayer = Layer | 'portals' | 'gatheringZones' | 'farmingPlots';
 
 const layers: { id: ExtendedLayer; label: string }[] = [
   { id: Layer.Ground, label: 'Ground' },
@@ -13,6 +13,8 @@ const layers: { id: ExtendedLayer; label: string }[] = [
   { id: Layer.Collision, label: 'Collision' },
   { id: Layer.Entities, label: 'Entities' },
   { id: 'portals', label: 'Portals' },
+  { id: 'gatheringZones', label: 'Gathering Zones' },
+  { id: 'farmingPlots', label: 'Farming Plots' },
 ];
 
 export function LayerPanel() {
@@ -27,10 +29,14 @@ export function LayerPanel() {
     showEntities,
     showMapObjects,
     showPortals,
+    showGatheringZones,
+    showFarmingPlots,
     toggleCollisionOverlay,
     toggleEntitiesOverlay,
     toggleMapObjectsOverlay,
     togglePortalsOverlay,
+    toggleGatheringZonesOverlay,
+    toggleFarmingPlotsOverlay,
   } = useEditorStore();
 
   const isLayerVisible = (layer: ExtendedLayer): boolean => {
@@ -49,6 +55,10 @@ export function LayerPanel() {
         return showMapObjects;
       case 'portals':
         return showPortals;
+      case 'gatheringZones':
+        return showGatheringZones;
+      case 'farmingPlots':
+        return showFarmingPlots;
       default:
         return true;
     }
@@ -77,12 +87,18 @@ export function LayerPanel() {
       case 'portals':
         togglePortalsOverlay();
         break;
+      case 'gatheringZones':
+        toggleGatheringZonesOverlay();
+        break;
+      case 'farmingPlots':
+        toggleFarmingPlotsOverlay();
+        break;
     }
   };
 
   const handleLayerClick = (layer: ExtendedLayer) => {
-    // Don't change active layer for portals - it's just a visibility toggle
-    if (layer !== 'portals') {
+    // These are visibility-only toggles, not editable layers.
+    if (layer !== 'portals' && layer !== 'gatheringZones' && layer !== 'farmingPlots') {
       setActiveLayer(layer as Layer);
     }
   };
