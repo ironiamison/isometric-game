@@ -1,9 +1,17 @@
 import { useState } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import styles from './EntityPanel.module.css';
 
 export function EntityPanel() {
-  const { entityRegistry, selectedEntityId, setSelectedEntityId, setActiveTool } = useEditorStore();
+  const { entityRegistry, selectedEntityId, setSelectedEntityId, setActiveTool } = useEditorStore(
+    useShallow((s) => ({
+      entityRegistry: s.entityRegistry,
+      selectedEntityId: s.selectedEntityId,
+      setSelectedEntityId: s.setSelectedEntityId,
+      setActiveTool: s.setActiveTool,
+    })),
+  );
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(['hostile', 'questGiver', 'merchant', 'station', 'other'])

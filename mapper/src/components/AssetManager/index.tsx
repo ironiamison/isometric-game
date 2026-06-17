@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { objectLoader } from '@/core/ObjectLoader';
 import { tilesetLoader } from '@/core/TilesetLoader';
 import { isometricRenderer } from '@/core/IsometricRenderer';
@@ -29,7 +30,13 @@ type UploadResult = {
 };
 
 export function AssetManager() {
-  const { assetManagerTab, closeAssetManager, refreshAssets } = useEditorStore();
+  const { assetManagerTab, closeAssetManager, refreshAssets } = useEditorStore(
+    useShallow((s) => ({
+      assetManagerTab: s.assetManagerTab,
+      closeAssetManager: s.closeAssetManager,
+      refreshAssets: s.refreshAssets,
+    })),
+  );
   const [tab, setTab] = useState<Tab>(assetManagerTab);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [importing, setImporting] = useState(false);

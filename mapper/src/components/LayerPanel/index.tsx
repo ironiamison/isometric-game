@@ -1,4 +1,5 @@
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { Layer } from '@/types';
 import styles from './LayerPanel.module.css';
 
@@ -37,7 +38,28 @@ export function LayerPanel() {
     togglePortalsOverlay,
     toggleGatheringZonesOverlay,
     toggleFarmingPlotsOverlay,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((s) => ({
+      layerPanelCollapsed: s.layerPanelCollapsed,
+      setLayerPanelCollapsed: s.setLayerPanelCollapsed,
+      activeLayer: s.activeLayer,
+      setActiveLayer: s.setActiveLayer,
+      visibleLayers: s.visibleLayers,
+      setLayerVisibility: s.setLayerVisibility,
+      showCollision: s.showCollision,
+      showEntities: s.showEntities,
+      showMapObjects: s.showMapObjects,
+      showPortals: s.showPortals,
+      showGatheringZones: s.showGatheringZones,
+      showFarmingPlots: s.showFarmingPlots,
+      toggleCollisionOverlay: s.toggleCollisionOverlay,
+      toggleEntitiesOverlay: s.toggleEntitiesOverlay,
+      toggleMapObjectsOverlay: s.toggleMapObjectsOverlay,
+      togglePortalsOverlay: s.togglePortalsOverlay,
+      toggleGatheringZonesOverlay: s.toggleGatheringZonesOverlay,
+      toggleFarmingPlotsOverlay: s.toggleFarmingPlotsOverlay,
+    })),
+  );
 
   const isLayerVisible = (layer: ExtendedLayer): boolean => {
     switch (layer) {

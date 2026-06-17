@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { objectLoader } from '@/core/ObjectLoader';
 import type { ObjectDefinition } from '@/types';
 import styles from './ObjectPalette.module.css';
@@ -8,7 +9,20 @@ type Category = 'objects' | 'walls';
 type WallTool = 'wallDown' | 'wallRight';
 
 export function ObjectPalette() {
-  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool, openAssetManager, refreshAssets, selectedBlockTypeDown, selectedBlockTypeRight, setSelectedBlockTypeDown, setSelectedBlockTypeRight } = useEditorStore();
+  const { selectedObjectId, setSelectedObjectId, setActiveTool, activeTool, openAssetManager, refreshAssets, selectedBlockTypeDown, selectedBlockTypeRight, setSelectedBlockTypeDown, setSelectedBlockTypeRight } = useEditorStore(
+    useShallow((s) => ({
+      selectedObjectId: s.selectedObjectId,
+      setSelectedObjectId: s.setSelectedObjectId,
+      setActiveTool: s.setActiveTool,
+      activeTool: s.activeTool,
+      openAssetManager: s.openAssetManager,
+      refreshAssets: s.refreshAssets,
+      selectedBlockTypeDown: s.selectedBlockTypeDown,
+      selectedBlockTypeRight: s.selectedBlockTypeRight,
+      setSelectedBlockTypeDown: s.setSelectedBlockTypeDown,
+      setSelectedBlockTypeRight: s.setSelectedBlockTypeRight,
+    })),
+  );
   const [category, setCategory] = useState<Category>('objects');
   const [filter, setFilter] = useState('');
   const lastWallTool = useRef<WallTool>('wallDown');

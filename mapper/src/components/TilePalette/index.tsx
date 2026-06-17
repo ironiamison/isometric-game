@@ -1,12 +1,24 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import type { Tileset } from '@/types';
 import styles from './TilePalette.module.css';
 
 export function TilePalette() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { tilesets, selectedTileId, selectedTiles, setSelectedTileId, setActiveTool, setActiveLayer, fillSelectedTiles, openAssetManager } = useEditorStore();
+  const { tilesets, selectedTileId, selectedTiles, setSelectedTileId, setActiveTool, setActiveLayer, fillSelectedTiles, openAssetManager } = useEditorStore(
+    useShallow((s) => ({
+      tilesets: s.tilesets,
+      selectedTileId: s.selectedTileId,
+      selectedTiles: s.selectedTiles,
+      setSelectedTileId: s.setSelectedTileId,
+      setActiveTool: s.setActiveTool,
+      setActiveLayer: s.setActiveLayer,
+      fillSelectedTiles: s.fillSelectedTiles,
+      openAssetManager: s.openAssetManager,
+    })),
+  );
   const [activeTilesetName, setActiveTilesetName] = useState<string | null>(null);
   const [hoveredTile, setHoveredTile] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);

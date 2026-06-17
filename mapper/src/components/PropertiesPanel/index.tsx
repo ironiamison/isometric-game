@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { objectLoader } from '@/core/ObjectLoader';
 import { interiorStorage } from '@/core/InteriorStorage';
 import type { EntitySpawn, Portal, ExitPortal, FarmingPatchType } from '@/types';
@@ -62,7 +63,58 @@ export function PropertiesPanel() {
     removeInteriorWall,
     removeWall,
     updateInteriorEntity,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((s) => ({
+      chunks: s.chunks,
+      activeTool: s.activeTool,
+      selectedEntitySpawn: s.selectedEntitySpawn,
+      selectedMapObject: s.selectedMapObject,
+      selectedPortal: s.selectedPortal,
+      selectedGatheringZone: s.selectedGatheringZone,
+      selectedGatheringZoneId: s.selectedGatheringZoneId,
+      selectedExitPortal: s.selectedExitPortal,
+      currentInterior: s.currentInterior,
+      availableInteriors: s.availableInteriors,
+      setSelectedEntitySpawn: s.setSelectedEntitySpawn,
+      setSelectedMapObject: s.setSelectedMapObject,
+      setSelectedPortal: s.setSelectedPortal,
+      setSelectedGatheringZone: s.setSelectedGatheringZone,
+      setSelectedGatheringZoneId: s.setSelectedGatheringZoneId,
+      setSelectedExitPortal: s.setSelectedExitPortal,
+      updateEntity: s.updateEntity,
+      removeEntity: s.removeEntity,
+      removeMapObject: s.removeMapObject,
+      updateMapObject: s.updateMapObject,
+      updatePortal: s.updatePortal,
+      removePortal: s.removePortal,
+      removeGatheringZone: s.removeGatheringZone,
+      updateGatheringZone: s.updateGatheringZone,
+      selectedFarmingPlot: s.selectedFarmingPlot,
+      setSelectedFarmingPlot: s.setSelectedFarmingPlot,
+      removeFarmingPlot: s.removeFarmingPlot,
+      updateFarmingPlot: s.updateFarmingPlot,
+      selectedFarmingPatchType: s.selectedFarmingPatchType,
+      setSelectedFarmingPatchType: s.setSelectedFarmingPatchType,
+      updateExitPortal: s.updateExitPortal,
+      removeExitPortal: s.removeExitPortal,
+      jumpToPortalTarget: s.jumpToPortalTarget,
+      jumpToExitPortalTarget: s.jumpToExitPortalTarget,
+      editorMode: s.editorMode,
+      selectedInteriorEntity: s.selectedInteriorEntity,
+      selectedInteriorMapObject: s.selectedInteriorMapObject,
+      selectedInteriorWall: s.selectedInteriorWall,
+      selectedWall: s.selectedWall,
+      setSelectedInteriorEntity: s.setSelectedInteriorEntity,
+      setSelectedInteriorMapObject: s.setSelectedInteriorMapObject,
+      setSelectedInteriorWall: s.setSelectedInteriorWall,
+      setSelectedWall: s.setSelectedWall,
+      removeInteriorEntity: s.removeInteriorEntity,
+      removeInteriorMapObject: s.removeInteriorMapObject,
+      removeInteriorWall: s.removeInteriorWall,
+      removeWall: s.removeWall,
+      updateInteriorEntity: s.updateInteriorEntity,
+    })),
+  );
 
   // Get the actual entity spawn from the selection
   const getSelectedEntity = () => {

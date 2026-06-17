@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { useViewportStore } from '@/state/viewportStore';
 import { notesStorage } from '@/core/NotesStorage';
 import { screenToWorldTile, worldToChunk } from '@/core/coords';
@@ -23,14 +24,26 @@ export function NotesPanel() {
     showNotes,
     selectedNoteId,
     notesPanelCollapsed,
-    hoveredTile,
     addNote,
     updateNote,
     removeNote,
     setSelectedNoteId,
     setShowNotes,
     setNotesPanelCollapsed,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((s) => ({
+      notes: s.notes,
+      showNotes: s.showNotes,
+      selectedNoteId: s.selectedNoteId,
+      notesPanelCollapsed: s.notesPanelCollapsed,
+      addNote: s.addNote,
+      updateNote: s.updateNote,
+      removeNote: s.removeNote,
+      setSelectedNoteId: s.setSelectedNoteId,
+      setShowNotes: s.setShowNotes,
+      setNotesPanelCollapsed: s.setNotesPanelCollapsed,
+    })),
+  );
 
   const [filterCategory, setFilterCategory] = useState<NoteCategory | null>(null);
   const [filterStatus, setFilterStatus] = useState<NoteStatus | null>(null);
@@ -81,7 +94,7 @@ export function NotesPanel() {
       ? { sx: canvas.width / 2, sy: canvas.height / 2 }
       : { sx: 400, sy: 200 };
     const centerTile = screenToWorldTile(canvasCenter, useViewportStore.getState().viewport);
-    const tile = hoveredTile || centerTile;
+    const tile = useEditorStore.getState().hoveredTile || centerTile;
     const now = new Date().toISOString();
     const note: DevNote = {
       id: generateId(),

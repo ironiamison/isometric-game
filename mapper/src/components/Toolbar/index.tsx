@@ -1,4 +1,5 @@
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { Tool } from '@/types';
 import {
   MousePointer2,
@@ -56,7 +57,15 @@ const tools: ToolDef[] = [
 ];
 
 export function Toolbar() {
-  const { activeTool, setActiveTool, editorMode, brushSize, setBrushSize } = useEditorStore();
+  const { activeTool, setActiveTool, editorMode, brushSize, setBrushSize } = useEditorStore(
+    useShallow((s) => ({
+      activeTool: s.activeTool,
+      setActiveTool: s.setActiveTool,
+      editorMode: s.editorMode,
+      brushSize: s.brushSize,
+      setBrushSize: s.setBrushSize,
+    })),
+  );
 
   const visibleTools = tools.filter((t) => !t.mode || t.mode === editorMode);
 

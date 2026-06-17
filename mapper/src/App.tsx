@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useEditorStore } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { tilesetLoader } from '@/core/TilesetLoader';
 import { entityRegistryLoader } from '@/core/EntityRegistry';
 import { objectLoader } from '@/core/ObjectLoader';
@@ -124,7 +125,24 @@ function App() {
     assetManagerOpen,
     assetManagerTab,
     assetRevision,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((s) => ({
+      setTilesets: s.setTilesets,
+      setEntityRegistry: s.setEntityRegistry,
+      setChunks: s.setChunks,
+      setWorldBounds: s.setWorldBounds,
+      setLoading: s.setLoading,
+      setConnected: s.setConnected,
+      isLoading: s.isLoading,
+      loadingMessage: s.loadingMessage,
+      setNotes: s.setNotes,
+      fetchUserInfo: s.fetchUserInfo,
+      paletteSide: s.paletteSide,
+      assetManagerOpen: s.assetManagerOpen,
+      assetManagerTab: s.assetManagerTab,
+      assetRevision: s.assetRevision,
+    })),
+  );
 
   // Initialize app
   useEffect(() => {

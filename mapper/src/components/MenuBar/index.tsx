@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import { useEditorStore, cancelPendingSave } from '@/state/store';
+import { useShallow } from 'zustand/react/shallow';
 import { useViewportStore } from '@/state/viewportStore';
 import { chunkManager } from '@/core/ChunkManager';
 import { history } from '@/core/History';
@@ -50,7 +51,36 @@ export function MenuBar({ onOpenContentStudio }: { onOpenContentStudio: () => vo
     switchWorld,
     paletteSide,
     togglePaletteSide,
-  } = useEditorStore();
+  } = useEditorStore(
+    useShallow((s) => ({
+      chunks: s.chunks,
+      showGrid: s.showGrid,
+      showChunkBounds: s.showChunkBounds,
+      toggleGrid: s.toggleGrid,
+      toggleChunkBounds: s.toggleChunkBounds,
+      getDirtyChunks: s.getDirtyChunks,
+      markAllClean: s.markAllClean,
+      setChunks: s.setChunks,
+      setWorldBounds: s.setWorldBounds,
+      isConnected: s.isConnected,
+      editorMode: s.editorMode,
+      currentInterior: s.currentInterior,
+      currentInteriorId: s.currentInteriorId,
+      availableInteriors: s.availableInteriors,
+      switchToOverworld: s.switchToOverworld,
+      createInterior: s.createInterior,
+      loadInterior: s.loadInterior,
+      saveCurrentInterior: s.saveCurrentInterior,
+      setAvailableInteriors: s.setAvailableInteriors,
+      resizeInterior: s.resizeInterior,
+      openAssetManager: s.openAssetManager,
+      currentWorld: s.currentWorld,
+      availableWorlds: s.availableWorlds,
+      switchWorld: s.switchWorld,
+      paletteSide: s.paletteSide,
+      togglePaletteSide: s.togglePaletteSide,
+    })),
+  );
 
   const [rebuildingAtlas, setRebuildingAtlas] = useState(false);
 
