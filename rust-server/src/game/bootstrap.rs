@@ -731,6 +731,7 @@ impl GameRoom {
             koth_states: RwLock::new(std::collections::HashMap::new()),
             boss_states: RwLock::new(std::collections::HashMap::new()),
             pharaoh_boss_states: RwLock::new(HashMap::new()),
+            reaper_boss_states: RwLock::new(HashMap::new()),
             db,
             gathering: RwLock::new(gathering),
             woodcutting: RwLock::new(woodcutting),

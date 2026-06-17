@@ -433,6 +433,12 @@ pub enum ServerMessage {
         radius: i32,
         damage: i32,
     },
+    /// Reaper boss: mark/unmark a player with a Mark of Death.
+    /// `duration_ms == 0` clears the mark.
+    ReaperMark {
+        player_id: String,
+        duration_ms: u64,
+    },
     /// Tell client to transition to a different map (interior or world)
     MapTransition {
         map_type: String, // "interior" or "world"
@@ -1379,6 +1385,7 @@ impl ServerMessage {
             ServerMessage::AoeWarning { .. } => "aoeWarning",
             ServerMessage::AoeDamage { .. } => "aoeDamage",
             ServerMessage::Explosion { .. } => "explosion",
+            ServerMessage::ReaperMark { .. } => "reaperMark",
             ServerMessage::Announcement { .. } => "announcement",
             ServerMessage::NpcSpeech { .. } => "npcSpeech",
             ServerMessage::MapTransition { .. } => "mapTransition",

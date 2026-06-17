@@ -5,6 +5,7 @@ use crate::protocol::ServerMessage;
 
 pub const BOSS_MAP_ID: &str = "desert_boss_cave";
 pub const PHARAOH_BOSS_MAP_ID: &str = "pyramid_tomb";
+pub const REAPER_BOSS_MAP_ID: &str = "Oakshore_reaper_Boss";
 
 impl GameRoom {
     /// Process all active boss fight sessions each tick
@@ -695,6 +696,387 @@ impl GameRoom {
             boss.add_player(player_id.to_string());
             tracing::info!(
                 "Player {} joined pharaoh boss fight in instance {}",
+                player_id,
+                instance_id
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Reaper boss tick pipeline
+    // -----------------------------------------------------------------------
+
+    /// Process all active reaper boss fight sessions each tick.
+    pub(in crate::game) async fn process_reaper_boss_tick(&self, current_time: u64) {
+        use crate::reaper_boss::ReaperAction;
+
+        // Snapshot the instances that currently have a reaper session.
+        let sessions: Vec<(String, String)> = {
+            let states = self.reaper_boss_states.read().await;
+            states
+                .iter()
+                .map(|(iid, boss)| (iid.clone(), boss.boss_npc_id.clone()))
+                .collect()
+        };
+
+        // Gather boss + wraith + player position snapshots (no boss lock held).
+        let mut boss_snaps: std::collections::HashMap<String, (i32, i32, i32, Option<String>)> =
+            std::collections::HashMap::new();
+        let mut wraith_snaps: std::collections::HashMap<String, Vec<(String, i32, i32)>> =
+            std::collections::HashMap::new();
+        let mut player_snaps: std::collections::HashMap<String, Vec<(String, i32, i32)>> =
+            std::collections::HashMap::new();
+        // Instances whose every player has left/died — the boss resets so it
+        // can't be re-attacked at diminished HP after a wipe.
+        let mut empty_instances: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+
+        for (instance_id, boss_npc_id) in &sessions {
+            if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
+                let npcs = instance.npcs.read().await;
+                if let Some(npc) = npcs.get(boss_npc_id) {
+                    boss_snaps.insert(
+                        instance_id.clone(),
+                        (npc.hp, npc.x, npc.y, npc.target_id.clone()),
+                    );
+                }
+                let wraiths: Vec<(String, i32, i32)> = npcs
+                    .iter()
+                    .filter(|(id, n)| id.starts_with("reaper_wraith_") && n.is_alive())
+                    .map(|(id, n)| (id.clone(), n.x, n.y))
+                    .collect();
+                wraith_snaps.insert(instance_id.clone(), wraiths);
+            }
+
+            let player_ids = self.get_instance_player_ids(instance_id).await;
+            if player_ids.is_empty() {
+                empty_instances.insert(instance_id.clone());
+            }
+            let players = self.players.read().await;
+            let alive: Vec<(String, i32, i32)> = player_ids
+                .iter()
+                .filter_map(|pid| {
+                    players
+                        .get(pid)
+                        .filter(|p| !p.is_dead)
+                        .map(|p| (pid.clone(), p.x, p.y))
+                })
+                .collect();
+            player_snaps.insert(instance_id.clone(), alive);
+        }
+
+        let mut all_events: Vec<BossEvent> = Vec::new();
+        let mut pending_actions: Vec<(String, String, Vec<ReaperAction>)> = Vec::new();
+        let mut finished_instances: Vec<String> = Vec::new();
+        // (instance_id, boss_npc_id) of abandoned fights to reset to full HP.
+        let mut reset_instances: Vec<(String, String)> = Vec::new();
+
+        {
+            let mut states = self.reaper_boss_states.write().await;
+            for (instance_id, boss) in states.iter_mut() {
+                // Instance emptied — abandoned mid-fight, OR cleared and everyone
+                // moved on (e.g. through the dungeon to the chest room). Reset the
+                // arena to full HP and drop the session so the next group gets a
+                // fresh boss. Unlike the Wurm, the Reaper NEVER teleports players
+                // out on death — they leave via the dungeon's own portals.
+                if empty_instances.contains(instance_id) {
+                    reset_instances.push((instance_id.clone(), boss.boss_npc_id.clone()));
+                    finished_instances.push(instance_id.clone());
+                    continue;
+                }
+
+                // Dead but players still present: hold. Loot was already granted
+                // on death; players proceed deeper into the dungeon themselves.
+                if boss.is_dead() {
+                    continue;
+                }
+
+                // Sync HP/position from the live NPC; detect combat death.
+                if let Some((hp, x, y, target_id)) = boss_snaps.get(instance_id) {
+                    boss.boss_hp = *hp;
+                    boss.boss_x = *x;
+                    boss.boss_y = *y;
+                    if *hp <= 0 && !boss.is_dead() {
+                        tracing::info!("Reaper boss killed via combat, triggering BossDied");
+                        boss.state = crate::reaper_boss::ReaperState::Dead;
+                        all_events.push(BossEvent::BossDied {
+                            instance_id: instance_id.clone(),
+                            killer_id: target_id.clone(),
+                        });
+                        continue;
+                    }
+                }
+
+                all_events.extend(boss.tick(current_time));
+
+                let empty = Vec::new();
+                let alive = player_snaps.get(instance_id).unwrap_or(&empty);
+                let wraiths = wraith_snaps.get(instance_id).unwrap_or(&empty);
+                let actions = boss.plan(current_time, alive, wraiths);
+                if !actions.is_empty() {
+                    pending_actions.push((instance_id.clone(), boss.boss_npc_id.clone(), actions));
+                }
+            }
+
+            for id in &finished_instances {
+                states.remove(id);
+            }
+        }
+
+        for event in all_events {
+            self.handle_boss_event(event, current_time).await;
+        }
+        for (instance_id, boss_npc_id, actions) in pending_actions {
+            self.apply_reaper_actions(&instance_id, &boss_npc_id, actions, current_time)
+                .await;
+        }
+        for (instance_id, boss_npc_id) in reset_instances {
+            if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
+                let mut npcs = instance.npcs.write().await;
+                if let Some(npc) = npcs.get_mut(&boss_npc_id) {
+                    npc.hp = npc.max_hp;
+                    npc.state = crate::npc::NpcState::Idle;
+                    npc.target_id = None;
+                    npc.invulnerable = false;
+                    npc.hidden = false;
+                    npc.death_time = 0;
+                }
+                // Despawn any leftover wraiths from the abandoned attempt.
+                npcs.retain(|id, _| !id.starts_with("reaper_wraith_"));
+            }
+            tracing::info!("Reaper arena {} reset (instance emptied)", instance_id);
+        }
+    }
+
+    /// Apply the world-side effects planned by the reaper boss this tick.
+    async fn apply_reaper_actions(
+        &self,
+        instance_id: &str,
+        boss_npc_id: &str,
+        actions: Vec<crate::reaper_boss::ReaperAction>,
+        current_time: u64,
+    ) {
+        use crate::reaper_boss::ReaperAction;
+
+        for action in actions {
+            match action {
+                ReaperAction::Mark {
+                    player_id,
+                    duration_ms,
+                } => {
+                    self.send_to_instance(
+                        instance_id,
+                        ServerMessage::ReaperMark {
+                            player_id,
+                            duration_ms,
+                        },
+                    )
+                    .await;
+                }
+                ReaperAction::SoulWard { tiles } => {
+                    self.send_to_instance(
+                        instance_id,
+                        ServerMessage::AoeWarning {
+                            tiles,
+                            delay_ms: 6_000,
+                            effect: "soul_ward".to_string(),
+                        },
+                    )
+                    .await;
+                }
+                ReaperAction::ClearMark { player_id } => {
+                    self.send_to_instance(
+                        instance_id,
+                        ServerMessage::ReaperMark {
+                            player_id,
+                            duration_ms: 0,
+                        },
+                    )
+                    .await;
+                }
+                ReaperAction::FailMark {
+                    player_id,
+                    damage,
+                    wraith,
+                } => {
+                    // Damage the marked player.
+                    let result = {
+                        let mut players = self.players.write().await;
+                        players.get_mut(&player_id).map(|player| {
+                            player.hp = (player.hp - damage).max(0);
+                            let died = player.hp <= 0 && !player.is_dead;
+                            if died {
+                                player.die(current_time);
+                            }
+                            (player.hp, player.x, player.y, died)
+                        })
+                    };
+                    if let Some((hp, px, py, died)) = result {
+                        if died {
+                            self.broadcast_to_zone(
+                                &player_id,
+                                ServerMessage::PlayerDied {
+                                    id: player_id.clone(),
+                                    killer_id: "reaper".to_string(),
+                                },
+                            )
+                            .await;
+                        }
+                        self.broadcast_to_area(
+                            Some(instance_id),
+                            px,
+                            py,
+                            ServerMessage::DamageEvent {
+                                source_id: String::new(),
+                                target_id: player_id.clone(),
+                                damage,
+                                target_hp: hp,
+                                target_x: px as f32,
+                                target_y: py as f32,
+                                projectile: None,
+                            },
+                        )
+                        .await;
+                    }
+
+                    // Tear loose a wraith at the player's position.
+                    if let Some((wraith_id, wx, wy)) = wraith {
+                        if let Some(instance) =
+                            self.instance_manager.get_by_instance_id(instance_id)
+                        {
+                            if let Some(prototype) = self.entity_registry.get("reaper_wraith") {
+                                let npc = crate::npc::Npc::from_prototype(
+                                    &wraith_id,
+                                    "reaper_wraith",
+                                    prototype,
+                                    wx,
+                                    wy,
+                                    1,
+                                    None,
+                                );
+                                instance.npcs.write().await.insert(wraith_id, npc);
+                            }
+                        }
+                    }
+
+                    // No heal here — the Reaper only heals if this wraith later
+                    // reaches it (ConsumeWraith).
+                }
+                ReaperAction::MoveWraith { npc_id, x, y } => {
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
+                        let mut npcs = instance.npcs.write().await;
+                        if let Some(npc) = npcs.get_mut(&npc_id) {
+                            npc.x = x;
+                            npc.y = y;
+                            npc.spawn_x = x;
+                            npc.spawn_y = y;
+                        }
+                    }
+                }
+                ReaperAction::ConsumeWraith { npc_id, heal } => {
+                    if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
+                        let mut npcs = instance.npcs.write().await;
+                        if let Some(npc) = npcs.get_mut(&npc_id) {
+                            // Mark dead (not removed) so the client fades the soul out
+                            // as it merges into the Reaper; instance cleanup sweeps it
+                            // after ~2s, and the alive-filter stops it being re-consumed.
+                            npc.hp = 0;
+                            npc.state = crate::npc::NpcState::Dead;
+                            npc.death_time = current_time;
+                        }
+                    }
+                    self.heal_reaper(instance_id, boss_npc_id, heal).await;
+                }
+                ReaperAction::Announce { message } => {
+                    self.send_to_instance(
+                        instance_id,
+                        ServerMessage::ChatMessage {
+                            sender_id: String::new(),
+                            sender_name: String::new(),
+                            text: message,
+                            timestamp: current_time,
+                            channel: "system".to_string(),
+                        },
+                    )
+                    .await;
+                }
+            }
+        }
+    }
+
+    /// Heal the reaper NPC (clamped to its max) so the soul economy is visible
+    /// on the HP bar next tick.
+    async fn heal_reaper(&self, instance_id: &str, boss_npc_id: &str, amount: i32) {
+        if amount <= 0 {
+            return;
+        }
+        if let Some(instance) = self.instance_manager.get_by_instance_id(instance_id) {
+            let mut npcs = instance.npcs.write().await;
+            if let Some(npc) = npcs.get_mut(boss_npc_id) {
+                npc.hp = (npc.hp + amount).min(npc.max_hp);
+            }
+        }
+    }
+
+    /// Called when a soul wraith dies via combat (player denied the heal).
+    pub(in crate::game) async fn check_reaper_wraith_death(&self, npc_id: &str, instance_id: &str) {
+        if !npc_id.starts_with("reaper_wraith_") {
+            return;
+        }
+        let mut states = self.reaper_boss_states.write().await;
+        if let Some(boss) = states.get_mut(instance_id) {
+            boss.on_wraith_died();
+        }
+    }
+
+    /// Start a reaper boss fight session for an instance.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn start_reaper_boss_session(
+        &self,
+        instance_id: &str,
+        boss_npc_id: &str,
+        boss_hp: i32,
+        boss_max_hp: i32,
+        boss_x: i32,
+        boss_y: i32,
+        map_width: i32,
+        map_height: i32,
+        current_time: u64,
+    ) {
+        let boss = crate::reaper_boss::ReaperBossState::new(
+            instance_id.to_string(),
+            boss_npc_id.to_string(),
+            boss_hp,
+            boss_max_hp,
+            boss_x,
+            boss_y,
+            map_width,
+            map_height,
+            current_time,
+        );
+        self.reaper_boss_states
+            .write()
+            .await
+            .insert(instance_id.to_string(), boss);
+        tracing::info!(
+            "Reaper boss session started in instance {} (npc: {})",
+            instance_id,
+            boss_npc_id
+        );
+    }
+
+    /// Check if a reaper boss session already exists for an instance.
+    pub async fn has_reaper_boss_session(&self, instance_id: &str) -> bool {
+        self.reaper_boss_states.read().await.contains_key(instance_id)
+    }
+
+    /// Add a player to an existing reaper boss fight session.
+    pub async fn add_reaper_boss_player(&self, instance_id: &str, player_id: &str) {
+        let mut states = self.reaper_boss_states.write().await;
+        if let Some(boss) = states.get_mut(instance_id) {
+            boss.add_player(player_id.to_string());
+            tracing::info!(
+                "Player {} joined reaper boss fight in instance {}",
                 player_id,
                 instance_id
             );

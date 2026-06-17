@@ -414,6 +414,17 @@ pub struct BossClientState {
     pub wurm_state: String,
 }
 
+/// Active Mark of Death (Reaper boss). The marked player must reach a Soul Ward
+/// before it expires or the Reaper claims their soul.
+#[derive(Debug, Clone)]
+pub struct ReaperMarkState {
+    pub player_id: String,
+    /// Client time (seconds) when the mark was received.
+    pub created_at: f64,
+    /// How long the player has to cleanse, in milliseconds.
+    pub duration_ms: u64,
+}
+
 /// AOE warning zone being displayed
 #[derive(Debug, Clone)]
 pub struct AoeWarningZone {

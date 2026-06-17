@@ -352,6 +352,21 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
             ));
             Value::Map(map)
         }
+        ServerMessage::ReaperMark {
+            player_id,
+            duration_ms,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("playerId".into()),
+                Value::String(player_id.clone().into()),
+            ));
+            map.push((
+                Value::String("durationMs".into()),
+                Value::Integer((*duration_ms as i64).into()),
+            ));
+            Value::Map(map)
+        }
         ServerMessage::FriendRequestReceived { from_id, from_name } => {
             let mut map = Vec::new();
             map.push((

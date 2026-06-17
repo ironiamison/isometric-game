@@ -18,6 +18,12 @@ impl Renderer {
             return;
         }
 
+        // Reaper soul wraiths are drawn as a translucent ghost-copy of their
+        // source player in a dedicated pass (render_soul_wraiths), not as a sprite.
+        if npc.entity_type == "wraith" {
+            return;
+        }
+
         // Get death tint color if dying, otherwise white
         let tint_color = npc.get_death_color().unwrap_or(WHITE);
 

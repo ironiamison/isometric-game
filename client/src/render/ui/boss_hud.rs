@@ -39,7 +39,11 @@ impl Renderer {
         );
 
         // Boss name
-        let name = "Desert Wurm";
+        let name = match boss.boss_id.as_str() {
+            "reaper" => "The Reaper",
+            "cursed_pharaoh" => "Cursed Pharaoh",
+            _ => "Desert Wurm",
+        };
         let name_dims = self.measure_text_sharp(name, 16.0);
         self.draw_text_sharp(
             name,
@@ -87,5 +91,47 @@ impl Renderer {
             16.0,
             WHITE,
         );
+
+        // Mark of Death warning — only for the LOCAL player, who must act.
+        if let Some(mark) = &state.reaper_mark {
+            if state.local_player_id.as_deref() == Some(mark.player_id.as_str()) {
+                let time = get_time();
+                let remaining_ms = mark.duration_ms as f64 - (time - mark.created_at) * 1000.0;
+                if remaining_ms > 0.0 && mark.duration_ms > 0 {
+                    let frac = (remaining_ms / mark.duration_ms as f64).clamp(0.0, 1.0) as f32;
+                    let pulse = (time * 8.0).sin() as f32 * 0.5 + 0.5;
+
+                    let warn = "MARKED FOR DEATH — reach the Soul Ward!";
+                    let wsize = 16.0;
+                    let wd = self.measure_text_sharp(warn, wsize);
+                    let back_w = wd.width + 24.0 * s;
+                    let back_x = (sw - back_w) / 2.0;
+                    let back_y = panel_y + panel_height + 8.0 * s;
+
+                    draw_rectangle(
+                        back_x,
+                        back_y,
+                        back_w,
+                        32.0 * s,
+                        Color::new(0.1, 0.0, 0.12, 0.82),
+                    );
+                    let col = Color::new(1.0, 0.3 + 0.25 * pulse, 0.95, 1.0);
+                    self.draw_text_sharp(warn, (sw - wd.width) / 2.0, back_y + 15.0 * s, wsize, col);
+
+                    // Countdown bar
+                    let cb_w = back_w - 12.0 * s;
+                    let cb_x = (sw - cb_w) / 2.0;
+                    let cb_y = back_y + 22.0 * s;
+                    draw_rectangle(cb_x, cb_y, cb_w, 5.0 * s, Color::new(0.15, 0.05, 0.18, 0.9));
+                    draw_rectangle(
+                        cb_x,
+                        cb_y,
+                        cb_w * frac,
+                        5.0 * s,
+                        Color::new(0.85, 0.1, 0.9, 0.95),
+                    );
+                }
+            }
+        }
     }
 }

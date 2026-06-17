@@ -625,6 +625,16 @@ impl GameRoom {
                                 if let Some(boss) = boss_states.get_mut(inst_id) {
                                     boss.damage_dealers.insert(player_id.to_string());
                                 }
+                                drop(boss_states);
+                                let mut pharaoh_states = self.pharaoh_boss_states.write().await;
+                                if let Some(boss) = pharaoh_states.get_mut(inst_id) {
+                                    boss.damage_dealers.insert(player_id.to_string());
+                                }
+                                drop(pharaoh_states);
+                                let mut reaper_states = self.reaper_boss_states.write().await;
+                                if let Some(boss) = reaper_states.get_mut(inst_id) {
+                                    boss.damage_dealers.insert(player_id.to_string());
+                                }
                             }
                             (npc.hp, name, died, damage)
                         }
@@ -910,6 +920,9 @@ impl GameRoom {
                     // Check pharaoh minion death (player killed a pharaoh minion via combat)
                     self.check_pharaoh_minion_death(&target_id, inst_id, ct)
                         .await;
+
+                    // Check reaper wraith death (player denied the boss a heal)
+                    self.check_reaper_wraith_death(&target_id, inst_id).await;
 
                     // Check boss NPC death (player killed the boss)
                     self.check_boss_npc_death(&target_id, inst_id, Some(player_id), ct)

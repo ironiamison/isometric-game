@@ -100,6 +100,9 @@ pub struct Npc {
     pub death_delay: Option<f32>,
     /// NPC footprint size (1 = single tile, 2 = 2x2, etc.)
     pub size: i32,
+    /// Client time (seconds) this NPC was first seen — used for spawn fade-in
+    /// (e.g. Reaper soul-wraiths).
+    pub spawned_at: f64,
 }
 
 impl Npc {
@@ -142,6 +145,7 @@ impl Npc {
             station_type: None,
             death_delay: None,
             size: 1,
+            spawned_at: macroquad::time::get_time(),
         }
     }
 
@@ -335,13 +339,19 @@ impl Npc {
             // Move faster when far behind to avoid visible teleport snaps
             // while still converging quickly to authoritative state.
             let catchup = (dist * 0.5).clamp(1.0, 3.0);
+            let is_wraith = self.entity_type == "wraith";
             let base_speed = if self.state == NpcState::Burrowing {
                 // Burrowing boss moves fast underground (matches server 150ms/tile)
                 6.67
+            } else if is_wraith {
+                // Reaper soul: slow, ominous drift (matches server WRAITH_MOVE_MS ~600ms/tile)
+                1.67
             } else {
                 self.move_speed * 1.2
             };
-            let speed = (base_speed * catchup).max(2.0);
+            // Souls glide below the normal 2.0 floor so the drift reads slow.
+            let floor = if is_wraith { 0.5 } else { 2.0 };
+            let speed = (base_speed * catchup).max(floor);
             let move_dist = speed * delta;
 
             if dist <= move_dist {

@@ -905,6 +905,7 @@ impl Renderer {
                         &state.camera,
                         &state.item_registry,
                         ground_z,
+                        None,
                     );
                 }
                 Renderable::Npc(npc) => {
@@ -1255,7 +1256,9 @@ impl Renderer {
         }
 
         // 4.5. Render name tags above all map elements (overhead, walls, objects, etc.)
+        self.render_soul_wraiths(state);
         self.render_name_tags(state);
+        self.render_reaper_mark(state);
         self.render_stall_indicators(state);
         self.render_tree_name_tag(state);
         self.render_ore_name_tag(state);

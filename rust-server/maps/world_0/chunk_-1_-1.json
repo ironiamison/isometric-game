@@ -96,8 +96,8 @@
       381,
       381,
       381,
-      381,
-      381,
+      1040,
+      1040,
       1040,
       1040,
       1040,
@@ -933,7 +933,7 @@
       381,
       381,
       381,
-      0,
+      17,
       381,
       418,
       418,
@@ -3085,7 +3085,7 @@
       0
     ]
   },
-  "collision": "wIBAPgADQD4ADEAAABBAAAAgQDYAIEA2AEBEAACAQAAAgEA+AABBPgAAQQAAAEEAAADC/wAAfgAAAAIAAAAEQAAAKAAAAJBAAAAQAQAAIAUAACAAAAAgAAAA4AAAAMAAAACAAAAA8AAAANz4AAB8+ACABPwAAAIcIAARHQDgCRg=",
+  "collision": "wIBAPgADQD4ADEAAABBAAAAgQDYAIEA2AEBEAACAQAAAgEA+AABBPgAAQQAAAEEAAAD+/wAAAAAAAAIAAAAEQAAAKAAAAJBAAAAQAQAAIAUAACAAAAAgAAAA4AAAAMAAAACAAAAA8AAAANz4AAB8+ACABLwAAAIcIAARHQDgCRg=",
   "entities": [],
   "mapObjects": [
     {
@@ -3236,20 +3236,6 @@
       "height": 171
     },
     {
-      "gid": 1468,
-      "x": 17,
-      "y": 13,
-      "width": 25,
-      "height": 190
-    },
-    {
-      "gid": 1469,
-      "x": 22,
-      "y": 13,
-      "width": 25,
-      "height": 157
-    },
-    {
       "gid": 1470,
       "x": 23,
       "y": 17,
@@ -3357,36 +3343,6 @@
   ],
   "walls": [
     {
-      "gid": 352,
-      "x": 22,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 352,
-      "x": 21,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 352,
-      "x": 20,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 352,
-      "x": 19,
-      "y": 13,
-      "edge": "down"
-    },
-    {
-      "gid": 352,
-      "x": 18,
-      "y": 13,
-      "edge": "down"
-    },
-    {
       "gid": 1461,
       "x": 22,
       "y": 0,
@@ -3462,12 +3418,6 @@
       "gid": 1461,
       "x": 22,
       "y": 12,
-      "edge": "right"
-    },
-    {
-      "gid": 1461,
-      "x": 22,
-      "y": 13,
       "edge": "right"
     },
     {
@@ -3557,6 +3507,36 @@
     {
       "gid": 1462,
       "x": 29,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 352,
+      "x": 22,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 352,
+      "x": 21,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 352,
+      "x": 20,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 352,
+      "x": 19,
+      "y": 12,
+      "edge": "down"
+    },
+    {
+      "gid": 352,
+      "x": 18,
       "y": 12,
       "edge": "down"
     }

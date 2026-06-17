@@ -1139,6 +1139,7 @@ impl GameRoom {
         // Boss fight tick
         self.process_boss_tick(current_time).await;
         self.process_pharaoh_boss_tick(current_time).await;
+        self.process_reaper_boss_tick(current_time).await;
 
         // Arena tick: zone detection + state machine
         let arena_start = std::time::Instant::now();

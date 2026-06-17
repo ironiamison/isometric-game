@@ -10,6 +10,10 @@ impl Renderer {
         camera: &Camera,
         item_registry: &crate::game::item_registry::ItemRegistry,
         ground_z: f32,
+        // When set, every appearance layer is drawn with this colour (a spectral
+        // tint with built-in alpha) and decorations (shadow/selection) are skipped.
+        // Used to render Reaper soul-wraiths as a ghost-copy of the player.
+        tint_override: Option<Color>,
     ) {
         let (screen_x, screen_y) = world_to_screen_z(player.x, player.y, player.z, camera);
         let zoom = camera.zoom;
@@ -22,7 +26,7 @@ impl Renderer {
         let alpha = if player.is_dead { 100 } else { 255 };
 
         // Selection highlight (draw first, behind player, at ground level)
-        if is_selected && !player.is_dead {
+        if is_selected && !player.is_dead && tint_override.is_none() {
             self.render_tile_selection(player.x, player.y, player.z, camera);
         }
 
@@ -34,19 +38,21 @@ impl Renderer {
                 0.0
             };
 
-        // Draw shadow at ground level, scaled by height above ground
-        let height_above_ground = (player.z - ground_z).max(0.0);
-        let shadow_scale = (1.0 - height_above_ground * 0.15).clamp(0.4, 1.0);
-        let shadow_alpha = ((60.0 - height_above_ground * 12.0).clamp(15.0, 60.0)) as u8;
-        let (shadow_sx, shadow_sy) = world_to_screen_z(player.x, player.y, ground_z, camera);
-        draw_ellipse(
-            shadow_sx,
-            shadow_sy + 4.0 * zoom,
-            16.0 * zoom * shadow_scale,
-            7.0 * zoom * shadow_scale,
-            0.0,
-            Color::from_rgba(0, 0, 0, shadow_alpha),
-        );
+        // Draw shadow at ground level, scaled by height above ground (skipped for ghosts)
+        if tint_override.is_none() {
+            let height_above_ground = (player.z - ground_z).max(0.0);
+            let shadow_scale = (1.0 - height_above_ground * 0.15).clamp(0.4, 1.0);
+            let shadow_alpha = ((60.0 - height_above_ground * 12.0).clamp(15.0, 60.0)) as u8;
+            let (shadow_sx, shadow_sy) = world_to_screen_z(player.x, player.y, ground_z, camera);
+            draw_ellipse(
+                shadow_sx,
+                shadow_sy + 4.0 * zoom,
+                16.0 * zoom * shadow_scale,
+                7.0 * zoom * shadow_scale,
+                0.0,
+                Color::from_rgba(0, 0, 0, shadow_alpha),
+            );
+        }
 
         // Try to render sprite based on player's appearance, fall back to colored circle
         if let Some((player_texture, player_offset)) =
@@ -56,8 +62,11 @@ impl Renderer {
             let (player_atlas_x, player_atlas_y) = player_offset.unwrap_or((0.0, 0.0));
             let (src_x, src_y, src_w, src_h) = coords.to_source_rect();
 
-            // Tint for local player distinction (slight green tint)
-            let tint = if is_local {
+            // Tint for local player distinction (slight green tint), or the
+            // spectral ghost tint when rendering a soul-wraith.
+            let tint = if let Some(c) = tint_override {
+                c
+            } else if is_local {
                 Color::from_rgba(220, 255, 220, alpha)
             } else {
                 Color::from_rgba(255, 255, 255, alpha)

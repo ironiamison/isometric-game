@@ -188,6 +188,8 @@ pub struct GameState {
     pub koth: Option<KothClientState>,
     /// Boss fight state (active when in boss arena)
     pub boss: Option<BossClientState>,
+    /// Active Mark of Death (Reaper boss), if any player is currently marked
+    pub reaper_mark: Option<ReaperMarkState>,
     /// Active AOE warning zones
     pub aoe_warnings: Vec<AoeWarningZone>,
     /// Active explosion effects
@@ -356,6 +358,7 @@ impl GameState {
             current_instance: None,
             koth: None,
             boss: None,
+            reaper_mark: None,
             aoe_warnings: Vec::new(),
             explosions: Vec::new(),
             koth_checkpoint_open: false,

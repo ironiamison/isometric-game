@@ -443,6 +443,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
 
                 if phase == "dead" {
                     state.boss = None;
+                    state.reaper_mark = None;
                 } else {
                     state.boss = Some(crate::game::state::BossClientState {
                         boss_id,
@@ -537,6 +538,32 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                     created_at: current_time(),
                 });
                 state.pending_sfx.push("rock_explode".to_string());
+            }
+        }
+        "reaperMark" => {
+            if let Some(value) = data {
+                let player_id = extract_string(value, "playerId").unwrap_or_default();
+                let duration_ms = extract_u64(value, "durationMs").unwrap_or(0);
+                if duration_ms == 0 {
+                    // Clear only if this player's mark was the active one.
+                    if state
+                        .reaper_mark
+                        .as_ref()
+                        .map(|m| m.player_id == player_id)
+                        .unwrap_or(false)
+                    {
+                        state.reaper_mark = None;
+                    }
+                } else {
+                    if state.local_player_id.as_deref() == Some(player_id.as_str()) {
+                        state.pending_sfx.push("error".to_string());
+                    }
+                    state.reaper_mark = Some(crate::game::state::ReaperMarkState {
+                        player_id,
+                        created_at: current_time(),
+                        duration_ms,
+                    });
+                }
             }
         }
 

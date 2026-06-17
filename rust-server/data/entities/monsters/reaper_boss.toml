@@ -1,0 +1,180 @@
+# The Reaper Boss, Soul Wraith adds, and reward NPC
+# Boss fight in the Oakshore_reaper_Boss instance
+#
+# Design pillar: SOUL ECONOMY. The Reaper is always present and always
+# vulnerable, but it heals every time it claims a soul (a failed Mark of Death,
+# or a Soul Wraith reaching the boss). Deny souls -> burn it down.
+
+# =============================================================================
+# The Reaper - Main boss
+# =============================================================================
+
+[reaper_boss]
+display_name = "The Reaper"
+sprite = "reaper"
+animation_type = "standard"
+size = 1
+description = "A hooded harvester of souls. It does not tire, and it does not forget the marked."
+tags = ["undead"]
+
+# NOTE: HP/damage are BASE values scaled by spawn level (see npc.rs scale_hp:
+# +10%/level, scale_damage: +15%/level). At level 70 these resolve to roughly
+# ~1260 HP and ~11 melee — keep the map entity at level 70 to match.
+[reaper_boss.stats]
+level = 70
+max_hp = 160
+damage = 1
+attack_bonus = 16
+defence_bonus = 6
+attack_range = 1
+aggro_range = 999
+chase_range = 999
+move_cooldown_ms = 450
+attack_cooldown_ms = 1600
+# Large respawn so the dead boss corpse isn't auto-swept (respawn 0 = cleaned
+# after 2s). The arena reset on instance-empty resurrects it for the next group;
+# it never naturally respawns mid-session.
+respawn_time_ms = 86400000
+# No passive regen — the Reaper only heals via the soul economy (failed marks /
+# wraiths reaching it).
+hp_regen_percent_per_sec = 0.0
+
+[reaper_boss.rewards]
+exp_base = 800
+gold_min = 15000
+gold_max = 60000
+
+# Always drops
+[[reaper_boss.loot]]
+item_id = "ancient_fragment"
+drop_chance = 1.0
+quantity_min = 1
+quantity_max = 3
+
+# Resource roll - always picks one resource
+[[reaper_boss.loot_tables]]
+name = "resource"
+chance = 1.0
+
+[[reaper_boss.loot_tables.entries]]
+item_id = "yew_log"
+weight = 15
+quantity_min = 15
+quantity_max = 30
+
+[[reaper_boss.loot_tables.entries]]
+item_id = "mithril_ore"
+weight = 12
+quantity_min = 12
+quantity_max = 25
+
+[[reaper_boss.loot_tables.entries]]
+item_id = "adamant_ore"
+weight = 8
+quantity_min = 8
+quantity_max = 18
+
+[[reaper_boss.loot_tables.entries]]
+item_id = "coal_ore"
+weight = 15
+quantity_min = 20
+quantity_max = 40
+
+# Rare roll
+[[reaper_boss.loot_tables]]
+name = "rare"
+chance = 1.0
+
+[[reaper_boss.loot_tables.entries]]
+item_id = "nothing"
+weight = 92
+
+[[reaper_boss.loot_tables.entries]]
+item_id = "ancient_fragment"
+weight = 7
+quantity_min = 2
+quantity_max = 5
+
+[[reaper_boss.loot_tables.entries]]
+item_id = "wurm_blade"
+weight = 1
+
+[reaper_boss.behaviors]
+hostile = true
+wander_enabled = false
+render_offset_y = 8.0
+
+# =============================================================================
+# Soul Wraith - spawns from a failed Mark of Death and races toward the Reaper.
+# If it reaches the boss it is consumed and heals it. Kill it to deny the heal.
+# hostile=false + friendly=false => attackable, but it does NOT self-path
+# (the boss tick drives its movement toward the Reaper).
+# =============================================================================
+
+[reaper_wraith]
+display_name = "Soul Wraith"
+sprite = "wraith"
+animation_type = "standard"
+size = 1
+description = "A torn-loose soul, drawn back toward its reaper."
+tags = ["undead"]
+
+[reaper_wraith.stats]
+level = 40
+max_hp = 18
+damage = 0
+attack_bonus = 0
+defence_bonus = 0
+attack_range = 1
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 9999999
+attack_cooldown_ms = 9999999
+respawn_time_ms = 0
+
+[reaper_wraith.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[reaper_wraith.behaviors]
+hostile = false
+friendly = false
+wander_enabled = false
+no_shadow = true
+render_offset_y = 16.0
+
+# =============================================================================
+# Reaper Battle Master - loot distribution NPC (place near the dungeon exit)
+# =============================================================================
+
+[reaper_battle_master]
+display_name = "Soulwarden"
+sprite = "bandit_one"
+animation_type = "standard"
+description = "Keeper of the souls reclaimed from the Reaper. Speak after the hunt for your share."
+
+[reaper_battle_master.stats]
+max_hp = 500
+damage = 0
+attack_range = 0
+aggro_range = 0
+chase_range = 0
+move_cooldown_ms = 0
+attack_cooldown_ms = 0
+respawn_time_ms = 0
+
+[reaper_battle_master.rewards]
+exp_base = 0
+gold_min = 0
+gold_max = 0
+
+[reaper_battle_master.behaviors]
+hostile = false
+friendly = true
+wander_enabled = false
+facing = "down"
+boss_rewards = true
+
+[reaper_battle_master.dialogue]
+greeting = "Slay the Reaper, and the souls it stole are yours to claim."

@@ -404,6 +404,11 @@ impl Npc {
         if self.state == NpcState::Dead {
             return;
         }
+        // A prototype with 0% regen (e.g. the Reaper boss) gets no passive heal —
+        // the `.max(1.0)` below would otherwise still trickle 1 HP per interval.
+        if self.stats.hp_regen_percent_per_sec <= 0.0 {
+            return;
+        }
         // First tick after spawn/respawn - just initialize timer, don't regen yet
         if self.last_regen_time == 0 {
             self.last_regen_time = current_time;

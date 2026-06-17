@@ -320,6 +320,16 @@ pub(super) async fn handle_enter_portal(
         instances.get(player_id).cloned()
     };
 
+    // Resolve the portal destination. The player is either in an interior (use
+    // its exit portal — which may lead to the overworld OR to another interior)
+    // or in the overworld (use the world portal under them). Both interior-bound
+    // cases fall through to the shared "enter interior" logic below.
+    let target_map: String;
+    let target_spawn: String;
+    // Only remember the current spot as the overworld return point when entering
+    // FROM the overworld; interior->interior keeps the original entrance.
+    let store_entrance: bool;
+
     // If player is in an interior, handle exit portal
     if let Some(instance_id) = current_instance_id {
         info!(
@@ -531,13 +541,16 @@ pub(super) async fn handle_enter_portal(
 
                     return;
                 } else {
-                    // Portal leads to another interior - fall through to normal handling
-                    // (would need to update portal struct to work with interior->interior)
+                    // Portal leads to ANOTHER interior. The player has already been
+                    // removed from the current instance above; carry the target to
+                    // the shared entry logic below (interior->interior transition).
                     info!(
-                        "Portal leads to another interior '{}' - not yet supported",
-                        portal.target_map
+                        "Player {} taking interior portal to '{}'",
+                        player_id, portal.target_map
                     );
-                    return;
+                    target_map = portal.target_map.clone();
+                    target_spawn = portal.target_spawn.clone().unwrap_or_default();
+                    store_entrance = false;
                 }
             }
             None => {
@@ -548,37 +561,40 @@ pub(super) async fn handle_enter_portal(
                 return;
             }
         }
-    }
-
-    // Player is in overworld - find portal in world chunks
-    let portal = match room.find_portal_at_player(player_id).await {
-        Some(p) => {
-            info!(
-                "Found portal at player position: id='{}', target_map='{}', target_spawn='{}'",
-                p.id, p.target_map, p.target_spawn
-            );
-            if p.id == portal_id {
-                p
-            } else {
+    } else {
+        // Player is in the overworld - find the portal in the world chunks.
+        let portal = match room.find_portal_at_player(player_id).await {
+            Some(p) => {
+                info!(
+                    "Found portal at player position: id='{}', target_map='{}', target_spawn='{}'",
+                    p.id, p.target_map, p.target_spawn
+                );
+                if p.id == portal_id {
+                    p
+                } else {
+                    warn!(
+                        "Player {} tried to use portal '{}' but is standing on portal '{}'",
+                        player_id, portal_id, p.id
+                    );
+                    return;
+                }
+            }
+            None => {
                 warn!(
-                    "Player {} tried to use portal '{}' but is standing on portal '{}'",
-                    player_id, portal_id, p.id
+                    "Player {} tried to use portal '{}' but no portal found at position",
+                    player_id, portal_id
                 );
                 return;
             }
-        }
-        None => {
-            warn!(
-                "Player {} tried to use portal '{}' but no portal found at position",
-                player_id, portal_id
-            );
-            return;
-        }
-    };
+        };
+        target_map = portal.target_map.clone();
+        target_spawn = portal.target_spawn.clone();
+        store_entrance = true;
+    }
 
     // Get interior definition
-    info!("Looking up interior map '{}'", portal.target_map);
-    let interior = match state.content.interior_registry.get(&portal.target_map) {
+    info!("Looking up interior map '{}'", target_map);
+    let interior = match state.content.interior_registry.get(&target_map) {
         Some(i) => {
             info!(
                 "Found interior '{}' with {} spawn points",
@@ -591,7 +607,7 @@ pub(super) async fn handle_enter_portal(
             error!(
                 "Portal '{}' references unknown interior '{}'. Available interiors: {:?}",
                 portal_id,
-                portal.target_map,
+                target_map,
                 state.content.interior_registry.list_ids()
             );
             return;
@@ -623,10 +639,10 @@ pub(super) async fn handle_enter_portal(
     // Get spawn point - try exact name, then "entrance", then first available
     info!(
         "Looking up spawn point '{}' in interior '{}'",
-        portal.target_spawn, interior.id
+        target_spawn, interior.id
     );
-    let spawn = if !portal.target_spawn.is_empty() {
-        interior.get_spawn_point(&portal.target_spawn)
+    let spawn = if !target_spawn.is_empty() {
+        interior.get_spawn_point(&target_spawn)
     } else {
         None
     };
@@ -696,8 +712,12 @@ pub(super) async fn handle_enter_portal(
         }
     }
 
-    // Store player's entrance position (where they came from) for return teleport
-    if let Some((entrance_x, entrance_y)) = room.get_player_position(player_id).await {
+    // Store player's entrance position (where they came from) for return teleport.
+    // Only when entering from the overworld — interior->interior must preserve the
+    // original overworld entrance so the dungeon's final exit returns there.
+    if store_entrance
+        && let Some((entrance_x, entrance_y)) = room.get_player_position(player_id).await
+    {
         let mut entrance_positions = state.player_entrance_positions.write().await;
         entrance_positions.insert(player_id.to_string(), (entrance_x, entrance_y));
         info!(
@@ -865,6 +885,34 @@ pub(super) async fn handle_enter_portal(
             let npcs = instance.npcs.read().await;
             if let Some(boss_npc) = npcs.values().find(|n| n.prototype_id == "khareth_pharaoh") {
                 room.start_pharaoh_boss_session(
+                    &instance.id,
+                    &boss_npc.id,
+                    boss_npc.hp,
+                    boss_npc.max_hp,
+                    boss_npc.x,
+                    boss_npc.y,
+                    instance.map_width as i32,
+                    instance.map_height as i32,
+                    ct,
+                )
+                .await;
+            }
+        }
+    }
+
+    // Start or join reaper boss session if entering the reaper arena
+    if interior.id == crate::game::boss_tick::REAPER_BOSS_MAP_ID {
+        let ct = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        if room.has_reaper_boss_session(&instance.id).await {
+            room.add_reaper_boss_player(&instance.id, player_id).await;
+        } else {
+            let npcs = instance.npcs.read().await;
+            if let Some(boss_npc) = npcs.values().find(|n| n.prototype_id == "reaper_boss") {
+                room.start_reaper_boss_session(
                     &instance.id,
                     &boss_npc.id,
                     boss_npc.hp,

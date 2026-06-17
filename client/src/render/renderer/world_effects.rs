@@ -58,6 +58,9 @@ impl Renderer {
             // Color based on effect type - default red for damage
             let base_color = match warning.effect.as_str() {
                 "sandstorm" => Color::new(0.9, 0.7, 0.2, pulse * progress),
+                // Soul Ward (Reaper): a "stand here to cleanse" safe zone. Green,
+                // and it fades IN as the timer runs down (inverse of a danger zone).
+                "soul_ward" => Color::new(0.25, 0.95, 0.45, pulse * (1.0 - progress) + 0.12),
                 _ => Color::new(0.9, 0.2, 0.1, pulse * progress),
             };
 
@@ -92,6 +95,159 @@ impl Renderer {
                 );
             }
         }
+    }
+
+    /// Render Reaper "Soul Wraiths" as translucent, drifting ghost-copies of the
+    /// player whose mark failed — full equipped appearance, drawn with a spectral
+    /// tint. The source player id is encoded in the wraith NPC id after "::".
+    pub(super) fn render_soul_wraiths(&self, state: &GameState) {
+        use crate::game::Direction;
+        use crate::render::animation::AnimationState;
+
+        let time = macroquad::time::get_time();
+        let zoom = state.camera.zoom;
+
+        // The Reaper's position — souls face/drift toward it.
+        let reaper_pos = state
+            .npcs
+            .values()
+            .find(|n| n.entity_type == "reaper")
+            .map(|b| (b.x, b.y));
+
+        const FADE_IN: f32 = 0.5;
+        const FADE_OUT: f32 = 0.6;
+
+        for npc in state.npcs.values() {
+            if npc.entity_type != "wraith" || npc.is_death_animation_complete() {
+                continue;
+            }
+
+            // Whose soul is this? Decode the source player (after "::"), falling
+            // back to the local player (so a solo player always sees their own).
+            let Some(source) = npc
+                .id
+                .split("::")
+                .nth(1)
+                .and_then(|id| state.players.get(id))
+                .or_else(|| {
+                    state
+                        .local_player_id
+                        .as_deref()
+                        .and_then(|id| state.players.get(id))
+                })
+            else {
+                continue;
+            };
+
+            // Fade in on spawn, fade out while dying (killed or consumed).
+            let fade_in = (((time - npc.spawned_at) as f32) / FADE_IN).clamp(0.0, 1.0);
+            let fade_out = match npc.death_timer {
+                Some(t) => (1.0 - t / FADE_OUT).clamp(0.0, 1.0),
+                None => 1.0,
+            };
+            let fade = fade_in * fade_out;
+            if fade <= 0.0 {
+                continue;
+            }
+
+            // Clone the player's full appearance (body, hair, equipment) and pose
+            // it as a soul FLOATING toward the Reaper — idle stance (no walk) with
+            // a gentle hover + bob. Keep the lift SMALL so the body stays over its
+            // real tile and remains click-targetable (picking is tile-based).
+            let mut ghost = source.clone();
+            ghost.x = npc.x;
+            ghost.y = npc.y;
+            let bob = (time * 2.2).sin() as f32 * 0.08;
+            ghost.z = npc.z + 0.22 + bob; // subtle hover + bob
+            ghost.is_dead = false;
+            let facing = match reaper_pos {
+                Some((bx, by)) => Direction::from_velocity(bx - npc.x, by - npc.y),
+                None => Direction::Up,
+            };
+            ghost.direction = facing;
+            ghost.animation.set_state(AnimationState::Idle);
+            ghost.animation.direction = facing;
+            ghost.animation.frame = 0.0;
+
+            // Soft spectral glow pooled at the feet — brighter when hovered/targeted
+            // so players can see it's a clickable target.
+            let targeted = state.hovered_entity_id.as_deref() == Some(npc.id.as_str())
+                || state.selected_entity_id.as_deref() == Some(npc.id.as_str());
+            let (sx, sy) = world_to_screen(npc.x, npc.y, &state.camera);
+            let glow_a = if targeted { 0.45 } else { 0.2 };
+            let glow_r = if targeted { 16.0 } else { 13.0 };
+            draw_ellipse(
+                sx,
+                sy + 2.0 * zoom,
+                glow_r * zoom,
+                (glow_r * 0.4) * zoom,
+                0.0,
+                Color::new(0.5, 0.9, 1.0, glow_a * fade),
+            );
+
+            // Full equipped appearance, drawn with a translucent spectral tint.
+            let pulse = (time * 3.0).sin() as f32 * 0.06 + 0.5;
+            let ghost_tint = Color::new(0.72, 0.92, 1.0, pulse * fade);
+            self.render_player(
+                &ghost,
+                false,
+                false,
+                false,
+                &state.camera,
+                &state.item_registry,
+                0.0,
+                Some(ghost_tint),
+            );
+        }
+    }
+
+    /// Render the Mark of Death indicator above the currently-marked player
+    /// (Reaper boss). A pulsing soul-purple ring with a countdown.
+    pub(super) fn render_reaper_mark(&self, state: &GameState) {
+        let mark = match &state.reaper_mark {
+            Some(m) => m,
+            None => return,
+        };
+        let time = macroquad::time::get_time();
+        let remaining_ms = mark.duration_ms as f64 - (time - mark.created_at) * 1000.0;
+        if remaining_ms <= 0.0 {
+            return;
+        }
+        let player = match state.players.get(&mark.player_id) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let zoom = state.camera.zoom;
+        let (sx, sy) = world_to_screen(player.x, player.y, &state.camera);
+        let cy = sy - 86.0 * zoom; // float just above the head
+
+        let pulse = (time * 6.0).sin() as f32 * 0.5 + 0.5;
+        let radius = (10.0 + pulse * 2.0) * zoom;
+        let ring = Color::new(0.85, 0.1, 0.9, 0.85); // soul-purple
+
+        draw_circle(sx, cy, radius, Color::new(0.05, 0.0, 0.08, 0.8));
+        draw_circle_lines(sx, cy, radius, (2.0 * zoom).max(1.0), ring);
+
+        // Downward pointer toward the player's head
+        draw_triangle(
+            Vec2::new(sx - 4.0 * zoom, cy + radius),
+            Vec2::new(sx + 4.0 * zoom, cy + radius),
+            Vec2::new(sx, cy + radius + 5.0 * zoom),
+            ring,
+        );
+
+        // Countdown seconds — native 16px bitmap size for crisp text
+        let secs = (remaining_ms / 1000.0).ceil() as i32;
+        let txt = secs.to_string();
+        let dims = self.measure_text_sharp(&txt, 16.0);
+        self.draw_text_sharp(
+            &txt,
+            sx - dims.width / 2.0,
+            cy + dims.height / 2.0,
+            16.0,
+            WHITE,
+        );
     }
 
     /// DEBUG: Render occupied tile footprints for multi-tile NPCs

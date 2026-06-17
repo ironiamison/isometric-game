@@ -62,6 +62,7 @@ mod npc;
 mod perf_metrics;
 mod pharaoh_boss;
 mod prayer;
+mod reaper_boss;
 mod protocol;
 mod quest;
 mod resource_contracts;

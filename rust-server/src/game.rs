@@ -1451,6 +1451,8 @@ pub struct GameRoom {
     boss_states: RwLock<crate::boss::BossStates>,
     /// Active pharaoh boss fight sessions: instance_id -> PharaohBossState
     pharaoh_boss_states: RwLock<HashMap<String, crate::pharaoh_boss::PharaohBossState>>,
+    /// Active reaper boss fight sessions: instance_id -> ReaperBossState
+    reaper_boss_states: RwLock<crate::reaper_boss::ReaperBossStates>,
     /// Database reference for arena stats persistence
     db: Option<Arc<crate::db::Database>>,
     /// Gathering system (fishing)

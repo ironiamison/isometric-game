@@ -23,10 +23,28 @@ impl GameRoom {
                     phase,
                     wurm_state,
                 } => {
+                    // Tag which boss this is so the client HUD can label it.
+                    let boss_id = if self
+                        .reaper_boss_states
+                        .read()
+                        .await
+                        .contains_key(&instance_id)
+                    {
+                        "reaper".to_string()
+                    } else if self
+                        .pharaoh_boss_states
+                        .read()
+                        .await
+                        .contains_key(&instance_id)
+                    {
+                        "cursed_pharaoh".to_string()
+                    } else {
+                        "desert_wurm".to_string()
+                    };
                     self.send_to_instance(
                         &instance_id,
                         ServerMessage::BossStateUpdate {
-                            boss_id: String::new(), // filled per-instance
+                            boss_id,
                             hp: boss_hp,
                             max_hp: boss_max_hp,
                             phase,
@@ -542,6 +560,12 @@ impl GameRoom {
                             boss.death_time = current_time;
                         }
                     }
+                    {
+                        let mut reaper_states = self.reaper_boss_states.write().await;
+                        if let Some(boss) = reaper_states.get_mut(&instance_id) {
+                            boss.death_time = current_time;
+                        }
+                    }
 
                     // Send final state update with 0 HP
                     self.send_to_instance(
@@ -560,7 +584,9 @@ impl GameRoom {
                     if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
                         let mut npcs = instance.npcs.write().await;
                         npcs.retain(|id, _| {
-                            !id.starts_with("boss_minion_") && !id.starts_with("pharaoh_minion_")
+                            !id.starts_with("boss_minion_")
+                                && !id.starts_with("pharaoh_minion_")
+                                && !id.starts_with("reaper_wraith_")
                         });
                     }
 
@@ -572,18 +598,25 @@ impl GameRoom {
                         } else {
                             drop(boss_states);
                             let pharaoh_states = self.pharaoh_boss_states.read().await;
-                            pharaoh_states
-                                .get(&instance_id)
-                                .map(|b| b.damage_dealers.clone())
-                                .unwrap_or_default()
+                            if let Some(b) = pharaoh_states.get(&instance_id) {
+                                b.damage_dealers.clone()
+                            } else {
+                                drop(pharaoh_states);
+                                let reaper_states = self.reaper_boss_states.read().await;
+                                reaper_states
+                                    .get(&instance_id)
+                                    .map(|b| b.damage_dealers.clone())
+                                    .unwrap_or_default()
+                            }
                         }
                     };
 
                     // Determine which boss prototype to use for loot
                     let boss_prototype_id = {
-                        let pharaoh_states = self.pharaoh_boss_states.read().await;
-                        if pharaoh_states.contains_key(&instance_id) {
+                        if self.pharaoh_boss_states.read().await.contains_key(&instance_id) {
                             "cursed_pharaoh"
+                        } else if self.reaper_boss_states.read().await.contains_key(&instance_id) {
+                            "reaper_boss"
                         } else {
                             "desert_wurm"
                         }
@@ -772,12 +805,18 @@ impl GameRoom {
                     .await;
                 }
                 BossEvent::TeleportOut { instance_id } => {
-                    // Reset boss NPC to full HP for the next fight
+                    // Reset boss NPC to full HP for the next fight, and note which
+                    // boss this was so players return to the matching overworld exit.
+                    let mut is_reaper = false;
                     if let Some(instance) = self.instance_manager.get_by_instance_id(&instance_id) {
                         let mut npcs = instance.npcs.write().await;
                         for npc in npcs.values_mut() {
+                            if npc.prototype_id == "reaper_boss" {
+                                is_reaper = true;
+                            }
                             if npc.prototype_id == "desert_wurm"
                                 || npc.prototype_id == "cursed_pharaoh"
+                                || npc.prototype_id == "reaper_boss"
                             {
                                 npc.hp = npc.max_hp;
                                 npc.state = NpcState::Idle;
@@ -786,13 +825,17 @@ impl GameRoom {
                                 npc.death_time = 0;
                             }
                         }
-                        // Clean up any remaining pharaoh minions
-                        npcs.retain(|id, _| !id.starts_with("pharaoh_minion_"));
+                        // Clean up any remaining pharaoh minions / reaper wraiths
+                        npcs.retain(|id, _| {
+                            !id.starts_with("pharaoh_minion_") && !id.starts_with("reaper_wraith_")
+                        });
                     }
 
                     let player_ids = self.get_instance_player_ids(&instance_id).await;
-                    let spawn_x: i32 = -258;
-                    let spawn_y: i32 = -125;
+                    // Reaper dungeon exits to its own overworld entrance; other
+                    // bosses return to the desert cave mouth.
+                    let (spawn_x, spawn_y): (i32, i32) =
+                        if is_reaper { (-53, -47) } else { (-258, -125) };
 
                     for pid in player_ids {
                         self.player_instances.write().await.remove(&pid);
