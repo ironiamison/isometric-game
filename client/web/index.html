@@ -2,117 +2,130 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
-    />
-    <title>New Aeven</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Solstead</title>
+    <link rel="stylesheet" href="title-screen.css" />
     <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #1e1e28;
-      }
-      canvas {
-        display: block;
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-      }
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0a0806; }
+      canvas { display: block; width: 100%; height: 100%; position: absolute; inset: 0; visibility: hidden; }
       #loading-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: #1e1e28;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 10;
-        color: #fff;
-        transition: opacity 0.3s;
+        position: absolute; inset: 0; background: #0a0806; display: none;
+        flex-direction: column; align-items: center; justify-content: center;
+        z-index: 50; color: #d4af37; font-family: "Inter", sans-serif;
       }
-      #loading-overlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #loading-title {
-        font-size: 24px;
-        margin-bottom: 24px;
-      }
-      #loading-bar-bg {
-        width: 50%;
-        max-width: 400px;
-        height: 16px;
-        background: #3c3c50;
-        border: 2px solid #8c8ca0;
-        border-radius: 4px;
-        overflow: hidden;
-      }
-      #loading-bar-fill {
-        height: 100%;
-        width: 0%;
-        background: #64c878;
-        transition: width 0.15s;
-      }
-      #loading-pct {
-        font-size: 16px;
-        margin-top: 8px;
-        color: #b4b4c8;
-      }
-      #loading-label {
-        font-size: 14px;
-        margin-top: 4px;
-        color: #8c8ca0;
-      }
+      #loading-overlay.hidden { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+      #loading-title { font-size: 18px; margin-bottom: 24px; color: #c9a227; letter-spacing: 0.1em; }
+      #loading-bar-bg { width: 50%; max-width: 400px; height: 8px; background: #1a1410; border: 1px solid #5c4428; overflow: hidden; }
+      #loading-bar-fill { height: 100%; width: 0%; background: #c9a227; transition: width 0.15s; }
+      #loading-pct { font-size: 13px; margin-top: 8px; color: rgba(212, 175, 55, 0.6); }
+      #loading-label { font-size: 12px; margin-top: 4px; color: rgba(212, 175, 55, 0.4); }
     </style>
   </head>
   <body>
+    <div id="title-screen">
+      <div class="title-bg" aria-hidden="true"></div>
+
+      <header class="title-header">
+        <a class="title-brand" href="/play/index.html" data-site-href="/play/index.html">
+          <img src="assets/title/logo-nav.png" alt="Solstead" height="32" />
+        </a>
+
+        <nav class="title-nav" aria-label="Site">
+          <a href="/play/index.html" data-site-href="/play/index.html" class="active">Home</a>
+          <a href="/world/" data-site-href="/world/">World</a>
+          <a href="/world/leaderboards" data-site-href="/world/leaderboards">Leaderboards</a>
+          <a href="/wiki" data-site-href="/wiki">Wiki</a>
+        </nav>
+
+        <div class="title-header-actions">
+          <button type="button" class="ss-btn-outline ss-btn-ghost" id="title-guest-header">Play as Guest</button>
+          <button type="button" class="ss-btn-outline" id="title-connect-wallet">Connect Wallet</button>
+        </div>
+      </header>
+
+      <main class="title-hero">
+        <div class="title-hero-stack">
+          <img class="title-hero-emblem" src="assets/title/hero-emblem.png" alt="" width="184" height="140" />
+
+          <img class="title-hero-wordmark" src="assets/title/hero-wordmark.png" alt="Solstead" width="488" height="90" />
+
+          <div class="title-tagline-rule" aria-hidden="true">
+            <span class="line"></span>
+            <span class="diamond"></span>
+            <span class="line"></span>
+          </div>
+          <p class="title-tagline">A persistent online world built by players.</p>
+
+          <p id="title-wallet-status"></p>
+
+          <div class="ss-enter-row">
+            <span class="ss-flank-diamond" aria-hidden="true"></span>
+            <div class="ss-enter-frame">
+              <button type="button" class="ss-enter" id="title-enter-btn" disabled>Enter Solstead</button>
+            </div>
+            <span class="ss-flank-diamond" aria-hidden="true"></span>
+          </div>
+
+          <p class="title-online-count">
+            <span class="title-online-dot" aria-hidden="true"></span>
+            <span><strong id="title-online-count">6</strong> players online</span>
+          </p>
+        </div>
+      </main>
+
+      <footer class="title-features">
+        <div class="title-feature">
+          <svg viewBox="0 0 24 24"><path d="M12 2L4 10h3v10h10V10h3L12 2z"/></svg>
+          <strong>Explore</strong>
+          <span>Discover a vast living world.</span>
+        </div>
+        <div class="title-feature">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <strong>Build</strong>
+          <span>Claim land and build your legacy.</span>
+        </div>
+        <div class="title-feature">
+          <svg viewBox="0 0 24 24"><path d="M14.59 6.59L16 8l-8 8-3.59-3.59L6 11l2.59 2.59zM20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+          <strong>Craft</strong>
+          <span>Gather, craft, and create anything.</span>
+        </div>
+        <div class="title-feature">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+          <strong>Trade</strong>
+          <span>Trade freely in a player-driven economy.</span>
+        </div>
+        <div class="title-feature">
+          <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+          <strong>Socialize</strong>
+          <span>Make friends and build communities.</span>
+        </div>
+        <div class="title-feature">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          <strong>Persistent</strong>
+          <span>A world that lives, even when you're away.</span>
+        </div>
+      </footer>
+    </div>
+
     <div id="loading-overlay">
-      <div id="loading-title">Loading...</div>
-      <div id="loading-bar-bg">
-        <div id="loading-bar-fill"></div>
-      </div>
+      <div id="loading-title">Loading Solstead...</div>
+      <div id="loading-bar-bg"><div id="loading-bar-fill"></div></div>
       <div id="loading-pct">0%</div>
       <div id="loading-label">Initializing...</div>
     </div>
-    <canvas
-      id="glcanvas"
-      tabindex="1"
-      style="image-rendering: pixelated"
-    ></canvas>
+    <canvas id="glcanvas" tabindex="1" style="image-rendering: pixelated"></canvas>
+
     <script src="https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js"></script>
     <script src="sapp_jsutils.js"></script>
     <script src="quad-storage.js"></script>
     <script src="auth.js"></script>
+    <script src="wallet.js"></script>
     <script src="network.js"></script>
     <script src="loading.js"></script>
-
+    <script src="title-screen.js"></script>
     <script>
-      // Disable browser context menu so the in-game one works on right-click
-      document.getElementById("glcanvas").addEventListener("contextmenu", function (e) {
-        e.preventDefault();
-      });
-
-      // Prevent early focus events that cause RefCell double-borrow panic in miniquad.
-      // The canvas starts non-focusable; we restore tabindex after WASM init settles.
+      document.getElementById("glcanvas").addEventListener("contextmenu", function (e) { e.preventDefault(); });
       document.getElementById("glcanvas").removeAttribute("tabindex");
-      load("isometric_client.wasm");
-      setTimeout(function () {
-        var canvas = document.getElementById("glcanvas");
-        canvas.setAttribute("tabindex", "1");
-        canvas.focus();
-      }, 500);
     </script>
   </body>
 </html>

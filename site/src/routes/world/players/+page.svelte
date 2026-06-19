@@ -1,13 +1,16 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import { onMount } from 'svelte';
   import { api, type OnlinePlayer } from '$lib/api';
+  import { DEMO_LEADERBOARD, DEMO_ONLINE_PLAYERS, resolveOnlinePlayers } from '$lib/world-fallback';
   import { Users } from '@lucide/svelte';
 
   type SortKey = keyof OnlinePlayer;
   type SortDir = 'asc' | 'desc';
 
-  let data: OnlinePlayer[] | undefined = $state();
-  let isLoading = $state(true);
+  let data: OnlinePlayer[] = $state(DEMO_ONLINE_PLAYERS);
+  let isLoading = $state(false);
+  let usingDemoData = $state(true);
   let sortKey: SortKey = $state('combat_level');
   let sortDir: SortDir = $state('desc');
 
@@ -43,15 +46,23 @@
   }
 
   async function load() {
+    if (!browser) return;
+    isLoading = true;
     try {
-      data = await api.online();
+      const live = await api.online();
+      const resolved = resolveOnlinePlayers(live);
+      data = resolved.players;
+      usingDemoData = resolved.usingDemo;
+    } catch {
+      data = DEMO_ONLINE_PLAYERS;
+      usingDemoData = true;
     } finally {
       isLoading = false;
     }
   }
 
   onMount(() => {
-    document.title = 'Online Players — New Aeven World Statistics';
+    document.title = 'Online Players — Solstead World Statistics';
     load();
     const id = setInterval(load, 15_000);
     return () => clearInterval(id);
@@ -59,31 +70,36 @@
 </script>
 
 <svelte:head>
-  <title>Online Players — New Aeven World Statistics</title>
+  <title>Online Players — Solstead World Statistics</title>
 </svelte:head>
 
 <div class="space-y-6">
-  <div class="flex items-center gap-3">
+  <div class="flex flex-wrap items-center gap-3">
     <Users size={22} class="text-[var(--gold)]" />
     <h1 class="text-2xl font-bold text-[var(--text)]">Online Players</h1>
-    {#if data}
-      <span class="rounded-full bg-[var(--gold)] px-3 py-0.5 text-sm font-bold text-[#1a1210]">{data.length}</span>
-    {/if}
+    <span class="rounded-full bg-[var(--gold)] px-3 py-0.5 text-sm font-bold text-[#1a1210]">{data.length}</span>
   </div>
+
+  {#if usingDemoData}
+    <p class="text-sm text-[var(--muted)]">Live player list unavailable — showing sample adventurers.</p>
+  {/if}
 
   <div class="pixel-box overflow-x-auto rounded-lg bg-[var(--panel)]">
     <table class="w-full">
       <thead>
         <tr class="bg-[var(--panel-soft)]">
           {#each columns as col}
-            <th
-              onclick={() => toggleSort(col.key)}
-              class="cursor-pointer px-4 py-3 text-left text-xs tracking-wider text-[var(--muted)] uppercase select-none transition-colors hover:text-[var(--text)]"
-            >
-              {col.label}
-              {#if sortKey === col.key}
-                <span class="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>
-              {/if}
+            <th scope="col">
+              <button
+                type="button"
+                onclick={() => toggleSort(col.key)}
+                class="sort-btn {sortKey === col.key ? 'is-active' : ''}"
+              >
+                {col.label}
+                {#if sortKey === col.key}
+                  <span class="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                {/if}
+              </button>
             </th>
           {/each}
         </tr>
@@ -104,7 +120,7 @@
             <td colspan={columns.length} class="px-4 py-12 text-center text-[var(--muted)]">Nobody's online right now</td>
           </tr>
         {:else}
-          {#each sorted as player}
+          {#each sorted as player (player.name)}
             <tr class="border-b border-[var(--panel-border)] transition-colors hover:bg-[var(--panel-soft)]">
               <td class="px-4 py-3">
                 <a href="/world/player/{encodeURIComponent(player.name)}" class="text-[var(--text)] hover:text-[var(--gold)]">{player.name}</a>
@@ -123,3 +139,28 @@
     </table>
   </div>
 </div>
+
+<style>
+  .sort-btn {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: transparent;
+    padding: 12px 16px;
+    font: inherit;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .sort-btn:hover,
+  .sort-btn.is-active {
+    color: var(--text);
+  }
+</style>

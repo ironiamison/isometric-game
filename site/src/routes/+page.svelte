@@ -1,13 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { appendUtms } from '$lib/utm';
+  import { SITE_URL } from '$lib/site-config';
 
   let navEl: HTMLElement | undefined = $state();
   let starsEl: HTMLElement | undefined = $state();
-  let playHref = $state('/play/');
+  let playHref = $state('/play/index.html');
 
   onMount(() => {
-    playHref = appendUtms('/play/');
+    // Old homepage used #play anchor; send players straight to the game.
+    if (window.location.hash === '#play') {
+      window.location.replace('/play/index.html');
+      return;
+    }
+
+    playHref = appendUtms('/play/index.html');
 
     if (starsEl) {
       for (let i = 0; i < 60; i++) {
@@ -82,41 +89,39 @@
 </script>
 
 <svelte:head>
-  <title>New Aeven — A Pixel Art Isometric MMO</title>
+  <title>Solstead — A Pixel Art Isometric MMO</title>
   <meta
     name="description"
-    content="New Aeven is a cozy pixel-art isometric MMO. Farm, craft, explore dungeons, and adventure with friends in a handcrafted open world. Play free in your browser, on desktop, or Android."
+    content="Solstead is a cozy pixel-art isometric MMO. Farm, craft, explore dungeons, and adventure with friends in a handcrafted open world. Play free in your browser, on desktop, or Android."
   />
   <meta
     name="keywords"
-    content="New Aeven, MMO, pixel art, isometric, farming, crafting, dungeons, co-op, free to play, browser game, indie game"
+    content="Solstead, MMO, pixel art, isometric, farming, crafting, dungeons, co-op, free to play, browser game, indie game"
   />
-  <meta name="author" content="New Aeven" />
+  <meta name="author" content="Solstead" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://aeven.xyz/" />
+  <link rel="canonical" href="{SITE_URL}/" />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://aeven.xyz/" />
-  <meta property="og:title" content="New Aeven — A Pixel Art Isometric MMO" />
+  <meta property="og:url" content="{SITE_URL}/" />
+  <meta property="og:title" content="Solstead — A Pixel Art Isometric MMO" />
   <meta
     property="og:description"
     content="A cozy pixel-art isometric MMO. Farm, craft, explore dungeons, and adventure with friends. Play free in your browser."
   />
-  <meta property="og:image" content="https://aeven.xyz/screenshots/screenshot-1.png" />
+  <meta property="og:image" content="{SITE_URL}/screenshots/screenshot-1.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="675" />
-  <meta property="og:site_name" content="New Aeven" />
+  <meta property="og:site_name" content="Solstead" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="New Aeven — A Pixel Art Isometric MMO" />
+  <meta name="twitter:title" content="Solstead — A Pixel Art Isometric MMO" />
   <meta
     name="twitter:description"
     content="A cozy pixel-art isometric MMO. Farm, craft, explore dungeons, and adventure with friends. Play free in your browser."
   />
-  <meta name="twitter:image" content="https://aeven.xyz/screenshots/screenshot-1.png" />
-  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="shortcut icon" href="/favicon.ico" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <meta name="apple-mobile-web-app-title" content="New Aeven" />
+  <meta name="twitter:image" content="{SITE_URL}/screenshots/screenshot-1.png" />
+  <link rel="icon" type="image/png" href="/solstead-logo.png" sizes="512x512" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/solstead-logo.png" />
+  <meta name="apple-mobile-web-app-title" content="Solstead" />
   <link rel="manifest" href="/site.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
@@ -128,8 +133,8 @@
   {@html `<script type="application/ld+json">${JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'VideoGame',
-    name: 'New Aeven',
-    url: 'https://aeven.xyz',
+    name: 'Solstead',
+    url: SITE_URL,
     description:
       'A cozy pixel-art isometric MMO. Farm, craft, explore dungeons, and adventure with friends in a handcrafted open world.',
     genre: ['MMO', 'RPG', 'Simulation'],
@@ -137,20 +142,23 @@
     applicationCategory: 'Game',
     operatingSystem: 'Any',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-    image: 'https://aeven.xyz/screenshots/screenshot-1.png',
+    image: `${SITE_URL}/screenshots/screenshot-1.png`,
     screenshot: [
-      'https://aeven.xyz/screenshots/screenshot-1.png',
-      'https://aeven.xyz/screenshots/screenshot-2.png',
-      'https://aeven.xyz/screenshots/screenshot-3.png',
+      `${SITE_URL}/screenshots/screenshot-1.png`,
+      `${SITE_URL}/screenshots/screenshot-2.png`,
+      `${SITE_URL}/screenshots/screenshot-3.png`,
     ],
   })}</script>`}
 </svelte:head>
 
 <nav id="nav" bind:this={navEl}>
-  <a href="/" class="nav-brand">New Aeven</a>
+  <a href="/" class="nav-brand">
+    <img src="/solstead-logo.png" alt="" class="nav-logo" width="32" height="32" />
+    Solstead
+  </a>
   <ul class="nav-links">
     <li><a href="#about">About</a></li>
-    <li><a href="#play">Play</a></li>
+    <li><a href="/play/index.html">Play</a></li>
     <li><a href="#community">Community</a></li>
     <li><a href="#media">Media</a></li>
     <li><a href="/world/">World Stats</a></li>
@@ -161,10 +169,11 @@
   <div class="sky"></div>
   <div class="stars" bind:this={starsEl}></div>
   <div class="hero-content">
-    <h1 class="game-title">New Aeven</h1>
+    <img src="/solstead-logo.png" alt="Solstead" class="hero-logo" width="160" height="160" />
+    <h1 class="game-title">Solstead</h1>
     <p class="game-subtitle">A cozy pixel-art isometric MMO — craft, explore, and adventure together</p>
     <div class="hero-actions">
-      <a href="#play" class="pixel-btn btn-primary">Play Now</a>
+      <a href="/play/index.html" class="pixel-btn btn-primary">Play Now</a>
       <a href="#community" class="pixel-btn btn-gold">Join Us</a>
     </div>
   </div>
@@ -180,9 +189,9 @@
 
 <section class="section about" id="about">
   <div class="section-inner fade-up">
-    <h2 class="section-title">What is New Aeven?</h2>
+    <h2 class="section-title">What is Solstead?</h2>
     <p class="about-text">
-      <strong>New Aeven</strong> is a 2.5D isometric MMO set in a handcrafted pixel-art world. Grow crops on your farm,
+      <strong>Solstead</strong> is a 2.5D isometric MMO set in a handcrafted pixel-art world. Grow crops on your farm,
       craft gear at your workbench, explore dungeons with friends, or simply hang out in town and trade. No rush, no
       pay-to-win — just a living world waiting for you to make it home.
     </p>
@@ -241,7 +250,7 @@
       <div class="card pixel-box fade-up">
         <span class="card-icon">&#x1F4F1;</span>
         <h3 class="card-title">Android</h3>
-        <p class="card-desc">Take Aeven with you. Available on Android devices.</p>
+        <p class="card-desc">Take Solstead with you. Available on Android devices.</p>
         <a href="https://discord.gg/VHB9qSyhUF" class="pixel-btn btn-ember">Get APK</a>
       </div>
     </div>
@@ -258,11 +267,11 @@
   <div class="section-inner">
     <h2 class="section-title fade-up">Community</h2>
     <p class="about-text fade-up" style="margin-bottom: 1.5rem">
-      New Aeven is built alongside its community. Come say hello, share your adventures, report bugs, or just hang out.
+      Solstead is built with its community. Come say hello, share your adventures, report bugs, or just hang out.
     </p>
     <div class="hero-actions fade-up">
       <a href="https://discord.gg/VHB9qSyhUF" class="pixel-btn btn-primary" style="background: #5865f2">Discord</a>
-      <a href="https://discord.gg/VHB9qSyhUF" class="pixel-btn btn-gold">Wiki</a>
+      <a href="/wiki" class="pixel-btn btn-gold">Wiki</a>
       <a href="/world/" class="pixel-btn btn-water">World Stats</a>
     </div>
   </div>
@@ -278,7 +287,7 @@
         <div class="pixel-box fade-up media-screenshot" style="overflow: hidden; aspect-ratio: 16/9">
           <img
             src="/screenshots/screenshot-{n}.png"
-            alt="Screenshot {n} of New Aeven gameplay"
+            alt="Screenshot {n} of Solstead gameplay"
             style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 6px"
           />
         </div>
@@ -288,6 +297,6 @@
 </section>
 
 <footer>
-  <p>New Aeven &mdash; made with care</p>
+  <p>Solstead &mdash; made with care</p>
   <p class="footer-pixel">* * *</p>
 </footer>

@@ -5,7 +5,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
-const DEFAULT_PRODUCTION_ORIGIN: &str = "https://aeven.xyz";
+const DEFAULT_PRODUCTION_ORIGIN: &str = "https://solstead.xyz";
 
 #[derive(Clone, Debug)]
 pub(super) struct ServerConfig {
@@ -40,7 +40,7 @@ impl ServerConfig {
             if is_production {
                 DEFAULT_PRODUCTION_ORIGIN.to_string()
             } else {
-                "http://localhost:5173,http://127.0.0.1:5173".to_string()
+                "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174".to_string()
             }
         });
         let allowed_origins = parse_origins(&allowed_origins_raw)?;

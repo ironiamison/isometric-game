@@ -51,6 +51,34 @@ impl AuthClient {
         }
     }
 
+    /// Create a guest session (no password)
+    pub fn guest(&self) -> Result<AuthSession, AuthError> {
+        let url = format!("{}/api/guest", self.base_url);
+
+        let response = ureq::post(&url)
+            .set("Content-Type", "application/json")
+            .send_json(ureq::json!({}))
+            .map_err(|e| AuthError::NetworkError(e.to_string()))?;
+
+        let auth_resp: AuthResponse = response
+            .into_json()
+            .map_err(|e| AuthError::NetworkError(e.to_string()))?;
+
+        if auth_resp.success {
+            Ok(AuthSession {
+                token: auth_resp.token.unwrap_or_default(),
+                username: auth_resp.username.unwrap_or_default(),
+                characters: auth_resp.characters.unwrap_or_default(),
+            })
+        } else {
+            Err(AuthError::ServerError(
+                auth_resp
+                    .error
+                    .unwrap_or_else(|| "Guest login failed".to_string()),
+            ))
+        }
+    }
+
     /// Login to an existing account
     pub fn login(&self, username: &str, password: &str) -> Result<AuthSession, AuthError> {
         let url = format!("{}/api/login", self.base_url);

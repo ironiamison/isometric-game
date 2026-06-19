@@ -150,6 +150,14 @@ struct AppState {
     perf_metrics: perf_metrics::PerfMetrics,
     /// Derived stats rows for public leaderboard/profile endpoints.
     leaderboard_cache: Arc<RwLock<LeaderboardCache>>,
+    /// Pending wallet sign-in challenges (nonce -> message + expiry)
+    wallet_challenges: Arc<DashMap<String, WalletChallenge>>,
+}
+
+#[derive(Clone)]
+struct WalletChallenge {
+    message: String,
+    expires_at: Instant,
 }
 
 const GAME_ROOM_NAME: &str = "game_room";
@@ -591,6 +599,9 @@ async fn main() {
         // Authentication
         .route("/api/register", post(register_account))
         .route("/api/login", post(login_account))
+        .route("/api/guest", post(guest_login))
+        .route("/api/wallet/challenge", get(wallet_challenge))
+        .route("/api/wallet/login", post(wallet_login))
         .route("/api/logout", post(logout_account))
         // Characters
         .route(

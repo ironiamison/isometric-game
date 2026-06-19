@@ -2,8 +2,8 @@ use std::env;
 
 const LOCAL_HTTP_URL: &str = "http://localhost:2567";
 const LOCAL_WS_URL: &str = "ws://localhost:2567";
-const PRODUCTION_HTTP_URL: &str = "https://aeven.xyz";
-const PRODUCTION_WS_URL: &str = "wss://aeven.xyz";
+const PRODUCTION_HTTP_URL: &str = "https://solstead.xyz";
+const PRODUCTION_WS_URL: &str = "wss://solstead.xyz";
 
 fn main() {
     println!("cargo:rerun-if-env-changed=AEVEN_SERVER_URL");

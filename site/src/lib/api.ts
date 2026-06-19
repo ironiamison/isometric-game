@@ -1,4 +1,17 @@
 const BASE = '/api/stats';
+const FETCH_TIMEOUT_MS = 8_000;
+
+async function get<T>(path: string): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const r = await fetch(`${BASE}${path}`, { signal: controller.signal });
+    if (!r.ok) throw new Error(`API error: ${r.status}`);
+    return r.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export interface Overview {
   online_players: number;
@@ -158,12 +171,6 @@ export interface Entity {
   loot: EntityLoot[];
   loot_tables: LootTable[];
   quest_ids: string[];
-}
-
-async function get<T>(path: string): Promise<T> {
-  const r = await fetch(`${BASE}${path}`);
-  if (!r.ok) throw new Error(`API error: ${r.status}`);
-  return r.json();
 }
 
 export const api = {

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://aeven.xyz/sitemap.xml
+Sitemap: https://solstead.xyz/sitemap.xml

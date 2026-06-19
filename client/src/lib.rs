@@ -32,8 +32,6 @@ pub use app::window_conf;
 use app::AppState;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use audio::AudioManager;
-#[cfg(target_arch = "wasm32")]
-use auth::AuthSession;
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
 use config::{SERVER_URL, WS_URL};
 #[cfg(target_arch = "wasm32")]
@@ -308,13 +306,11 @@ async fn async_main() {
     #[cfg(target_arch = "wasm32")]
     {
         use crate::auth::AuthResult;
+        use crate::auth::{take_pending_auth_session, AuthSession};
+        use crate::auth::credentials;
 
         // Start menu music
         audio.play_music("assets/audio/menu.ogg").await;
-
-        let mut login_screen = LoginScreen::new(SERVER_URL);
-        login_screen.use_renderer_font(renderer.font().clone());
-        login_screen.load_font().await;
 
         enum WasmAppState {
             Login(LoginScreen),
@@ -340,7 +336,23 @@ async fn async_main() {
         // Live world preview streamed behind the login/character screens. Upgraded in
         // place to a full player session when the game starts (matches native).
         let mut spectator: Option<SpectatorState> = Some(SpectatorState::new());
-        let mut app_state = WasmAppState::Login(login_screen);
+        let mut app_state = if let Some(session) = take_pending_auth_session() {
+            credentials::save_username(&session.username);
+            let mut char_screen = CharacterSelectScreen::new(session, SERVER_URL);
+            char_screen.use_renderer_assets(
+                renderer.font().clone(),
+                renderer.player_sprites().clone(),
+                renderer.hair_sprites().clone(),
+                renderer.equipment_sprites().clone(),
+            );
+            char_screen.load_font().await;
+            WasmAppState::CharacterSelect(char_screen)
+        } else {
+            let mut login_screen = LoginScreen::new(SERVER_URL);
+            login_screen.use_renderer_font(renderer.font().clone());
+            login_screen.load_font().await;
+            WasmAppState::Login(login_screen)
+        };
 
         loop {
             match &mut app_state {

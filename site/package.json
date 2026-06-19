@@ -9,17 +9,20 @@
     "npm": "10.x"
   },
   "scripts": {
+    "predev": "node scripts/generate-wiki-data.mjs",
+    "prebuild": "node scripts/generate-wiki-data.mjs",
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
-    "@types/node": "^22.19.21",
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^22.19.21",
+    "smol-toml": "^1.6.1",
     "svelte": "^5.19.0",
     "svelte-check": "^4.1.4",
     "tailwindcss": "^4.1.18",

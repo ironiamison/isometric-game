@@ -843,14 +843,13 @@ impl QuestRegistry {
 
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         let registry = Arc::clone(self);
+        let rt = tokio::runtime::Handle::current();
 
         // Create the watcher in a blocking thread since notify is sync
         let data_dir = self.data_dir.clone();
         let scripts_dir = self.scripts_dir.clone();
 
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Handle::current();
-
             let (notify_tx, notify_rx) = std::sync::mpsc::channel();
 
             let mut watcher = match RecommendedWatcher::new(

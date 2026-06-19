@@ -1,0 +1,17 @@
+[Unit]
+Description=Solstead game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/solstead/rust-server
+EnvironmentFile=/opt/solstead/.env
+Environment=AEVEN_ENV=production
+ExecStart=/opt/solstead/target/release/isometric-server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,430 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&display=swap");
+
+:root {
+  --gold: #c9a227;
+  --gold-light: #e8c84a;
+  --gold-dim: #8a7020;
+  --text-gold: #d4af37;
+  --bg-dark: #0a0806;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+#title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-gold);
+  font-family: "Inter", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#title-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.title-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-dark) url("assets/title/background.png") center / cover no-repeat;
+  z-index: 0;
+}
+
+.title-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 6, 4, 0.82) 0%,
+    rgba(8, 6, 4, 0.35) 28%,
+    rgba(8, 6, 4, 0.15) 50%,
+    rgba(8, 6, 4, 0.55) 78%,
+    rgba(8, 6, 4, 0.92) 100%
+  );
+}
+
+/* ── Header ── */
+.title-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  flex-shrink: 0;
+  min-height: 60px;
+}
+
+.title-brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.title-brand img {
+  height: 32px;
+  width: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.6));
+}
+
+.title-nav {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 28px;
+  flex-wrap: nowrap;
+  justify-content: center;
+  white-space: nowrap;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.title-nav a {
+  pointer-events: auto;
+  color: var(--text-gold);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+  position: relative;
+}
+
+.title-nav a:hover,
+.title-nav a.active {
+  opacity: 1;
+}
+
+.title-nav a.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 1px;
+  background: var(--gold);
+}
+
+.title-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+/* Gold outline buttons (mockup PLAY NOW style) */
+.ss-btn-outline {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 10px 22px;
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--text-gold);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ss-btn-outline:hover:not(:disabled) {
+  background: rgba(201, 162, 39, 0.12);
+}
+
+.ss-btn-outline:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ss-btn-ghost {
+  border-color: rgba(201, 162, 39, 0.45);
+  color: rgba(212, 175, 55, 0.75);
+}
+
+/* ── Hero ── */
+.title-hero {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px 12px;
+  min-height: 0;
+}
+
+.title-hero-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: min(560px, 92vw);
+  margin-top: -2vh;
+}
+
+.title-hero-emblem {
+  width: min(184px, 36vw);
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 0 20px rgba(201, 162, 39, 0.35)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+
+.title-hero-wordmark {
+  width: min(488px, 92vw);
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.55));
+}
+
+.title-tagline-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.title-tagline-rule .line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.55), transparent);
+}
+
+.title-tagline-rule .diamond {
+  width: 7px;
+  height: 7px;
+  background: var(--gold);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(201, 162, 39, 0.4);
+}
+
+.title-tagline {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(212, 175, 55, 0.82);
+  margin: 0 0 32px;
+  line-height: 1.5;
+}
+
+#title-wallet-status {
+  min-height: 14px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  margin: -20px 0 18px;
+  opacity: 0.85;
+}
+
+#title-wallet-status.error {
+  color: #e87868;
+}
+
+#title-wallet-status.ok {
+  color: #88c878;
+}
+
+/* Enter row with flank diamonds */
+.ss-enter-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 5vw, 48px);
+  width: 100%;
+}
+
+.ss-flank-diamond {
+  width: 8px;
+  height: 8px;
+  background: var(--gold);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  opacity: 0.88;
+  box-shadow: 0 0 8px rgba(201, 162, 39, 0.35);
+}
+
+.ss-enter {
+  position: relative;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-gold);
+  background: rgba(8, 6, 4, 0.5);
+  border: none;
+  padding: 15px 56px;
+  min-width: 260px;
+  cursor: not-allowed;
+  opacity: 0.42;
+  transition: opacity 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.ss-enter.ready {
+  cursor: pointer;
+  opacity: 1;
+  box-shadow: 0 0 18px rgba(201, 162, 39, 0.12);
+}
+
+.ss-enter.ready:hover {
+  background: rgba(201, 162, 39, 0.12);
+  box-shadow: 0 0 26px rgba(201, 162, 39, 0.25);
+}
+
+.ss-enter:disabled {
+  pointer-events: none;
+}
+
+.ss-enter-frame {
+  position: relative;
+  display: inline-block;
+  padding: 4px;
+}
+
+.ss-enter-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(201, 162, 39, 0.85);
+  pointer-events: none;
+}
+
+.ss-enter-frame::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  pointer-events: none;
+}
+
+.title-online-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(212, 175, 55, 0.72);
+}
+
+.title-online-count strong {
+  color: var(--text-gold);
+  font-weight: 600;
+}
+
+.title-online-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7a9a5f;
+  box-shadow: 0 0 8px rgba(122, 154, 95, 0.85);
+  flex-shrink: 0;
+}
+
+/* ── Feature bar ── */
+.title-features {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border-top: 1px solid rgba(201, 162, 39, 0.25);
+  background: rgba(8, 6, 4, 0.88);
+  flex-shrink: 0;
+}
+
+.title-feature {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 12px 20px;
+  text-align: center;
+  border-right: 1px solid rgba(201, 162, 39, 0.2);
+}
+
+.title-feature:last-child {
+  border-right: none;
+}
+
+.title-feature svg {
+  width: 26px;
+  height: 26px;
+  fill: var(--gold);
+  opacity: 0.95;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.title-feature strong {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-gold);
+}
+
+.title-feature span {
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgba(212, 175, 55, 0.55);
+  max-width: 140px;
+}
+
+@media (max-width: 900px) {
+  .title-nav {
+    display: none;
+  }
+
+  .title-features {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .title-feature:nth-child(3) {
+    border-right: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .title-header {
+    padding: 12px 16px;
+  }
+
+  .title-header-actions .ss-btn-ghost {
+    display: none;
+  }
+
+  .title-features {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .title-feature span {
+    display: none;
+  }
+}

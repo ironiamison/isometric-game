@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { api, type LeaderboardEntry, type PlayerProfileRanks } from '$lib/api';
+  import { getDemoPlayerProfile } from '$lib/world-fallback';
   import { formatPlayedTime, percentile } from '$lib/format';
   import { ArrowLeft, Check, Copy, UserRound } from '@lucide/svelte';
 
@@ -37,19 +38,27 @@
   let data = $state<Awaited<ReturnType<typeof api.playerProfile>> | undefined>();
   let isLoading = $state(true);
   let isError = $state(false);
+  let usingDemoData = $state(false);
   let copied = $state(false);
 
   let sharePath = $derived(`/world/player/${encodeURIComponent(data?.player.name ?? playerName)}`);
 
   async function load(name: string) {
-    if (!name) return;
+    if (!browser || !name) return;
     isLoading = true;
     isError = false;
+    usingDemoData = false;
     try {
       data = await api.playerProfile(name);
     } catch {
-      isError = true;
-      data = undefined;
+      const demo = getDemoPlayerProfile(name);
+      if (demo) {
+        data = demo;
+        usingDemoData = true;
+      } else {
+        isError = true;
+        data = undefined;
+      }
     } finally {
       isLoading = false;
     }
@@ -68,8 +77,8 @@
 
   $effect(() => {
     document.title = playerName
-      ? `${playerName} — New Aeven Player Profile`
-      : 'Player Profile — New Aeven World Statistics';
+      ? `${playerName} — Solstead Player Profile`
+      : 'Player Profile — Solstead World Statistics';
     load(playerName);
   });
 </script>
@@ -121,6 +130,9 @@
         </a>
       </div>
       <p class="mt-3 text-xs text-[var(--muted)]">{sharePath}</p>
+      {#if usingDemoData}
+        <p class="mt-2 text-xs text-[var(--muted)]">Sample profile — live data unavailable for this adventurer.</p>
+      {/if}
     </section>
 
     <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

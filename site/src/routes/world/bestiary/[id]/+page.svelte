@@ -1,15 +1,13 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { page } from '$app/stores';
-  import { api, type Entity } from '$lib/api';
+  import EntitySprite from '$lib/components/EntitySprite.svelte';
+  import type { Entity } from '$lib/api';
   import { formatChance, formatItemName, signed } from '$lib/format';
   import { ArrowLeft, Dice5, Droplets, ScrollText, Skull, TrendingUp } from '@lucide/svelte';
+  import type { PageData } from './$types';
 
-  let entities: Entity[] | undefined = $state();
-  let isLoading = $state(true);
+  let { data }: { data: PageData } = $props();
 
-  let monsterId = $derived($page.params.id ?? '');
-  let monster = $derived(entities?.find((e) => e.id === monsterId));
+  let monster = $derived(data.monster as Entity | null);
 
   let scalingRows = $derived.by(() => {
     if (!monster) return [];
@@ -37,39 +35,27 @@
     return `${seconds}s`;
   }
 
-  onMount(async () => {
-    try {
-      entities = await api.entities();
-    } finally {
-      isLoading = false;
-    }
-  });
-
   $effect(() => {
     document.title = monster
-      ? `${monster.display_name} — New Aeven Bestiary`
-      : 'Bestiary — New Aeven World Statistics';
+      ? `${monster.display_name} — Solstead Bestiary`
+      : 'Bestiary — Solstead World Statistics';
   });
 </script>
 
-{#if isLoading}
-  <div class="space-y-4">
-    <div class="h-36 animate-pulse rounded-xl border border-[var(--panel-border)] bg-[var(--panel-soft)]"></div>
-    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      {#each Array(6) as _, i}
-        <div class="h-24 animate-pulse rounded-xl border border-[var(--panel-border)] bg-[var(--panel-soft)]"></div>
-      {/each}
-    </div>
-  </div>
-{:else if !monster}
+{#if !monster}
   <div class="space-y-4 rounded-xl border border-[var(--panel-border)] bg-[var(--panel)] p-6">
     <h1 class="text-2xl text-[var(--text)]">Monster not found</h1>
-    <p class="text-[var(--text-soft)]">No data exists for "{monsterId}".</p>
+    <p class="text-[var(--text-soft)]">No data exists for this creature.</p>
     <a href="/world/bestiary" class="pixel-btn inline-flex rounded-md bg-[var(--panel-soft)] px-3 py-2 text-sm text-[var(--text)]">Back to Bestiary</a>
   </div>
 {:else}
   <div class="space-y-5">
     <section class="pixel-box relative overflow-hidden rounded-xl bg-[radial-gradient(circle_at_25%_10%,rgba(180,60,60,0.18),transparent_50%),radial-gradient(circle_at_90%_0%,rgba(212,168,68,0.14),transparent_48%),var(--panel)] p-6 md:p-7">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div class="monster-portrait">
+          <EntitySprite sprite={monster.sprite} alt={monster.display_name} />
+        </div>
+        <div class="min-w-0 flex-1">
       <p class="flex items-center gap-2 text-xs tracking-[0.22em] text-[var(--muted)] uppercase" style="font-family: var(--font-display)">
         <Skull size={14} class="text-[var(--ember)]" />
         Bestiary Entry
@@ -89,6 +75,8 @@
           <ArrowLeft size={14} />
           Bestiary
         </a>
+      </div>
+        </div>
       </div>
     </section>
 
@@ -225,3 +213,21 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  .monster-portrait {
+    display: grid;
+    place-items: center;
+    width: 96px;
+    height: 96px;
+    flex-shrink: 0;
+    border: 1px solid var(--panel-border);
+    background: rgba(8, 6, 4, 0.55);
+    box-shadow: inset 0 0 24px rgba(180, 60, 60, 0.08);
+  }
+
+  .monster-portrait :global(.entity-sprite) {
+    width: 72px;
+    height: 72px;
+  }
+</style>

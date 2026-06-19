@@ -13,6 +13,9 @@ extern "C" {
 pub enum AuthResult {
     Login(Result<AuthSession, AuthError>),
     Register(Result<AuthSession, AuthError>),
+    Guest(Result<AuthSession, AuthError>),
+    WalletChallenge(Result<WalletChallenge, AuthError>),
+    WalletLogin(Result<AuthSession, AuthError>),
     Characters(Result<Vec<CharacterInfo>, AuthError>),
     CharacterCreated(Result<CharacterInfo, AuthError>),
     CharacterDeleted(Result<(), AuthError>),
@@ -23,6 +26,9 @@ pub enum AuthResult {
 enum PendingRequestKind {
     Login,
     Register,
+    Guest,
+    WalletChallenge,
+    WalletLogin,
     GetCharacters,
     CreateCharacter,
     DeleteCharacter,
@@ -95,6 +101,42 @@ impl AuthClient {
         self.pending_request = Some(PendingRequest {
             id,
             kind: PendingRequestKind::Login,
+        });
+    }
+
+    pub fn start_guest(&mut self) {
+        let url = format!("{}/api/guest", self.base_url);
+        let headers = make_headers_json(None);
+        let id = fire_request("POST", &url, &headers, Some("{}"));
+        self.pending_request = Some(PendingRequest {
+            id,
+            kind: PendingRequestKind::Guest,
+        });
+    }
+
+    pub fn start_wallet_challenge(&mut self) {
+        let url = format!("{}/api/wallet/challenge", self.base_url);
+        let headers = r#"{"Content-Type":"application/json"}"#.to_string();
+        let id = fire_request("GET", &url, &headers, None);
+        self.pending_request = Some(PendingRequest {
+            id,
+            kind: PendingRequestKind::WalletChallenge,
+        });
+    }
+
+    pub fn start_wallet_login(&mut self, pubkey: &str, signature: &str, nonce: &str) {
+        let url = format!("{}/api/wallet/login", self.base_url);
+        let headers = make_headers_json(None);
+        let body = serde_json::json!({
+            "pubkey": pubkey,
+            "signature": signature,
+            "nonce": nonce,
+        })
+        .to_string();
+        let id = fire_request("POST", &url, &headers, Some(&body));
+        self.pending_request = Some(PendingRequest {
+            id,
+            kind: PendingRequestKind::WalletLogin,
         });
     }
 
@@ -203,6 +245,9 @@ impl AuthClient {
             return Some(match pending.kind {
                 PendingRequestKind::Login => AuthResult::Login(Err(err)),
                 PendingRequestKind::Register => AuthResult::Register(Err(err)),
+                PendingRequestKind::Guest => AuthResult::Guest(Err(err)),
+                PendingRequestKind::WalletChallenge => AuthResult::WalletChallenge(Err(err)),
+                PendingRequestKind::WalletLogin => AuthResult::WalletLogin(Err(err)),
                 PendingRequestKind::GetCharacters => AuthResult::Characters(Err(err)),
                 PendingRequestKind::CreateCharacter => AuthResult::CharacterCreated(Err(err)),
                 PendingRequestKind::DeleteCharacter => AuthResult::CharacterDeleted(Err(err)),
@@ -219,6 +264,15 @@ impl AuthClient {
             PendingRequestKind::Register => {
                 AuthResult::Register(self.parse_auth_response(&body_text, http_status))
             }
+            PendingRequestKind::Guest => {
+                AuthResult::Guest(self.parse_auth_response(&body_text, http_status))
+            }
+            PendingRequestKind::WalletChallenge => AuthResult::WalletChallenge(
+                self.parse_wallet_challenge_response(&body_text, http_status),
+            ),
+            PendingRequestKind::WalletLogin => {
+                AuthResult::WalletLogin(self.parse_auth_response(&body_text, http_status))
+            }
             PendingRequestKind::GetCharacters => {
                 AuthResult::Characters(self.parse_characters_response(&body_text, http_status))
             }
@@ -233,6 +287,17 @@ impl AuthClient {
             }
             PendingRequestKind::HealthCheck => AuthResult::HealthCheck(http_status == 200),
         })
+    }
+
+    fn parse_wallet_challenge_response(
+        &self,
+        body: &str,
+        http_status: i32,
+    ) -> Result<WalletChallenge, AuthError> {
+        if http_status != 200 {
+            return Err(AuthError::ServerError(format!("HTTP {http_status}")));
+        }
+        serde_json::from_str(body).map_err(|e| AuthError::NetworkError(e.to_string()))
     }
 
     fn parse_auth_response(&self, body: &str, http_status: i32) -> Result<AuthSession, AuthError> {

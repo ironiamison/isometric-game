@@ -70,6 +70,12 @@ pub struct CharacterInfo {
 }
 
 #[derive(Deserialize)]
+pub struct WalletChallenge {
+    pub nonce: String,
+    pub message: String,
+}
+
+#[derive(Deserialize)]
 pub struct AuthResponse {
     pub success: bool,
     pub token: Option<String>,

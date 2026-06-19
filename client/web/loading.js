@@ -28,6 +28,9 @@ miniquad_add_plugin({
         };
 
         importObject.env.loading_hide = function () {
+            if (window.SolsteadTitleScreen && !window.SolsteadTitleScreen.isEntered()) {
+                return;
+            }
             var overlay = document.getElementById("loading-overlay");
             if (overlay) {
                 overlay.classList.add("hidden");
