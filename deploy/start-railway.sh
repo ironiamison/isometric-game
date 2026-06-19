@@ -32,7 +32,7 @@ for i in $(seq 1 60); do
 done
 
 export PORT
-envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
+sed "s/__PORT__/${PORT}/g" /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
 nginx -t
 
 echo "==> Starting nginx on port ${PORT}"
