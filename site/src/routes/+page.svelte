@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { appendUtms } from '$lib/utm';
-  import { SITE_URL } from '$lib/site-config';
+  import { SITE_URL, SOCIAL_X_URL, SOCIAL_X_HANDLE } from '$lib/site-config';
+  import ContractAddress from '$lib/components/ContractAddress.svelte';
+  import HomeMusic from '$lib/components/HomeMusic.svelte';
 
   let navEl: HTMLElement | undefined = $state();
   let starsEl: HTMLElement | undefined = $state();
@@ -119,6 +121,7 @@
     content="A cozy pixel-art isometric MMO. Farm, craft, explore dungeons, and adventure with friends. Play free in your browser."
   />
   <meta name="twitter:image" content="{SITE_URL}/screenshots/screenshot-1.png" />
+  <meta name="twitter:site" content={SOCIAL_X_HANDLE} />
   <link rel="icon" type="image/png" href="/solstead-logo.png" sizes="512x512" />
   <link rel="apple-touch-icon" sizes="180x180" href="/solstead-logo.png" />
   <meta name="apple-mobile-web-app-title" content="Solstead" />
@@ -151,6 +154,8 @@
   })}</script>`}
 </svelte:head>
 
+<HomeMusic />
+
 <nav id="nav" bind:this={navEl}>
   <a href="/" class="nav-brand">
     <img src="/solstead-logo.png" alt="" class="nav-logo" width="32" height="32" />
@@ -176,6 +181,7 @@
       <a href="/play/index.html" class="pixel-btn btn-primary">Play Now</a>
       <a href="#community" class="pixel-btn btn-gold">Join Us</a>
     </div>
+    <ContractAddress />
   </div>
   <div class="scroll-hint">
     <svg viewBox="0 0 24 24"><path d="M12 16l-6-6h12z" /></svg>
@@ -271,6 +277,7 @@
     </p>
     <div class="hero-actions fade-up">
       <a href="https://discord.gg/VHB9qSyhUF" class="pixel-btn btn-primary" style="background: #5865f2">Discord</a>
+      <a href={SOCIAL_X_URL} class="pixel-btn btn-ember" target="_blank" rel="noopener noreferrer">X / Twitter</a>
       <a href="/wiki" class="pixel-btn btn-gold">Wiki</a>
       <a href="/world/" class="pixel-btn btn-water">World Stats</a>
     </div>
@@ -298,5 +305,8 @@
 
 <footer>
   <p>Solstead &mdash; made with care</p>
+  <p>
+    <a href={SOCIAL_X_URL} target="_blank" rel="noopener noreferrer">{SOCIAL_X_HANDLE}</a>
+  </p>
   <p class="footer-pixel">* * *</p>
 </footer>

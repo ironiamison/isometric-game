@@ -461,8 +461,8 @@ impl InputHandler {
                 .ground_items
                 .values()
                 .find(|item| {
-                    item.x.round() as i32 == clicked_tile_x
-                        && item.y.round() as i32 == clicked_tile_y
+                    let (tile_x, tile_y) = item.tile_coords();
+                    tile_x == clicked_tile_x && tile_y == clicked_tile_y
                 })
                 .map(|item| item.id.clone())
             {
@@ -483,8 +483,8 @@ impl InputHandler {
                                 // Out of range - path to an adjacent tile
                                 let player_x = player.server_x.round() as i32;
                                 let player_y = player.server_y.round() as i32;
-                                let item_x = ground_item.x.round() as i32;
-                                let item_y = ground_item.y.round() as i32;
+                                let item_x = ground_item.x.floor() as i32;
+                                let item_y = ground_item.y.floor() as i32;
 
                                 let occupied = build_occupied_set(state, true, true);
 
@@ -1008,8 +1008,7 @@ impl InputHandler {
 
                 // Check ground items
                 for item in state.ground_items.values() {
-                    let ix = item.x.round() as i32;
-                    let iy = item.y.round() as i32;
+                    let (ix, iy) = item.tile_coords();
                     if ix == clicked_tile_x && iy == clicked_tile_y {
                         break 'find_target ContextMenuTarget::GroundItem {
                             id: item.id.clone(),

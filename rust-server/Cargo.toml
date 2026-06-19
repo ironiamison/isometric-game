@@ -9,6 +9,10 @@ workspace = true
 [dependencies]
 aeven-protocol = { path = "../crates/aeven-protocol" }
 
+solstead-chain = { path = "../crates/solstead-chain" }
+solana-client = "2.1"
+solana-sdk = "2.1"
+
 # Web framework
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }

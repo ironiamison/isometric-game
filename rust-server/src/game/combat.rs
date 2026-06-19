@@ -1319,7 +1319,7 @@ impl GameRoom {
         let player_instance = self.player_instances.read().await.get(player_id).cloned();
 
         // Check if item exists and can be picked up
-        let (item_info, protection_remaining) = {
+        let (item_info, protection_remaining, too_far) = {
             let items = self.ground_items.read().await;
             match items.get(item_id) {
                 Some(item) => {
@@ -1336,17 +1336,17 @@ impl GameRoom {
                     let distance = (dx * dx + dy * dy).sqrt();
 
                     if distance > 2.0 {
-                        (None, None)
+                        (None, None, true)
                     } else if !item.can_pickup(player_id, current_time) {
                         let elapsed = current_time.saturating_sub(item.drop_time);
                         let remaining_ms = 10000u64.saturating_sub(elapsed);
                         let remaining_secs = remaining_ms.div_ceil(1000);
-                        (None, Some(remaining_secs))
+                        (None, Some(remaining_secs), false)
                     } else {
-                        (Some((item.item_id.clone(), item.quantity)), None)
+                        (Some((item.item_id.clone(), item.quantity)), None, false)
                     }
                 }
-                None => (None, None),
+                None => (None, None, false),
             }
         };
 
@@ -1360,6 +1360,15 @@ impl GameRoom {
                 ),
             )
             .await;
+            return;
+        }
+
+        if item_info.is_none() {
+            let items = self.ground_items.read().await;
+            if items.contains_key(item_id) && too_far {
+                self.send_system_message(player_id, "You are too far away to pick that up.")
+                    .await;
+            }
             return;
         }
 

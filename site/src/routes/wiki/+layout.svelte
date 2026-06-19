@@ -38,7 +38,7 @@
       <div class="wiki-social">
         <a href="https://discord.gg/solstead" aria-label="Discord" title="Discord">◆</a>
         <a href="https://reddit.com/r/solstead" aria-label="Reddit" title="Reddit">●</a>
-        <a href="https://x.com/solstead" aria-label="X" title="X">✕</a>
+        <a href="https://x.com/solsteadsol" aria-label="X" title="X (@solsteadsol)">✕</a>
         <a href="https://youtube.com/@solstead" aria-label="YouTube" title="YouTube">▶</a>
       </div>
     </div>

@@ -1,11 +1,30 @@
 const BASE = '/api/stats';
+const AUTH_BASE = '/api';
 const FETCH_TIMEOUT_MS = 8_000;
+
+/** Poll interval aligned with server leaderboard cache TTL (~10s). */
+export const LIVE_STATS_POLL_MS = 10_000;
 
 async function get<T>(path: string): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const r = await fetch(`${BASE}${path}`, { signal: controller.signal });
+    if (!r.ok) throw new Error(`API error: ${r.status}`);
+    return r.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function authGet<T>(path: string, token: string): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const r = await fetch(`${AUTH_BASE}${path}`, {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!r.ok) throw new Error(`API error: ${r.status}`);
     return r.json();
   } finally {
@@ -173,6 +192,19 @@ export interface Entity {
   quest_ids: string[];
 }
 
+export interface CharacterInfo {
+  id: number;
+  name: string;
+  level: number;
+  playedTime: number;
+}
+
+export interface CharacterListResponse {
+  success: boolean;
+  characters?: CharacterInfo[];
+  error?: string;
+}
+
 export const api = {
   overview: () => get<Overview>('/overview'),
   online: () => get<OnlinePlayer[]>('/online'),
@@ -180,6 +212,11 @@ export const api = {
     get<LeaderboardEntry[]>(`/leaderboard?sort=${sort}&limit=${limit}`),
   playerProfile: (name: string) =>
     get<PlayerProfileResponse>(`/player/${encodeURIComponent(name)}`),
+  characters: async (token: string) => {
+    const resp = await authGet<CharacterListResponse>('/characters', token);
+    if (!resp.success) throw new Error(resp.error ?? 'Not authenticated');
+    return resp.characters ?? [];
+  },
   items: () => get<Item[]>('/items'),
   entities: () => get<Entity[]>('/entities'),
 };

@@ -1,7 +1,13 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
-  import { api, type LeaderboardEntry } from '$lib/api';
+  import { api, LIVE_STATS_POLL_MS, type LeaderboardEntry, type PlayerProfileResponse } from '$lib/api';
+  import {
+    pickPrimaryCharacter,
+    readAuthSession,
+    writeAuthSession,
+    type AuthSession,
+  } from '$lib/auth-session';
   import {
     LEADERBOARD_CATEGORIES,
     MOCK_TOP_CLANS,
@@ -9,6 +15,7 @@
     clanForPlayer,
     displayLevel,
     formatScore,
+    rankForCategory,
     seasonCountdown,
     type LeaderboardCategory,
   } from '$lib/leaderboard-ui';
@@ -21,6 +28,13 @@
   let isLoading = $state(true);
   let usingDemoData = $state(false);
   let countdown = $state('—');
+  let lastUpdatedAt = $state<Date | null>(null);
+  let session = $state<AuthSession | null>(null);
+  let yourProfile = $state<PlayerProfileResponse | null>(null);
+  let yourCharacterName = $state<string | null>(null);
+  let yourRankLoading = $state(false);
+  let yourRankError = $state<string | null>(null);
+  let liveTick = $state(0);
   const pageSize = 10;
 
   let category = $derived(
@@ -30,6 +44,14 @@
   let ranked = $derived((data ?? []).map((entry, index) => ({ rank: index + 1, entry })));
   let totalPages = $derived(Math.max(1, Math.ceil(ranked.length / pageSize)));
   let pageRows = $derived(ranked.slice((currentPage - 1) * pageSize, currentPage * pageSize));
+
+  let yourRank = $derived(
+    yourProfile ? rankForCategory(category, yourProfile.ranks) : null,
+  );
+
+  let yourScore = $derived(
+    yourProfile ? formatScore(category, yourProfile.player) : '—',
+  );
 
   let pageNumbers = $derived.by(() => {
     const nums: (number | 'ellipsis')[] = [];
@@ -41,12 +63,13 @@
     return nums;
   });
 
-  async function load(cat: LeaderboardCategory) {
+  async function loadLeaderboard(cat: LeaderboardCategory) {
     isLoading = true;
     try {
       const rows = await api.leaderboard(cat.sort, 100);
       data = rows.length > 0 ? rows : DEMO_LEADERBOARD;
       usingDemoData = rows.length === 0;
+      lastUpdatedAt = new Date();
     } catch {
       data = cat.id === 'clans' ? [] : DEMO_LEADERBOARD;
       usingDemoData = cat.id !== 'clans';
@@ -55,14 +78,62 @@
     }
   }
 
+  async function loadYourRank() {
+    session = readAuthSession();
+    yourProfile = null;
+    yourCharacterName = null;
+    yourRankError = null;
+
+    if (!session?.token) {
+      yourRankLoading = false;
+      return;
+    }
+
+    yourRankLoading = true;
+    try {
+      const characters = await api.characters(session.token);
+      writeAuthSession({ ...session, characters });
+      session = readAuthSession();
+
+      const primary = pickPrimaryCharacter(characters);
+      if (!primary) {
+        yourRankError = 'no_character';
+        return;
+      }
+
+      yourCharacterName = primary.name;
+      yourProfile = await api.playerProfile(primary.name);
+    } catch {
+      yourRankError = 'load_failed';
+    } finally {
+      yourRankLoading = false;
+    }
+  }
+
+  async function refreshAll() {
+    await Promise.all([loadLeaderboard(category), loadYourRank()]);
+  }
+
   function selectCategory(id: string) {
     activeCategoryId = id;
     currentPage = 1;
   }
 
+  function isYourRow(name: string): boolean {
+    return !!yourCharacterName && name.toLowerCase() === yourCharacterName.toLowerCase();
+  }
+
+  function liveAgeLabel(): string {
+    void liveTick;
+    if (!lastUpdatedAt) return 'Connecting…';
+    const secs = Math.max(0, Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000));
+    if (secs < 5) return 'Updated just now';
+    return `Updated ${secs}s ago`;
+  }
+
   $effect(() => {
     if (!browser) return;
-    load(category);
+    loadLeaderboard(category);
   });
 
   let isClansView = $derived(activeCategoryId === 'clans');
@@ -77,10 +148,29 @@
   onMount(() => {
     document.title = 'Leaderboards — Solstead';
     countdown = seasonCountdown();
-    const id = setInterval(() => {
+    const countdownId = setInterval(() => {
       countdown = seasonCountdown();
     }, 60_000);
-    return () => clearInterval(id);
+    const liveLabelId = setInterval(() => {
+      liveTick += 1;
+    }, 1000);
+
+    refreshAll();
+    const pollId = setInterval(refreshAll, LIVE_STATS_POLL_MS);
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === 'solstead_auth_session') {
+        loadYourRank();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      clearInterval(countdownId);
+      clearInterval(liveLabelId);
+      clearInterval(pollId);
+      window.removeEventListener('storage', onStorage);
+    };
   });
 </script>
 
@@ -128,6 +218,10 @@
     <header class="lb-main-header">
       <h1>{category.title.toUpperCase()}</h1>
       <p>{category.subtitle}</p>
+      <p class="lb-live-badge">
+        <span class="lb-live-dot" aria-hidden="true"></span>
+        Live · {liveAgeLabel()}
+      </p>
       {#if usingDemoData && !isClansView}
         <p class="lb-demo-notice">Live rankings unavailable — showing sample adventurers.</p>
       {/if}
@@ -189,7 +283,7 @@
           {:else}
             {#each pageRows as { rank, entry }}
               {@const clan = clanForPlayer(entry.name)}
-              <tr>
+              <tr class:is-you={isYourRow(entry.name)}>
                 <td>
                   <span class="lb-rank {rankClass(rank)}">
                     {#if rank <= 3}
@@ -264,19 +358,62 @@
   <aside class="lb-rail">
     <div class="lb-panel">
       <h2 class="lb-panel-title">Your Rank</h2>
-      <div class="lb-your-rank">
-        <span class="lb-avatar lb-avatar-you" aria-hidden="true"></span>
-        <div>
-          <p class="lb-you-label">You</p>
-          <p class="lb-you-meta">Play to appear on the board</p>
+      {#if yourRankLoading}
+        <div class="lb-your-rank">
+          <span class="lb-avatar lb-avatar-you lb-skeleton-avatar" aria-hidden="true"></span>
+          <div>
+            <p class="lb-you-label">Loading…</p>
+            <p class="lb-you-meta">Fetching your stats</p>
+          </div>
         </div>
-        <div class="lb-you-stats">
-          <span class="lb-you-rank-num">—</span>
+      {:else if !session}
+        <div class="lb-your-rank">
+          <span class="lb-avatar lb-avatar-you" aria-hidden="true"></span>
+          <div>
+            <p class="lb-you-label">Guest</p>
+            <p class="lb-you-meta">Connect wallet to track your rank</p>
+          </div>
         </div>
-      </div>
-      <p class="lb-you-xp-label">Total XP</p>
-      <p class="lb-you-xp">—</p>
-      <a href="/play/index.html" class="lb-cta-outline">Enter Solstead</a>
+        <a href="/play/index.html" class="lb-cta-outline">Connect Wallet</a>
+      {:else if yourRankError === 'no_character'}
+        <div class="lb-your-rank">
+          <span class="lb-avatar lb-avatar-you" aria-hidden="true"></span>
+          <div>
+            <p class="lb-you-label">{session.username}</p>
+            <p class="lb-you-meta">Create a character in-game to appear on the board</p>
+          </div>
+        </div>
+        <a href="/play/index.html" class="lb-cta-outline">Enter Solstead</a>
+      {:else if yourProfile && yourCharacterName}
+        <div class="lb-your-rank">
+          <span
+            class="lb-avatar"
+            style="--av-hue: {avatarHue(yourCharacterName)}"
+            aria-hidden="true"
+          ></span>
+          <div>
+            <a href="/world/player/{encodeURIComponent(yourCharacterName)}" class="lb-you-label lb-you-link">
+              {yourCharacterName}
+            </a>
+            <p class="lb-you-meta">#{yourRank ?? '—'} in {category.label}</p>
+          </div>
+          <div class="lb-you-stats">
+            <span class="lb-you-rank-num">#{yourRank ?? '—'}</span>
+          </div>
+        </div>
+        <p class="lb-you-xp-label">{category.valueLabel}</p>
+        <p class="lb-you-xp">{yourScore}</p>
+        <a href="/play/index.html" class="lb-cta-outline">Continue Playing</a>
+      {:else}
+        <div class="lb-your-rank">
+          <span class="lb-avatar lb-avatar-you" aria-hidden="true"></span>
+          <div>
+            <p class="lb-you-label">{session.username}</p>
+            <p class="lb-you-meta">Could not load your stats — try again shortly</p>
+          </div>
+        </div>
+        <a href="/play/index.html" class="lb-cta-outline">Enter Solstead</a>
+      {/if}
     </div>
 
     <div class="lb-panel">
@@ -460,6 +597,55 @@
     font-size: 11px;
     font-style: italic;
     color: var(--muted);
+  }
+
+  .lb-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: -4px 0 14px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8fd48f;
+  }
+
+  .lb-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #6fdc6f;
+    box-shadow: 0 0 8px rgba(111, 220, 111, 0.65);
+    animation: live-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes live-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .lb-table tbody tr.is-you {
+    background: rgba(212, 168, 68, 0.12);
+    box-shadow: inset 2px 0 0 var(--gold);
+  }
+
+  .lb-you-link {
+    display: block;
+    text-decoration: none;
+    color: var(--gold-light);
+  }
+
+  .lb-you-link:hover {
+    color: var(--gold);
+  }
+
+  .lb-skeleton-avatar {
+    animation: pulse 1.5s ease-in-out infinite;
   }
 
   .lb-clan-icon-lg {

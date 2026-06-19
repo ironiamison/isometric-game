@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 mod accounts;
+mod chain;
 mod characters;
 mod crafting_orders;
 mod farming_contracts;

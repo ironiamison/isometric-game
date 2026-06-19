@@ -219,8 +219,8 @@ impl InputHandler {
                                         // Out of range - path to an adjacent tile
                                         let player_x = player.x.round() as i32;
                                         let player_y = player.y.round() as i32;
-                                        let item_x = ground_item.x.round() as i32;
-                                        let item_y = ground_item.y.round() as i32;
+                                        let item_x = ground_item.x.floor() as i32;
+                                        let item_y = ground_item.y.floor() as i32;
 
                                         // Build occupied set (other players + NPCs)
                                         let occupied = build_occupied_set(state, true, true);

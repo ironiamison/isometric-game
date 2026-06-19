@@ -130,7 +130,7 @@ Aeven already has the **off-chain game economy** you need as a foundation:
 - [ ] `AEVEN_*` env vars → `SOLSTEAD_*` (or keep internal, rebrand UI only)
 - [x] Site meta, play shell title
 - [ ] Deploy own domain (see [DEPLOY-SOLSTEAD.md](./DEPLOY-SOLSTEAD.md))
-- [ ] SPL mint + Anchor program deploy (devnet → mainnet)
+- [ ] SPL mint + Anchor program deploy (devnet → mainnet) — **devnet live:** see [CHAIN-DEVNET.md](./CHAIN-DEVNET.md)
 
 ---
 

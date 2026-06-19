@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
-  import { api, type OnlinePlayer } from '$lib/api';
+  import { api, LIVE_STATS_POLL_MS, type OnlinePlayer } from '$lib/api';
   import { DEMO_LEADERBOARD, DEMO_ONLINE_PLAYERS, resolveOnlinePlayers } from '$lib/world-fallback';
   import { Users } from '@lucide/svelte';
 
@@ -64,7 +64,7 @@
   onMount(() => {
     document.title = 'Online Players — Solstead World Statistics';
     load();
-    const id = setInterval(load, 15_000);
+    const id = setInterval(load, LIVE_STATS_POLL_MS);
     return () => clearInterval(id);
   });
 </script>

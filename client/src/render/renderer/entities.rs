@@ -256,25 +256,14 @@ impl Renderer {
     pub(super) fn render_ground_item(&self, item: &GroundItem, camera: &Camera, state: &GameState) {
         // Special rendering for gold piles
         if item.item_id == "gold" && item.gold_pile.is_some() {
-            self.render_gold_pile(item, camera);
+            self.render_gold_pile(item, camera, state);
             return;
         }
 
         // Look up terrain height at item position for Z-aware rendering
-        let item_z = {
-            let ix = item.x.round() as i32;
-            let iy = item.y.round() as i32;
-            let coord = crate::game::ChunkCoord::from_world(ix, iy);
-            state
-                .chunk_manager
-                .chunks()
-                .get(&coord)
-                .map(|chunk| {
-                    let (lx, ly) = crate::game::chunk::world_to_local(ix, iy);
-                    chunk.get_height(lx, ly) as f32
-                })
-                .unwrap_or(0.0)
-        };
+        let item_z = state
+            .chunk_manager
+            .get_height(item.x.floor() as i32, item.y.floor() as i32) as f32;
         let (screen_x, screen_y) = world_to_screen_z(item.x, item.y, item_z, camera);
         let zoom = camera.zoom;
         let time = macroquad::time::get_time();

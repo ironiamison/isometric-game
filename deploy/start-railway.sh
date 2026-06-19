@@ -37,73 +37,8 @@ if [[ "$READY" -ne 1 ]]; then
   exit 1
 fi
 
-cat > /etc/nginx/conf.d/default.conf <<NGINX
-server {
-    listen ${PORT};
-    server_name _;
-
-    root /var/www/solstead;
-    index index.html;
-
-    client_max_body_size 20m;
-
-    location / {
-        try_files \$uri \$uri/ \$uri.html /404.html;
-    }
-
-    location ~* \\.wasm\$ {
-        types { application/wasm wasm; }
-        default_type application/wasm;
-        add_header Cache-Control "public, max-age=3600";
-    }
-
-    location /play/assets/ {
-        add_header Cache-Control "public, max-age=31536000, immutable";
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:2567;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location /matchmake/ {
-        proxy_pass http://127.0.0.1:2567;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location /health {
-        proxy_pass http://127.0.0.1:2567/health;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-    }
-
-    location /spectate {
-        proxy_pass http://127.0.0.1:2567;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_read_timeout 86400;
-    }
-
-    location ~ "^/[0-9a-f-]{36}\$" {
-        proxy_pass http://127.0.0.1:2567;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_read_timeout 86400;
-    }
-}
-NGINX
+echo "==> Writing nginx config for port ${PORT}"
+sed "s/__PORT__/${PORT}/g" /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
 
 nginx -t
 

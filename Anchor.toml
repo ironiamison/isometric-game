@@ -1,0 +1,22 @@
+[toolchain]
+anchor_version = "0.31.0"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+solstead_escrow = "FQumtv5g3m625Ue3TSsEaeP2igFQMPDxiaek4xunHEd3"
+
+[programs.devnet]
+solstead_escrow = "FQumtv5g3m625Ue3TSsEaeP2igFQMPDxiaek4xunHEd3"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsmocha.json -t 1000000 tests/**/*.ts"

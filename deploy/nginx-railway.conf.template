@@ -5,10 +5,14 @@ server {
     root /var/www/solstead;
     index index.html;
 
+    # Railway terminates TLS; avoid redirects to :8080
+    absolute_redirect off;
+    port_in_redirect off;
+
     client_max_body_size 20m;
 
     location / {
-        try_files $uri $uri/ $uri.html /404.html;
+        try_files $uri $uri/ $uri/index.html $uri.html /404.html;
     }
 
     location ~* \.wasm$ {
@@ -54,7 +58,7 @@ server {
         proxy_read_timeout 86400;
     }
 
-    location ~ ^/[0-9a-f-]{36}$ {
+    location ~ "^/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\$" {
         proxy_pass http://127.0.0.1:2567;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

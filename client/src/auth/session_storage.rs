@@ -11,10 +11,9 @@ const SESSION_KEY: &str = "solstead_auth_session";
 #[cfg(target_arch = "wasm32")]
 extern "C" {
     fn storage_get(key: JsObject) -> JsObject;
-    fn storage_remove(key: JsObject);
 }
 
-/// Read and consume a browser title-screen auth session (set before WASM load).
+/// Read the browser title-screen auth session (kept in localStorage for site pages).
 #[cfg(target_arch = "wasm32")]
 pub fn take_pending_auth_session() -> Option<AuthSession> {
     unsafe {
@@ -24,7 +23,6 @@ pub fn take_pending_auth_session() -> Option<AuthSession> {
         }
         let mut json = String::new();
         obj.to_string(&mut json);
-        storage_remove(JsObject::string(SESSION_KEY));
         if json.is_empty() {
             return None;
         }

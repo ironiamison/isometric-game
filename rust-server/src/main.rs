@@ -33,6 +33,7 @@ mod admin_api;
 mod app_state;
 mod arena;
 mod boss;
+mod chain_api;
 mod characters;
 mod chest;
 mod chunk;
@@ -152,6 +153,8 @@ struct AppState {
     leaderboard_cache: Arc<RwLock<LeaderboardCache>>,
     /// Pending wallet sign-in challenges (nonce -> message + expiry)
     wallet_challenges: Arc<DashMap<String, WalletChallenge>>,
+    /// Devnet SPL economy (optional — set SOLSTEAD_CHAIN_ENABLED=1)
+    chain_config: Option<Arc<solstead_chain::ChainConfig>>,
 }
 
 #[derive(Clone)]
@@ -235,6 +238,10 @@ async fn main() {
             .unwrap_or_else(|error| panic!("Invalid server configuration: {error}")),
     );
     let state = AppState::new(log_buffer, config.clone()).await;
+    if state.chain_config.is_some() {
+        info!("Solstead chain economy enabled (devnet indexer running)");
+        tokio::spawn(chain_api::run_chain_indexer(state.clone()));
+    }
     let room_load_start = std::time::Instant::now();
     state.get_or_create_room(GAME_ROOM_NAME).await;
     info!(
@@ -602,6 +609,10 @@ async fn main() {
         .route("/api/guest", post(guest_login))
         .route("/api/wallet/challenge", get(wallet_challenge))
         .route("/api/wallet/login", post(wallet_login))
+        .route("/api/chain/config", get(chain_api::chain_config))
+        .route("/api/chain/balance", get(chain_api::chain_balance))
+        .route("/api/chain/history", get(chain_api::chain_history))
+        .route("/api/chain/withdraw", post(chain_api::chain_withdraw))
         .route("/api/logout", post(logout_account))
         // Characters
         .route(

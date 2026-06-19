@@ -1029,8 +1029,7 @@ impl InputHandler {
                                     match option_idx {
                                         0 => {
                                             if let Some(item) = state.ground_items.get(id) {
-                                                let item_x = item.x.round() as i32;
-                                                let item_y = item.y.round() as i32;
+                                                let (item_x, item_y) = item.tile_coords();
                                                 let item_id = item.id.clone();
                                                 const PICKUP_RANGE: f32 = 2.0;
                                                 if let Some(player) = state.get_local_player() {

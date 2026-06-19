@@ -74,14 +74,69 @@ const SolsteadTitleScreen = (function () {
     });
   }
 
+  function updateHeaderAuth() {
+    const loggedIn = !!(session && session.token && session.username);
+    CONNECT_IDS.forEach(function (id) {
+      const btn = document.getElementById(id);
+      if (btn) btn.hidden = loggedIn;
+    });
+    GUEST_IDS.forEach(function (id) {
+      const btn = document.getElementById(id);
+      if (btn) btn.hidden = loggedIn;
+    });
+    const userEl = document.getElementById("title-user");
+    if (userEl) {
+      userEl.hidden = !loggedIn;
+      userEl.textContent = loggedIn ? session.username : "";
+      userEl.title = loggedIn ? session.username : "";
+    }
+    const signOutBtn = document.getElementById("title-sign-out");
+    if (signOutBtn) signOutBtn.hidden = !loggedIn;
+  }
+
+  function signOut() {
+    session = null;
+    try {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem("remembered_username");
+    } catch (e) {
+      console.error("storage:", e);
+    }
+    updateHeaderAuth();
+    setStatus("", false);
+    setButtonsEnabled(false);
+  }
+
   function saveSession(data) {
     session = {
       token: data.token,
       username: data.username,
       characters: data.characters || [],
     };
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem("remembered_username", session.username);
+    } catch (e) {
+      console.error("storage:", e);
+    }
     setStatus("Signed in — click Enter Solstead", false);
     setButtonsEnabled(true);
+    updateHeaderAuth();
+  }
+
+  function parseJsonResponse(text, res) {
+    if (!text || !text.trim()) {
+      throw new Error(
+        res.ok ? "Empty server response" : "Server unavailable (" + res.status + ")"
+      );
+    }
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      throw new Error(
+        res.ok ? "Invalid server response" : "Server unavailable (" + res.status + ")"
+      );
+    }
   }
 
   async function apiPost(path, body) {
@@ -91,12 +146,7 @@ const SolsteadTitleScreen = (function () {
       body: JSON.stringify(body || {}),
     });
     const text = await res.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (_) {
-      throw new Error("Invalid server response");
-    }
+    const data = parseJsonResponse(text, res);
     if (!data.success) {
       throw new Error(data.error || "Request failed");
     }
@@ -105,7 +155,8 @@ const SolsteadTitleScreen = (function () {
 
   async function apiGet(path) {
     const res = await fetch(serverUrl + path);
-    return JSON.parse(await res.text());
+    const text = await res.text();
+    return parseJsonResponse(text, res);
   }
 
   function bytesToBase64(bytes) {
@@ -179,6 +230,7 @@ const SolsteadTitleScreen = (function () {
 
   function enterGame() {
     if (!session || entered) return;
+    if (window.SolsteadTitleAudio) window.SolsteadTitleAudio.stop();
     entered = true;
 
     try {
@@ -216,6 +268,66 @@ const SolsteadTitleScreen = (function () {
     }
   }
 
+  function shortenAddress(address, head, tail) {
+    head = head || 6;
+    tail = tail || 6;
+    if (!address || address.length <= head + tail + 3) return address || "";
+    return address.slice(0, head) + "…" + address.slice(-tail);
+  }
+
+  function initContractAddress() {
+    const cfg = window.SOLSTEAD_CHAIN || {};
+    const mint = cfg.tokenMint;
+    if (!mint) return;
+
+    const addressEl = document.getElementById("title-contract-address");
+    const symbolEl = document.getElementById("title-contract-symbol");
+    const clusterEl = document.getElementById("title-contract-cluster");
+    const copyBtn = document.getElementById("title-contract-copy");
+    if (!addressEl) return;
+
+    addressEl.textContent = mint;
+    addressEl.title = mint;
+    if (symbolEl && cfg.tokenSymbol) symbolEl.textContent = cfg.tokenSymbol;
+    if (clusterEl && cfg.cluster) clusterEl.textContent = cfg.cluster;
+
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function () {
+        navigator.clipboard.writeText(mint).then(
+          function () {
+            const label = copyBtn.querySelector(".title-contract-copy-label");
+            if (label) label.textContent = "Copied";
+            else copyBtn.textContent = "Copied";
+            setTimeout(function () {
+              if (label) label.textContent = "Copy";
+              else copyBtn.textContent = "Copy";
+            }, 2000);
+          },
+          function () {}
+        );
+      });
+    }
+  }
+
+  function initAudio() {
+    if (window.SolsteadTitleAudio) {
+      window.SolsteadTitleAudio.init();
+    }
+  }
+
+  function restoreSession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data && data.token && data.username) {
+        saveSession(data);
+      }
+    } catch (e) {
+      console.error("restore session:", e);
+    }
+  }
+
   function bindEvents() {
     CONNECT_IDS.forEach(function (id) {
       const el = document.getElementById(id);
@@ -228,6 +340,9 @@ const SolsteadTitleScreen = (function () {
 
     const enter = document.getElementById("title-enter-btn");
     if (enter) enter.addEventListener("click", enterGame);
+
+    const signOutBtn = document.getElementById("title-sign-out");
+    if (signOutBtn) signOutBtn.addEventListener("click", signOut);
   }
 
   function init() {
@@ -241,8 +356,14 @@ const SolsteadTitleScreen = (function () {
     });
 
     bindEvents();
-    setButtonsEnabled(false);
-    setStatus("", false);
+    restoreSession();
+    initContractAddress();
+    initAudio();
+    if (!session) {
+      setButtonsEnabled(false);
+      setStatus("", false);
+    }
+    updateHeaderAuth();
     refreshOnlineCount();
     setInterval(refreshOnlineCount, 15000);
   }

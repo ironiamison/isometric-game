@@ -198,7 +198,7 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
         }
         "npcDied" => {
             if let Some(value) = data {
-                let npc_id = extract_string(value, "npc_id").unwrap_or_default();
+                let npc_id = extract_string(value, "id").unwrap_or_default();
                 log::debug!("NPC died: {}", npc_id);
 
                 if let Some(npc) = state.npcs.get_mut(&npc_id) {

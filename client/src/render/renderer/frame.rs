@@ -228,7 +228,7 @@ impl Renderer {
             }
             let item_z = state
                 .chunk_manager
-                .get_height(item.x.round() as i32, item.y.round() as i32)
+                .get_height(item.x.floor() as i32, item.y.floor() as i32)
                 as f32;
             let depth = calculate_depth_z(item.x, item.y, item_z, 1) + 0.01;
             renderables.push((depth, Renderable::Item(item)));

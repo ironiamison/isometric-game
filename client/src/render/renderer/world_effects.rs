@@ -375,8 +375,11 @@ impl Renderer {
     }
 
     /// Render a gold pile with multiple animated nuggets
-    pub(super) fn render_gold_pile(&self, item: &GroundItem, camera: &Camera) {
-        let (screen_x, screen_y) = world_to_screen(item.x, item.y, camera);
+    pub(super) fn render_gold_pile(&self, item: &GroundItem, camera: &Camera, state: &GameState) {
+        let item_z = state
+            .chunk_manager
+            .get_height(item.x.floor() as i32, item.y.floor() as i32) as f32;
+        let (screen_x, screen_y) = world_to_screen_z(item.x, item.y, item_z, camera);
         let zoom = camera.zoom;
         let time = macroquad::time::get_time();
 

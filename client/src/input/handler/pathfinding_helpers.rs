@@ -753,7 +753,7 @@ pub(super) fn rebuild_current_auto_path(state: &mut GameState) -> bool {
 
     if let Some(item_id) = template.pickup_target.clone() {
         if let Some(item) = state.ground_items.get(&item_id) {
-            let target = (item.x.round() as i32, item.y.round() as i32);
+            let target = item.tile_coords();
             let occupied = build_occupied_set(state, true, true);
             if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
                 start,

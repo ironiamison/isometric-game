@@ -130,6 +130,11 @@ impl GroundItem {
             gold_pile: Some(GoldPileState::new(quantity, spawn_time)),
         }
     }
+
+    /// Tile grid cell this ground item occupies (matches server drop tiles).
+    pub fn tile_coords(&self) -> (i32, i32) {
+        (self.x.floor() as i32, self.y.floor() as i32)
+    }
 }
 
 /// Inventory slot (client-side)

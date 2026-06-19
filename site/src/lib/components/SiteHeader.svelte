@@ -1,11 +1,39 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { Menu, X } from '@lucide/svelte';
+  import { onMount } from 'svelte';
+  import { readAuthSession, clearAuthSession, type AuthSession } from '$lib/auth-session';
   import { SITE_NAV_LINKS } from '$lib/site-nav';
 
   let mobileOpen = $state(false);
+  let session = $state<AuthSession | null>(null);
 
   let pathname = $derived($page.url.pathname);
+
+  function refreshSession() {
+    session = readAuthSession();
+  }
+
+  function signOut() {
+    clearAuthSession();
+    session = null;
+  }
+
+  onMount(() => {
+    refreshSession();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === 'solstead_auth_session') {
+        refreshSession();
+      }
+    };
+    const onFocus = () => refreshSession();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocus);
+    };
+  });
 </script>
 
 <svelte:head>
@@ -34,8 +62,15 @@
 
     <div class="site-header-right">
       <div class="site-header-actions">
-        <a href="/play/index.html" class="site-btn site-btn-outline">Login</a>
-        <a href="/play/index.html" class="site-btn site-btn-play">Play Now</a>
+        {#if session}
+          <span class="site-user" title={session.username}>{session.username}</span>
+          <button type="button" class="site-btn site-btn-outline site-btn-signout" onclick={signOut}>
+            Sign out
+          </button>
+        {:else}
+          <a href="/play/index.html" class="site-btn site-btn-outline">Login</a>
+        {/if}
+        <a href="/play/index.html" class="site-btn site-btn-play">{session ? 'Continue' : 'Play Now'}</a>
       </div>
 
       <button
@@ -66,8 +101,15 @@
         </a>
       {/each}
       <div class="site-mobile-actions">
-        <a href="/play/index.html" class="site-btn site-btn-outline">Login</a>
-        <a href="/play/index.html" class="site-btn site-btn-play">Play Now</a>
+        {#if session}
+          <span class="site-user site-user-mobile" title={session.username}>{session.username}</span>
+          <button type="button" class="site-btn site-btn-outline site-btn-signout" onclick={signOut}>
+            Sign out
+          </button>
+        {:else}
+          <a href="/play/index.html" class="site-btn site-btn-outline">Login</a>
+        {/if}
+        <a href="/play/index.html" class="site-btn site-btn-play">{session ? 'Continue' : 'Play Now'}</a>
       </div>
     </nav>
   {/if}
@@ -211,6 +253,29 @@
 
   .site-btn-outline:hover {
     background: rgba(201, 162, 39, 0.12);
+  }
+
+  .site-user {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: #e8c84a;
+    padding: 0 4px;
+  }
+
+  .site-user-mobile {
+    flex: 1 1 100%;
+    max-width: none;
+    padding: 8px 4px 0;
+  }
+
+  .site-btn-signout {
+    font: inherit;
   }
 
   .site-btn-play {

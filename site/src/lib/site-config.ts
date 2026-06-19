@@ -2,3 +2,6 @@
 export const SITE_NAME = 'Solstead';
 export const SITE_TAGLINE = 'A pixel-art isometric MMO';
 export const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'https://solstead.xyz';
+
+export const SOCIAL_X_URL = 'https://x.com/solsteadsol';
+export const SOCIAL_X_HANDLE = '@solsteadsol';

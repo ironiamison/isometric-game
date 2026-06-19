@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
-  import { api, type LeaderboardEntry, type Overview } from '$lib/api';
+  import { api, LIVE_STATS_POLL_MS, type LeaderboardEntry, type Overview } from '$lib/api';
   import WorldMap from '$lib/components/WorldMap.svelte';
   import { DEMO_LEADERBOARD, FALLBACK_OVERVIEW, resolveOverview } from '$lib/world-fallback';
   import {
@@ -88,7 +88,7 @@
       displayTime = serverTime();
     }, 30_000);
     load();
-    const id = setInterval(load, 15_000);
+    const id = setInterval(load, LIVE_STATS_POLL_MS);
     return () => {
       clearInterval(id);
       clearInterval(timeId);

@@ -882,7 +882,7 @@ impl Renderer {
         let zoom = state.camera.zoom;
 
         for (item_id, item) in &state.ground_items {
-            let item_z = state.chunk_manager.get_height(item.x as i32, item.y as i32) as f32;
+            let item_z = state.chunk_manager.get_height(item.x.floor() as i32, item.y.floor() as i32) as f32;
             let (screen_x, screen_y) = world_to_screen_z(item.x, item.y, item_z, &state.camera);
 
             // Clickable area - cover the full isometric tile so hovering/clicking
@@ -902,7 +902,9 @@ impl Renderer {
 
             if is_hovered {
                 // Draw tile hover effect
-                let item_z = state.chunk_manager.get_height(item.x as i32, item.y as i32) as i32;
+                let item_z = state
+                    .chunk_manager
+                    .get_height(item.x.floor() as i32, item.y.floor() as i32) as i32;
                 self.render_tile_hover(item.x as i32, item.y as i32, item_z, &state.camera);
 
                 // Get item definition for display name

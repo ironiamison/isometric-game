@@ -75,6 +75,19 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                             macroquad::time::get_time(),
                         ));
                     }
+                } else {
+                    for pending in &mut state.pending_ground_items {
+                        if pending.0.id == id {
+                            pending.0.quantity = quantity;
+                            if pending.0.item_id == "gold" {
+                                pending.0.gold_pile = Some(crate::game::item::GoldPileState::new(
+                                    quantity,
+                                    macroquad::time::get_time(),
+                                ));
+                            }
+                            break;
+                        }
+                    }
                 }
             }
         }

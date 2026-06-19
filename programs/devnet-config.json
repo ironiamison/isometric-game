@@ -1,0 +1,9 @@
+{
+  "cluster": "devnet",
+  "programId": "FQumtv5g3m625Ue3TSsEaeP2igFQMPDxiaek4xunHEd3",
+  "mint": "5pWpcPo9Y9JpovJBwqQGz6Y7id77baxzCGZojbYSGTLv",
+  "authority": "5E1aC5fUKckpfrks1GkgEwNmspcSWX6pjWz1VJeCDq6n",
+  "vaultTokenAccount": "5AhiHNSrafdeWTjYTs27t4Woa4mxh5wM7PKQD7TKQC2M",
+  "tokenSymbol": "SOLST",
+  "tokenDecimals": 6
+}

@@ -67,6 +67,7 @@ impl AppState {
             perf_metrics: perf_metrics::PerfMetrics::new(),
             leaderboard_cache: Arc::new(RwLock::new(LeaderboardCache::default())),
             wallet_challenges: Arc::new(DashMap::new()),
+            chain_config: chain_api::load_chain_config(),
         }
     }
 

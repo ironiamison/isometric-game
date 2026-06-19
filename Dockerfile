@@ -6,6 +6,7 @@
 
 ARG PUBLIC_URL=https://solstead.xyz
 ARG AEVEN_WS_URL=wss://solstead.xyz
+ARG SOLSTEAD_MINT_ADDRESS=Ez1JTZYnPJicwV4rhtfuhUPnyQHMaBQAXNksPbZ9pump
 
 # ── WASM client ──────────────────────────────────────────────────────────────
 FROM rust:1.92-bookworm AS wasm-build
@@ -38,6 +39,7 @@ RUN mkdir -p /play && \
 # ── SvelteKit static site ────────────────────────────────────────────────────
 FROM node:22-bookworm AS site-build
 ARG PUBLIC_URL
+ARG SOLSTEAD_MINT_ADDRESS=Ez1JTZYnPJicwV4rhtfuhUPnyQHMaBQAXNksPbZ9pump
 WORKDIR /app/site
 COPY site/package.json site/package-lock.json ./
 RUN npm ci
@@ -46,6 +48,7 @@ COPY rust-server/data ../rust-server/data
 COPY rust-server/maps ../rust-server/maps
 COPY --from=wasm-build /play ./static/play
 ENV VITE_SITE_URL=${PUBLIC_URL}
+ENV VITE_SOLSTEAD_MINT_ADDRESS=${SOLSTEAD_MINT_ADDRESS}
 RUN npm run build
 
 # ── Rust game server ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { LeaderboardEntry, LeaderboardSort } from '$lib/api';
+import type { LeaderboardEntry, LeaderboardSort, PlayerProfileRanks } from '$lib/api';
 
 export type LeaderboardCategory = {
   id: string;
@@ -193,4 +193,18 @@ export function seasonCountdown(): string {
   const hours = Math.max(0, Math.floor((ms % 86_400_000) / 3_600_000));
   const mins = Math.max(0, Math.floor((ms % 3_600_000) / 60_000));
   return `${days}d ${hours}h ${mins}m`;
+}
+
+export function rankForCategory(category: LeaderboardCategory, ranks: PlayerProfileRanks): number {
+  switch (category.id) {
+    case 'combat':
+      return ranks.combat_level;
+    case 'exploration':
+      return ranks.played_time;
+    case 'bosses':
+    case 'wealth':
+      return ranks.monster_kills;
+    default:
+      return ranks.total_level;
+  }
 }

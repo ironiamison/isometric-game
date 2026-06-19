@@ -1,7 +1,8 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
-  import { api, type LeaderboardEntry, type PlayerProfileRanks } from '$lib/api';
+  import { onMount } from 'svelte';
+  import { api, LIVE_STATS_POLL_MS, type LeaderboardEntry, type PlayerProfileRanks } from '$lib/api';
   import { getDemoPlayerProfile } from '$lib/world-fallback';
   import { formatPlayedTime, percentile } from '$lib/format';
   import { ArrowLeft, Check, Copy, UserRound } from '@lucide/svelte';
@@ -43,14 +44,18 @@
 
   let sharePath = $derived(`/world/player/${encodeURIComponent(data?.player.name ?? playerName)}`);
 
-  async function load(name: string) {
+  async function load(name: string, silent = false) {
     if (!browser || !name) return;
-    isLoading = true;
-    isError = false;
-    usingDemoData = false;
+    if (!silent) {
+      isLoading = true;
+      isError = false;
+      usingDemoData = false;
+    }
     try {
       data = await api.playerProfile(name);
+      if (!silent) usingDemoData = false;
     } catch {
+      if (silent && data) return;
       const demo = getDemoPlayerProfile(name);
       if (demo) {
         data = demo;
@@ -60,7 +65,7 @@
         data = undefined;
       }
     } finally {
-      isLoading = false;
+      if (!silent) isLoading = false;
     }
   }
 
@@ -80,6 +85,13 @@
       ? `${playerName} — Solstead Player Profile`
       : 'Player Profile — Solstead World Statistics';
     load(playerName);
+  });
+
+  onMount(() => {
+    const id = setInterval(() => {
+      if (playerName) load(playerName, true);
+    }, LIVE_STATS_POLL_MS);
+    return () => clearInterval(id);
   });
 </script>
 

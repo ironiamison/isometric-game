@@ -38,6 +38,28 @@
         </nav>
 
         <div class="title-header-actions">
+          <a
+            href="https://x.com/solsteadsol"
+            class="title-social-x"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="X (@solsteadsol)"
+            title="Follow @solsteadsol on X"
+          >✕</a>
+          <button
+            type="button"
+            class="title-music-toggle"
+            id="title-music-toggle"
+            aria-label="Toggle music"
+            aria-pressed="false"
+            title="Toggle music"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
+            </svg>
+          </button>
+          <span class="title-user" id="title-user" hidden></span>
+          <button type="button" class="ss-btn-outline title-signout" id="title-sign-out" hidden>Sign out</button>
           <button type="button" class="ss-btn-outline ss-btn-ghost" id="title-guest-header">Play as Guest</button>
           <button type="button" class="ss-btn-outline" id="title-connect-wallet">Connect Wallet</button>
         </div>
@@ -55,6 +77,32 @@
             <span class="line"></span>
           </div>
           <p class="title-tagline">A persistent online world built by players.</p>
+
+          <div id="title-contract" class="title-contract" aria-label="Token contract address">
+            <div class="title-contract-frame">
+              <div class="title-contract-inner">
+                <div class="title-contract-head">
+                  <div class="title-contract-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M10.59 13.41c.41.39.41 1.03 0 1.42-.39.39-1.03.39-1.42 0a5.003 5.003 0 0 1 0-7.07l3.54-3.54a5.003 5.003 0 0 1 7.07 0 5.003 5.003 0 0 1 0 7.07l-1.49 1.49c.01-.82-.12-1.64-.4-2.43l.47-.48a3.003 3.003 0 0 0 0-4.24 3.003 3.003 0 0 0-4.24 0l-3.53 3.53a3.003 3.003 0 0 0 0 4.24zm2.82-4.24c.39-.39 1.03-.39 1.42 0a5.003 5.003 0 0 1 0 7.07l-3.54 3.54a5.003 5.003 0 0 1-7.07 0 5.003 5.003 0 0 1 0-7.07l1.49-1.49c-.01.82.12 1.64.4 2.43l-.47.48a3.003 3.003 0 0 0 0 4.24 3.003 3.003 0 0 0 4.24 0l3.53-3.53a3.003 3.003 0 0 0 0-4.24.973.973 0 0 1 0-1.42z"/></svg>
+                  </div>
+                  <div class="title-contract-copyblock">
+                    <span class="title-contract-label">Token Contract</span>
+                    <span class="title-contract-hint">Official on-chain mint address</span>
+                  </div>
+                  <div class="title-contract-badges">
+                    <span id="title-contract-symbol" class="title-contract-badge">SOLST</span>
+                    <span id="title-contract-cluster" class="title-contract-badge is-cluster">mainnet</span>
+                  </div>
+                </div>
+                <div class="title-contract-row">
+                  <code id="title-contract-address" class="title-contract-address"></code>
+                  <button type="button" id="title-contract-copy" class="title-contract-copy">
+                    <span class="title-contract-copy-label">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <p id="title-wallet-status"></p>
 
@@ -119,6 +167,8 @@
     <script src="sapp_jsutils.js"></script>
     <script src="quad-storage.js"></script>
     <script src="auth.js"></script>
+    <script src="chain-config.js"></script>
+    <script src="title-audio.js"></script>
     <script src="wallet.js"></script>
     <script src="network.js"></script>
     <script src="loading.js"></script>
