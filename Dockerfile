@@ -50,6 +50,8 @@ FROM rust:1.92-bookworm AS server-build
 WORKDIR /app
 COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY client ./client
+COPY launcher ./launcher
 COPY rust-server ./rust-server
 RUN cargo build --locked --release -p isometric-server
 
