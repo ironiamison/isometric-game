@@ -15,6 +15,8 @@ WORKDIR /app
 COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY client ./client
+COPY launcher ./launcher
+COPY rust-server ./rust-server
 RUN rustup target add wasm32-unknown-unknown
 ENV AEVEN_SERVER_URL=${PUBLIC_URL} \
     AEVEN_WS_URL=${AEVEN_WS_URL} \
