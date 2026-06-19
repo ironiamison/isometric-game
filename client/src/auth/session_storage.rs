@@ -1,3 +1,6 @@
+#[cfg(target_arch = "wasm32")]
+use super::types::{AuthSession, CharacterInfo};
+#[cfg(not(target_arch = "wasm32"))]
 use super::types::AuthSession;
 
 #[cfg(target_arch = "wasm32")]
