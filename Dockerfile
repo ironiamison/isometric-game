@@ -80,7 +80,7 @@ ENV AEVEN_BIND_ADDR=127.0.0.1:2567 \
     PORT=8080
 
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=5 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/health" || exit 1
 
 CMD ["/app/start-railway.sh"]
