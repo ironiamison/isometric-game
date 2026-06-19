@@ -18,9 +18,11 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "==> Waiting for game server health"
-for i in $(seq 1 90); do
+READY=0
+for i in $(seq 1 180); do
   if curl -fsS "http://127.0.0.1:2567/health" >/dev/null 2>&1; then
     echo "Game server ready"
+    READY=1
     break
   fi
   if ! kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -30,6 +32,10 @@ for i in $(seq 1 90); do
   fi
   sleep 2
 done
+if [[ "$READY" -ne 1 ]]; then
+  echo "ERROR: game server did not become healthy within 6 minutes"
+  exit 1
+fi
 
 cat > /etc/nginx/conf.d/default.conf <<NGINX
 server {
@@ -74,7 +80,7 @@ server {
     }
 
     location /health {
-        proxy_pass http://127.0.0.1:2567;
+        proxy_pass http://127.0.0.1:2567/health;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
     }
@@ -88,7 +94,7 @@ server {
         proxy_read_timeout 86400;
     }
 
-    location ~ ^/[0-9a-f-]{36}\$ {
+    location ~ "^/[0-9a-f-]{36}\$" {
         proxy_pass http://127.0.0.1:2567;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
