@@ -43,6 +43,7 @@ COPY site/package.json site/package-lock.json ./
 RUN npm ci
 COPY site/ ./
 COPY rust-server/data ../rust-server/data
+COPY rust-server/maps ../rust-server/maps
 COPY --from=wasm-build /play ./static/play
 ENV VITE_SITE_URL=${PUBLIC_URL}
 RUN npm run build
