@@ -31,9 +31,9 @@ RUN mkdir -p /play && \
     fi && \
     cp client/web/*.js client/web/index.html /play/ && \
     cp client/web/*.css /play/ 2>/dev/null || true && \
-    rsync -a client/assets/ /play/assets/ && \
+    cp -R client/assets/. /play/assets/ && \
     mkdir -p /play/assets/title && \
-    cp -R client/assets/title/* /play/assets/title/
+    cp -R client/assets/title/. /play/assets/title/
 
 # ── SvelteKit static site ────────────────────────────────────────────────────
 FROM node:22-bookworm AS site-build
