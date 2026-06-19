@@ -18,7 +18,9 @@ pub use client::AuthClient;
 pub use wasm_client::{AuthClient, AuthResult};
 
 #[cfg(target_arch = "wasm32")]
-pub use wallet_wasm::{is_wallet_available, poll_wallet_sign, start_wallet_sign, WalletSignPoll, WalletSignResult};
+pub use wallet_wasm::{
+    is_wallet_available, poll_wallet_sign, start_wallet_sign, WalletSignPoll, WalletSignResult,
+};
 
 pub use types::{AuthError, AuthSession, CharacterInfo, WalletChallenge};
 

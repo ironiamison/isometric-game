@@ -1,6 +1,8 @@
 use super::*;
 #[cfg(target_arch = "wasm32")]
-use crate::auth::{is_wallet_available, poll_wallet_sign, start_wallet_sign, AuthResult, WalletSignPoll};
+use crate::auth::{
+    is_wallet_available, poll_wallet_sign, start_wallet_sign, AuthResult, WalletSignPoll,
+};
 use crate::render::ui::common::{
     draw_corner_accents, draw_panel_frame, FRAME_ACCENT, FRAME_OUTER, TEXT_DIM, TEXT_GOLD,
     TEXT_NORMAL, TEXT_TITLE,
@@ -133,7 +135,8 @@ impl LoginScreen {
         let footer_h = 24.0;
         let g = 14.0;
 
-        let content_h: f32 = title_h + g + subtitle_h + g + error_h + g + button_h + g + button_h + 24.0 + footer_h;
+        let content_h: f32 =
+            title_h + g + subtitle_h + g + error_h + g + button_h + g + button_h + 24.0 + footer_h;
         let panel_h = (content_h + pad_top + pad_bottom).floor();
         let panel_x = ((sw - panel_w) / 2.0).floor();
         let panel_y = ((sh - panel_h) / 2.0).max(8.0).floor();
@@ -155,7 +158,12 @@ impl LoginScreen {
         let footer_center_y = (y + footer_h / 2.0).floor();
         let icon_size = 24.0;
         let icon_y = (footer_center_y - icon_size / 2.0).floor();
-        let discord_icon = Rect::new(content_x + content_w - icon_size, icon_y, icon_size, icon_size);
+        let discord_icon = Rect::new(
+            content_x + content_w - icon_size,
+            icon_y,
+            icon_size,
+            icon_size,
+        );
 
         LoginLayout {
             panel: Rect::new(panel_x, panel_y, panel_w, panel_h),
@@ -452,7 +460,11 @@ impl Screen for LoginScreen {
         } else {
             Color::from_rgba(200, 60, 60, 255)
         };
-        let status_text = if self.server_online { "Online" } else { "Offline" };
+        let status_text = if self.server_online {
+            "Online"
+        } else {
+            "Offline"
+        };
         draw_circle(l.content_x + 4.0, l.footer_center_y, 4.0, status_color);
         self.draw_text_sharp(
             status_text,

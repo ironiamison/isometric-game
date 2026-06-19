@@ -305,9 +305,9 @@ async fn async_main() {
     // WASM build - full auth flow
     #[cfg(target_arch = "wasm32")]
     {
+        use crate::auth::credentials;
         use crate::auth::AuthResult;
         use crate::auth::{take_pending_auth_session, AuthSession};
-        use crate::auth::credentials;
 
         // Start menu music
         audio.play_music("assets/audio/menu.ogg").await;

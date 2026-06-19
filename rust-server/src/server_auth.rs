@@ -526,10 +526,14 @@ pub(super) async fn wallet_login(
     let message = challenge.message.clone();
     drop(challenge);
 
-    if let Err(error) = verify_solana_wallet_signature(&req.pubkey, message.as_bytes(), &req.signature)
+    if let Err(error) =
+        verify_solana_wallet_signature(&req.pubkey, message.as_bytes(), &req.signature)
     {
         state.auth_rate_limiter.record_failure(&client_ip);
-        warn!("Wallet login failed verification from {}: {}", client_ip, error);
+        warn!(
+            "Wallet login failed verification from {}: {}",
+            client_ip, error
+        );
         return Json(AuthResponse {
             success: false,
             token: None,

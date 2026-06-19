@@ -1,4 +1,4 @@
-use super::types::{AuthSession, CharacterInfo};
+use super::types::AuthSession;
 
 #[cfg(target_arch = "wasm32")]
 use sapp_jsutils::JsObject;
@@ -33,11 +33,13 @@ pub fn take_pending_auth_session() -> Option<AuthSession> {
             characters: Vec<CharacterInfo>,
         }
 
-        serde_json::from_str::<StoredSession>(&json).ok().map(|s| AuthSession {
-            token: s.token,
-            username: s.username,
-            characters: s.characters,
-        })
+        serde_json::from_str::<StoredSession>(&json)
+            .ok()
+            .map(|s| AuthSession {
+                token: s.token,
+                username: s.username,
+                characters: s.characters,
+            })
     }
 }
 
