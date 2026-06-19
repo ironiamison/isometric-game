@@ -1,0 +1,15 @@
+target/
+**/node_modules/
+**/.svelte-kit/
+site/build/
+site/.production-output/
+.git/
+.worktrees/
+*.db
+*.db-*
+.env
+.env.*
+!.env.example
+client/android/
+dist/
+**/*.log
