@@ -60,11 +60,19 @@ set_namecheap_dns() {
 remote_deploy() {
   : "${SOLSTEAD_SSH:?Set SOLSTEAD_SSH=root@YOUR_VPS_IP}"
 
+  if [ -x "$ROOT/scripts/check-dns.sh" ]; then
+    "$ROOT/scripts/check-dns.sh" "$DOMAIN" || {
+      echo "Fix DNS before deploying. See messages above."
+      exit 1
+    }
+  fi
+
   echo "==> Syncing repo to VPS"
   ssh -o StrictHostKeyChecking=accept-new "$SOLSTEAD_SSH" "mkdir -p /opt/solstead /var/www/solstead"
   rsync -avz --delete \
-    --exclude target --exclude site/node_modules --exclude site/build --exclude .git \
+    --exclude target --exclude site/node_modules --exclude site/build --exclude site/.production-output --exclude .git \
     "$ROOT/" "${SOLSTEAD_SSH}:/opt/solstead/"
+  rsync -avz "$ROOT/.env" "${SOLSTEAD_SSH}:/opt/solstead/.env"
 
   echo "==> Running first-boot + deploy on VPS"
   ssh "$SOLSTEAD_SSH" bash -s "$DOMAIN" <<'REMOTE'
@@ -72,12 +80,12 @@ set -euo pipefail
 DOMAIN="$1"
 cd /opt/solstead
 export SITE_DEPLOY_DIR=/var/www/solstead
+sed -i 's|^SITE_DEPLOY_DIR=.*|SITE_DEPLOY_DIR=/var/www/solstead|' .env
 if [ ! -f /etc/nginx/sites-enabled/solstead ]; then
   bash scripts/vps-first-boot.sh "$DOMAIN"
 fi
 bash scripts/deploy-solstead.sh
-cd rust-server && AEVEN_ENV=production cargo build --release --locked
-cd ..
+cargo build --release --locked -p isometric-server
 cp deploy/solstead-server.service /etc/systemd/system/solstead-server.service
 systemctl daemon-reload
 systemctl enable solstead-server
@@ -93,23 +101,37 @@ REMOTE
 }
 
 ensure_env
-build_local
+
+SKIP_BUILD=false
+for arg in "$@"; do
+  case "$arg" in
+    --skip-build) SKIP_BUILD=true ;;
+  esac
+done
+
+if [ "$SKIP_BUILD" = true ]; then
+  echo "==> Skipping local build (--skip-build)"
+else
+  build_local
+fi
 
 for arg in "$@"; do
   case "$arg" in
     --dns) set_namecheap_dns ;;
     --remote) remote_deploy ;;
+    --skip-build) ;;
   esac
 done
 
-if [ "$#" -eq 0 ]; then
+if [ "$#" -eq 0 ] || { [ "$#" -eq 1 ] && [ "$1" = "--skip-build" ]; }; then
   echo ""
   echo "Local production build complete."
   echo ""
   echo "To finish go-live:"
-  echo "  1. Create Ubuntu VPS (2GB+ RAM), note its IP"
-  echo "  2. Namecheap -> solstead.xyz -> Advanced DNS -> A record @ and www -> VPS IP"
-  echo "  3. SOLSTEAD_SSH=root@VPS_IP ./scripts/go-live.sh --remote"
+  echo "  1. Hetzner: HETZNER_API_TOKEN=... ./scripts/provision-hetzner.sh"
+  echo "     Or create any Ubuntu 22/24 VPS (2GB+ RAM) manually"
+  echo "  2. Namecheap -> remove URL Forward -> A record @ and www -> VPS IP"
+  echo "  3. SOLSTEAD_SSH=root@VPS_IP ./scripts/go-live.sh --remote --skip-build"
   echo ""
   echo "Optional Namecheap API DNS:"
   echo "  NAMECHEAP_API_USER=... NAMECHEAP_API_KEY=... CLIENT_IP=... SOLSTEAD_VPS_IP=... ./scripts/go-live.sh --dns"
