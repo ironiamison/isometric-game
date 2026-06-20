@@ -488,6 +488,56 @@ pub struct StallBrowseInfo {
     pub items: Vec<StallSlotInfo>,
 }
 
+/// One of the player's own Grand Exchange offers (client view).
+#[derive(Debug, Clone, Default)]
+pub struct GeOfferInfo {
+    pub id: i64,
+    pub side: String,
+    pub item_id: String,
+    pub price: i64,
+    pub quantity: i64,
+    pub remaining: i64,
+    pub collect_items: i64,
+    pub status: String,
+}
+
+/// A live market row (client view).
+#[derive(Debug, Clone, Default)]
+pub struct GeMarketInfo {
+    pub side: String,
+    pub item_id: String,
+    pub price: i64,
+    pub quantity: i64,
+}
+
+/// Which numeric field of the GE create form is being edited.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum GeEditField {
+    #[default]
+    None,
+    Price,
+    Quantity,
+}
+
+/// Grand Exchange panel state.
+#[derive(Debug, Clone, Default)]
+pub struct GeState {
+    pub open: bool,
+    pub balance: i64,
+    pub decimals: u8,
+    pub offers: Vec<GeOfferInfo>,
+    pub market: Vec<GeMarketInfo>,
+    /// false = buy, true = sell
+    pub side_sell: bool,
+    pub selected_item: Option<String>,
+    pub price_input: String,
+    pub qty_input: String,
+    pub status_msg: String,
+    pub market_scroll: f32,
+    pub offers_scroll: f32,
+    pub editing: GeEditField,
+}
+
 pub struct UiState {
     pub chat_open: bool,
     /// When true, the Enter→open-chat shortcut is ignored until Enter is released.
@@ -621,6 +671,8 @@ pub struct UiState {
     pub bank_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub bank_inv_scroll_drag: crate::ui::scroll::ScrollDragState,
     pub bank_drag: Option<BankDrag>,
+    // Grand Exchange UI state
+    pub ge: GeState,
     // Chest UI state
     pub chest_open: bool,
     pub chest_id: String,
@@ -909,6 +961,7 @@ impl Default for UiState {
             bank_scroll_drag: Default::default(),
             bank_inv_scroll_drag: Default::default(),
             bank_drag: None,
+            ge: GeState::default(),
             chest_open: false,
             chest_id: String::new(),
             chest_name: String::new(),

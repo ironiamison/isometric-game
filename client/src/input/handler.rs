@@ -24,6 +24,7 @@ mod drag_start;
 mod fletching;
 mod furnace;
 mod gameplay;
+mod grand_exchange;
 mod helpers;
 mod lifecycle;
 mod menus;
@@ -330,6 +331,20 @@ pub enum InputCommand {
     // KOTH commands
     KothContinue,
     KothLeave,
+    // Grand Exchange
+    GeOpen,
+    GePlaceOffer {
+        side: String,
+        item_id: String,
+        price: i64,
+        quantity: i64,
+    },
+    GeCancelOffer {
+        offer_id: i64,
+    },
+    GeCollect {
+        offer_id: i64,
+    },
 }
 
 /// Movement directions for isometric movement (cardinal + diagonal)
@@ -751,6 +766,10 @@ impl InputHandler {
         }
 
         if self.handle_dialogue_and_altar(state, layout, audio, frame, &mut commands) {
+            return commands;
+        }
+
+        if self.handle_grand_exchange(state, layout, frame, &mut commands) {
             return commands;
         }
 

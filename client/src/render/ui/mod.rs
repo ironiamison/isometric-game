@@ -19,6 +19,7 @@ pub mod dialogue;
 pub mod fletching;
 pub mod furnace;
 pub mod gold_drop_dialog;
+pub mod grand_exchange;
 pub mod inventory;
 pub mod koth;
 pub mod menu;

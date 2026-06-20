@@ -82,6 +82,11 @@ impl Renderer {
             }
         }
 
+        // Grand Exchange UI (when open)
+        if state.ui_state.ge.open {
+            self.render_grand_exchange(state, hovered, &mut layout);
+        }
+
         // Skills panel (when open)
         self.render_skills_panel(state, hovered, &mut layout);
 

@@ -16,6 +16,7 @@ mod chain;
 mod characters;
 mod crafting_orders;
 mod farming_contracts;
+mod grand_exchange;
 mod moderation_collection;
 mod rewards_arena;
 mod setup;

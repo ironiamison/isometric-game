@@ -552,6 +552,24 @@ pub(super) async fn handle_client_message(
             room.handle_use_item_on(player_id, slot_index, &target_npc_id)
                 .await;
         }
+        ClientMessage::GeOpen => {
+            room.handle_ge_open(player_id).await;
+        }
+        ClientMessage::GePlaceOffer {
+            side,
+            item_id,
+            price,
+            quantity,
+        } => {
+            room.handle_ge_place_offer(player_id, &side, &item_id, price, quantity)
+                .await;
+        }
+        ClientMessage::GeCancelOffer { offer_id } => {
+            room.handle_ge_cancel_offer(player_id, offer_id).await;
+        }
+        ClientMessage::GeCollect { offer_id } => {
+            room.handle_ge_collect(player_id, offer_id).await;
+        }
     }
 
     let handler_duration = handler_start.elapsed();

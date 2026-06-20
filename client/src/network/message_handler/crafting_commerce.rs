@@ -521,6 +521,58 @@ pub(super) fn handle(msg_type: &str, data: Option<&rmpv::Value>, state: &mut Gam
                 }
             }
         }
+        "grandExchangeData" => {
+            if let Some(value) = data {
+                use crate::game::state::{GeMarketInfo, GeOfferInfo};
+                let ge = &mut state.ui_state.ge;
+                ge.balance = extract_i64(value, "balance").unwrap_or(0);
+                ge.decimals = extract_u8(value, "decimals").unwrap_or(6);
+
+                ge.offers = extract_array(value, "offers")
+                    .map(|arr| {
+                        arr.iter()
+                            .map(|o| GeOfferInfo {
+                                id: extract_i64(o, "id").unwrap_or(0),
+                                side: extract_string(o, "side").unwrap_or_default(),
+                                item_id: extract_string(o, "item_id").unwrap_or_default(),
+                                price: extract_i64(o, "price").unwrap_or(0),
+                                quantity: extract_i64(o, "quantity").unwrap_or(0),
+                                remaining: extract_i64(o, "remaining").unwrap_or(0),
+                                collect_items: extract_i64(o, "collect_items").unwrap_or(0),
+                                status: extract_string(o, "status").unwrap_or_default(),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                ge.market = extract_array(value, "market")
+                    .map(|arr| {
+                        arr.iter()
+                            .map(|m| GeMarketInfo {
+                                side: extract_string(m, "side").unwrap_or_default(),
+                                item_id: extract_string(m, "item_id").unwrap_or_default(),
+                                price: extract_i64(m, "price").unwrap_or(0),
+                                quantity: extract_i64(m, "quantity").unwrap_or(0),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                // Opening implicitly when data first arrives.
+                ge.open = true;
+            }
+        }
+        "geResult" => {
+            if let Some(value) = data {
+                let success = extract_bool(value, "success").unwrap_or(false);
+                let message = extract_string(value, "message").unwrap_or_default();
+                let _ = success;
+                if !message.is_empty() {
+                    state.ui_state.ge.status_msg = message.clone();
+                    state.push_system_chat(message);
+                }
+            }
+        }
         _ => return false,
     }
     true

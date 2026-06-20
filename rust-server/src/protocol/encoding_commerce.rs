@@ -724,6 +724,88 @@ pub(super) fn encode(msg: &ServerMessage) -> Option<Value> {
             ));
             Value::Map(map)
         }
+        ServerMessage::GrandExchangeData {
+            balance,
+            decimals,
+            offers,
+            market,
+        } => {
+            let mut map = Vec::new();
+            map.push((
+                Value::String("balance".into()),
+                Value::Integer((*balance).into()),
+            ));
+            map.push((
+                Value::String("decimals".into()),
+                Value::Integer((*decimals as i64).into()),
+            ));
+            let offer_values: Vec<Value> = offers
+                .iter()
+                .map(|o| {
+                    let mut omap = Vec::new();
+                    omap.push((Value::String("id".into()), Value::Integer(o.id.into())));
+                    omap.push((
+                        Value::String("side".into()),
+                        Value::String(o.side.clone().into()),
+                    ));
+                    omap.push((
+                        Value::String("item_id".into()),
+                        Value::String(o.item_id.clone().into()),
+                    ));
+                    omap.push((Value::String("price".into()), Value::Integer(o.price.into())));
+                    omap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer(o.quantity.into()),
+                    ));
+                    omap.push((
+                        Value::String("remaining".into()),
+                        Value::Integer(o.remaining.into()),
+                    ));
+                    omap.push((
+                        Value::String("collect_items".into()),
+                        Value::Integer(o.collect_items.into()),
+                    ));
+                    omap.push((
+                        Value::String("status".into()),
+                        Value::String(o.status.clone().into()),
+                    ));
+                    Value::Map(omap)
+                })
+                .collect();
+            map.push((Value::String("offers".into()), Value::Array(offer_values)));
+
+            let market_values: Vec<Value> = market
+                .iter()
+                .map(|m| {
+                    let mut mmap = Vec::new();
+                    mmap.push((
+                        Value::String("side".into()),
+                        Value::String(m.side.clone().into()),
+                    ));
+                    mmap.push((
+                        Value::String("item_id".into()),
+                        Value::String(m.item_id.clone().into()),
+                    ));
+                    mmap.push((Value::String("price".into()), Value::Integer(m.price.into())));
+                    mmap.push((
+                        Value::String("quantity".into()),
+                        Value::Integer(m.quantity.into()),
+                    ));
+                    Value::Map(mmap)
+                })
+                .collect();
+            map.push((Value::String("market".into()), Value::Array(market_values)));
+            Value::Map(map)
+        }
+        ServerMessage::GeResult { success, message } => {
+            let mut map = Vec::new();
+            map.push((Value::String("success".into()), Value::Boolean(*success)));
+            map.push((
+                Value::String("message".into()),
+                Value::String(message.clone().into()),
+            ));
+            Value::Map(map)
+        }
         _ => return None,
     };
     Some(value)

@@ -422,6 +422,35 @@ pub enum ClientMessage {
     /// Player leaves KOTH and claims rewards
     #[serde(rename = "kothLeave")]
     KothLeave,
+
+    // ===== Grand Exchange Messages =====
+    /// Open the Grand Exchange (request current offers + balance)
+    #[serde(rename = "geOpen")]
+    GeOpen,
+
+    /// Place a buy or sell offer. `side` is "buy" or "sell".
+    #[serde(rename = "gePlaceOffer")]
+    GePlaceOffer {
+        side: String,
+        #[serde(rename = "itemId", alias = "item_id")]
+        item_id: String,
+        price: i64,
+        quantity: i64,
+    },
+
+    /// Cancel the resting portion of one of your offers
+    #[serde(rename = "geCancelOffer")]
+    GeCancelOffer {
+        #[serde(rename = "offerId", alias = "offer_id")]
+        offer_id: i64,
+    },
+
+    /// Collect items waiting in one of your offers' collect boxes
+    #[serde(rename = "geCollect")]
+    GeCollect {
+        #[serde(rename = "offerId", alias = "offer_id")]
+        offer_id: i64,
+    },
 }
 
 impl ClientMessage {
@@ -516,6 +545,10 @@ impl ClientMessage {
             ClientMessage::SetCombatStyle { .. } => "SetCombatStyle",
             ClientMessage::KothContinue => "KothContinue",
             ClientMessage::KothLeave => "KothLeave",
+            ClientMessage::GeOpen => "GeOpen",
+            ClientMessage::GePlaceOffer { .. } => "GePlaceOffer",
+            ClientMessage::GeCancelOffer { .. } => "GeCancelOffer",
+            ClientMessage::GeCollect { .. } => "GeCollect",
         }
     }
 }

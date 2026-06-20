@@ -33,6 +33,7 @@ mod crafting;
 pub(crate) mod crafting_orders;
 pub(crate) mod crate_loot;
 mod farming;
+mod grand_exchange;
 mod instance_npc_tick;
 mod interactions;
 mod inventory;

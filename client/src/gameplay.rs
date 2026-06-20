@@ -687,6 +687,26 @@ pub(crate) fn run_game_frame(
             InputCommand::SetAutoRetaliate { enabled } => {
                 ClientMessage::SetAutoRetaliate { enabled: *enabled }
             }
+            InputCommand::GeOpen => ClientMessage::GeOpen,
+            InputCommand::GePlaceOffer {
+                side,
+                item_id,
+                price,
+                quantity,
+            } => ClientMessage::GePlaceOffer {
+                side: side.clone(),
+                item_id: item_id.clone(),
+                price: *price,
+                quantity: *quantity,
+            },
+            InputCommand::GeCancelOffer { offer_id } => {
+                ClientMessage::GeCancelOffer {
+                    offer_id: *offer_id,
+                }
+            }
+            InputCommand::GeCollect { offer_id } => ClientMessage::GeCollect {
+                offer_id: *offer_id,
+            },
         };
         network.send(&msg);
     }

@@ -186,6 +186,21 @@ pub enum UiElementId {
     BankDepositAllButton,
     BankSortButton,
 
+    // Grand Exchange
+    GeCloseButton,
+    GeSideBuy,
+    GeSideSell,
+    GeMarketRow(usize),
+    GeMarketScrollArea,
+    GeInventorySlot(usize),
+    GeInvScrollArea,
+    GePriceField,
+    GeQuantityField,
+    GeConfirmButton,
+    GeOfferCollect(usize),
+    GeOfferCancel(usize),
+    GeOffersScrollArea,
+
     // Altar Panel
     AltarOfferAll(usize),
     AltarPray,

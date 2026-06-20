@@ -955,6 +955,45 @@ pub enum ServerMessage {
         source_detail: String,
         obtained_at: String,
     },
+
+    // ===== Grand Exchange =====
+    /// Full Grand Exchange snapshot for a player: their SOLST balance, their own
+    /// offers (with collect boxes), and a slice of the live market book.
+    GrandExchangeData {
+        /// SOLST balance in base units.
+        balance: i64,
+        /// SOLST decimal places (for client formatting).
+        decimals: u8,
+        offers: Vec<GeOfferData>,
+        market: Vec<GeMarketData>,
+    },
+    /// Result of a Grand Exchange action (place/cancel/collect).
+    GeResult {
+        success: bool,
+        message: String,
+    },
+}
+
+/// One of the player's own Grand Exchange offers.
+#[derive(Debug, Clone, Serialize)]
+pub struct GeOfferData {
+    pub id: i64,
+    pub side: String,
+    pub item_id: String,
+    pub price: i64,
+    pub quantity: i64,
+    pub remaining: i64,
+    pub collect_items: i64,
+    pub status: String,
+}
+
+/// An aggregated market row (best resting price + quantity for an item/side).
+#[derive(Debug, Clone, Serialize)]
+pub struct GeMarketData {
+    pub side: String,
+    pub item_id: String,
+    pub price: i64,
+    pub quantity: i64,
 }
 
 /// Scroll spell definition sent to clients
@@ -1469,6 +1508,9 @@ impl ServerMessage {
             ServerMessage::CollectionLogDefinitions { .. } => "collectionLogDefinitions",
             ServerMessage::CollectionLogSync { .. } => "collectionLogSync",
             ServerMessage::CollectionLogEntry { .. } => "collectionLogEntry",
+            // Grand Exchange
+            ServerMessage::GrandExchangeData { .. } => "grandExchangeData",
+            ServerMessage::GeResult { .. } => "geResult",
         }
     }
 }
