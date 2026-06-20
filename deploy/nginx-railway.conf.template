@@ -12,7 +12,13 @@ server {
     client_max_body_size 20m;
 
     location / {
-        try_files $uri $uri/ $uri/index.html $uri.html /404.html;
+        # SvelteKit static adapter uses trailingSlash: 'never' and prerenders
+        # pages as `world.html` (not `world/index.html`), while still creating a
+        # `world/` directory for sub-routes. Strip trailing slashes first so we
+        # never hit the empty directory (which would 403), then resolve to the
+        # matching `.html` file.
+        rewrite ^/(.+)/$ /$1 permanent;
+        try_files $uri $uri.html $uri/index.html /404.html;
     }
 
     location ~* \.wasm$ {
