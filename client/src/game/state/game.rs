@@ -48,6 +48,10 @@ pub struct GameState {
     /// Pending chair to sit on after pathfinding completes
     pub pending_chair_sit: Option<(i32, i32)>,
     pub pending_harvest_patch: Option<String>,
+    /// Pending gathering marker to fish/gather once pathfinding completes
+    pub pending_gather_marker: Option<(i32, i32)>,
+    /// Pending (patch_id, seed_item_id) to plant once pathfinding completes
+    pub pending_plant: Option<(String, String)>,
     /// Timestamp when gathering started (for cast animation delay)
     pub gathering_started_at: f64,
 
@@ -286,6 +290,8 @@ impl GameState {
             chest_positions: Vec::new(),
             pending_chair_sit: None,
             pending_harvest_patch: None,
+            pending_gather_marker: None,
+            pending_plant: None,
             gathering_started_at: 0.0,
 
             gathering_buff: None,

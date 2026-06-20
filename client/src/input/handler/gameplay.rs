@@ -908,6 +908,22 @@ impl InputHandler {
                 if let Some(patch_id) = state.pending_harvest_patch.take() {
                     commands.push(InputCommand::HarvestCrop { patch_id });
                 }
+                // Handle gathering target (right-click Fish/Gather): face the spot, then gather
+                if let Some((marker_x, marker_y)) = state.pending_gather_marker.take() {
+                    if let Some(dir) = state.get_local_player().map(|p| {
+                        crate::game::Direction::from_velocity(
+                            marker_x as f32 - p.x,
+                            marker_y as f32 - p.y,
+                        ) as u8
+                    }) {
+                        queue_face(state, commands, dir);
+                    }
+                    commands.push(InputCommand::StartGathering { marker_x, marker_y });
+                }
+                // Handle farming plant target (right-click Plant)
+                if let Some((patch_id, item_id)) = state.pending_plant.take() {
+                    commands.push(InputCommand::PlantSeed { patch_id, item_id });
+                }
                 // Handle auto-action: send StartAutoAction now that we've arrived
                 let auto_action_snapshot = state.auto_action_state.as_ref().map(|aa| {
                     (

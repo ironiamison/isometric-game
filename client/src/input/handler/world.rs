@@ -753,14 +753,59 @@ impl InputHandler {
                         }
                     }
                 }
+            } else if let Some((marker_x, marker_y)) = state
+                .gathering_markers
+                .iter()
+                .find(|m| m.x == clicked_tile_x && m.y == clicked_tile_y)
+                .map(|m| (m.x, m.y))
+            {
+                // Clicked on a gathering spot (e.g. fishing) — walk over, face, gather.
+                if let Some(player) = state.get_local_player() {
+                    let px = player.server_x.round() as i32;
+                    let py = player.server_y.round() as i32;
+                    let cdx = (px - marker_x).abs();
+                    let cdy = (py - marker_y).abs();
+                    if cdx <= 1 && cdy <= 1 {
+                        let dir = crate::game::Direction::from_velocity(
+                            (marker_x - px) as f32,
+                            (marker_y - py) as f32,
+                        );
+                        queue_face(state, commands, dir as u8);
+                        commands.push(InputCommand::StartGathering { marker_x, marker_y });
+                    } else {
+                        let occupied = build_occupied_set(state, true, true);
+                        const MAX_PATH_DISTANCE: i32 = 32;
+                        if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                            (px, py),
+                            (marker_x, marker_y),
+                            &state.chunk_manager,
+                            &occupied,
+                            MAX_PATH_DISTANCE,
+                        ) {
+                            state.auto_path = Some(PathState {
+                                path,
+                                current_index: 0,
+                                destination: dest,
+                                pickup_target: None,
+                                interact_target: None,
+                                interact_object_target: None,
+                                waystone_target: None,
+                                browse_stall_target: None,
+                            });
+                            state.pending_gather_marker = Some((marker_x, marker_y));
+                        }
+                    }
+                }
             } else if let Some(patch_id) = state
                 .farming_patch_positions
                 .get(&(clicked_tile_x, clicked_tile_y))
                 .cloned()
             {
                 // Clicked on a farming patch
-                if let Some(patch) = state.farming_patches.get(&patch_id) {
-                    if patch.state == "harvestable" {
+                if let Some(patch_state) =
+                    state.farming_patches.get(&patch_id).map(|p| p.state.clone())
+                {
+                    if patch_state == "harvestable" {
                         if let Some(local_id) = &state.local_player_id {
                             if let Some(player) = state.players.get(local_id) {
                                 let px = player.server_x.round() as i32;
@@ -794,6 +839,58 @@ impl InputHandler {
                                     }
                                 }
                             }
+                        }
+                    } else if patch_state == "empty" {
+                        // Plant the first seed found in the inventory.
+                        let seed = state
+                            .inventory
+                            .slots
+                            .iter()
+                            .flatten()
+                            .find(|s| s.item_id.ends_with("_seed"))
+                            .map(|s| s.item_id.clone());
+                        let player_tile = state.get_local_player().map(|p| {
+                            (p.server_x.round() as i32, p.server_y.round() as i32)
+                        });
+                        match (seed, player_tile) {
+                            (Some(seed_id), Some((px, py))) => {
+                                let cdx = (px - clicked_tile_x).abs();
+                                let cdy = (py - clicked_tile_y).abs();
+                                if cdx <= 1 && cdy <= 1 {
+                                    commands.push(InputCommand::PlantSeed {
+                                        patch_id,
+                                        item_id: seed_id,
+                                    });
+                                } else {
+                                    let occupied = build_occupied_set(state, true, true);
+                                    const MAX_PATH_DISTANCE: i32 = 32;
+                                    if let Some((dest, path)) = pathfinding::find_path_to_adjacent(
+                                        (px, py),
+                                        (clicked_tile_x, clicked_tile_y),
+                                        &state.chunk_manager,
+                                        &occupied,
+                                        MAX_PATH_DISTANCE,
+                                    ) {
+                                        state.auto_path = Some(PathState {
+                                            path,
+                                            current_index: 0,
+                                            destination: dest,
+                                            pickup_target: None,
+                                            interact_target: None,
+                                            interact_object_target: None,
+                                            waystone_target: None,
+                                            browse_stall_target: None,
+                                        });
+                                        state.pending_plant = Some((patch_id, seed_id));
+                                    }
+                                }
+                            }
+                            (None, _) => {
+                                state.push_system_chat(
+                                    "You need a seed in your inventory to plant.".to_string(),
+                                );
+                            }
+                            _ => {}
                         }
                     }
                 }

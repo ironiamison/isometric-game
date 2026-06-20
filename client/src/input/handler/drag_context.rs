@@ -964,49 +964,59 @@ impl InputHandler {
                                     // Options: 0=Fish/Gather, 1=Examine
                                     match option_idx {
                                         0 => {
-                                            if let Some(marker) =
-                                                state.gathering_markers.get(*marker_index)
+                                            let coords = state
+                                                .gathering_markers
+                                                .get(*marker_index)
+                                                .map(|m| (m.x, m.y));
+                                            let player_tile = state.get_local_player().map(|p| {
+                                                (
+                                                    p.server_x.round() as i32,
+                                                    p.server_y.round() as i32,
+                                                )
+                                            });
+                                            if let (Some((marker_x, marker_y)), Some((px, py))) =
+                                                (coords, player_tile)
                                             {
-                                                let marker_x = marker.x;
-                                                let marker_y = marker.y;
-                                                // Pathfind to marker and start gathering
-                                                if let Some(player) = state.get_local_player() {
-                                                    let px = player.server_x.round() as i32;
-                                                    let py = player.server_y.round() as i32;
-                                                    let dx = (px - marker_x).abs();
-                                                    let dy = (py - marker_y).abs();
-                                                    if dx <= 1 && dy <= 1 {
-                                                        commands.push(
-                                                            InputCommand::StartGathering {
-                                                                marker_x,
-                                                                marker_y,
-                                                            },
-                                                        );
-                                                    } else {
-                                                        let occupied =
-                                                            build_occupied_set(state, true, true);
-                                                        const MAX_PATH_DISTANCE: i32 = 32;
-                                                        if let Some((dest, path)) =
-                                                            pathfinding::find_path_to_adjacent(
-                                                                (px, py),
-                                                                (marker_x, marker_y),
-                                                                &state.chunk_manager,
-                                                                &occupied,
-                                                                MAX_PATH_DISTANCE,
-                                                            )
-                                                        {
-                                                            state.auto_path = Some(PathState {
-                                                                path,
-                                                                current_index: 0,
-                                                                destination: dest,
-                                                                pickup_target: None,
-                                                                interact_target: None,
-                                                                interact_object_target: None,
-                                                                waystone_target: None,
-                                                                browse_stall_target: None,
-                                                            });
-                                                            // Player will need to interact again when they arrive
-                                                        }
+                                                let dx = (px - marker_x).abs();
+                                                let dy = (py - marker_y).abs();
+                                                if dx <= 1 && dy <= 1 {
+                                                    // Already adjacent: face the spot, then gather.
+                                                    let dir = crate::game::Direction::from_velocity(
+                                                        (marker_x - px) as f32,
+                                                        (marker_y - py) as f32,
+                                                    )
+                                                        as u8;
+                                                    queue_face(state, commands, dir);
+                                                    commands.push(InputCommand::StartGathering {
+                                                        marker_x,
+                                                        marker_y,
+                                                    });
+                                                } else {
+                                                    let occupied =
+                                                        build_occupied_set(state, true, true);
+                                                    const MAX_PATH_DISTANCE: i32 = 32;
+                                                    if let Some((dest, path)) =
+                                                        pathfinding::find_path_to_adjacent(
+                                                            (px, py),
+                                                            (marker_x, marker_y),
+                                                            &state.chunk_manager,
+                                                            &occupied,
+                                                            MAX_PATH_DISTANCE,
+                                                        )
+                                                    {
+                                                        state.auto_path = Some(PathState {
+                                                            path,
+                                                            current_index: 0,
+                                                            destination: dest,
+                                                            pickup_target: None,
+                                                            interact_target: None,
+                                                            interact_object_target: None,
+                                                            waystone_target: None,
+                                                            browse_stall_target: None,
+                                                        });
+                                                        // Gather once we arrive at the spot.
+                                                        state.pending_gather_marker =
+                                                            Some((marker_x, marker_y));
                                                     }
                                                 }
                                             }
@@ -1147,11 +1157,73 @@ impl InputHandler {
                                             // Options: 0=Plant, 1=Examine
                                             match option_idx {
                                                 0 => {
-                                                    // TODO: Open seed selection UI or plant first seed
-                                                    state.push_system_chat(
-                                                        "Use a seed on this patch to plant it."
-                                                            .to_string(),
-                                                    );
+                                                    // Plant the first seed found in the inventory.
+                                                    let seed = state
+                                                        .inventory
+                                                        .slots
+                                                        .iter()
+                                                        .flatten()
+                                                        .find(|s| s.item_id.ends_with("_seed"))
+                                                        .map(|s| s.item_id.clone());
+                                                    let player_tile =
+                                                        state.get_local_player().map(|p| {
+                                                            (
+                                                                p.server_x.round() as i32,
+                                                                p.server_y.round() as i32,
+                                                            )
+                                                        });
+                                                    match (seed, player_tile) {
+                                                        (Some(seed_id), Some((px, py))) => {
+                                                            let cdx = (px - patch_x).abs();
+                                                            let cdy = (py - patch_y).abs();
+                                                            if cdx <= 1 && cdy <= 1 {
+                                                                commands.push(
+                                                                    InputCommand::PlantSeed {
+                                                                        patch_id: pid,
+                                                                        item_id: seed_id,
+                                                                    },
+                                                                );
+                                                            } else {
+                                                                let occupied = build_occupied_set(
+                                                                    state, true, true,
+                                                                );
+                                                                const MAX_PATH_DISTANCE: i32 = 32;
+                                                                if let Some((dest, path)) =
+                                                                    pathfinding::find_path_to_adjacent(
+                                                                        (px, py),
+                                                                        (patch_x, patch_y),
+                                                                        &state.chunk_manager,
+                                                                        &occupied,
+                                                                        MAX_PATH_DISTANCE,
+                                                                    )
+                                                                {
+                                                                    state.auto_path =
+                                                                        Some(PathState {
+                                                                            path,
+                                                                            current_index: 0,
+                                                                            destination: dest,
+                                                                            pickup_target: None,
+                                                                            interact_target: None,
+                                                                            interact_object_target:
+                                                                                None,
+                                                                            waystone_target: None,
+                                                                            browse_stall_target:
+                                                                                None,
+                                                                        });
+                                                                    state.pending_plant = Some((
+                                                                        pid, seed_id,
+                                                                    ));
+                                                                }
+                                                            }
+                                                        }
+                                                        (None, _) => {
+                                                            state.push_system_chat(
+                                                                "You need a seed in your inventory to plant."
+                                                                    .to_string(),
+                                                            );
+                                                        }
+                                                        _ => {}
+                                                    }
                                                 }
                                                 1 => {
                                                     state.push_system_chat(
